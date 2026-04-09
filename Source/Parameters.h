@@ -51,10 +51,10 @@ namespace ParamID
 }
 
 // Warm preset harmonic amplitudes for H2..H8
-constexpr float kWarmAmps[7]       = { 0.80f, 0.70f, 0.50f, 0.35f, 0.20f, 0.12f, 0.07f };
-constexpr float kAggressiveAmps[7] = { 0.40f, 0.50f, 0.90f, 1.00f, 0.80f, 0.50f, 0.30f };
-constexpr float kHollowAmps[7]     = { 0.10f, 0.80f, 0.10f, 0.70f, 0.10f, 0.60f, 0.10f };
-constexpr float kDenseAmps[7]      = { 0.85f, 0.85f, 0.85f, 0.85f, 0.85f, 0.85f, 0.85f };
+inline constexpr float kWarmAmps[7]       = { 0.80f, 0.70f, 0.50f, 0.35f, 0.20f, 0.12f, 0.07f };
+inline constexpr float kAggressiveAmps[7] = { 0.40f, 0.50f, 0.90f, 1.00f, 0.80f, 0.50f, 0.30f };
+inline constexpr float kHollowAmps[7]     = { 0.10f, 0.80f, 0.10f, 0.70f, 0.10f, 0.60f, 0.10f };
+inline constexpr float kDenseAmps[7]      = { 0.85f, 0.85f, 0.85f, 0.85f, 0.85f, 0.85f, 0.85f };
 
 // ── ID registry — every parameter ID in declaration order ─────────────
 // Used by tests and serialization to enumerate all IDs without requiring
@@ -116,7 +116,9 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         NormalisableRange<float>(0.0f, 100.0f), 100.0f,
         AudioParameterFloatAttributes().withLabel("%")));
     params.push_back(std::make_unique<APC>(
-        ParamID::GHOST_MODE, "Ghost Mode", StringArray{ "Replace", "Add" }, 0));
+        ParamID::GHOST_MODE, "Ghost Mode",
+        // WARNING: order is serialized — do not insert or reorder.
+        StringArray{ "Replace", "Add" }, 0));
     params.push_back(std::make_unique<APF>(
         ParamID::PHANTOM_THRESHOLD, "Phantom Threshold",
         NormalisableRange<float>(20.0f, 150.0f), 80.0f,
@@ -157,6 +159,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
 
     params.push_back(std::make_unique<APC>(
         ParamID::RECIPE_PRESET, "Recipe Preset",
+        // WARNING: order is serialized — do not insert or reorder.
         StringArray{ "Warm", "Aggressive", "Hollow", "Dense", "Custom" }, 0));
     params.push_back(std::make_unique<APF>(
         ParamID::RECIPE_ROTATION, "Recipe Rotation",
@@ -189,6 +192,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     // ── Deconfliction ─────────────────────────────────────────────────
     params.push_back(std::make_unique<APC>(
         ParamID::DECONFLICTION_MODE, "Deconfliction Mode",
+        // WARNING: order is serialized — do not insert or reorder.
         StringArray{ "Partition","Lane","Stagger","Odd-Even","Residue","Binaural" }, 0));
     params.push_back(std::make_unique<APFI>(
         ParamID::MAX_VOICES, "Max Voices", 1, 8, 4));

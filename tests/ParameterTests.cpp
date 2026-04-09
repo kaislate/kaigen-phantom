@@ -47,6 +47,8 @@ TEST_CASE("createParameterLayout contains all required parameter IDs")
     REQUIRE(has(ParamID::SIDECHAIN_DUCK_ATTACK));
     REQUIRE(has(ParamID::SIDECHAIN_DUCK_RELEASE));
     REQUIRE(has(ParamID::STEREO_WIDTH));
+
+    REQUIRE(ids.size() == 34u);
 }
 
 TEST_CASE("ghost parameter default is 100 percent")
