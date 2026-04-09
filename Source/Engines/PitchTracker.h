@@ -19,7 +19,7 @@ public:
 
 private:
     double sampleRate    = 44100.0;
-    float  yinThreshold  = 0.15f;
+    float  yinThreshold  = 0.10f;
     float  glideMs       = 20.0f;
     float  smoothedPitch = -1.0f;
 

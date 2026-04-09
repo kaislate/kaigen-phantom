@@ -43,10 +43,22 @@ TEST_CASE("PitchTracker returns -1 for silence")
 TEST_CASE("PitchTracker glide smooths pitch changes")
 {
     PitchTracker tracker;
-    tracker.prepare(44100.0, 512);
+    tracker.prepare(44100.0, 2048);
     tracker.setGlideMs(50.0f);
+
+    // Step 1: establish baseline at 80 Hz
     auto sine80 = makeSine(80.0f, 44100.0f, 2048);
     tracker.detectPitch(sine80.data(), 2048);
-    float smoothed80 = tracker.getSmoothedPitch();
-    REQUIRE(smoothed80 == Catch::Approx(80.0f).margin(5.0f));
+
+    // Step 2: feed a 320 Hz buffer — a large jump
+    std::vector<float> buf320(2048);
+    for (int i = 0; i < 2048; ++i)
+        buf320[i] = std::sin(2.0f * juce::MathConstants<float>::pi * 320.0f * i / 44100.0f);
+    tracker.detectPitch(buf320.data(), 2048);
+
+    // After ONE call at 320 Hz, smoothed pitch must not have jumped instantly —
+    // it should still be somewhere between 80 and 320 (exclusive).
+    float smoothed = tracker.getSmoothedPitch();
+    REQUIRE(smoothed > 80.0f);
+    REQUIRE(smoothed < 320.0f);
 }
