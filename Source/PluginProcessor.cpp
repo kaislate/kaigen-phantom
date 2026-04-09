@@ -11,7 +11,7 @@ PhantomProcessor::PhantomProcessor()
 {
 }
 
-void PhantomProcessor::prepareToPlay(double, int) {}
+void PhantomProcessor::prepareToPlay(double /*sampleRate*/, int /*samplesPerBlock*/) {}
 
 void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
