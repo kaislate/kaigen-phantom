@@ -20,6 +20,7 @@ void PhantomProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     perceptualOpt.prepare(sampleRate, samplesPerBlock);
     crossoverBlend.prepare(sampleRate, samplesPerBlock);
 
+    this->sampleRate = sampleRate;
     stratStagger.setDelayMs(8.0f, sampleRate);
 
     phantomBuf.setSize(2, samplesPerBlock, false, false, false);
@@ -29,17 +30,15 @@ void PhantomProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
 void PhantomProcessor::releaseResources()
 {
+    pitchTracker.reset();
     harmonicGen.reset();
     binauralStage.reset();
     crossoverBlend.reset();
 }
 
-void PhantomProcessor::syncEnginesFromApvts()
+void PhantomProcessor::syncEnginesFromApvts(bool isInstrumentMode)
 {
     using namespace ParamID;
-
-    const int modeIdx = (int)apvts.getRawParameterValue(MODE)->load();
-    const bool isInstrumentMode = (modeIdx == 1);
 
     const float ghost    = apvts.getRawParameterValue(GHOST)->load() / 100.0f;
     const int   ghostModeIdx = (int)apvts.getRawParameterValue(GHOST_MODE)->load();
@@ -95,7 +94,7 @@ void PhantomProcessor::syncEnginesFromApvts()
         }
         harmonicGen.setMaxVoices((int)apvts.getRawParameterValue(MAX_VOICES)->load());
         stratStagger.setDelayMs(apvts.getRawParameterValue(STAGGER_DELAY)->load(),
-                                getSampleRate());
+                                sampleRate);
     }
 
     const int binMode = (int)apvts.getRawParameterValue(BINAURAL_MODE)->load();
@@ -103,8 +102,6 @@ void PhantomProcessor::syncEnginesFromApvts()
                         : binMode == 1 ? BinauralMode::Spread
                                        : BinauralMode::VoiceSplit);
     binauralStage.setWidth(apvts.getRawParameterValue(BINAURAL_WIDTH)->load() / 100.0f);
-
-    perceptualOpt.setFundamental(threshold);
 }
 
 void PhantomProcessor::updateDeconflictionStrategy(int modeIndex)
@@ -126,18 +123,21 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     const int n     = buffer.getNumSamples();
     if (numCh < 2 || n == 0) return;
 
-    syncEnginesFromApvts();
-
-    const int modeIdx = (int)apvts.getRawParameterValue(ParamID::MODE)->load();
-    const bool isInstrumentMode = (modeIdx == 1);
+    const bool isInstrumentMode = ((int)apvts.getRawParameterValue(ParamID::MODE)->load() == 1);
+    syncEnginesFromApvts(isInstrumentMode);
 
     if (isInstrumentMode)
     {
         for (const auto msg : midi)
         {
             const auto m = msg.getMessage();
-            if (m.isNoteOn())
+            if (m.isNoteOn() && m.getVelocity() > 0)
+            {
                 harmonicGen.noteOn(m.getNoteNumber(), m.getVelocity());
+                // Update perceptual optimizer with note pitch
+                const float noteHz = 440.0f * std::pow(2.0f, (m.getNoteNumber() - 69) / 12.0f);
+                perceptualOpt.setFundamental(noteHz);
+            }
             else if (m.isNoteOff() || (m.isNoteOn() && m.getVelocity() == 0))
                 harmonicGen.noteOff(m.getNoteNumber());
         }
@@ -153,7 +153,6 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         }
     }
 
-    phantomBuf.setSize(numCh, n, false, false, true);
     phantomBuf.clear();
     harmonicGen.process(phantomBuf);
 
@@ -169,7 +168,6 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     }
 
     // Copy dry to pre-allocated member buffer (crossoverBlend modifies in-place)
-    dryBuf.setSize(numCh, n, false, false, true);
     for (int ch = 0; ch < numCh; ++ch)
         dryBuf.copyFrom(ch, 0, buffer, ch, 0, n);
 

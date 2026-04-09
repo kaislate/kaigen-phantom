@@ -44,7 +44,7 @@ public:
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-    void syncEnginesFromApvts();
+    void syncEnginesFromApvts(bool isInstrumentMode);
     void updateDeconflictionStrategy(int modeIndex);
 
     PitchTracker         pitchTracker;
@@ -60,7 +60,8 @@ private:
     ResidueStrategy      stratResidue;
     BinauralStrategy     stratBinaural;
 
-    int  lastDeconflictionMode = -1;
+    int    lastDeconflictionMode = -1;
+    double sampleRate = 44100.0;
 
     juce::AudioBuffer<float> phantomBuf;
     juce::AudioBuffer<float> dryBuf;
