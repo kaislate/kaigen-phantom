@@ -55,7 +55,12 @@ void CrossoverBlend::process(juce::AudioBuffer<float>& dry,
                               const juce::AudioBuffer<float>& phantom,
                               const juce::AudioBuffer<float>* sidechain) noexcept
 {
-    if (ghost < 1e-5f) return;  // Ghost 0% = dry unchanged
+    if (ghost < 1e-5f)
+    {
+        if (std::abs(outputGain - 1.0f) > 1e-5f)
+            dry.applyGain(outputGain);
+        return;
+    }
 
     const int numSamples = dry.getNumSamples();
     const int numCh      = juce::jmin(dry.getNumChannels(), 2);
@@ -70,10 +75,13 @@ void CrossoverBlend::process(juce::AudioBuffer<float>& dry,
                 sc = std::max(sc, std::abs(sidechain->getSample(ch, i)));
 
             const float target = 1.0f - duckAmount * juce::jlimit(0.0f, 1.0f, sc);
-            const float coeff  = (sc > (1.0f - currentDuck)) ? duckAttackCoeff : duckReleaseCoeff;
+            const float coeff  = (target < currentDuck) ? duckAttackCoeff : duckReleaseCoeff;
             currentDuck        = currentDuck * coeff + target * (1.0f - coeff);
         }
     }
+
+    // Note: currentDuck is snapshot from end of sidechain scan — applied uniformly per block.
+    // TODO: sample-accurate duck (pass per-sample gain array) if envelope granularity becomes audible.
 
     // 2. Mix dry with phantom per channel
     for (int ch = 0; ch < numCh; ++ch)
