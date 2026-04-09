@@ -1,13 +1,15 @@
 #include "PartitionStrategy.h"
 #include "../HarmonicGenerator.h"
+#include <array>
 
-void PartitionStrategy::resolve(std::vector<Voice>& voices)
+void PartitionStrategy::resolve(std::vector<Voice>& voices) noexcept
 {
-    std::vector<Voice*> active;
-    for (auto& v : voices) if (v.active) active.push_back(&v);
-    if (active.size() <= 1) return;
+    std::array<Voice*, 8> active {};
+    int n = 0;
+    for (auto& v : voices)
+        if (v.active && n < 8) active[n++] = &v;
+    if (n <= 1) return;
 
-    const int n = (int)active.size();
     for (int i = 0; i < 7; ++i)
     {
         int owner = i % n;

@@ -7,7 +7,7 @@ void StaggerStrategy::setDelayMs(float ms, double sr) noexcept
     sampleRate = sr;
 }
 
-void StaggerStrategy::resolve(std::vector<Voice>& voices)
+void StaggerStrategy::resolve(std::vector<Voice>& voices) noexcept
 {
     // delaySamples is a fixed-size std::array — no heap allocation here
     delaySamples.fill(0);

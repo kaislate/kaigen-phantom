@@ -1,16 +1,18 @@
 #include "SpectralLaneStrategy.h"
 #include "../HarmonicGenerator.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 
-void SpectralLaneStrategy::resolve(std::vector<Voice>& voices)
+void SpectralLaneStrategy::resolve(std::vector<Voice>& voices) noexcept
 {
-    std::vector<Voice*> active;
-    for (auto& v : voices) if (v.active) active.push_back(&v);
-    if (active.size() <= 1) return;
+    std::array<Voice*, 8> active {};
+    int n = 0;
+    for (auto& v : voices)
+        if (v.active && n < 8) active[n++] = &v;
+    if (n <= 1) return;
 
-    const int n = (int)active.size();
-    std::sort(active.begin(), active.end(),
+    std::stable_sort(active.begin(), active.begin() + n,
               [](const Voice* a, const Voice* b) { return a->fundamentalHz < b->fundamentalHz; });
 
     for (int v = 0; v < n; ++v)

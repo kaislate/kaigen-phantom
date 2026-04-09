@@ -3,5 +3,5 @@
 
 class PartitionStrategy : public IDeconflictionStrategy {
 public:
-    void resolve(std::vector<Voice>& voices) override;
+    void resolve(std::vector<Voice>& voices) noexcept override;
 };

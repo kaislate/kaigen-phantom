@@ -8,7 +8,7 @@ public:
     StaggerStrategy() noexcept { delaySamples.fill(0); }
 
     void setDelayMs(float ms, double sampleRate) noexcept;
-    void resolve(std::vector<Voice>& voices) override;
+    void resolve(std::vector<Voice>& voices) noexcept override;
     int  getDelaySamplesForVoice(int voiceIndex) const noexcept;
 
 private:

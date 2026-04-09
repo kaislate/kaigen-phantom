@@ -1,7 +1,7 @@
 #include "OddEvenStrategy.h"
 #include "../HarmonicGenerator.h"
 
-void OddEvenStrategy::resolve(std::vector<Voice>& voices)
+void OddEvenStrategy::resolve(std::vector<Voice>& voices) noexcept
 {
     for (auto& v : voices)
     {

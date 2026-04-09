@@ -7,7 +7,7 @@ class BinauralStrategy : public IDeconflictionStrategy
 public:
     BinauralStrategy() noexcept { panPositions.fill(0.0f); }
 
-    void  resolve(std::vector<Voice>& voices) override;
+    void  resolve(std::vector<Voice>& voices) noexcept override;
     float getPanForVoice(int voiceIndex) const noexcept;
 
 private:

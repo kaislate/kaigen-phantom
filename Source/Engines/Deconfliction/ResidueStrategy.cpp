@@ -1,19 +1,21 @@
 #include "ResidueStrategy.h"
 #include "../HarmonicGenerator.h"
 #include <cmath>
+#include <array>
 
-void ResidueStrategy::resolve(std::vector<Voice>& voices)
+void ResidueStrategy::resolve(std::vector<Voice>& voices) noexcept
 {
-    std::vector<Voice*> active;
-    for (auto& v : voices) if (v.active) active.push_back(&v);
-    if (active.size() <= 1) return;
+    std::array<Voice*, 8> active {};
+    int n = 0;
+    for (auto& v : voices)
+        if (v.active && n < 8) active[n++] = &v;
+    if (n <= 1) return;
 
-    const int n = (int)active.size();
     for (int i = 0; i < 7; ++i)
     {
         const float harmNum = (float)(i + 2);
-        std::vector<float> freqs;
-        for (auto* v : active) freqs.push_back(harmNum * v->fundamentalHz);
+        std::array<float, 8> freqs {};
+        for (int fi = 0; fi < n; ++fi) freqs[fi] = harmNum * active[fi]->fundamentalHz;
 
         for (int a = 0; a < n; ++a)
         {
@@ -26,7 +28,7 @@ void ResidueStrategy::resolve(std::vector<Voice>& voices)
             const float factor = (sharedCount > 0)
                 ? 1.0f / (float)(1 + sharedCount)
                 : 1.2f;
-            active[a]->amps[i] *= juce::jlimit(0.0f, 1.0f, factor);
+            active[a]->amps[i] = juce::jlimit(0.0f, 1.0f, active[a]->amps[i] * factor);
         }
     }
 }

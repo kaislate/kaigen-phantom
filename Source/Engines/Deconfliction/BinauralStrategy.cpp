@@ -1,15 +1,17 @@
 #include "BinauralStrategy.h"
 #include "../HarmonicGenerator.h"
+#include <array>
 
-void BinauralStrategy::resolve(std::vector<Voice>& voices)
+void BinauralStrategy::resolve(std::vector<Voice>& voices) noexcept
 {
-    std::vector<Voice*> active;
-    for (auto& v : voices) if (v.active) active.push_back(&v);
-    if (active.empty()) return;
+    std::array<Voice*, 8> active {};
+    int n = 0;
+    for (auto& v : voices)
+        if (v.active && n < 8) active[n++] = &v;
+    if (n == 0) return;
 
     panPositions.fill(0.0f);
 
-    const int n = (int)active.size();
     if (n == 1)
     {
         panPositions[active[0]->voiceIndex] = 0.0f;
