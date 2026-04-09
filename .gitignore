@@ -3,4 +3,5 @@ build/
 *.user
 *.suo
 .vs/
+*.vcxproj.user
 .worktrees/
