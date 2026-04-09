@@ -1,2 +1,7 @@
 #pragma once
-#include <JuceHeader.h>
+#include "IDeconflictionStrategy.h"
+
+class PartitionStrategy : public IDeconflictionStrategy {
+public:
+    void resolve(std::vector<Voice>& voices) override;
+};
