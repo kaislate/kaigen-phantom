@@ -4,6 +4,20 @@
 void PerceptualOptimizer::prepare(double sr, int /*maxBlockSize*/) noexcept
 {
     sampleRate = sr;
+    recomputeGain();
+}
+
+void PerceptualOptimizer::recomputeGain() noexcept
+{
+    const float hz = fundamentalHz.load(std::memory_order_relaxed);
+    if (hz <= 0.0f) { cachedGain.store(1.0f, std::memory_order_relaxed); return; }
+
+    float avg = 0.0f;
+    for (int h = 2; h <= 8; ++h)
+        avg += getLoudnessGain(hz * (float)h);
+    avg /= 7.0f;
+
+    cachedGain.store(juce::jlimit(0.5f, 4.0f, avg), std::memory_order_relaxed);
 }
 
 float PerceptualOptimizer::getLoudnessGain(float freq) const noexcept
@@ -37,22 +51,14 @@ float PerceptualOptimizer::aWeightingDb(float freq) noexcept
 
 void PerceptualOptimizer::process(juce::AudioBuffer<float>& buffer) noexcept
 {
-    if (fundamentalHz <= 0.0f) return;
-
-    // Average gain over harmonics H2..H8
-    float avgGain = 0.0f;
-    for (int h = 2; h <= 8; ++h)
-        avgGain += getLoudnessGain(fundamentalHz * (float)h);
-    avgGain /= 7.0f;
-
-    // Clamp to avoid extreme boosts at very low fundamentals
-    avgGain = juce::jlimit(0.5f, 4.0f, avgGain);
+    const float gain = cachedGain.load(std::memory_order_relaxed);
+    if (gain <= 0.0f) return;
 
     const int numSamples = buffer.getNumSamples();
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
     {
         float* data = buffer.getWritePointer(ch);
         for (int i = 0; i < numSamples; ++i)
-            data[i] *= avgGain;
+            data[i] *= gain;
     }
 }
