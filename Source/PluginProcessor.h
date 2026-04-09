@@ -1,5 +1,16 @@
 #pragma once
 #include <JuceHeader.h>
+#include "Engines/PitchTracker.h"
+#include "Engines/HarmonicGenerator.h"
+#include "Engines/BinauralStage.h"
+#include "Engines/PerceptualOptimizer.h"
+#include "Engines/CrossoverBlend.h"
+#include "Engines/Deconfliction/PartitionStrategy.h"
+#include "Engines/Deconfliction/SpectralLaneStrategy.h"
+#include "Engines/Deconfliction/StaggerStrategy.h"
+#include "Engines/Deconfliction/OddEvenStrategy.h"
+#include "Engines/Deconfliction/ResidueStrategy.h"
+#include "Engines/Deconfliction/BinauralStrategy.h"
 
 class PhantomProcessor : public juce::AudioProcessor
 {
@@ -8,7 +19,7 @@ public:
     ~PhantomProcessor() override = default;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void releaseResources() override {}
+    void releaseResources() override;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
@@ -32,5 +43,27 @@ public:
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+    void syncEnginesFromApvts();
+    void updateDeconflictionStrategy(int modeIndex);
+
+    PitchTracker         pitchTracker;
+    HarmonicGenerator    harmonicGen;
+    BinauralStage        binauralStage;
+    PerceptualOptimizer  perceptualOpt;
+    CrossoverBlend       crossoverBlend;
+
+    PartitionStrategy    stratPartition;
+    SpectralLaneStrategy stratLane;
+    StaggerStrategy      stratStagger;
+    OddEvenStrategy      stratOddEven;
+    ResidueStrategy      stratResidue;
+    BinauralStrategy     stratBinaural;
+
+    int  lastDeconflictionMode = -1;
+
+    juce::AudioBuffer<float> phantomBuf;
+    juce::AudioBuffer<float> dryBuf;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomProcessor)
 };
