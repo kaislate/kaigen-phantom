@@ -17,11 +17,14 @@ public:
     // Smoothed pitch after glide applied — call after detectPitch()
     float getSmoothedPitch() const noexcept { return smoothedPitch; }
 
+    void reset() noexcept { smoothedPitch = -1.0f; }
+
 private:
     double sampleRate    = 44100.0;
     float  yinThreshold  = 0.10f;
     float  glideMs       = 20.0f;
     float  smoothedPitch = -1.0f;
+    int    lastBlockSize = 512;
 
     std::vector<float> diffBuf;
     std::vector<float> cmndBuf;

@@ -19,20 +19,18 @@ float PitchTracker::detectPitch(const float* samples, int numSamples)
 
 float PitchTracker::computeRawPitch(const float* samples, int numSamples)
 {
+    lastBlockSize = numSamples;
     const int tauMax = numSamples / 2;
     if (tauMax < 2) return -1.0f;
 
-    // Resize buffers if called with larger block than prepare() saw
-    if ((int)diffBuf.size() < tauMax)
-    {
-        diffBuf.assign(tauMax, 0.0f);
-        cmndBuf.assign(tauMax, 0.0f);
-    }
+    if (tauMax > (int)diffBuf.size())
+        return -1.0f;  // block exceeds prepare() contract — return no-pitch safely
 
     // 1. Difference function
     for (int tau = 0; tau < tauMax; ++tau)
     {
         diffBuf[tau] = 0.0f;
+        // Safety: j + tau <= 2*(tauMax-1) = numSamples-2, within bounds since tauMax = numSamples/2
         for (int j = 0; j < tauMax; ++j)
         {
             float delta = samples[j] - samples[j + tau];
@@ -86,7 +84,7 @@ void PitchTracker::applyGlide(float rawPitch)
     }
 
     // 1-pole IIR glide
-    const float blockDuration = 512.0f / (float)sampleRate * 1000.0f;
+    const float blockDuration = (float)lastBlockSize / (float)sampleRate * 1000.0f;
     const float coeff = 1.0f - std::exp(-blockDuration / glideMs);
     smoothedPitch = smoothedPitch + coeff * (rawPitch - smoothedPitch);
 }
