@@ -1,1 +1,7 @@
+build/
+.superpowers/
+*.user
+*.suo
+.vs/
+*.vcxproj.user
 .worktrees/
