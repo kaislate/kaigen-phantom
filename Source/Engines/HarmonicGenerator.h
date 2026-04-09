@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include <array>
+#include <cmath>
 #include <vector>
 #include "Deconfliction/IDeconflictionStrategy.h"
 
@@ -34,15 +35,15 @@ public:
 
     void setEffectModePitch(float hz) noexcept;
 
-    void noteOn(int midiNote, int velocity);
-    void noteOff(int midiNote);
+    void noteOn(int midiNote, int velocity) noexcept;
+    void noteOff(int midiNote) noexcept;
     int  getActiveVoiceCount() const noexcept;
     void setMaxVoices(int n) noexcept { maxVoices = juce::jlimit(1, 8, n); }
 
-    void setPreset(RecipePreset preset);
-    void setHarmonicAmp(int harmonic, float amp);
-    void setHarmonicPhase(int harmonic, float deg);
-    void setRotation(float degrees) noexcept { rotationDeg = degrees; }
+    void setPreset(RecipePreset preset) noexcept;
+    void setHarmonicAmp(int harmonic, float amp) noexcept;
+    void setHarmonicPhase(int harmonic, float deg) noexcept;
+    void setRotation(float degrees) noexcept { rotationDeg = std::fmod(degrees, 360.0f); if (rotationDeg < 0.0f) rotationDeg += 360.0f; }
     void setSaturation(float amount) noexcept { saturation = juce::jlimit(0.0f, 1.0f, amount); }
     std::array<float, 7> getHarmonicAmplitudes() const noexcept { return recipeAmps; }
 

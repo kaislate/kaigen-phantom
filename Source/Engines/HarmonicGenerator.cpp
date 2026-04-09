@@ -26,7 +26,7 @@ void HarmonicGenerator::setEffectModePitch(float hz) noexcept
         effectVoice.amps[i] = recipeAmps[i];
 }
 
-void HarmonicGenerator::noteOn(int midiNote, int /*velocity*/)
+void HarmonicGenerator::noteOn(int midiNote, int /*velocity*/) noexcept
 {
     if (findVoiceForNote(midiNote) >= 0) return;
 
@@ -42,7 +42,7 @@ void HarmonicGenerator::noteOn(int midiNote, int /*velocity*/)
     for (int i = 0; i < 7; ++i) v.amps[i] = recipeAmps[i];
 }
 
-void HarmonicGenerator::noteOff(int midiNote)
+void HarmonicGenerator::noteOff(int midiNote) noexcept
 {
     int idx = findVoiceForNote(midiNote);
     if (idx >= 0) voicePool[idx].reset();
@@ -56,7 +56,7 @@ int HarmonicGenerator::getActiveVoiceCount() const noexcept
     return count;
 }
 
-void HarmonicGenerator::setPreset(RecipePreset preset)
+void HarmonicGenerator::setPreset(RecipePreset preset) noexcept
 {
     switch (preset)
     {
@@ -73,13 +73,13 @@ void HarmonicGenerator::setPreset(RecipePreset preset)
     }
 }
 
-void HarmonicGenerator::setHarmonicAmp(int harmonic, float amp)
+void HarmonicGenerator::setHarmonicAmp(int harmonic, float amp) noexcept
 {
     if (harmonic >= 2 && harmonic <= 8)
         recipeAmps[harmonic - 2] = juce::jlimit(0.0f, 1.0f, amp);
 }
 
-void HarmonicGenerator::setHarmonicPhase(int harmonic, float deg)
+void HarmonicGenerator::setHarmonicPhase(int harmonic, float deg) noexcept
 {
     if (harmonic >= 2 && harmonic <= 8)
         recipePhases[harmonic - 2] = deg;
@@ -91,9 +91,6 @@ void HarmonicGenerator::process(juce::AudioBuffer<float>& buffer)
 
     const int numSamples = buffer.getNumSamples();
 
-    if (deconfliction != nullptr)
-        deconfliction->resolve(voicePool);
-
     if (effectVoice.active)
     {
         for (int i = 0; i < 7; ++i) effectVoice.amps[i] = recipeAmps[i];
@@ -101,6 +98,9 @@ void HarmonicGenerator::process(juce::AudioBuffer<float>& buffer)
     }
     else
     {
+        if (deconfliction != nullptr)
+            deconfliction->resolve(voicePool);
+
         for (auto& v : voicePool)
             if (v.active) renderVoice(v, buffer, numSamples);
     }
@@ -125,23 +125,21 @@ void HarmonicGenerator::renderVoice(Voice& v, juce::AudioBuffer<float>& buffer, 
         if (amp < 1e-6f) continue;
 
         const float phaseInc = kTwoPi * harmNum * v.fundamentalHz / sr;
+        const float k     = (saturation > 1e-4f) ? (1.0f + saturation * 9.0f) : 0.0f;
+        const float tanhK = (saturation > 1e-4f) ? std::tanh(k) : 1.0f;
 
         for (int s = 0; s < numSamples; ++s)
         {
             float sample = std::sin(v.phases[harmIdx] + phaseOffset) * amp;
 
             if (saturation > 1e-4f)
-            {
-                const float k     = 1.0f + saturation * 9.0f;
-                const float tanhK = std::tanh(k);
                 sample = std::tanh(sample * k) / tanhK;
-            }
 
             buffer.addSample(0, s, sample);
             buffer.addSample(1, s, sample);
 
             v.phases[harmIdx] += phaseInc;
-            if (v.phases[harmIdx] > kTwoPi) v.phases[harmIdx] -= kTwoPi;
+            v.phases[harmIdx] = std::fmod(v.phases[harmIdx], kTwoPi);
         }
     }
 }
@@ -153,13 +151,16 @@ float HarmonicGenerator::midiNoteToHz(int note) const noexcept
 
 int HarmonicGenerator::findFreeVoice() const noexcept
 {
+    // Count active voices across the whole pool first.
     int active = 0;
+    for (const auto& v : voicePool)
+        if (v.active) ++active;
+    if (active >= maxVoices) return -1;
+
+    // Safe to allocate — find the first free slot.
     for (int i = 0; i < (int)voicePool.size(); ++i)
-    {
         if (!voicePool[i].active) return i;
-        ++active;
-        if (active >= maxVoices) return -1;
-    }
+
     return -1;
 }
 
