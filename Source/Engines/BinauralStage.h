@@ -6,7 +6,7 @@ enum class BinauralMode { Off, Spread, VoiceSplit };
 class BinauralStage
 {
 public:
-    void prepare(double sampleRate, int maxBlockSize);
+    void prepare(double sampleRate, int maxBlockSize) noexcept;
     void reset() noexcept;
 
     void setMode(BinauralMode m) noexcept  { mode  = m; }
@@ -14,7 +14,7 @@ public:
 
     void setVoicePan(int voiceIndex, float pan) noexcept;
 
-    void process(juce::AudioBuffer<float>& buffer);
+    void process(juce::AudioBuffer<float>& buffer) noexcept;
 
     bool isUsingBinaural() const noexcept { return mode != BinauralMode::Off; }
 
@@ -25,5 +25,5 @@ private:
 
     float voicePans[8] = {};
 
-    void applySpread(juce::AudioBuffer<float>& buffer);
+    void applySpread(juce::AudioBuffer<float>& buffer) noexcept;
 };

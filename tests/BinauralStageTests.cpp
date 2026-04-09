@@ -38,17 +38,20 @@ TEST_CASE("BinauralStage Spread mode: channels differ at non-zero width")
     buf.clear();
     for (int i = 0; i < 512; ++i)
     {
-        buf.setSample(0, i, 0.5f);
-        buf.setSample(1, i, 0.5f);
+        buf.setSample(0, i, 0.7f);   // L slightly different from R
+        buf.setSample(1, i, 0.3f);
     }
     stage.process(buf);
 
-    // After spread processing L and R should differ (high harmonics pushed outward)
-    float diffSum = 0.0f;
+    // After M/S widening with width=1, the side signal is doubled.
+    // Original side = (0.7 - 0.3) / 2 = 0.2
+    // New side = 0.2 * (1 + 1) = 0.4
+    // L = 0.5 + 0.4 = 0.9, R = 0.5 - 0.4 = 0.1 — channels should differ more than input
+    float diffAfter = 0.0f;
     for (int i = 0; i < 512; ++i)
-        diffSum += std::abs(buf.getSample(0, i) - buf.getSample(1, i));
+        diffAfter += std::abs(buf.getSample(0, i) - buf.getSample(1, i));
 
-    REQUIRE(diffSum > 0.0f);
+    REQUIRE(diffAfter > 0.0f);
 }
 
 TEST_CASE("BinauralStage isUsingBinaural returns true when mode != Off")
