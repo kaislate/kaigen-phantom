@@ -139,6 +139,46 @@
       </div>
     </div>
   </div>
+<div id="settings-overlay" class="settings-overlay hidden">
+  <div class="settings-backdrop"></div>
+  <div class="settings-panel">
+    <div class="settings-header">
+      <span class="el">SETTINGS</span>
+      <button id="settings-close" class="settings-close">&times;</button>
+    </div>
+    <div class="settings-content">
+      <div class="settings-section">
+        <div class="el">BINAURAL</div>
+        <div class="settings-row">
+          <select id="binaural-mode-select" class="param-select" data-param="binaural_mode">
+            <option value="0">Off</option>
+            <option value="1">Spread</option>
+            <option value="2">Voice-Split</option>
+          </select>
+          <phantom-knob data-param="binaural_width" size="medium" label="Width" default-value="0.5"></phantom-knob>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="el">RECIPE</div>
+        <div class="settings-row">
+          <phantom-knob data-param="recipe_rotation" size="medium" label="Rotation" default-value="0.5"></phantom-knob>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="el">HARMONIC PHASES</div>
+        <div class="settings-row phases-grid">
+          <phantom-knob data-param="recipe_phase_h2" size="medium" label="H2" default-value="0"></phantom-knob>
+          <phantom-knob data-param="recipe_phase_h3" size="medium" label="H3" default-value="0"></phantom-knob>
+          <phantom-knob data-param="recipe_phase_h4" size="medium" label="H4" default-value="0"></phantom-knob>
+          <phantom-knob data-param="recipe_phase_h5" size="medium" label="H5" default-value="0"></phantom-knob>
+          <phantom-knob data-param="recipe_phase_h6" size="medium" label="H6" default-value="0"></phantom-knob>
+          <phantom-knob data-param="recipe_phase_h7" size="medium" label="H7" default-value="0"></phantom-knob>
+          <phantom-knob data-param="recipe_phase_h8" size="medium" label="H8" default-value="0"></phantom-knob>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 <script type="module" src="/knob.js"></script>
 <script type="module" src="/phantom.js"></script>
 <script type="module" src="/spectrum.js"></script>

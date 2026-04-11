@@ -210,9 +210,32 @@ function pollData() {
 pollData();
 
 // =============================================================================
-// 8. Settings gear button
+// 8. Settings overlay toggle
 // =============================================================================
 
 document.getElementById("settings-btn")?.addEventListener("click", () => {
   document.getElementById("settings-overlay")?.classList.toggle("hidden");
 });
+document.getElementById("settings-close")?.addEventListener("click", () => {
+  document.getElementById("settings-overlay")?.classList.add("hidden");
+});
+document.querySelector(".settings-backdrop")?.addEventListener("click", () => {
+  document.getElementById("settings-overlay")?.classList.add("hidden");
+});
+
+// =============================================================================
+// 9. Wire binaural mode select
+// =============================================================================
+
+const binauralSelect = document.getElementById("binaural-mode-select");
+if (binauralSelect) {
+  const binauralState = getComboBoxState?.("binaural_mode");
+  if (binauralState) {
+    binauralSelect.addEventListener("change", () => {
+      binauralState.setSelectedItemIndex(parseInt(binauralSelect.value));
+    });
+    binauralState.valueChangedEvent?.addListener(() => {
+      binauralSelect.value = binauralState.getSelectedItemIndex();
+    });
+  }
+}
