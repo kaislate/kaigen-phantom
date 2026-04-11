@@ -161,11 +161,15 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     perceptualOpt.process(phantomBuf);
 
     const juce::AudioBuffer<float>* sidechainBuf = nullptr;
+    juce::AudioBuffer<float> scBufStorage;
     if (getBusCount(true) > 1)
     {
         auto* scBus = getBus(true, 1);
         if (scBus != nullptr && scBus->isEnabled())
-            sidechainBuf = &getBusBuffer(buffer, true, 1);
+        {
+            scBufStorage = getBusBuffer(buffer, true, 1);
+            sidechainBuf = &scBufStorage;
+        }
     }
 
     // Copy dry to pre-allocated member buffer (crossoverBlend modifies in-place)
