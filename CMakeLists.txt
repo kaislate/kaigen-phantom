@@ -43,6 +43,12 @@ target_sources(KaigenPhantom PRIVATE
     Source/Engines/Deconfliction/OddEvenStrategy.cpp
     Source/Engines/Deconfliction/ResidueStrategy.cpp
     Source/Engines/Deconfliction/BinauralStrategy.cpp
+    Source/UI/PhantomLookAndFeel.cpp
+    Source/UI/PhantomKnob.cpp
+    Source/UI/NeumorphicPanel.cpp
+    Source/UI/GlowSeam.cpp
+    Source/UI/HeaderBar.cpp
+    Source/UI/FooterBar.cpp
 )
 
 target_include_directories(KaigenPhantom PRIVATE Source)
