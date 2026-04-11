@@ -23,7 +23,8 @@ juce_add_plugin(KaigenPhantom
     NEEDS_MIDI_OUTPUT         FALSE
     IS_MIDI_EFFECT            FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
-    COPY_PLUGIN_AFTER_BUILD   FALSE
+    COPY_PLUGIN_AFTER_BUILD   TRUE
+    VST3_COPY_DIR             "$ENV{LOCALAPPDATA}/Programs/Common/VST3"
     VST3_CATEGORIES           "Fx" "Tools"
 )
 
