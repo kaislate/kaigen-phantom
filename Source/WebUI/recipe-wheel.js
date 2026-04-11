@@ -92,13 +92,14 @@ function buildWheel(scene) {
     holo.position.set(0, 0, 2);
 
     // ── Dark circular base plane ──────────────────────────────────────────────
-    holo.add(Object.assign(
-        new THREE.Mesh(
+    {
+        const baseMesh = new THREE.Mesh(
             new THREE.CircleGeometry(138, 64),
             new THREE.MeshStandardMaterial({ color: 0x010108, roughness: 0.98, metalness: 0.02 })
-        ),
-        { position: new THREE.Vector3(0, 0, -1.8) }
-    ));
+        );
+        baseMesh.position.set(0, 0, -1.8);
+        holo.add(baseMesh);
+    }
 
     // ── Holographic rings ────────────────────────────────────────────────────
     const rings = [];

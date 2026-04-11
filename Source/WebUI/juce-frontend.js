@@ -32,7 +32,30 @@
   ==============================================================================
 */
 
-import "./check_native_interop.js";
+// Inlined check_native_interop.js (JUCE polyfill — only fires if __JUCE__ is missing)
+if (
+  typeof window.__JUCE__ !== "undefined" &&
+  typeof window.__JUCE__.getAndroidUserScripts !== "undefined" &&
+  typeof window.inAndroidUserScriptEval === "undefined"
+) {
+  window.inAndroidUserScriptEval = true;
+  eval(window.__JUCE__.getAndroidUserScripts());
+  delete window.inAndroidUserScriptEval;
+}
+if (typeof window.__JUCE__ === "undefined") {
+  console.warn("window.__JUCE__ undefined — native integration disabled");
+  window.__JUCE__ = { postMessage: function () {} };
+}
+if (typeof window.__JUCE__.initialisationData === "undefined") {
+  window.__JUCE__.initialisationData = {
+    __juce__platform: [],
+    __juce__functions: [],
+    __juce__registeredGlobalEventIds: [],
+    __juce__sliders: [],
+    __juce__toggles: [],
+    __juce__comboBoxes: [],
+  };
+}
 
 class PromiseHandler {
   constructor() {
@@ -567,7 +590,8 @@ class ControlParameterIndexUpdater {
   }
 }
 
-export {
+// Expose API on window.Juce (ES export replaced for non-module loading)
+window.Juce = {
   getNativeFunction,
   getSliderState,
   getToggleState,

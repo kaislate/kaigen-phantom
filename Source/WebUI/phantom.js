@@ -1,11 +1,15 @@
 // phantom.js — central JS bridge connecting Phantom WebView UI to C++ backend
-// Uses JUCE 8 WebSliderRelay, WebComboBoxRelay, and native function APIs
+// Regular script (not a module) — depends on window.Juce from juce-frontend.js
 
-import {
-  getSliderState,
-  getComboBoxState,
-  getNativeFunction,
-} from "/juce-frontend.js";
+(function(){
+if (!window.Juce) {
+  console.error("phantom.js: window.Juce not defined");
+  return;
+}
+
+const getSliderState   = window.Juce.getSliderState;
+const getComboBoxState = window.Juce.getComboBoxState;
+const getNativeFunction = window.Juce.getNativeFunction;
 
 // =============================================================================
 // 1. Display value formatting
@@ -239,3 +243,5 @@ if (binauralSelect) {
     });
   }
 }
+
+})();
