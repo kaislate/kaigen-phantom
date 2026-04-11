@@ -1,0 +1,329 @@
+From: <Saved by Blink>
+Snapshot-Content-Location: http://localhost:58639/
+Subject: Superpowers Brainstorming
+Date: Wed, 8 Apr 2026 10:50:30 -0500
+MIME-Version: 1.0
+Content-Type: multipart/related;
+	type="text/html";
+	boundary="----MultipartBoundary--yVEJu0CEqURoaZGk6hFlBBSQirzyF26vkPA1DUqnbL----"
+
+
+------MultipartBoundary--yVEJu0CEqURoaZGk6hFlBBSQirzyF26vkPA1DUqnbL----
+Content-Type: text/html
+Content-ID: <frame-0443B8B812BE3C4137829D49B90CDE8B@mhtml.blink>
+Content-Transfer-Encoding: quoted-printable
+Content-Location: http://localhost:58639/
+
+<!DOCTYPE html><html><head><meta http-equiv=3D"Content-Type" content=3D"tex=
+t/html; charset=3DUTF-8"><link rel=3D"stylesheet" type=3D"text/css" href=3D=
+"cid:css-5a627e92-cfff-4765-872c-b879fac696a8@mhtml.blink" />
+ =20
+  <title>Superpowers Brainstorming</title>
+ =20
+</head>
+<body>
+  <div class=3D"header">
+    <h1><a href=3D"https://github.com/obra/superpowers" style=3D"color: inh=
+erit; text-decoration: none;">Superpowers Brainstorming</a></h1>
+    <div class=3D"status">Connected</div>
+  </div>
+
+  <div class=3D"main">
+    <div id=3D"claude-content">
+      <h2>Parameter Design</h2>
+<p class=3D"subtitle">Section 2 of 4 =E2=80=94 All APVTS parameters for Pha=
+ntom. Does anything look wrong or missing?</p>
+
+<div class=3D"section">
+  <h3>Mode &amp; Global</h3>
+  <table style=3D"width:100%;border-collapse:collapse;font-size:13px">
+    <tbody><tr style=3D"color:#88bbff;border-bottom:1px solid #333"><td sty=
+le=3D"padding:6px">ID</td><td>Range</td><td>Default</td><td>Notes</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>mode</code></td><td>Effect / Instrument</td><td>Effect</td><td>Main mod=
+e switch</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>ghost</code></td><td>0=E2=80=93100%</td><td>100%</td><td>Real=E2=86=92P=
+hantom crossfade</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>ghost_mode</code></td><td>Replace / Add</td><td>Replace</td><td>Substit=
+utive vs additive</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>phantom_threshold</code></td><td>20=E2=80=93150 Hz</td><td>80 Hz</td><t=
+d>Below this =3D phantom zone</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>phantom_strength</code></td><td>0=E2=80=93100%</td><td>80%</td><td>Over=
+all harmonic level</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>output_gain</code></td><td>-24=E2=80=93+12 dB</td><td>0 dB</td><td>Outp=
+ut trim</td></tr>
+  </tbody></table>
+</div>
+
+<div class=3D"section">
+  <h3>Recipe Engine (Harmonic Generator)</h3>
+  <table style=3D"width:100%;border-collapse:collapse;font-size:13px">
+    <tbody><tr style=3D"color:#88bbff;border-bottom:1px solid #333"><td sty=
+le=3D"padding:6px">ID</td><td>Range</td><td>Default</td><td>Notes</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>recipe_h2</code> =E2=80=93 <code>recipe_h8</code></td><td>0=E2=80=93100=
+%</td><td>Warm preset</td><td>Per-harmonic amplitude (7 params)</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>recipe_phase_h2</code> =E2=80=93 <code>recipe_phase_h8</code></td><td>0=
+=E2=80=93360=C2=B0</td><td>0=C2=B0</td><td>Per-harmonic phase offset (7 par=
+ams)</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>recipe_preset</code></td><td>Warm/Aggressive/Hollow/Dense/Custom</td><t=
+d>Warm</td><td>Preset shapes</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>recipe_rotation</code></td><td>-180=E2=80=93+180=C2=B0</td><td>0=C2=B0<=
+/td><td>Rotate harmonic emphasis up/down</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>harmonic_saturation</code></td><td>0=E2=80=93100%</td><td>0%</td><td>Ad=
+ds overtones, enriches phantom</td></tr>
+  </tbody></table>
+</div>
+
+<div class=3D"section">
+  <h3>Binaural Stage</h3>
+  <table style=3D"width:100%;border-collapse:collapse;font-size:13px">
+    <tbody><tr style=3D"color:#00ff88;border-bottom:1px solid #333"><td sty=
+le=3D"padding:6px">ID</td><td>Range</td><td>Default</td><td>Notes</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>binaural_mode</code></td><td>Off / Spread / Voice-Split</td><td>Off</td=
+><td>Binaural processing mode</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>binaural_width</code></td><td>0=E2=80=93100%</td><td>50%</td><td>L=E2=
+=86=94R harmonic divergence</td></tr>
+  </tbody></table>
+</div>
+
+<div class=3D"section">
+  <h3>Pitch Tracker (Effect Mode)</h3>
+  <table style=3D"width:100%;border-collapse:collapse;font-size:13px">
+    <tbody><tr style=3D"color:#88bbff;border-bottom:1px solid #333"><td sty=
+le=3D"padding:6px">ID</td><td>Range</td><td>Default</td><td>Notes</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>tracking_sensitivity</code></td><td>0=E2=80=93100%</td><td>70%</td><td>=
+YIN confidence threshold</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>tracking_glide</code></td><td>0=E2=80=93200ms</td><td>20ms</td><td>Pitc=
+h change smoothing</td></tr>
+  </tbody></table>
+</div>
+
+<div class=3D"section">
+  <h3>Polyphonic Deconfliction (Instrument Mode)</h3>
+  <table style=3D"width:100%;border-collapse:collapse;font-size:13px">
+    <tbody><tr style=3D"color:#88bbff;border-bottom:1px solid #333"><td sty=
+le=3D"padding:6px">ID</td><td>Range</td><td>Default</td><td>Notes</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>deconfliction_mode</code></td><td>Partition/Lane/Stagger/Odd-Even/Resid=
+ue/Binaural</td><td>Partition</td><td>Polyphonic separation strategy</td></=
+tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>max_voices</code></td><td>1=E2=80=938</td><td>4</td><td>Voice pool ceil=
+ing</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>stagger_delay</code></td><td>0=E2=80=9330ms</td><td>8ms</td><td>Onset d=
+elay (Stagger mode only)</td></tr>
+  </tbody></table>
+</div>
+
+<div class=3D"section">
+  <h3>Crossover &amp; Sidechain</h3>
+  <table style=3D"width:100%;border-collapse:collapse;font-size:13px">
+    <tbody><tr style=3D"color:#88bbff;border-bottom:1px solid #333"><td sty=
+le=3D"padding:6px">ID</td><td>Range</td><td>Default</td><td>Notes</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>sidechain_duck_amount</code></td><td>0=E2=80=93100%</td><td>0%</td><td>=
+How much sidechain ducks phantom</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>sidechain_duck_attack</code></td><td>1=E2=80=93100ms</td><td>5ms</td><t=
+d>Duck attack time</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>sidechain_duck_release</code></td><td>10=E2=80=93500ms</td><td>80ms</td=
+><td>Duck release time</td></tr>
+    <tr style=3D"border-bottom:1px solid #222"><td style=3D"padding:6px"><c=
+ode>stereo_width</code></td><td>0=E2=80=93200%</td><td>100%</td><td>Stereo =
+width of phantom harmonics</td></tr>
+  </tbody></table>
+</div>
+
+<div style=3D"margin-top:16px;padding:12px;background:#0a0820;border:1px so=
+lid #333;border-radius:6px;font-size:13px">
+  <span style=3D"color:#ffaa00">Total: ~35 parameters</span> =E2=80=94 7 gl=
+obal, 16 recipe (amplitude+phase=C3=977 + preset + rotation + saturation), =
+2 binaural, 2 tracking, 3 deconfliction, 4 sidechain/stereo
+</div>
+
+    </div>
+  </div>
+
+  <div class=3D"indicator-bar">
+    <span id=3D"indicator-text">Click an option above, then return to the t=
+erminal</span>
+  </div>
+
+
+
+
+</body></html>
+------MultipartBoundary--yVEJu0CEqURoaZGk6hFlBBSQirzyF26vkPA1DUqnbL----
+Content-Type: text/css
+Content-Transfer-Encoding: quoted-printable
+Content-Location: cid:css-5a627e92-cfff-4765-872c-b879fac696a8@mhtml.blink
+
+@charset "utf-8";
+
+* { box-sizing: border-box; margin: 0px; padding: 0px; }
+
+html, body { height: 100%; overflow: hidden; }
+
+:root { --bg-primary: #f5f5f7; --bg-secondary: #ffffff; --bg-tertiary: #e5e=
+5e7; --border: #d1d1d6; --text-primary: #1d1d1f; --text-secondary: #86868b;=
+ --text-tertiary: #aeaeb2; --accent: #0071e3; --accent-hover: #0077ed; --su=
+ccess: #34c759; --warning: #ff9f0a; --error: #ff3b30; --selected-bg: #e8f4f=
+d; --selected-border: #0071e3; }
+
+@media (prefers-color-scheme: dark) {
+  :root { --bg-primary: #1d1d1f; --bg-secondary: #2d2d2f; --bg-tertiary: #3=
+d3d3f; --border: #424245; --text-primary: #f5f5f7; --text-secondary: #86868=
+b; --text-tertiary: #636366; --accent: #0a84ff; --accent-hover: #409cff; --=
+selected-bg: rgba(10, 132, 255, 0.15); --selected-border: #0a84ff; }
+}
+
+body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-seri=
+f; background: var(--bg-primary); color: var(--text-primary); display: flex=
+; flex-direction: column; line-height: 1.5; }
+
+.header { background: var(--bg-secondary); padding: 0.5rem 1.5rem; display:=
+ flex; justify-content: space-between; align-items: center; border-bottom: =
+1px solid var(--border); flex-shrink: 0; }
+
+.header h1 { font-size: 0.85rem; font-weight: 500; color: var(--text-second=
+ary); }
+
+.header .status { font-size: 0.7rem; color: var(--success); display: flex; =
+align-items: center; gap: 0.4rem; }
+
+.header .status::before { content: ""; width: 6px; height: 6px; background:=
+ var(--success); border-radius: 50%; }
+
+.main { flex: 1 1 0%; overflow-y: auto; }
+
+#claude-content { padding: 2rem; min-height: 100%; }
+
+.indicator-bar { background: var(--bg-secondary); border-top: 1px solid var=
+(--border); padding: 0.5rem 1.5rem; flex-shrink: 0; text-align: center; }
+
+.indicator-bar span { font-size: 0.75rem; color: var(--text-secondary); }
+
+.indicator-bar .selected-text { color: var(--accent); font-weight: 500; }
+
+h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+
+h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+
+.subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; }
+
+.section { margin-bottom: 2rem; }
+
+.label { font-size: 0.7rem; color: var(--text-secondary); text-transform: u=
+ppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+
+.options { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.option { background: var(--bg-secondary); border: 2px solid var(--border);=
+ border-radius: 12px; padding: 1rem 1.25rem; cursor: pointer; transition: 0=
+.15s; display: flex; align-items: flex-start; gap: 1rem; }
+
+.option:hover { border-color: var(--accent); }
+
+.option.selected { background: var(--selected-bg); border-color: var(--sele=
+cted-border); }
+
+.option .letter { background: var(--bg-tertiary); color: var(--text-seconda=
+ry); width: 1.75rem; height: 1.75rem; border-radius: 6px; display: flex; al=
+ign-items: center; justify-content: center; font-weight: 600; font-size: 0.=
+85rem; flex-shrink: 0; }
+
+.option.selected .letter { background: var(--accent); color: white; }
+
+.option .content { flex: 1 1 0%; }
+
+.option .content h3 { font-size: 0.95rem; margin-bottom: 0.15rem; }
+
+.option .content p { color: var(--text-secondary); font-size: 0.85rem; marg=
+in: 0px; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280p=
+x, 1fr)); gap: 1rem; }
+
+.card { background: var(--bg-secondary); border: 1px solid var(--border); b=
+order-radius: 12px; overflow: hidden; cursor: pointer; transition: 0.15s; }
+
+.card:hover { border-color: var(--accent); transform: translateY(-2px); box=
+-shadow: rgba(0, 0, 0, 0.1) 0px 4px 12px; }
+
+.card.selected { border-color: var(--selected-border); border-width: 2px; }
+
+.card-image { background: var(--bg-tertiary); aspect-ratio: 16 / 10; displa=
+y: flex; align-items: center; justify-content: center; }
+
+.card-body { padding: 1rem; }
+
+.card-body h3 { margin-bottom: 0.25rem; }
+
+.card-body p { color: var(--text-secondary); font-size: 0.85rem; }
+
+.mockup { background: var(--bg-secondary); border: 1px solid var(--border);=
+ border-radius: 12px; overflow: hidden; margin-bottom: 1.5rem; }
+
+.mockup-header { background: var(--bg-tertiary); padding: 0.5rem 1rem; font=
+-size: 0.75rem; color: var(--text-secondary); border-bottom: 1px solid var(=
+--border); }
+
+.mockup-body { padding: 1.5rem; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+
+@media (max-width: 700px) {
+  .split { grid-template-columns: 1fr; }
+}
+
+.pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; marg=
+in: 1rem 0px; }
+
+.pros, .cons { background: var(--bg-secondary); border-radius: 8px; padding=
+: 1rem; }
+
+.pros h4 { color: var(--success); font-size: 0.85rem; margin-bottom: 0.5rem=
+; }
+
+.cons h4 { color: var(--error); font-size: 0.85rem; margin-bottom: 0.5rem; =
+}
+
+.pros ul, .cons ul { margin-left: 1.25rem; font-size: 0.85rem; color: var(-=
+-text-secondary); }
+
+.pros li, .cons li { margin-bottom: 0.25rem; }
+
+.placeholder { background: var(--bg-tertiary); border: 2px dashed var(--bor=
+der); border-radius: 8px; padding: 2rem; text-align: center; color: var(--t=
+ext-tertiary); }
+
+.mock-nav { background: var(--accent); color: white; padding: 0.75rem 1rem;=
+ display: flex; gap: 1.5rem; font-size: 0.9rem; }
+
+.mock-sidebar { background: var(--bg-tertiary); padding: 1rem; min-width: 1=
+80px; }
+
+.mock-content { padding: 1.5rem; flex: 1 1 0%; }
+
+.mock-button { background: var(--accent); color: white; border: none; paddi=
+ng: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; }
+
+.mock-input { background: var(--bg-primary); border: 1px solid var(--border=
+); border-radius: 6px; padding: 0.5rem; width: 100%; }
+------MultipartBoundary--yVEJu0CEqURoaZGk6hFlBBSQirzyF26vkPA1DUqnbL------

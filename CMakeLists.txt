@@ -43,38 +43,27 @@ target_sources(KaigenPhantom PRIVATE
     Source/Engines/Deconfliction/OddEvenStrategy.cpp
     Source/Engines/Deconfliction/ResidueStrategy.cpp
     Source/Engines/Deconfliction/BinauralStrategy.cpp
-    Source/UI/PhantomLookAndFeel.cpp
-    Source/UI/PhantomKnob.cpp
-    Source/UI/NeumorphicPanel.cpp
-    Source/UI/GlowSeam.cpp
-    Source/UI/HeaderBar.cpp
-    Source/UI/FooterBar.cpp
-    Source/UI/HarmonicEnginePanel.cpp
-    Source/UI/GhostPanel.cpp
-    Source/UI/OutputPanel.cpp
-    Source/UI/PitchTrackerPanel.cpp
-    Source/UI/SidechainPanel.cpp
-    Source/UI/StereoPanel.cpp
-    Source/UI/DeconflictionPanel.cpp
-    Source/UI/RecipeWheel.cpp
-    Source/UI/RecipeWheelPanel.cpp
-    Source/UI/SpectrumAnalyzer.cpp
-    Source/UI/LevelMeter.cpp
+)
+
+juce_add_binary_data(PhantomWebUI SOURCES
+    Source/WebUI/index.html
 )
 
 target_include_directories(KaigenPhantom PRIVATE Source)
 
 target_compile_definitions(KaigenPhantom PUBLIC
-    JUCE_WEB_BROWSER=0
+    JUCE_WEB_BROWSER=1
+    JUCE_USE_WIN_WEBVIEW2=1
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
-    JUCE_DISPLAY_SPLASH_SCREEN=0
 )
 
 target_link_libraries(KaigenPhantom
     PRIVATE
         juce::juce_audio_utils
+        juce::juce_gui_extra
         juce::juce_dsp
+        PhantomWebUI
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
