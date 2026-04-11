@@ -107,22 +107,19 @@ function applyMode(idx) {
     .forEach((b) =>
       b.classList.toggle("active", parseInt(b.dataset.mode) === idx)
     );
-  document.getElementById("pitchPanel")?.classList.toggle("hidden", idx !== 0);
-  document.getElementById("deconPanel")?.classList.toggle("hidden", idx === 0);
 }
 
 document.querySelectorAll(".mb[data-mode]").forEach((btn) => {
   btn.addEventListener("click", () => {
     const idx = parseInt(btn.dataset.mode);
-    applyMode(idx);                     // update UI immediately
-    modeState.setChoiceIndex(idx);      // send to backend
+    applyMode(idx);
+    modeState.setChoiceIndex(idx);
   });
 });
 
 modeState.valueChangedEvent.addListener(() => {
   applyMode(modeState.getChoiceIndex());
 });
-// Initialize visibility
 applyMode(modeState.getChoiceIndex() || 0);
 
 // =============================================================================

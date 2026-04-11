@@ -27,38 +27,32 @@ private:
 
     PhantomProcessor& processor;
 
-    // Relays — declared before webView (construction order)
-    juce::WebSliderRelay  ghostRelay { "ghost" },
-                          phantomThresholdRelay { "phantom_threshold" },
-                          phantomStrengthRelay { "phantom_strength" },
-                          outputGainRelay { "output_gain" },
-                          recipeH2Relay { "recipe_h2" },  recipeH3Relay { "recipe_h3" },
-                          recipeH4Relay { "recipe_h4" },  recipeH5Relay { "recipe_h5" },
-                          recipeH6Relay { "recipe_h6" },  recipeH7Relay { "recipe_h7" },
-                          recipeH8Relay { "recipe_h8" },
-                          recipePhaseH2Relay { "recipe_phase_h2" }, recipePhaseH3Relay { "recipe_phase_h3" },
-                          recipePhaseH4Relay { "recipe_phase_h4" }, recipePhaseH5Relay { "recipe_phase_h5" },
-                          recipePhaseH6Relay { "recipe_phase_h6" }, recipePhaseH7Relay { "recipe_phase_h7" },
-                          recipePhaseH8Relay { "recipe_phase_h8" },
-                          recipeRotationRelay { "recipe_rotation" },
-                          harmonicSaturationRelay { "harmonic_saturation" },
-                          binauralWidthRelay { "binaural_width" },
-                          trackingSensitivityRelay { "tracking_sensitivity" },
-                          trackingGlideRelay { "tracking_glide" },
-                          maxVoicesRelay { "max_voices" },
-                          staggerDelayRelay { "stagger_delay" },
-                          sidechainDuckAmountRelay { "sidechain_duck_amount" },
-                          sidechainDuckAttackRelay { "sidechain_duck_attack" },
-                          sidechainDuckReleaseRelay { "sidechain_duck_release" },
-                          stereoWidthRelay { "stereo_width" };
+    // ── Slider relays (one per APVTS slider parameter) ────────────────
+    juce::WebSliderRelay ghostRelay              { "ghost" };
+    juce::WebSliderRelay phantomThresholdRelay   { "phantom_threshold" };
+    juce::WebSliderRelay phantomStrengthRelay    { "phantom_strength" };
+    juce::WebSliderRelay outputGainRelay         { "output_gain" };
+    juce::WebSliderRelay recipeH2Relay           { "recipe_h2" };
+    juce::WebSliderRelay recipeH3Relay           { "recipe_h3" };
+    juce::WebSliderRelay recipeH4Relay           { "recipe_h4" };
+    juce::WebSliderRelay recipeH5Relay           { "recipe_h5" };
+    juce::WebSliderRelay recipeH6Relay           { "recipe_h6" };
+    juce::WebSliderRelay recipeH7Relay           { "recipe_h7" };
+    juce::WebSliderRelay recipeH8Relay           { "recipe_h8" };
+    juce::WebSliderRelay harmonicSaturationRelay { "harmonic_saturation" };
+    juce::WebSliderRelay envAttackRelay          { "env_attack_ms" };
+    juce::WebSliderRelay envReleaseRelay         { "env_release_ms" };
+    juce::WebSliderRelay binauralWidthRelay      { "binaural_width" };
+    juce::WebSliderRelay stereoWidthRelay        { "stereo_width" };
 
-    juce::WebComboBoxRelay modeRelay { "mode" },
-                           ghostModeRelay { "ghost_mode" },
-                           recipePresetRelay { "recipe_preset" },
-                           deconflictionModeRelay { "deconfliction_mode" },
-                           binauralModeRelay { "binaural_mode" };
+    // ── Combo-box relays ──────────────────────────────────────────────
+    juce::WebComboBoxRelay modeRelay             { "mode" };
+    juce::WebComboBoxRelay ghostModeRelay        { "ghost_mode" };
+    juce::WebComboBoxRelay recipePresetRelay     { "recipe_preset" };
+    juce::WebComboBoxRelay binauralModeRelay     { "binaural_mode" };
 
-    juce::WebToggleButtonRelay bypassRelay { "bypass" };
+    // ── Toggle relay for bypass ───────────────────────────────────────
+    juce::WebToggleButtonRelay bypassRelay       { "bypass" };
 
     // WebView — constructed in .cpp via buildWebViewOptions()
     SinglePageBrowser webView;
