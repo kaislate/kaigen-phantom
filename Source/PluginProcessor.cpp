@@ -175,6 +175,85 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
     for (int ch = 0; ch < numCh; ++ch)
         buffer.copyFrom(ch, 0, dryBuf, ch, 0, n);
+
+    // -------------------------------------------------------------------------
+    // Peak levels — input from dryBuf (pre-crossover copy), output from buffer
+    // -------------------------------------------------------------------------
+    {
+        const float* inL  = dryBuf.getReadPointer(0);
+        const float* inR  = (dryBuf.getNumChannels() > 1) ? dryBuf.getReadPointer(1) : inL;
+        const float* outL = buffer.getReadPointer(0);
+        const float* outR = (buffer.getNumChannels() > 1) ? buffer.getReadPointer(1) : outL;
+
+        float pInL = 0.0f, pInR = 0.0f, pOutL = 0.0f, pOutR = 0.0f;
+        for (int i = 0; i < n; ++i)
+        {
+            pInL  = juce::jmax(pInL,  std::abs(inL[i]));
+            pInR  = juce::jmax(pInR,  std::abs(inR[i]));
+            pOutL = juce::jmax(pOutL, std::abs(outL[i]));
+            pOutR = juce::jmax(pOutR, std::abs(outR[i]));
+        }
+        peakInL .store(pInL,  std::memory_order_relaxed);
+        peakInR .store(pInR,  std::memory_order_relaxed);
+        peakOutL.store(pOutL, std::memory_order_relaxed);
+        peakOutR.store(pOutR, std::memory_order_relaxed);
+    }
+
+    // -------------------------------------------------------------------------
+    // Spectrum FFT — accumulate output samples; compute when 512 collected
+    // -------------------------------------------------------------------------
+    {
+        const float* outL = buffer.getReadPointer(0);
+
+        for (int i = 0; i < n; ++i)
+        {
+            fftBuffer[fftWritePos++] = outL[i];
+
+            if (fftWritePos >= 512)
+            {
+                fftWritePos = 0;
+
+                // Apply Hann window to first 512 samples
+                for (int k = 0; k < 512; ++k)
+                {
+                    const float w = 0.5f * (1.0f - std::cos(juce::MathConstants<float>::twoPi * k / 511.0f));
+                    fftBuffer[k] *= w;
+                }
+
+                // Zero-pad upper half
+                for (int k = 512; k < 1024; ++k)
+                    fftBuffer[k] = 0.0f;
+
+                // In-place forward FFT (frequency-magnitude output)
+                spectrumFFT.performFrequencyOnlyForwardTransform(fftBuffer.data());
+
+                // Bin into 80 log-spaced bands: 30 Hz – 16 kHz
+                const float sr      = static_cast<float>(sampleRate);
+                const float fftSize = 512.0f;
+                const float logMin  = std::log10(30.0f);
+                const float logMax  = std::log10(16000.0f);
+
+                for (int b = 0; b < kSpectrumBins; ++b)
+                {
+                    const float fLow  = std::pow(10.0f, logMin + (logMax - logMin) *  b      / kSpectrumBins);
+                    const float fHigh = std::pow(10.0f, logMin + (logMax - logMin) * (b + 1) / kSpectrumBins);
+
+                    const int binLow  = juce::jmax(1,   static_cast<int>(std::floor(fLow  * fftSize / sr)));
+                    const int binHigh = juce::jmin(255, static_cast<int>(std::ceil (fHigh * fftSize / sr)));
+
+                    float mag = 0.0f;
+                    for (int k = binLow; k <= binHigh; ++k)
+                        mag = juce::jmax(mag, fftBuffer[k]);
+
+                    // Convert to 0-1: (dBFS + 48) / 48, clamped
+                    const float dB      = juce::Decibels::gainToDecibels(mag, -96.0f);
+                    spectrumData[b]     = juce::jlimit(0.0f, 1.0f, (dB + 48.0f) / 48.0f);
+                }
+
+                spectrumReady.store(true, std::memory_order_release);
+            }
+        }
+    }
 }
 
 juce::AudioProcessorEditor* PhantomProcessor::createEditor()

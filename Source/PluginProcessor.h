@@ -41,6 +41,17 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
+    // Peak levels for I/O meters
+    std::atomic<float> peakInL  { 0.0f };
+    std::atomic<float> peakInR  { 0.0f };
+    std::atomic<float> peakOutL { 0.0f };
+    std::atomic<float> peakOutR { 0.0f };
+
+    // Spectrum data — 80 log-spaced bins
+    static constexpr int kSpectrumBins = 80;
+    std::array<float, kSpectrumBins> spectrumData {};
+    std::atomic<bool> spectrumReady { false };
+
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
@@ -65,6 +76,11 @@ private:
 
     juce::AudioBuffer<float> phantomBuf;
     juce::AudioBuffer<float> dryBuf;
+
+    // FFT for spectrum analysis
+    juce::dsp::FFT spectrumFFT { 9 }; // 512-point FFT
+    std::array<float, 1024> fftBuffer {};
+    int fftWritePos = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomProcessor)
 };
