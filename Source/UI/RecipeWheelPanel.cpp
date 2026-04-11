@@ -106,7 +106,7 @@ void RecipeWheelPanel::updatePitch(float hz)
 void RecipeWheelPanel::paint(juce::Graphics& g)
 {
     // Stamp label at top
-    g.setFont(juce::Font(juce::FontOptions().withHeight(5.5f).withStyle("Bold")));
+    g.setFont(juce::Font(5.5f, juce::Font::bold));
     g.setColour(PhantomColours::textDim.withAlpha(0.12f));
     g.drawText("RECIPE ENGINE \xc2\xb7 H2-H8",
                getLocalBounds().removeFromTop(14),

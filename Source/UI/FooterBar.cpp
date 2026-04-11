@@ -74,10 +74,7 @@ void FooterBar::paint(juce::Graphics& g)
 
     // ── Version label — very dim, right-aligned ──────────────────────────
     {
-        juce::Font versionFont(juce::FontOptions()
-            .withName("Helvetica Neue")
-            .withStyle("Light")
-            .withHeight(10.0f));
+        juce::Font versionFont("Helvetica Neue", 10.0f, juce::Font::plain);
 
         g.setFont(versionFont);
         g.setColour(juce::Colour(0xffffffff).withAlpha(0.07f));

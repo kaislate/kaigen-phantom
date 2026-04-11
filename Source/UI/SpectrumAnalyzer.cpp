@@ -146,7 +146,7 @@ void SpectrumAnalyzer::paintLine(juce::Graphics& g, juce::Rectangle<float> area)
 
     // Fill underneath: gradient from 20% white at bottom to transparent at top
     juce::ColourGradient fillGradient(
-        juce::Colours::transparent,        area.getX(), area.getY(),
+        juce::Colours::transparentBlack,   area.getX(), area.getY(),
         juce::Colours::white.withAlpha(0.20f), area.getX(), area.getBottom(),
         false);
 

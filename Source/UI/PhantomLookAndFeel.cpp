@@ -179,11 +179,19 @@ void PhantomLookAndFeel::drawRotarySlider (juce::Graphics& g,
     {
         // Highlight — top-left offset
         DropShadow hlShadow (PhantomColours::panelShadowLight.withAlpha (0.55f), 12, { -5, -5 });
-        hlShadow.drawForEllipse (g, knobBounds.toNearestInt());
+        {
+            juce::Path ellipsePath;
+            ellipsePath.addEllipse (knobBounds);
+            hlShadow.drawForPath (g, ellipsePath);
+        }
 
         // Dark drop shadow — bottom-right offset
         DropShadow dkShadow (PhantomColours::panelShadowDark.withAlpha (0.85f), 16, { 6, 6 });
-        dkShadow.drawForEllipse (g, knobBounds.toNearestInt());
+        {
+            juce::Path ellipsePath;
+            ellipsePath.addEllipse (knobBounds);
+            dkShadow.drawForPath (g, ellipsePath);
+        }
     }
 
     // ================================================================
@@ -276,7 +284,7 @@ void PhantomLookAndFeel::drawRotarySlider (juce::Graphics& g,
         const juce::String valueText = formatSliderValue (slider);
 
         const float valueFontSize = isLarge ? 11.5f : 9.5f;
-        const Font  valueFont (juce::FontOptions ("Courier New", valueFontSize, Font::bold));
+        const Font  valueFont ("Courier New", valueFontSize, Font::bold);
 
         // Centre the text in the OLED well
         const auto textArea = oledBounds.reduced (2.0f);
@@ -289,7 +297,7 @@ void PhantomLookAndFeel::drawRotarySlider (juce::Graphics& g,
     {
         const juce::String labelText = slider.getName().toUpperCase();
         const float labelFontSize    = 5.0f;
-        const Font  labelFont (juce::FontOptions (labelFontSize));
+        const Font  labelFont (labelFontSize);
 
         const float labelTop = (float) y + availableH + kLabelPad;
         const auto  labelArea = Rectangle<float> ((float) x, labelTop,
@@ -378,7 +386,7 @@ void PhantomLookAndFeel::drawButtonText (juce::Graphics& g,
 
     const bool   toggled   = button.getToggleState();
     const float  fontSize  = jmin (15.0f, (float) button.getHeight() * 0.55f);
-    const Font   font (juce::FontOptions (fontSize));
+    const Font   font (fontSize);
     const String label     = button.getButtonText();
 
     const auto textArea = button.getLocalBounds().toFloat().reduced (4.0f, 2.0f);

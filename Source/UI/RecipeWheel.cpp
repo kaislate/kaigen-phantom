@@ -82,11 +82,19 @@ void RecipeWheel::paintNeumorphicMount (Graphics& g, float cx, float cy, float r
 
     // Top-left highlight shadow
     DropShadow hlShadow (Colour (0x14ffffff), 16, { -6, -6 });
-    hlShadow.drawForEllipse (g, ellipseBounds);
+    {
+        juce::Path ellipsePath;
+        ellipsePath.addEllipse (ellipseBounds.toFloat());
+        hlShadow.drawForPath (g, ellipsePath);
+    }
 
     // Bottom-right dark shadow
     DropShadow dkShadow (Colour (0x80000000), 20, { 6, 6 });
-    dkShadow.drawForEllipse (g, ellipseBounds);
+    {
+        juce::Path ellipsePath;
+        ellipsePath.addEllipse (ellipseBounds.toFloat());
+        dkShadow.drawForPath (g, ellipsePath);
+    }
 
     // Radial gradient surface
     const float lightX = cx - radius * 0.5f;
@@ -211,7 +219,7 @@ void RecipeWheel::paintCenterOled (Graphics& g, float cx, float cy, float radius
 
     // "FUND" label — small dim text, centred just above middle
     {
-        const Font  labelFont (FontOptions ("Courier New", 6.0f, Font::plain));
+        const Font  labelFont ("Courier New", 6.0f, Font::plain);
         const auto  labelArea = Rectangle<float> (cx - radius, cy - halfH - lineH - 2.0f,
                                                    radius * 2.0f, lineH);
         g.setColour (PhantomColours::textDim.withAlpha (0.3f));
@@ -221,7 +229,7 @@ void RecipeWheel::paintCenterOled (Graphics& g, float cx, float cy, float radius
 
     // Frequency / note name — glow text, centred at middle
     {
-        const Font glowFont (FontOptions ("Courier New", 14.0f, Font::bold));
+        const Font glowFont ("Courier New", 14.0f, Font::bold);
         const auto glowArea = Rectangle<float> (cx - radius, cy - halfH,
                                                  radius * 2.0f, lineH);
 
@@ -243,7 +251,7 @@ void RecipeWheel::paintCenterOled (Graphics& g, float cx, float cy, float radius
 
     // Preset name — small phosphor text below middle
     {
-        const Font  presetFont (FontOptions ("Courier New", 7.0f, Font::plain));
+        const Font  presetFont ("Courier New", 7.0f, Font::plain);
         const auto  presetArea = Rectangle<float> (cx - radius, cy + halfH + 2.0f,
                                                     radius * 2.0f, lineH);
         g.setColour (PhantomColours::phosphorWhite.withAlpha (0.7f));
@@ -261,7 +269,7 @@ void RecipeWheel::paintHarmonicLabels (Graphics& g, float cx, float cy, float ra
     const float twoPi  = MathConstants<float>::twoPi;
     const float halfPi = MathConstants<float>::halfPi;
 
-    const Font labelFont (FontOptions ("Courier New", 8.0f, Font::bold));
+    const Font labelFont ("Courier New", 8.0f, Font::bold);
     g.setColour (PhantomColours::textDim);
     g.setFont (labelFont);
 

@@ -107,10 +107,7 @@ void HeaderBar::paint(juce::Graphics& g)
 
     // ── "PHANTOM" — large etched title ──────────────────────────────────
     {
-        juce::Font phantomFont(juce::FontOptions()
-            .withName("Helvetica Neue")
-            .withStyle("Light")
-            .withHeight(22.0f));
+        juce::Font phantomFont("Helvetica Neue", 22.0f, juce::Font::plain);
 
         // Wide letter-spacing via GlyphArrangement
         juce::GlyphArrangement ga;
@@ -143,10 +140,7 @@ void HeaderBar::paint(juce::Graphics& g)
 
     // ── "KAIGEN" — smaller right-aligned sub-label ───────────────────────
     {
-        juce::Font kaiFont(juce::FontOptions()
-            .withName("Helvetica Neue")
-            .withStyle("Light")
-            .withHeight(13.0f));
+        juce::Font kaiFont("Helvetica Neue", 13.0f, juce::Font::plain);
 
         // Reserve right side area above mode buttons
         float rightEdge = b.getRight() - 12.0f;
