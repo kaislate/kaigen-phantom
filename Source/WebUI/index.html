@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div style="position:fixed;top:2px;right:2px;z-index:99999;background:#0a0;color:#fff;font:bold 10px monospace;padding:2px 6px;border-radius:3px">BUILD-19</div>
+  <div style="position:fixed;top:2px;right:2px;z-index:99999;background:#0a0;color:#fff;font:bold 10px monospace;padding:2px 6px;border-radius:3px">DSP-1 RESHAPED</div>
   <div class="wrap">
     <!-- Header -->
     <div class="hdr">
@@ -90,32 +90,13 @@
 
         <div class="gap-h"></div>
 
-        <!-- Row 3 (mode-switched) -->
+        <!-- Row 3: Envelope follower -->
         <div class="ctrl-row">
-          <div class="candy-inner panel-pitch" id="pitchPanel">
-            <div class="el">Pitch Tracker</div>
+          <div class="candy-inner panel-envelope">
+            <div class="el">Envelope Follower</div>
             <div class="knob-row">
-              <phantom-knob data-param="tracking_sensitivity" size="medium" label="Sensitivity" default-value="0.7"></phantom-knob>
-              <phantom-knob data-param="tracking_glide" size="medium" label="Glide" default-value="0.1"></phantom-knob>
-            </div>
-          </div>
-          <div class="candy-inner panel-decon hidden" id="deconPanel">
-            <div class="el">Deconfliction</div>
-            <select id="decon-mode" class="param-select" data-param="deconfliction_mode">
-              <option>Partition</option><option>Lane</option><option>Stagger</option>
-              <option>Odd-Even</option><option>Residue</option><option>Binaural</option>
-            </select>
-            <div class="knob-row">
-              <phantom-knob data-param="max_voices" size="medium" label="Voices" default-value="0.429"></phantom-knob>
-              <phantom-knob data-param="stagger_delay" size="medium" label="Stagger" default-value="0.267"></phantom-knob>
-            </div>
-          </div>
-          <div class="candy-inner panel-sidechain">
-            <div class="el">Sidechain Duck</div>
-            <div class="knob-row">
-              <phantom-knob data-param="sidechain_duck_amount" size="medium" label="Amount" default-value="0"></phantom-knob>
-              <phantom-knob data-param="sidechain_duck_attack" size="medium" label="Attack" default-value="0.04"></phantom-knob>
-              <phantom-knob data-param="sidechain_duck_release" size="medium" label="Release" default-value="0.143"></phantom-knob>
+              <phantom-knob data-param="env_attack_ms" size="medium" label="Attack" default-value="0.05"></phantom-knob>
+              <phantom-knob data-param="env_release_ms" size="medium" label="Release" default-value="0.1"></phantom-knob>
             </div>
           </div>
         </div>
@@ -151,24 +132,6 @@
             <option value="2">Voice-Split</option>
           </select>
           <phantom-knob data-param="binaural_width" size="medium" label="Width" default-value="0.5"></phantom-knob>
-        </div>
-      </div>
-      <div class="settings-section">
-        <div class="el">RECIPE</div>
-        <div class="settings-row">
-          <phantom-knob data-param="recipe_rotation" size="medium" label="Rotation" default-value="0.5"></phantom-knob>
-        </div>
-      </div>
-      <div class="settings-section">
-        <div class="el">HARMONIC PHASES</div>
-        <div class="settings-row phases-grid">
-          <phantom-knob data-param="recipe_phase_h2" size="medium" label="H2" default-value="0"></phantom-knob>
-          <phantom-knob data-param="recipe_phase_h3" size="medium" label="H3" default-value="0"></phantom-knob>
-          <phantom-knob data-param="recipe_phase_h4" size="medium" label="H4" default-value="0"></phantom-knob>
-          <phantom-knob data-param="recipe_phase_h5" size="medium" label="H5" default-value="0"></phantom-knob>
-          <phantom-knob data-param="recipe_phase_h6" size="medium" label="H6" default-value="0"></phantom-knob>
-          <phantom-knob data-param="recipe_phase_h7" size="medium" label="H7" default-value="0"></phantom-knob>
-          <phantom-knob data-param="recipe_phase_h8" size="medium" label="H8" default-value="0"></phantom-knob>
         </div>
       </div>
     </div>

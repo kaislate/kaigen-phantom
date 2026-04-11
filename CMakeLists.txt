@@ -33,17 +33,11 @@ juce_generate_juce_header(KaigenPhantom)
 target_sources(KaigenPhantom PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
-    Source/Engines/PitchTracker.cpp
-    Source/Engines/HarmonicGenerator.cpp
     Source/Engines/BinauralStage.cpp
-    Source/Engines/PerceptualOptimizer.cpp
-    Source/Engines/CrossoverBlend.cpp
-    Source/Engines/Deconfliction/PartitionStrategy.cpp
-    Source/Engines/Deconfliction/SpectralLaneStrategy.cpp
-    Source/Engines/Deconfliction/StaggerStrategy.cpp
-    Source/Engines/Deconfliction/OddEvenStrategy.cpp
-    Source/Engines/Deconfliction/ResidueStrategy.cpp
-    Source/Engines/Deconfliction/BinauralStrategy.cpp
+    Source/Engines/BassExtractor.cpp
+    Source/Engines/Waveshaper.cpp
+    Source/Engines/EnvelopeFollower.cpp
+    Source/Engines/PhantomEngine.cpp
 )
 
 juce_add_binary_data(PhantomWebUI SOURCES
