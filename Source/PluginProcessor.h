@@ -40,6 +40,7 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
 
     juce::AudioProcessorValueTreeState apvts;
+    std::atomic<float> currentPitch { -1.0f };
 
     // Peak levels for I/O meters
     std::atomic<float> peakInL  { 0.0f };

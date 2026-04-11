@@ -12,9 +12,11 @@
 #include "UI/SidechainPanel.h"
 #include "UI/StereoPanel.h"
 #include "UI/DeconflictionPanel.h"
+#include "UI/RecipeWheelPanel.h"
 
 class PhantomEditor : public juce::AudioProcessorEditor,
-                      private juce::AudioProcessorValueTreeState::Listener
+                      private juce::AudioProcessorValueTreeState::Listener,
+                      private juce::Timer
 {
 public:
     explicit PhantomEditor(PhantomProcessor&);
@@ -24,6 +26,7 @@ public:
 
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
+    void timerCallback() override;
 
     PhantomProcessor& processor;
     PhantomLookAndFeel phantomLnf;
@@ -37,6 +40,8 @@ private:
     HarmonicEnginePanel harmonicPanel;
     GhostPanel          ghostPanel;
     OutputPanel         outputPanel;
+
+    RecipeWheelPanel   recipeWheelPanel;
 
     GlowSeam           row2Seam { GlowSeam::Orientation::Horizontal };
     PitchTrackerPanel  pitchTrackerPanel;

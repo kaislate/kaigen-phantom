@@ -146,6 +146,7 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     if (!isInstrumentMode)
     {
         float detectedHz = pitchTracker.detectPitch(buffer.getReadPointer(0), n);
+        currentPitch.store(pitchTracker.getSmoothedPitch(), std::memory_order_relaxed);
         if (detectedHz > 0.0f)
         {
             harmonicGen.setEffectModePitch(detectedHz);

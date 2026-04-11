@@ -5,6 +5,7 @@
 PhantomEditor::PhantomEditor(PhantomProcessor& p)
     : AudioProcessorEditor(&p), processor(p),
       headerBar(p.apvts),
+      recipeWheelPanel(p.apvts),
       harmonicPanel(p.apvts),
       ghostPanel(p.apvts),
       outputPanel(p.apvts),
@@ -16,6 +17,7 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
     setLookAndFeel(&phantomLnf);
     setSize(920, 620);
 
+    addAndMakeVisible(recipeWheelPanel);
     addAndMakeVisible(headerBar);
     addAndMakeVisible(footerBar);
     addAndMakeVisible(headerSeam);
@@ -33,12 +35,20 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
     deconflictionPanel.setVisible(false);   // Effect mode is default
 
     processor.apvts.addParameterListener(ParamID::MODE, this);
+
+    startTimerHz(30);
 }
 
 PhantomEditor::~PhantomEditor()
 {
+    stopTimer();
     processor.apvts.removeParameterListener(ParamID::MODE, this);
     setLookAndFeel(nullptr);
+}
+
+void PhantomEditor::timerCallback()
+{
+    recipeWheelPanel.updatePitch(processor.currentPitch.load(std::memory_order_relaxed));
 }
 
 void PhantomEditor::parameterChanged(const juce::String& parameterID, float newValue)
@@ -70,8 +80,8 @@ void PhantomEditor::resized()
 
     // Body: left recipe wheel area (316px) | seam | right panel
     auto body = area;
-    auto leftArea = body.removeFromLeft(316);  // Reserved for RecipeWheelPanel (Phase 4)
-    (void)leftArea;
+    auto leftArea = body.removeFromLeft(316);
+    recipeWheelPanel.setBounds(leftArea);
     bodyVSeam.setBounds(body.removeFromLeft(3));
     auto rightArea = body;
 
