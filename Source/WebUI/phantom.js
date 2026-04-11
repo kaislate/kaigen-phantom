@@ -9,7 +9,22 @@ if (!window.Juce) {
 
 const getSliderState   = window.Juce.getSliderState;
 const getComboBoxState = window.Juce.getComboBoxState;
+const getToggleState   = window.Juce.getToggleState;
 const getNativeFunction = window.Juce.getNativeFunction;
+
+// ── Bypass toggle ─────────────────────────────────────────────────────────
+const bypassState = getToggleState?.("bypass");
+const bypassBtn = document.getElementById("bypass-btn");
+if (bypassBtn && bypassState) {
+  bypassBtn.addEventListener("click", () => {
+    bypassState.setValue(!bypassState.getValue());
+  });
+  function updateBypassUI() {
+    bypassBtn.classList.toggle("active", !!bypassState.getValue());
+  }
+  bypassState.valueChangedEvent.addListener(updateBypassUI);
+  updateBypassUI();
+}
 
 // =============================================================================
 // 1. Display value formatting
@@ -86,14 +101,7 @@ document.querySelectorAll("phantom-knob[data-param]").forEach((el) => {
 
 const modeState = getComboBoxState("mode");
 
-document.querySelectorAll(".mb[data-mode]").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    modeState.setChoiceIndex(parseInt(btn.dataset.mode));
-  });
-});
-
-function updateModeUI() {
-  const idx = modeState.getChoiceIndex();
+function applyMode(idx) {
   document
     .querySelectorAll(".mb[data-mode]")
     .forEach((b) =>
@@ -103,8 +111,19 @@ function updateModeUI() {
   document.getElementById("deconPanel")?.classList.toggle("hidden", idx === 0);
 }
 
-modeState.valueChangedEvent.addListener(updateModeUI);
-updateModeUI();
+document.querySelectorAll(".mb[data-mode]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const idx = parseInt(btn.dataset.mode);
+    applyMode(idx);                     // update UI immediately
+    modeState.setChoiceIndex(idx);      // send to backend
+  });
+});
+
+modeState.valueChangedEvent.addListener(() => {
+  applyMode(modeState.getChoiceIndex());
+});
+// Initialize visibility
+applyMode(modeState.getChoiceIndex() || 0);
 
 // =============================================================================
 // 4. Wire preset strip
@@ -236,10 +255,10 @@ if (binauralSelect) {
   const binauralState = getComboBoxState?.("binaural_mode");
   if (binauralState) {
     binauralSelect.addEventListener("change", () => {
-      binauralState.setSelectedItemIndex(parseInt(binauralSelect.value));
+      binauralState.setChoiceIndex(parseInt(binauralSelect.value));
     });
     binauralState.valueChangedEvent?.addListener(() => {
-      binauralSelect.value = binauralState.getSelectedItemIndex();
+      binauralSelect.value = String(binauralState.getChoiceIndex());
     });
   }
 }

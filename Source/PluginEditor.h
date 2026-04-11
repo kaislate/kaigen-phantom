@@ -55,7 +55,10 @@ private:
     juce::WebComboBoxRelay modeRelay { "mode" },
                            ghostModeRelay { "ghost_mode" },
                            recipePresetRelay { "recipe_preset" },
-                           deconflictionModeRelay { "deconfliction_mode" };
+                           deconflictionModeRelay { "deconfliction_mode" },
+                           binauralModeRelay { "binaural_mode" };
+
+    juce::WebToggleButtonRelay bypassRelay { "bypass" };
 
     // WebView — constructed in .cpp via buildWebViewOptions()
     SinglePageBrowser webView;
@@ -63,6 +66,7 @@ private:
     // Attachments — constructed in .cpp after webView
     std::vector<std::unique_ptr<juce::WebSliderParameterAttachment>> sliderAttachments;
     std::vector<std::unique_ptr<juce::WebComboBoxParameterAttachment>> comboAttachments;
+    std::unique_ptr<juce::WebToggleButtonParameterAttachment>          bypassAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomEditor)
 };

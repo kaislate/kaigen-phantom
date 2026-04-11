@@ -5,6 +5,7 @@ namespace ParamID
 {
     // ── Mode & Global ─────────────────────────────────────────────────
     inline constexpr auto MODE               = "mode";
+    inline constexpr auto BYPASS             = "bypass";
     inline constexpr auto GHOST              = "ghost";
     inline constexpr auto GHOST_MODE         = "ghost_mode";
     inline constexpr auto PHANTOM_THRESHOLD  = "phantom_threshold";
@@ -63,6 +64,7 @@ inline std::vector<juce::String> getAllParameterIDs()
 {
     return {
         ParamID::MODE,
+        ParamID::BYPASS,
         ParamID::GHOST,
         ParamID::GHOST_MODE,
         ParamID::PHANTOM_THRESHOLD,
@@ -111,6 +113,8 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     // ── Mode & Global ─────────────────────────────────────────────────
     params.push_back(std::make_unique<APC>(
         ParamID::MODE, "Mode", StringArray{ "Effect", "Instrument" }, 0));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        ParamID::BYPASS, "Bypass", false));
     params.push_back(std::make_unique<APF>(
         ParamID::GHOST, "Ghost",
         NormalisableRange<float>(0.0f, 100.0f), 100.0f,

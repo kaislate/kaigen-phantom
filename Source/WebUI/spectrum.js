@@ -1,255 +1,284 @@
 /**
- * spectrum.js — Canvas2D spectrum analyzer (bar + line modes) and I/O meters
- * Listens for CustomEvents dispatched by phantom.js on `document`:
- *   'spectrum-data'  detail: Array(80) of floats 0-1
- *   'peak-data'      detail: { inL, inR, outL, outR } floats 0-1
+ * spectrum.js — Professional EQ-style spectrum analyzer
+ * Smooth curve over log-frequency axis (20Hz - 20kHz), dB scale (-60 to 0),
+ * with fill beneath the curve.
  */
 
+(function(){
 const specCanvas    = document.getElementById('spectrumCanvas');
 const meterInCanvas = document.getElementById('meterIn');
 const meterOutCanvas= document.getElementById('meterOut');
 
-// ── State ────────────────────────────────────────────────────────────────────
+if (!specCanvas) return;
+
+// ─── Resize canvases to match CSS size at device pixel ratio ────────────────
+function resize() {
+    const pr = window.devicePixelRatio || 1;
+    for (const c of [specCanvas, meterInCanvas, meterOutCanvas]) {
+        if (!c) continue;
+        const r = c.getBoundingClientRect();
+        c.width  = Math.max(1, Math.floor(r.width  * pr));
+        c.height = Math.max(1, Math.floor(r.height * pr));
+    }
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ─── State ──────────────────────────────────────────────────────────────────
 const BIN_COUNT = 80;
-const bins      = new Float32Array(BIN_COUNT);
-const smoothed  = new Float32Array(BIN_COUNT);
-const peakCaps  = new Float32Array(BIN_COUNT);   // per-bin peak-hold heights
+const BIN_FREQ_LOW  = 30;     // matches C++ FFT binning
+const BIN_FREQ_HIGH = 16000;
+const DISPLAY_FREQ_LOW  = 20;    // display axis
+const DISPLAY_FREQ_HIGH = 20000;
 
-let mode     = 'bar';   // 'bar' | 'line'
-let inLevel  = 0;
-let outLevel = 0;
-let inPeak   = 0;
-let outPeak  = 0;
+const smoothed = new Float32Array(BIN_COUNT);
+const peakHold = new Float32Array(BIN_COUNT);
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function ctx2d(canvas) {
-    return canvas ? canvas.getContext('2d') : null;
+let inL = 0, inR = 0, outL = 0, outR = 0;
+let inLSmooth = 0, inRSmooth = 0, outLSmooth = 0, outRSmooth = 0;
+
+const SMOOTH_UP = 0.5;    // fast attack
+const SMOOTH_DN = 0.08;   // slow release
+const PEAK_DECAY = 0.003;
+
+// ─── Frequency → X position (log scale) ─────────────────────────────────────
+function freqToX(freq, w) {
+    const logLo = Math.log10(DISPLAY_FREQ_LOW);
+    const logHi = Math.log10(DISPLAY_FREQ_HIGH);
+    const logF  = Math.log10(Math.max(freq, DISPLAY_FREQ_LOW));
+    return ((logF - logLo) / (logHi - logLo)) * w;
 }
 
-// ── Grid ─────────────────────────────────────────────────────────────────────
-const FREQ_LABELS = ['30','60','125','250','500','1k','2k','4k','8k','16k'];
-const DB_LABELS   = ['-48','-36','-24','-12','0'];
+// ─── Bin index → frequency (matches C++ log-spaced binning) ─────────────────
+function binToFreq(bin) {
+    const logLo = Math.log10(BIN_FREQ_LOW);
+    const logHi = Math.log10(BIN_FREQ_HIGH);
+    return Math.pow(10, logLo + (logHi - logLo) * (bin + 0.5) / BIN_COUNT);
+}
+
+// ─── Grid + labels ──────────────────────────────────────────────────────────
+const FREQ_LABELS = [
+    { hz: 30,   label: '30'  },
+    { hz: 100,  label: '100' },
+    { hz: 300,  label: '300' },
+    { hz: 1000, label: '1k'  },
+    { hz: 3000, label: '3k'  },
+    { hz: 10000,label: '10k' },
+];
+const DB_LINES = [-12, -24, -36, -48];
 
 function drawGrid(ctx, w, h) {
     ctx.save();
+    ctx.lineWidth = 1;
 
-    // Horizontal lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.02)';
-    ctx.lineWidth   = 1;
-    for (let i = 1; i <= 5; i++) {
-        const y = Math.round(h * i / 6) + 0.5;
+    // Horizontal dB grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    for (const db of DB_LINES) {
+        const y = Math.round(h * (-db) / 60) + 0.5;
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(w, y);
         ctx.stroke();
     }
 
-    ctx.font      = '5px monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    // Vertical freq grid at major frequencies
+    const majors = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
+    ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+    for (const f of majors) {
+        const x = Math.round(freqToX(f, w)) + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+    }
 
-    // Frequency labels (bottom)
-    const step = w / FREQ_LABELS.length;
-    for (let i = 0; i < FREQ_LABELS.length; i++) {
-        const x = step * i + step * 0.5;
-        ctx.textAlign = 'center';
-        ctx.fillText(FREQ_LABELS[i], x, h - 2);
+    // Frequency labels
+    const labelFontPx = Math.max(9, Math.round(h * 0.04));
+    ctx.font = labelFontPx + 'px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    for (const { hz, label } of FREQ_LABELS) {
+        const x = freqToX(hz, w);
+        if (x < 4 || x > w - 4) continue;
+        ctx.fillText(label, x, h - 2);
     }
 
     // dB labels (right edge)
     ctx.textAlign = 'right';
-    for (let i = 0; i < DB_LABELS.length; i++) {
-        const y = h * (1 - (i + 1) / (DB_LABELS.length + 1));
-        ctx.fillText(DB_LABELS[i], w - 2, y + 2);
+    ctx.textBaseline = 'middle';
+    for (const db of [0, -12, -24, -36, -48]) {
+        const y = h * (-db) / 60;
+        ctx.fillText(db + 'dB', w - 3, y);
     }
 
     ctx.restore();
 }
 
-// ── Spectrum rendering ────────────────────────────────────────────────────────
+// ─── Main spectrum draw ─────────────────────────────────────────────────────
 function drawSpectrum() {
     if (!specCanvas) return;
-    const ctx = ctx2d(specCanvas);
+    const ctx = specCanvas.getContext('2d');
     if (!ctx) return;
 
     const w = specCanvas.width;
     const h = specCanvas.height;
 
-    ctx.clearRect(0, 0, w, h);
+    // Clear with solid black
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+
     drawGrid(ctx, w, h);
 
-    if (mode === 'bar') {
-        drawBars(ctx, w, h);
-    } else {
-        drawLine(ctx, w, h);
-    }
-}
-
-function drawBars(ctx, w, h) {
-    const barW = w / BIN_COUNT;
-    const gap  = 1;
-
+    // Build smooth path: one point per bin at its center freq
+    // Skip bins outside display range
+    const points = [];
     for (let i = 0; i < BIN_COUNT; i++) {
-        const x   = i * barW;
-        const bw  = Math.max(1, barW - gap);
-        const bh  = smoothed[i] * h * 0.88;
-        const y   = h - bh;
-
-        // Bar gradient
-        const grad = ctx.createLinearGradient(0, y, 0, h);
-        grad.addColorStop(0, 'rgba(255,255,255,0.04)');
-        grad.addColorStop(1, 'rgba(255,255,255,0.50)');
-
-        ctx.fillStyle = grad;
-        ctx.fillRect(x, y, bw, bh);
-
-        // Peak cap
-        const capY = h - peakCaps[i] * h * 0.88;
-        ctx.fillStyle = 'rgba(255,255,255,0.65)';
-        ctx.fillRect(x, capY, bw, 1);
+        const f = binToFreq(i);
+        if (f < DISPLAY_FREQ_LOW || f > DISPLAY_FREQ_HIGH) continue;
+        const x = freqToX(f, w);
+        // smoothed[i] is 0..1 where 1 = 0dB, 0 = -60dB
+        const y = h * (1 - smoothed[i]);
+        points.push({ x, y });
     }
-}
 
-function drawLine(ctx, w, h) {
-    const barW = w / BIN_COUNT;
+    if (points.length < 2) return;
 
+    // Fill under curve
     ctx.beginPath();
-    for (let i = 0; i < BIN_COUNT; i++) {
-        const x = i * barW + barW * 0.5;
-        const y = h - smoothed[i] * h * 0.88;
-        if (i === 0) ctx.moveTo(x, y);
-        else         ctx.lineTo(x, y);
-    }
-
-    // Close path down to bottom corners for fill
-    ctx.lineTo(w, h);
-    ctx.lineTo(0, h);
+    ctx.moveTo(points[0].x, h);
+    for (const p of points) ctx.lineTo(p.x, p.y);
+    ctx.lineTo(points[points.length - 1].x, h);
     ctx.closePath();
-
-    const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, 'rgba(255,255,255,0.00)');
-    grad.addColorStop(1, 'rgba(255,255,255,0.20)');
-    ctx.fillStyle = grad;
+    const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
+    fillGrad.addColorStop(0, 'rgba(255,255,255,0.28)');
+    fillGrad.addColorStop(0.5, 'rgba(255,255,255,0.12)');
+    fillGrad.addColorStop(1, 'rgba(255,255,255,0.02)');
+    ctx.fillStyle = fillGrad;
     ctx.fill();
 
-    // Stroke the top line
+    // Stroke curve on top
     ctx.beginPath();
-    for (let i = 0; i < BIN_COUNT; i++) {
-        const x = i * barW + barW * 0.5;
-        const y = h - smoothed[i] * h * 0.88;
-        if (i === 0) ctx.moveTo(x, y);
-        else         ctx.lineTo(x, y);
+    ctx.moveTo(points[0].x, points[0].y);
+    // Smooth curve via quadratic midpoints
+    for (let i = 1; i < points.length - 1; i++) {
+        const xc = (points[i].x + points[i + 1].x) / 2;
+        const yc = (points[i].y + points[i + 1].y) / 2;
+        ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
     }
-    ctx.strokeStyle = 'rgba(255,255,255,0.60)';
-    ctx.lineWidth   = 1.5;
+    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = Math.max(1.2, h * 0.006);
+    ctx.shadowColor = 'rgba(255,255,255,0.6)';
+    ctx.shadowBlur = 4;
     ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Peak hold line (dim, no fill)
+    const peakPoints = [];
+    for (let i = 0; i < BIN_COUNT; i++) {
+        const f = binToFreq(i);
+        if (f < DISPLAY_FREQ_LOW || f > DISPLAY_FREQ_HIGH) continue;
+        const x = freqToX(f, w);
+        const y = h * (1 - peakHold[i]);
+        peakPoints.push({ x, y });
+    }
+    if (peakPoints.length >= 2) {
+        ctx.beginPath();
+        ctx.moveTo(peakPoints[0].x, peakPoints[0].y);
+        for (let i = 1; i < peakPoints.length; i++) {
+            ctx.lineTo(peakPoints[i].x, peakPoints[i].y);
+        }
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
 }
 
-// ── Meter rendering ───────────────────────────────────────────────────────────
+// ─── Meter drawing ──────────────────────────────────────────────────────────
 function drawMeter(canvas, level, peak, label) {
     if (!canvas) return;
-    const ctx = ctx2d(canvas);
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
     const w = canvas.width;
     const h = canvas.height;
 
-    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
 
-    const fillH = level * h * 0.85;
-    const y     = h - fillH;
-
-    // Meter bar
-    if (fillH > 0) {
-        const grad = ctx.createLinearGradient(0, y, 0, h);
-        grad.addColorStop(0, 'rgba(255,255,255,0.05)');
-        grad.addColorStop(1, 'rgba(255,255,255,0.35)');
+    const fillH = level * h * 0.9;
+    if (fillH > 0.5) {
+        const grad = ctx.createLinearGradient(0, h, 0, h - fillH);
+        grad.addColorStop(0, 'rgba(255,255,255,0.55)');
+        grad.addColorStop(1, 'rgba(255,255,255,0.12)');
         ctx.fillStyle = grad;
-        ctx.fillRect(0, y, w, fillH);
+        ctx.fillRect(1, h - fillH, w - 2, fillH);
     }
 
-    // Peak hold line
-    const peakY = h - peak * h * 0.85;
-    ctx.fillStyle = 'rgba(255,255,255,0.50)';
-    ctx.fillRect(0, peakY, w, 1);
+    // Peak hold
+    if (peak > 0) {
+        const py = h - peak * h * 0.9;
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.fillRect(1, py, w - 2, 1);
+    }
 
     // Label
-    ctx.font      = '5px monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.20)';
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.font = Math.max(8, Math.round(h * 0.04)) + 'px monospace';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
     ctx.fillText(label, w / 2, h - 2);
 }
 
-// ── Mode toggle ───────────────────────────────────────────────────────────────
-document.getElementById('specToggle')?.addEventListener('click', () => {
-    mode = mode === 'bar' ? 'line' : 'bar';
-    drawSpectrum();
+// ─── Data ingest (from phantom.js polling) ──────────────────────────────────
+document.addEventListener('spectrum-data', (e) => {
+    const data = e.detail;
+    if (!data || data.length < BIN_COUNT) return;
+    for (let i = 0; i < BIN_COUNT; i++) {
+        const v = +data[i] || 0;
+        // Asymmetric smoothing — fast up, slow down
+        if (v > smoothed[i])
+            smoothed[i] += (v - smoothed[i]) * SMOOTH_UP;
+        else
+            smoothed[i] += (v - smoothed[i]) * SMOOTH_DN;
+
+        if (smoothed[i] > peakHold[i])
+            peakHold[i] = smoothed[i];
+        else
+            peakHold[i] = Math.max(0, peakHold[i] - PEAK_DECAY);
+    }
 });
 
-// ── Auto-init ────────────────────────────────────────────────────────────────
-if (specCanvas) {
-    function resize() {
-        for (const c of [specCanvas, meterInCanvas, meterOutCanvas]) {
-            if (!c) continue;
-            const parent = c.parentElement || c;
-            const pw = parent.clientWidth;
-            const ph = parent.clientHeight;
-            if (pw === 0 || ph === 0) continue;
-            c.width        = pw * 2;
-            c.height       = ph * 2;
-            c.style.width  = pw + 'px';
-            c.style.height = ph + 'px';
-        }
-        drawSpectrum();
-        drawMeter(meterInCanvas,  inLevel,  inPeak,  'IN');
-        drawMeter(meterOutCanvas, outLevel, outPeak, 'OUT');
-    }
+document.addEventListener('peak-data', (e) => {
+    const d = e.detail;
+    if (!d) return;
+    inL  = +d.inL  || 0;
+    inR  = +d.inR  || 0;
+    outL = +d.outL || 0;
+    outR = +d.outR || 0;
+});
 
-    resize();
-    window.addEventListener('resize', resize);
+// ─── Animation loop — renders at 60fps ──────────────────────────────────────
+function tick() {
+    requestAnimationFrame(tick);
 
-    // spectrum-data event
-    document.addEventListener('spectrum-data', (e) => {
-        const data = e.detail;
-        if (!data || data.length < BIN_COUNT) return;
+    // Smooth meters
+    const tgtIn  = Math.max(inL, inR);
+    const tgtOut = Math.max(outL, outR);
+    inLSmooth  += (tgtIn  - inLSmooth)  * (tgtIn  > inLSmooth  ? 0.5 : 0.08);
+    outLSmooth += (tgtOut - outLSmooth) * (tgtOut > outLSmooth ? 0.5 : 0.08);
+    if (inLSmooth  > inRSmooth)  inRSmooth  = inLSmooth;
+    else inRSmooth  = Math.max(0, inRSmooth  - 0.003);
+    if (outLSmooth > outRSmooth) outRSmooth = outLSmooth;
+    else outRSmooth = Math.max(0, outRSmooth - 0.003);
 
-        const SMOOTH = 0.3;
-        for (let i = 0; i < BIN_COUNT; i++) {
-            bins[i]     = data[i];
-            smoothed[i] = smoothed[i] * (1 - SMOOTH) + bins[i] * SMOOTH;
-
-            // Peak cap: rise instantly, fall slowly
-            if (smoothed[i] >= peakCaps[i]) {
-                peakCaps[i] = smoothed[i];
-            } else {
-                peakCaps[i] = Math.max(0, peakCaps[i] - 0.005);
-            }
-        }
-
-        drawSpectrum();
-    });
-
-    // peak-data event
-    document.addEventListener('peak-data', (e) => {
-        const d = e.detail;
-        if (!d) return;
-
-        const SMOOTH = 0.3;
-
-        // Combine L+R as max for each side
-        const rawIn  = Math.max(d.inL  || 0, d.inR  || 0);
-        const rawOut = Math.max(d.outL || 0, d.outR || 0);
-
-        inLevel  = inLevel  * (1 - SMOOTH) + rawIn  * SMOOTH;
-        outLevel = outLevel * (1 - SMOOTH) + rawOut * SMOOTH;
-
-        // Peak hold
-        if (inLevel  >= inPeak)  inPeak  = inLevel;
-        else                     inPeak  = Math.max(0, inPeak  - 0.003);
-
-        if (outLevel >= outPeak) outPeak = outLevel;
-        else                     outPeak = Math.max(0, outPeak - 0.003);
-
-        drawMeter(meterInCanvas,  inLevel,  inPeak,  'IN');
-        drawMeter(meterOutCanvas, outLevel, outPeak, 'OUT');
-    });
+    drawSpectrum();
+    drawMeter(meterInCanvas,  inLSmooth,  inRSmooth,  'IN');
+    drawMeter(meterOutCanvas, outLSmooth, outRSmooth, 'OUT');
 }
+tick();
+
+// Mode toggle button (bar/line) — no-op now, we only do line style
+const toggleBtn = document.getElementById('specToggle');
+if (toggleBtn) toggleBtn.style.display = 'none';
+})();

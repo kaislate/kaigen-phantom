@@ -1,459 +1,210 @@
 /**
- * recipe-wheel.js — Holographic Recipe Wheel
- * Kaigen Phantom WebUI — Three.js holographic harmonic display
- *
- * Renders a ghostly holographic wheel showing H2–H8 harmonic amplitudes
- * as tank spokes with energy flow particles. Designed in the v7 ethereal style
- * from mockup-v21.
+ * recipe-wheel.js — Canvas2D holographic recipe wheel
+ * Pure Canvas2D implementation (no Three.js, no CDN, no modules).
  */
 
-import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-
-// ─── Module state ────────────────────────────────────────────────────────────
-let _renderer = null;
-let _composer = null;
-let _animId = null;
-let _harmonicNodes = [];   // { glow, core, trackLine, fillLine, capDot, ba }
-let _particles = null;     // { geometry, data[] }
-let _rings = [];
-let _scanLine = null;
-let _centerGlow = null;
-let _t0 = 0;
-
-// Default amplitudes for H2–H8
-let _amps = [0.85, 0.66, 0.88, 0.40, 0.50, 0.76, 0.22];
-
-const TAU = Math.PI * 2;
-const NUM_HARMONICS = 7;
-const SPOKE_RADIUS = 108;
-const PARTICLE_COUNT = 140; // 20 per spoke
-
-// Ring config: [radius, halfWidth, opacity, colorHex]
-const RING_DEFS = [
-    [120, 0.8, 0.10, 0xffffff],
-    [100, 0.6, 0.07, 0xddeeff],
-    [ 78, 0.5, 0.05, 0xffeedd],
-    [ 52, 0.6, 0.08, 0xeeffee],
-    [ 28, 0.8, 0.13, 0xffffff],
-    [126, 0.3, 0.035, 0xeeddff],
-];
-
-// Ring rotation speeds (rad/frame at 60fps, approx)
-const RING_SPEEDS = [0.015, -0.02, 0.01, -0.025, 0.012, -0.008];
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function additiveMat(color, opacity) {
-    return new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-    });
-}
-
-function lineMat(opacity) {
-    return new THREE.LineBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-    });
-}
-
-// ─── Scene construction ───────────────────────────────────────────────────────
-
-function buildScene(W, H) {
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x010108);
-
-    // Ambient light — very dim
-    scene.add(new THREE.AmbientLight(0x040410, 1.4));
-
-    // Dark base plane — fills the canvas
-    scene.add(new THREE.Mesh(
-        new THREE.PlaneGeometry(W, H),
-        new THREE.MeshStandardMaterial({ color: 0x020210, roughness: 0.96, metalness: 0.02 })
-    ));
-
-    return scene;
-}
-
-function buildWheel(scene) {
-    const holo = new THREE.Group();
-    // Position at center of canvas (PlaneGeometry is centered at 0,0)
-    holo.position.set(0, 0, 2);
-
-    // ── Dark circular base plane ──────────────────────────────────────────────
-    {
-        const baseMesh = new THREE.Mesh(
-            new THREE.CircleGeometry(138, 64),
-            new THREE.MeshStandardMaterial({ color: 0x010108, roughness: 0.98, metalness: 0.02 })
-        );
-        baseMesh.position.set(0, 0, -1.8);
-        holo.add(baseMesh);
-    }
-
-    // ── Holographic rings ────────────────────────────────────────────────────
-    const rings = [];
-    for (const [r, w, op, col] of RING_DEFS) {
-        const ring = new THREE.Mesh(
-            new THREE.RingGeometry(r - w, r + w, 128),
-            additiveMat(col, op)
-        );
-        holo.add(ring);
-        rings.push(ring);
-    }
-
-    // ── Harmonic spokes (track + fill + cap) and nodes ───────────────────────
-    const harmonicNodes = [];
-
-    for (let i = 0; i < NUM_HARMONICS; i++) {
-        const angle = i * (TAU / NUM_HARMONICS) - Math.PI / 2;
-        const amp = _amps[i];
-        const cosA = Math.cos(angle);
-        const sinA = Math.sin(angle);
-        const endX = SPOKE_RADIUS * cosA;
-        const endY = SPOKE_RADIUS * sinA;
-
-        // ── Dim track line (full spoke, opacity 0.05, width 5 — approximated) ─
-        const trackGeo = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(0, 0, 0),
-            new THREE.Vector3(endX, endY, 0),
-        ]);
-        const trackLine = new THREE.Line(trackGeo, lineMat(0.05));
-        trackLine.material.linewidth = 5; // note: only works with WebGL2 line ext
-        holo.add(trackLine);
-
-        // ── Bright fill line (proportional to amplitude) ─────────────────────
-        const fillLength = amp * SPOKE_RADIUS;
-        const fillGeo = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(0, 0, 0.1),
-            new THREE.Vector3(fillLength * cosA, fillLength * sinA, 0.1),
-        ]);
-        const fillMat = new THREE.LineBasicMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.3 + amp * 0.5,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            linewidth: 3.5,
-        });
-        const fillLine = new THREE.Line(fillGeo, fillMat);
-        holo.add(fillLine);
-
-        // ── Cap dot at spoke endpoint ─────────────────────────────────────────
-        const capDot = new THREE.Mesh(
-            new THREE.CircleGeometry(2.5, 16),
-            additiveMat(0xffffff, 0.4 + amp * 0.35)
-        );
-        capDot.position.set(fillLength * cosA, fillLength * sinA, 0.15);
-        holo.add(capDot);
-
-        // ── Dual-element harmonic node ────────────────────────────────────────
-        const nodeSize = 6 + amp * 12;
-
-        // Large soft glow halo
-        const glow = new THREE.Mesh(
-            new THREE.CircleGeometry(nodeSize * 1.6, 32),
-            additiveMat(0xffffff, amp * 0.14)
-        );
-        glow.position.set(endX, endY, 0.05);
-        holo.add(glow);
-
-        // Small bright core
-        const core = new THREE.Mesh(
-            new THREE.CircleGeometry(nodeSize * 0.55, 32),
-            additiveMat(0xffffff, 0.4 + amp * 0.45)
-        );
-        core.position.set(endX, endY, 0.12);
-        holo.add(core);
-
-        harmonicNodes.push({
-            glow,
-            core,
-            trackLine,
-            fillLine,
-            capDot,
-            angle,
-            ba: amp, // base amplitude (updated by updateHarmonics)
-        });
-    }
-
-    // ── Scan line ────────────────────────────────────────────────────────────
-    const scanLine = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(0, 0, 0),
-            new THREE.Vector3(SPOKE_RADIUS + 14, 0, 0),
-        ]),
-        lineMat(0.05)
-    );
-    holo.add(scanLine);
-
-    // ── Center glow ───────────────────────────────────────────────────────────
-    holo.add(new THREE.Mesh(
-        new THREE.CircleGeometry(22, 32),
-        additiveMat(0xffffff, 0.07)
-    ));
-    const centerGlow = new THREE.Mesh(
-        new THREE.CircleGeometry(12, 32),
-        additiveMat(0xffffff, 0.14)
-    );
-    holo.add(centerGlow);
-
-    // ── Energy flow particles ─────────────────────────────────────────────────
-    const positions = new Float32Array(PARTICLE_COUNT * 3);
-    const particleData = [];
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const spokeIdx = i % NUM_HARMONICS;
-        const progress = Math.random(); // 0 → 1 along spoke
-        const angle = harmonicNodes[spokeIdx].angle;
-        const dist = progress * SPOKE_RADIUS;
-
-        positions[i * 3]     = dist * Math.cos(angle);
-        positions[i * 3 + 1] = dist * Math.sin(angle);
-        positions[i * 3 + 2] = 0.2;
-
-        particleData.push({
-            spokeIdx,
-            progress,
-        });
-    }
-
-    const particleGeo = new THREE.BufferGeometry();
-    particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-    const particleMat = new THREE.PointsMaterial({
-        color: 0xffffff,
-        size: 1.8,
-        transparent: true,
-        opacity: 0.22,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        sizeAttenuation: false,
-    });
-
-    const particlePoints = new THREE.Points(particleGeo, particleMat);
-    holo.add(particlePoints);
-
-    scene.add(holo);
-
-    return { rings, harmonicNodes, scanLine, centerGlow, particles: { geo: particleGeo, data: particleData } };
-}
-
-// ─── Animation ────────────────────────────────────────────────────────────────
-
-function animate(composer, rings, harmonicNodes, scanLine, centerGlow, particles, t0) {
-    function frame() {
-        _animId = requestAnimationFrame(frame);
-        const t = (Date.now() - t0) * 0.001;
-
-        // Rotate rings at their individual speeds
-        for (let i = 0; i < rings.length; i++) {
-            rings[i].rotation.z += RING_SPEEDS[i];
-        }
-
-        // Advance scan line
-        scanLine.rotation.z += 0.018;
-
-        // Pulse harmonic nodes
-        for (let i = 0; i < harmonicNodes.length; i++) {
-            const n = harmonicNodes[i];
-            const amp = n.ba;
-            const pulse = 0.93 + 0.07 * Math.sin(t * 0.5 + i * 0.7);
-            n.core.material.opacity = (0.4 + amp * 0.45) * pulse;
-            n.glow.material.opacity = amp * 0.14 * pulse;
-        }
-
-        // Pulse center glow
-        centerGlow.material.opacity = 0.12 + 0.04 * Math.sin(t * 0.3);
-
-        // Advance energy flow particles along spokes
-        const pos = particles.geo.attributes.position;
-        for (let i = 0; i < PARTICLE_COUNT; i++) {
-            const pd = particles.data[i];
-            const amp = harmonicNodes[pd.spokeIdx].ba;
-            const speed = 0.005 + amp * 0.02;
-
-            pd.progress += speed;
-            if (pd.progress >= 1.0) {
-                pd.progress = 0.0;
-            }
-
-            const angle = harmonicNodes[pd.spokeIdx].angle;
-            const dist = pd.progress * SPOKE_RADIUS;
-            pos.array[i * 3]     = dist * Math.cos(angle);
-            pos.array[i * 3 + 1] = dist * Math.sin(angle);
-            // z stays constant
-
-            // Fade brightness: bright near center, dim at perimeter
-            // We modulate opacity on the shared material based on average amp
-            // (individual per-particle opacity isn't supported easily in PointsMaterial;
-            // we use the shared opacity as a global "energy" level)
-        }
-        pos.needsUpdate = true;
-
-        // Update particle material opacity from average amplitude
-        const avgAmp = _amps.reduce((s, v) => s + v, 0) / NUM_HARMONICS;
-        particles.geo.userData.mat && (particles.geo.userData.mat.opacity = 0.08 + avgAmp * 0.28);
-
-        composer.render();
-    }
-    frame();
-}
-
-// ─── Public API ──────────────────────────────────────────────────────────────
-
-/**
- * Initialize the holographic wheel scene on the given canvas element.
- * Sizes the canvas to fill its parent container.
- */
-export function initWheel(canvas) {
-    if (_renderer) return; // already initialized
-
-    const parent = canvas.parentElement;
-    const W = parent ? parent.clientWidth  || 280 : 280;
-    const H = parent ? parent.clientHeight || 280 : 280;
-
-    // Resize canvas
-    canvas.width  = W * Math.min(devicePixelRatio, 2);
-    canvas.height = H * Math.min(devicePixelRatio, 2);
-    canvas.style.width  = W + 'px';
-    canvas.style.height = H + 'px';
-
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setSize(W, H);
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.82;
-    _renderer = renderer;
-
-    // Camera — orthographic, centered at (0,0)
-    const cam = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, 0.1, 2000);
-    cam.position.z = 500;
-
-    // Scene
-    const scene = buildScene(W, H);
-
-    // Wheel group
-    const { rings, harmonicNodes, scanLine, centerGlow, particles } = buildWheel(scene);
-    _rings = rings;
-    _harmonicNodes = harmonicNodes;
-    _scanLine = scanLine;
-    _centerGlow = centerGlow;
-    _particles = particles;
-
-    // Store mat reference on geo for opacity updates
-    const pts = scene.getObjectByProperty('type', 'Points');
-    if (pts) particles.geo.userData.mat = pts.material;
-
-    // Post-processing: bloom
-    const composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, cam));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), 3.5, 0.85, 0.006));
-    composer.addPass(new OutputPass());
-    _composer = composer;
-
-    // Handle resize
-    function onResize() {
-        if (!canvas.parentElement) return;
-        const nW = canvas.parentElement.clientWidth  || 280;
-        const nH = canvas.parentElement.clientHeight || 280;
-        renderer.setSize(nW, nH);
-        composer.setSize(nW, nH);
-        cam.left   = -nW / 2;
-        cam.right  =  nW / 2;
-        cam.top    =  nH / 2;
-        cam.bottom = -nH / 2;
-        cam.updateProjectionMatrix();
-    }
-    window.addEventListener('resize', onResize);
-
-    _t0 = Date.now();
-    animate(composer, rings, harmonicNodes, scanLine, centerGlow, particles, _t0);
-}
-
-/**
- * Update harmonic amplitudes. amps is an array of 7 floats in [0, 1].
- * Updates spoke fill lengths, node brightness, and particle speeds.
- */
-export function updateHarmonics(amps) {
-    if (!Array.isArray(amps) || amps.length < NUM_HARMONICS) return;
-
-    for (let i = 0; i < NUM_HARMONICS; i++) {
-        const amp = Math.max(0, Math.min(1, amps[i]));
-        _amps[i] = amp;
-
-        const n = _harmonicNodes[i];
-        if (!n) continue;
-
-        n.ba = amp;
-
-        // Update fill line endpoint
-        const fillLength = amp * SPOKE_RADIUS;
-        const cosA = Math.cos(n.angle);
-        const sinA = Math.sin(n.angle);
-
-        const fillPositions = n.fillLine.geometry.attributes.position;
-        fillPositions.setXYZ(1, fillLength * cosA, fillLength * sinA, 0.1);
-        fillPositions.needsUpdate = true;
-
-        // Update fill line opacity
-        n.fillLine.material.opacity = 0.3 + amp * 0.5;
-
-        // Move cap dot
-        n.capDot.position.set(fillLength * cosA, fillLength * sinA, 0.15);
-        n.capDot.material.opacity = 0.4 + amp * 0.35;
-
-        // Resize node glow/core geometry
-        const nodeSize = 6 + amp * 12;
-        // Rebuild geometries for accurate sizing
-        n.glow.geometry.dispose();
-        n.glow.geometry = new THREE.CircleGeometry(nodeSize * 1.6, 32);
-
-        n.core.geometry.dispose();
-        n.core.geometry = new THREE.CircleGeometry(nodeSize * 0.55, 32);
-    }
-}
-
-/**
- * Stop animation, dispose GPU resources, and clean up.
- */
-export function dispose() {
-    if (_animId !== null) {
-        cancelAnimationFrame(_animId);
-        _animId = null;
-    }
-    if (_renderer) {
-        _renderer.dispose();
-        _renderer = null;
-    }
-    _composer = null;
-    _harmonicNodes = [];
-    _rings = [];
-    _scanLine = null;
-    _centerGlow = null;
-    _particles = null;
-}
-
-// ─── Auto-initialize ──────────────────────────────────────────────────────────
-
+(function(){
 const canvas = document.getElementById('wheelCanvas');
-if (canvas) {
-    // Defer to next frame so layout is complete
-    requestAnimationFrame(() => initWheel(canvas));
+if (!canvas) return;
 
-    // Listen for harmonic amplitude changes from phantom.js
-    document.addEventListener('harmonics-update', (e) => {
-        updateHarmonics(e.detail);
-    });
+const ctx = canvas.getContext('2d');
+if (!ctx) return;
+
+// Match canvas pixel size to its CSS size (2x for retina)
+function resize() {
+    const r = canvas.getBoundingClientRect();
+    const pr = window.devicePixelRatio || 1;
+    canvas.width  = Math.max(1, Math.floor(r.width  * pr));
+    canvas.height = Math.max(1, Math.floor(r.height * pr));
 }
+resize();
+window.addEventListener('resize', resize);
+
+// ─── State ───────────────────────────────────────────────────────────────
+let harmonicAmps = [0.80, 0.70, 0.50, 0.35, 0.20, 0.12, 0.07];
+let ringRot = [0, 0, 0, 0, 0, 0];
+let ringSpeed = [0.015, -0.020, 0.010, -0.025, 0.012, -0.008];
+let scanAngle = 0;
+let shimmerT = 0;
+
+// Energy flow particles — 20 per spoke = 140 total
+const PARTICLES_PER_SPOKE = 20;
+const particles = [];
+for (let s = 0; s < 7; s++) {
+    for (let i = 0; i < PARTICLES_PER_SPOKE; i++) {
+        particles.push({ spoke: s, progress: Math.random() });
+    }
+}
+
+// ─── Public API ──────────────────────────────────────────────────────────
+window.PhantomRecipeWheel = {
+    setAmplitudes(amps) {
+        if (Array.isArray(amps) && amps.length >= 7) {
+            for (let i = 0; i < 7; i++) harmonicAmps[i] = amps[i];
+        }
+    }
+};
+
+// ─── Drawing ─────────────────────────────────────────────────────────────
+function draw() {
+    requestAnimationFrame(draw);
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const R  = Math.min(w, h) * 0.5 - 4;  // outer radius
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Background gradient fill (dark with slight glow)
+    const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+    bgGrad.addColorStop(0,   'rgba(10,10,20,0.4)');
+    bgGrad.addColorStop(0.6, 'rgba(3,3,8,0.6)');
+    bgGrad.addColorStop(1,   'rgba(0,0,0,0.8)');
+    ctx.fillStyle = bgGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ── Holographic rings ──────────────────────────────────────────────
+    const ringRadii  = [0.92, 0.77, 0.60, 0.40, 0.22, 0.96];
+    const ringWidths = [0.8, 0.6, 0.5, 0.6, 0.8, 0.3];
+    const ringAlphas = [0.18, 0.12, 0.08, 0.13, 0.22, 0.06];
+    for (let i = 0; i < 6; i++) {
+        const rr = R * ringRadii[i];
+        ctx.strokeStyle = `rgba(255,255,255,${ringAlphas[i]})`;
+        ctx.lineWidth = ringWidths[i] * (window.devicePixelRatio || 1);
+        ctx.beginPath();
+        ctx.arc(cx, cy, rr, ringRot[i], ringRot[i] + Math.PI * 2);
+        ctx.stroke();
+        ringRot[i] += ringSpeed[i] * 0.5;
+    }
+
+    // ── Harmonic tank spokes and nodes ─────────────────────────────────
+    const innerR = R * 0.22;
+    const outerR = R * 0.90;
+    for (let i = 0; i < 7; i++) {
+        const angle = (i / 7) * Math.PI * 2 - Math.PI / 2;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const amp = harmonicAmps[i];
+
+        // Dim track (full spoke)
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        ctx.lineWidth = 5 * (window.devicePixelRatio || 1);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(cx + innerR * cos, cy + innerR * sin);
+        ctx.lineTo(cx + outerR * cos, cy + outerR * sin);
+        ctx.stroke();
+
+        // Bright fill (proportional to amplitude)
+        const fillEnd = innerR + (outerR - innerR) * amp;
+        const gradX1 = cx + innerR * cos;
+        const gradY1 = cy + innerR * sin;
+        const gradX2 = cx + fillEnd * cos;
+        const gradY2 = cy + fillEnd * sin;
+
+        const spokeGrad = ctx.createLinearGradient(gradX1, gradY1, gradX2, gradY2);
+        spokeGrad.addColorStop(0, `rgba(255,255,255,${0.55 * amp})`);
+        spokeGrad.addColorStop(1, `rgba(255,255,255,${0.08 * amp})`);
+
+        // Glow halo
+        ctx.strokeStyle = `rgba(255,255,255,${0.25 * amp})`;
+        ctx.lineWidth = 9 * (window.devicePixelRatio || 1);
+        ctx.beginPath();
+        ctx.moveTo(gradX1, gradY1);
+        ctx.lineTo(gradX2, gradY2);
+        ctx.stroke();
+
+        // Sharp fill line
+        ctx.strokeStyle = spokeGrad;
+        ctx.lineWidth = 3.5 * (window.devicePixelRatio || 1);
+        ctx.beginPath();
+        ctx.moveTo(gradX1, gradY1);
+        ctx.lineTo(gradX2, gradY2);
+        ctx.stroke();
+
+        // Cap dot at fill endpoint
+        ctx.fillStyle = `rgba(255,255,255,${0.8 * amp})`;
+        ctx.beginPath();
+        ctx.arc(gradX2, gradY2, 3 * (window.devicePixelRatio || 1), 0, Math.PI * 2);
+        ctx.fill();
+
+        // Outer node (glow halo + bright core)
+        const nx = cx + outerR * cos;
+        const ny = cy + outerR * sin;
+        const nodeSize = (3 + amp * 10) * (window.devicePixelRatio || 1);
+        // Halo
+        const haloGrad = ctx.createRadialGradient(nx, ny, 0, nx, ny, nodeSize * 3);
+        haloGrad.addColorStop(0, `rgba(255,255,255,${0.4 * amp})`);
+        haloGrad.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = haloGrad;
+        ctx.beginPath();
+        ctx.arc(nx, ny, nodeSize * 3, 0, Math.PI * 2);
+        ctx.fill();
+        // Core
+        ctx.fillStyle = `rgba(255,255,255,${0.5 + amp * 0.45})`;
+        ctx.beginPath();
+        ctx.arc(nx, ny, nodeSize * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // ── Energy flow particles ──────────────────────────────────────────
+    for (const p of particles) {
+        const spokeAngle = (p.spoke / 7) * Math.PI * 2 - Math.PI / 2;
+        const cos = Math.cos(spokeAngle);
+        const sin = Math.sin(spokeAngle);
+        const amp = harmonicAmps[p.spoke];
+        const speed = 0.004 + amp * 0.020;
+        p.progress += speed;
+        if (p.progress > 1) p.progress = 0;
+
+        // Position along the spoke
+        const r = innerR + (outerR - innerR) * p.progress;
+        const px = cx + r * cos;
+        const py = cy + r * sin;
+        const alpha = amp * (1 - p.progress) * 0.85;
+
+        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+        ctx.beginPath();
+        ctx.arc(px, py, 1.4 * (window.devicePixelRatio || 1), 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // ── Scan line ──────────────────────────────────────────────────────
+    scanAngle += 0.018;
+    const sx = cx + Math.cos(scanAngle) * outerR * 0.95;
+    const sy = cy + Math.sin(scanAngle) * outerR * 0.95;
+    const scanGrad = ctx.createLinearGradient(cx, cy, sx, sy);
+    scanGrad.addColorStop(0, 'rgba(255,255,255,0)');
+    scanGrad.addColorStop(0.7, 'rgba(255,255,255,0.04)');
+    scanGrad.addColorStop(1, 'rgba(255,255,255,0.12)');
+    ctx.strokeStyle = scanGrad;
+    ctx.lineWidth = 1.5 * (window.devicePixelRatio || 1);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(sx, sy);
+    ctx.stroke();
+
+    // ── Center glow ────────────────────────────────────────────────────
+    shimmerT += 0.05;
+    const pulse = 0.7 + 0.3 * Math.sin(shimmerT);
+    const centerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, innerR);
+    centerGlow.addColorStop(0,   `rgba(255,255,255,${0.25 * pulse})`);
+    centerGlow.addColorStop(0.5, `rgba(255,255,255,${0.08 * pulse})`);
+    centerGlow.addColorStop(1,   'rgba(255,255,255,0)');
+    ctx.fillStyle = centerGlow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+draw();
+
+// Listen for harmonic amp updates from phantom.js (if it dispatches them)
+document.addEventListener('harmonics-update', (e) => {
+    if (e && e.detail) window.PhantomRecipeWheel.setAmplitudes(e.detail);
+});
+})();

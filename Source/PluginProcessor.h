@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include "Parameters.h"
 #include "Engines/PitchTracker.h"
 #include "Engines/HarmonicGenerator.h"
 #include "Engines/BinauralStage.h"
@@ -25,6 +26,11 @@ public:
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
+
+    juce::AudioProcessorParameter* getBypassParameter() const override
+    {
+        return apvts.getParameter(ParamID::BYPASS);
+    }
 
     const juce::String getName() const override { return "Kaigen Phantom"; }
     bool acceptsMidi() const override { return true; }
@@ -54,6 +60,11 @@ public:
     std::array<float, kSpectrumBins> spectrumData {};
     std::atomic<bool> spectrumReady { false };
 
+    // Diagnostics
+    std::atomic<int>   fftRunCount   { 0 };
+    std::atomic<float> fftMaxMagnitude { 0.0f };
+    std::atomic<int>   processBlockCount { 0 };
+
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
@@ -82,8 +93,10 @@ private:
     juce::AudioBuffer<float> dryBuf;
 
     // FFT for spectrum analysis
-    juce::dsp::FFT spectrumFFT { 9 }; // 512-point FFT
-    std::array<float, 1024> fftBuffer {};
+    static constexpr int kFftOrder = 11;                     // 2048-point FFT
+    static constexpr int kFftSize  = 1 << kFftOrder;         // 2048
+    juce::dsp::FFT spectrumFFT { kFftOrder };
+    std::array<float, kFftSize * 2> fftBuffer {};
     int fftWritePos = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomProcessor)

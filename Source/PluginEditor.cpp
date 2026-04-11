@@ -1,6 +1,10 @@
 #include "PluginEditor.h"
 #include "BinaryData.h"
 
+#if JUCE_WINDOWS
+#include <windows.h>
+#endif
+
 static const char* getMimeForExtension(const juce::String& extension)
 {
     static const std::unordered_map<juce::String, const char*> mimeMap =
@@ -19,6 +23,13 @@ static const char* getMimeForExtension(const juce::String& extension)
 // Build the Options chain for the WebView — called once during construction
 juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEditor& self)
 {
+   #if JUCE_WINDOWS
+    // Enable WebView2 remote debugging on port 9222 — must be set before
+    // the first WebView2 environment is created in this process
+    SetEnvironmentVariableW(L"WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+                             L"--remote-debugging-port=9222 --remote-allow-origins=*");
+   #endif
+
     auto options = juce::WebBrowserComponent::Options{}
         .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
         .withWinWebView2Options(
@@ -48,10 +59,14 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
     // Register combo relays
     juce::WebComboBoxRelay* comboRelays[] = {
         &self.modeRelay, &self.ghostModeRelay,
-        &self.recipePresetRelay, &self.deconflictionModeRelay
+        &self.recipePresetRelay, &self.deconflictionModeRelay,
+        &self.binauralModeRelay
     };
     for (auto* r : comboRelays)
         options = options.withOptionsFrom(*r);
+
+    // Register bypass toggle relay
+    options = options.withOptionsFrom(self.bypassRelay);
 
     // Native functions for real-time data
     options = options
@@ -59,13 +74,25 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
             [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
                 juce::Array<juce::var> bins;
-                if (self.processor.spectrumReady.exchange(false))
-                    for (int i = 0; i < PhantomProcessor::kSpectrumBins; ++i)
-                        bins.add(self.processor.spectrumData[(size_t)i]);
-                else
-                    for (int i = 0; i < PhantomProcessor::kSpectrumBins; ++i)
-                        bins.add(0.0f);
+                // Always return latest spectrum data (don't consume ready flag)
+                for (int i = 0; i < PhantomProcessor::kSpectrumBins; ++i)
+                    bins.add(self.processor.spectrumData[(size_t)i]);
                 complete(bins);
+            })
+        .withNativeFunction("getDiagnostics",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty("processBlocks",    self.processor.processBlockCount.load(std::memory_order_relaxed));
+                obj->setProperty("fftRuns",          self.processor.fftRunCount.load(std::memory_order_relaxed));
+                obj->setProperty("fftMaxMagnitude",  (double)self.processor.fftMaxMagnitude.load(std::memory_order_relaxed));
+                obj->setProperty("currentPitch",     (double)self.processor.currentPitch.load(std::memory_order_relaxed));
+                // First 5 spectrumData values
+                juce::Array<juce::var> first5;
+                for (int i = 0; i < 5; ++i)
+                    first5.add((double)self.processor.spectrumData[(size_t)i]);
+                obj->setProperty("spectrum0_4", first5);
+                complete(juce::var(obj));
             })
         .withNativeFunction("getPeakLevels",
             [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
@@ -159,10 +186,15 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         { ParamID::GHOST_MODE,         ghostModeRelay },
         { ParamID::RECIPE_PRESET,      recipePresetRelay },
         { ParamID::DECONFLICTION_MODE, deconflictionModeRelay },
+        { ParamID::BINAURAL_MODE,      binauralModeRelay },
     };
     for (auto& b : comboBindings)
         comboAttachments.push_back(std::make_unique<juce::WebComboBoxParameterAttachment>(
             *processor.apvts.getParameter(b.paramId), b.relay, nullptr));
+
+    // Bypass toggle attachment
+    bypassAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
+        *processor.apvts.getParameter(ParamID::BYPASS), bypassRelay, nullptr);
 }
 
 PhantomEditor::~PhantomEditor() = default;
