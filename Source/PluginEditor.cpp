@@ -1,132 +1,70 @@
 #include "PluginEditor.h"
-#include "UI/PhantomColours.h"
-#include "Parameters.h"
+#include "BinaryData.h"
+
+static const char* getMimeForExtension(const juce::String& extension)
+{
+    static const std::unordered_map<juce::String, const char*> mimeMap =
+    {
+        { "html", "text/html" },
+        { "htm",  "text/html" },
+        { "css",  "text/css" },
+        { "js",   "text/javascript" },
+        { "json", "application/json" },
+        { "png",  "image/png" },
+        { "jpg",  "image/jpeg" },
+        { "svg",  "image/svg+xml" },
+        { "woff2","font/woff2" },
+    };
+
+    if (const auto it = mimeMap.find(extension.toLowerCase()); it != mimeMap.end())
+        return it->second;
+
+    return "application/octet-stream";
+}
 
 PhantomEditor::PhantomEditor(PhantomProcessor& p)
-    : AudioProcessorEditor(&p), processor(p),
-      headerBar(p.apvts),
-      recipeWheelPanel(p.apvts),
-      harmonicPanel(p.apvts),
-      ghostPanel(p.apvts),
-      outputPanel(p.apvts),
-      pitchTrackerPanel(p.apvts),
-      sidechainPanel(p.apvts),
-      stereoPanel(p.apvts),
-      deconflictionPanel(p.apvts)
+    : AudioProcessorEditor(&p), processor(p)
 {
-    setLookAndFeel(&phantomLnf);
     setSize(920, 620);
-
-    addAndMakeVisible(recipeWheelPanel);
-    addAndMakeVisible(headerBar);
-    addAndMakeVisible(footerBar);
-    addAndMakeVisible(headerSeam);
-    addAndMakeVisible(bodyVSeam);
-    addAndMakeVisible(row1Seam);
-    addAndMakeVisible(harmonicPanel);
-    addAndMakeVisible(ghostPanel);
-    addAndMakeVisible(outputPanel);
-    addAndMakeVisible(row2Seam);
-    addAndMakeVisible(pitchTrackerPanel);
-    addAndMakeVisible(sidechainPanel);
-    addAndMakeVisible(stereoPanel);
-    addAndMakeVisible(deconflictionPanel);
-
-    addAndMakeVisible(spectrumAnalyzer);
-    addAndMakeVisible(inputMeter);
-    addAndMakeVisible(outputMeter);
-
-    deconflictionPanel.setVisible(false);   // Effect mode is default
-
-    processor.apvts.addParameterListener(ParamID::MODE, this);
-
-    startTimerHz(30);
-}
-
-PhantomEditor::~PhantomEditor()
-{
-    stopTimer();
-    processor.apvts.removeParameterListener(ParamID::MODE, this);
-    setLookAndFeel(nullptr);
-}
-
-void PhantomEditor::timerCallback()
-{
-    recipeWheelPanel.updatePitch(processor.currentPitch.load(std::memory_order_relaxed));
-
-    inputMeter.setLevel(processor.peakInL.load(std::memory_order_relaxed),
-                        processor.peakInR.load(std::memory_order_relaxed));
-    outputMeter.setLevel(processor.peakOutL.load(std::memory_order_relaxed),
-                         processor.peakOutR.load(std::memory_order_relaxed));
-
-    spectrumAnalyzer.pullSpectrum(processor);
-}
-
-void PhantomEditor::parameterChanged(const juce::String& parameterID, float newValue)
-{
-    if (parameterID == ParamID::MODE)
-    {
-        bool isEffect = (newValue < 0.5f);
-        juce::MessageManager::callAsync([this, isEffect]()
-        {
-            pitchTrackerPanel.setVisible(isEffect);
-            deconflictionPanel.setVisible(!isEffect);
-            resized();
-        });
-    }
+    addAndMakeVisible(webView);
+    webView.goToURL(juce::WebBrowserComponent::getResourceProviderRoot());
 }
 
 void PhantomEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(PhantomColours::background);
+    g.fillAll(juce::Colour(0xff06060c));
 }
 
 void PhantomEditor::resized()
 {
-    auto area = getLocalBounds();
+    webView.setBounds(getLocalBounds());
+}
 
-    headerBar.setBounds(area.removeFromTop(50));
-    headerSeam.setBounds(area.removeFromTop(3));
-    footerBar.setBounds(area.removeFromBottom(38));
+std::optional<juce::WebBrowserComponent::Resource> PhantomEditor::getResource(const juce::String& url)
+{
+    const auto urlToRetrieve = url == "/" ? juce::String{ "index.html" }
+                                          : url.fromFirstOccurrenceOf("/", false, false);
 
-    // Body: left recipe wheel area (316px) | seam | right panel
-    auto body = area;
-    auto leftArea = body.removeFromLeft(316);
-    recipeWheelPanel.setBounds(leftArea);
-    bodyVSeam.setBounds(body.removeFromLeft(3));
-    auto rightArea = body;
+    // BinaryData converts filenames: "index.html" -> "index_html", "styles.css" -> "styles_css"
+    auto resourceName = urlToRetrieve.replace(".", "_").replace("-", "_").replace("/", "_");
 
-    // Right panel: Row 1 (knob panels) | seam | rest
-    auto row1 = rightArea.removeFromTop(130);
-    row1Seam.setBounds(rightArea.removeFromTop(3));
+    for (int i = 0; i < BinaryData::namedResourceListSize; ++i)
+    {
+        if (juce::String(BinaryData::namedResourceList[i]) == resourceName)
+        {
+            int size = 0;
+            const auto* data = BinaryData::getNamedResource(BinaryData::namedResourceList[i], size);
 
-    // Row 1: HarmonicEngine (42%) | Ghost (35%) | Output (rest)
-    int heW = (int)(row1.getWidth() * 0.42f);
-    int ghW = (int)(row1.getWidth() * 0.35f);
+            if (data != nullptr && size > 0)
+            {
+                auto extension = urlToRetrieve.fromLastOccurrenceOf(".", false, false);
+                std::vector<std::byte> bytes(reinterpret_cast<const std::byte*>(data),
+                                              reinterpret_cast<const std::byte*>(data) + size);
+                return juce::WebBrowserComponent::Resource{ std::move(bytes),
+                                                             juce::String(getMimeForExtension(extension)) };
+            }
+        }
+    }
 
-    harmonicPanel.setBounds(row1.removeFromLeft(heW));
-    ghostPanel.setBounds(row1.removeFromLeft(ghW));
-    outputPanel.setBounds(row1);
-
-    // Row 2 (mode-switched)
-    auto row2 = rightArea.removeFromTop(130);
-    row2Seam.setBounds(rightArea.removeFromTop(3));
-
-    // First panel: PitchTracker (Effect) or Deconfliction (Instrument) — same bounds
-    auto row2Left = row2.removeFromLeft((int)(row2.getWidth() * 0.30f));
-    pitchTrackerPanel.setBounds(row2Left);
-    deconflictionPanel.setBounds(row2Left);
-
-    // Sidechain
-    auto row2Mid = row2.removeFromLeft((int)(row2.getWidth() * 0.58f));
-    sidechainPanel.setBounds(row2Mid);
-
-    // Stereo
-    stereoPanel.setBounds(row2);
-
-    // Spectrum row fills remaining space
-    auto specRow = rightArea;
-    inputMeter.setBounds(specRow.removeFromLeft(14));
-    outputMeter.setBounds(specRow.removeFromRight(14));
-    spectrumAnalyzer.setBounds(specRow);
+    return std::nullopt;
 }

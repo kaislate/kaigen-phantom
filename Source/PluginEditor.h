@@ -1,59 +1,40 @@
 #pragma once
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
-#include "UI/PhantomLookAndFeel.h"
-#include "UI/HeaderBar.h"
-#include "UI/FooterBar.h"
-#include "UI/GlowSeam.h"
-#include "UI/HarmonicEnginePanel.h"
-#include "UI/GhostPanel.h"
-#include "UI/OutputPanel.h"
-#include "UI/PitchTrackerPanel.h"
-#include "UI/SidechainPanel.h"
-#include "UI/StereoPanel.h"
-#include "UI/DeconflictionPanel.h"
-#include "UI/RecipeWheelPanel.h"
-#include "UI/SpectrumAnalyzer.h"
-#include "UI/LevelMeter.h"
 
-class PhantomEditor : public juce::AudioProcessorEditor,
-                      private juce::AudioProcessorValueTreeState::Listener,
-                      private juce::Timer
+struct SinglePageBrowser : juce::WebBrowserComponent
+{
+    using WebBrowserComponent::WebBrowserComponent;
+    bool pageAboutToLoad(const juce::String& newURL) override
+    {
+        return newURL == getResourceProviderRoot();
+    }
+};
+
+class PhantomEditor : public juce::AudioProcessorEditor
 {
 public:
     explicit PhantomEditor(PhantomProcessor&);
-    ~PhantomEditor() override;
+    ~PhantomEditor() override = default;
+
     void paint(juce::Graphics&) override;
     void resized() override;
 
 private:
-    void parameterChanged(const juce::String& parameterID, float newValue) override;
-    void timerCallback() override;
+    std::optional<juce::WebBrowserComponent::Resource> getResource(const juce::String& url);
 
     PhantomProcessor& processor;
-    PhantomLookAndFeel phantomLnf;
 
-    HeaderBar  headerBar;
-    FooterBar  footerBar;
-    GlowSeam   headerSeam { GlowSeam::Orientation::Horizontal };
-    GlowSeam   bodyVSeam  { GlowSeam::Orientation::Vertical };
-    GlowSeam   row1Seam   { GlowSeam::Orientation::Horizontal };
-
-    HarmonicEnginePanel harmonicPanel;
-    GhostPanel          ghostPanel;
-    OutputPanel         outputPanel;
-
-    RecipeWheelPanel   recipeWheelPanel;
-
-    GlowSeam           row2Seam { GlowSeam::Orientation::Horizontal };
-    PitchTrackerPanel  pitchTrackerPanel;
-    SidechainPanel     sidechainPanel;
-    StereoPanel        stereoPanel;
-    DeconflictionPanel deconflictionPanel;
-
-    SpectrumAnalyzer spectrumAnalyzer;
-    LevelMeter inputMeter  { "IN" };
-    LevelMeter outputMeter { "OUT" };
+    SinglePageBrowser webView {
+        juce::WebBrowserComponent::Options{}
+            .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
+            .withWinWebView2Options(
+                juce::WebBrowserComponent::Options::WinWebView2{}
+                    .withUserDataFolder(
+                        juce::File::getSpecialLocation(juce::File::tempDirectory)))
+            .withNativeIntegrationEnabled()
+            .withResourceProvider([this](const auto& url) { return getResource(url); })
+    };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomEditor)
 };
