@@ -182,7 +182,8 @@ std::optional<juce::WebBrowserComponent::Resource> PhantomEditor::getResource(co
     const auto urlToRetrieve = url == "/" ? juce::String{ "index.html" }
                                           : url.fromFirstOccurrenceOf("/", false, false);
 
-    auto resourceName = urlToRetrieve.replace(".", "_").replace("-", "_").replace("/", "_");
+    // JUCE BinaryData naming: dots -> underscores, dashes STRIPPED (not replaced)
+    auto resourceName = urlToRetrieve.replace(".", "_").replace("-", "").replace("/", "_");
 
     for (int i = 0; i < BinaryData::namedResourceListSize; ++i)
     {
