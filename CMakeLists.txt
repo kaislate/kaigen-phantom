@@ -56,6 +56,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/SidechainPanel.cpp
     Source/UI/StereoPanel.cpp
     Source/UI/DeconflictionPanel.cpp
+    Source/UI/RecipeWheel.cpp
 )
 
 target_include_directories(KaigenPhantom PRIVATE Source)
