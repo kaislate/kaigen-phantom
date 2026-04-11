@@ -47,6 +47,7 @@ target_sources(KaigenPhantom PRIVATE
 
 juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/index.html
+    Source/WebUI/styles.css
 )
 
 target_include_directories(KaigenPhantom PRIVATE Source)
