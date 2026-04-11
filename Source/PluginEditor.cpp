@@ -109,7 +109,12 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
 {
     setSize(920, 620);
     addAndMakeVisible(webView);
-    webView.goToURL(juce::WebBrowserComponent::getResourceProviderRoot());
+
+    // Defer URL load until after construction completes — fixes VST3 white screen
+    juce::MessageManager::callAsync([this]()
+    {
+        webView.goToURL(juce::WebBrowserComponent::getResourceProviderRoot());
+    });
 
     // Create parameter attachments
     struct SliderBinding { const char* paramId; juce::WebSliderRelay& relay; };
