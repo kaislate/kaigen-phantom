@@ -51,9 +51,23 @@ juce_add_binary_data(PhantomWebUI SOURCES
 
 target_include_directories(KaigenPhantom PRIVATE Source)
 
+# Fetch WebView2 SDK for Windows
+set(WEBVIEW2_DIR "${CMAKE_BINARY_DIR}/webview2")
+if(NOT EXISTS "${WEBVIEW2_DIR}/build/native/include/WebView2.h")
+    file(DOWNLOAD
+        "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.2739.15"
+        "${WEBVIEW2_DIR}/webview2.zip"
+        STATUS DL_STATUS)
+    file(ARCHIVE_EXTRACT INPUT "${WEBVIEW2_DIR}/webview2.zip"
+         DESTINATION "${WEBVIEW2_DIR}")
+endif()
+target_include_directories(KaigenPhantom PRIVATE
+    "${WEBVIEW2_DIR}/build/native/include")
+
 target_compile_definitions(KaigenPhantom PUBLIC
     JUCE_WEB_BROWSER=1
     JUCE_USE_WIN_WEBVIEW2=1
+    JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
 )
@@ -64,6 +78,7 @@ target_link_libraries(KaigenPhantom
         juce::juce_gui_extra
         juce::juce_dsp
         PhantomWebUI
+        "${CMAKE_BINARY_DIR}/webview2/build/native/x64/WebView2LoaderStatic.lib"
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
