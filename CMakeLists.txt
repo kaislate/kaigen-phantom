@@ -52,6 +52,10 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/HarmonicEnginePanel.cpp
     Source/UI/GhostPanel.cpp
     Source/UI/OutputPanel.cpp
+    Source/UI/PitchTrackerPanel.cpp
+    Source/UI/SidechainPanel.cpp
+    Source/UI/StereoPanel.cpp
+    Source/UI/DeconflictionPanel.cpp
 )
 
 target_include_directories(KaigenPhantom PRIVATE Source)

@@ -1,12 +1,17 @@
 #include "PluginEditor.h"
 #include "UI/PhantomColours.h"
+#include "Parameters.h"
 
 PhantomEditor::PhantomEditor(PhantomProcessor& p)
     : AudioProcessorEditor(&p), processor(p),
       headerBar(p.apvts),
       harmonicPanel(p.apvts),
       ghostPanel(p.apvts),
-      outputPanel(p.apvts)
+      outputPanel(p.apvts),
+      pitchTrackerPanel(p.apvts),
+      sidechainPanel(p.apvts),
+      stereoPanel(p.apvts),
+      deconflictionPanel(p.apvts)
 {
     setLookAndFeel(&phantomLnf);
     setSize(920, 620);
@@ -19,11 +24,35 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
     addAndMakeVisible(harmonicPanel);
     addAndMakeVisible(ghostPanel);
     addAndMakeVisible(outputPanel);
+    addAndMakeVisible(row2Seam);
+    addAndMakeVisible(pitchTrackerPanel);
+    addAndMakeVisible(sidechainPanel);
+    addAndMakeVisible(stereoPanel);
+    addAndMakeVisible(deconflictionPanel);
+
+    deconflictionPanel.setVisible(false);   // Effect mode is default
+
+    processor.apvts.addParameterListener(ParamID::MODE, this);
 }
 
 PhantomEditor::~PhantomEditor()
 {
+    processor.apvts.removeParameterListener(ParamID::MODE, this);
     setLookAndFeel(nullptr);
+}
+
+void PhantomEditor::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    if (parameterID == ParamID::MODE)
+    {
+        bool isEffect = (newValue < 0.5f);
+        juce::MessageManager::callAsync([this, isEffect]()
+        {
+            pitchTrackerPanel.setVisible(isEffect);
+            deconflictionPanel.setVisible(!isEffect);
+            resized();
+        });
+    }
 }
 
 void PhantomEditor::paint(juce::Graphics& g)
@@ -42,7 +71,7 @@ void PhantomEditor::resized()
     // Body: left recipe wheel area (316px) | seam | right panel
     auto body = area;
     auto leftArea = body.removeFromLeft(316);  // Reserved for RecipeWheelPanel (Phase 4)
-    juce::ignoreUnused(leftArea);
+    (void)leftArea;
     bodyVSeam.setBounds(body.removeFromLeft(3));
     auto rightArea = body;
 
@@ -57,4 +86,20 @@ void PhantomEditor::resized()
     harmonicPanel.setBounds(row1.removeFromLeft(heW));
     ghostPanel.setBounds(row1.removeFromLeft(ghW));
     outputPanel.setBounds(row1);
+
+    // Row 2 (mode-switched)
+    auto row2 = rightArea.removeFromTop(130);
+    row2Seam.setBounds(rightArea.removeFromTop(3));
+
+    // First panel: PitchTracker (Effect) or Deconfliction (Instrument) — same bounds
+    auto row2Left = row2.removeFromLeft((int)(row2.getWidth() * 0.30f));
+    pitchTrackerPanel.setBounds(row2Left);
+    deconflictionPanel.setBounds(row2Left);
+
+    // Sidechain
+    auto row2Mid = row2.removeFromLeft((int)(row2.getWidth() * 0.58f));
+    sidechainPanel.setBounds(row2Mid);
+
+    // Stereo
+    stereoPanel.setBounds(row2);
 }

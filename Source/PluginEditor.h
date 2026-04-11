@@ -8,8 +8,13 @@
 #include "UI/HarmonicEnginePanel.h"
 #include "UI/GhostPanel.h"
 #include "UI/OutputPanel.h"
+#include "UI/PitchTrackerPanel.h"
+#include "UI/SidechainPanel.h"
+#include "UI/StereoPanel.h"
+#include "UI/DeconflictionPanel.h"
 
-class PhantomEditor : public juce::AudioProcessorEditor
+class PhantomEditor : public juce::AudioProcessorEditor,
+                      private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     explicit PhantomEditor(PhantomProcessor&);
@@ -18,6 +23,8 @@ public:
     void resized() override;
 
 private:
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+
     PhantomProcessor& processor;
     PhantomLookAndFeel phantomLnf;
 
@@ -30,6 +37,12 @@ private:
     HarmonicEnginePanel harmonicPanel;
     GhostPanel          ghostPanel;
     OutputPanel         outputPanel;
+
+    GlowSeam           row2Seam { GlowSeam::Orientation::Horizontal };
+    PitchTrackerPanel  pitchTrackerPanel;
+    SidechainPanel     sidechainPanel;
+    StereoPanel        stereoPanel;
+    DeconflictionPanel deconflictionPanel;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomEditor)
 };
