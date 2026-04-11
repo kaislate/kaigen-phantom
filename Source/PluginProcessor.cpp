@@ -143,6 +143,7 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 // Update perceptual optimizer with note pitch
                 const float noteHz = 440.0f * std::pow(2.0f, (m.getNoteNumber() - 69) / 12.0f);
                 perceptualOpt.setFundamental(noteHz);
+                currentPitch.store(noteHz, std::memory_order_relaxed);
             }
             else if (m.isNoteOff() || (m.isNoteOn() && m.getVelocity() == 0))
                 harmonicGen.noteOff(m.getNoteNumber());
