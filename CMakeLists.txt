@@ -50,6 +50,7 @@ juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/styles.css
     Source/WebUI/knob.js
     Source/WebUI/phantom.js
+    Source/WebUI/spectrum.js
 )
 
 target_include_directories(KaigenPhantom PRIVATE Source)
