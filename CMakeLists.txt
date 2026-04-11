@@ -49,6 +49,9 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/GlowSeam.cpp
     Source/UI/HeaderBar.cpp
     Source/UI/FooterBar.cpp
+    Source/UI/HarmonicEnginePanel.cpp
+    Source/UI/GhostPanel.cpp
+    Source/UI/OutputPanel.cpp
 )
 
 target_include_directories(KaigenPhantom PRIVATE Source)
