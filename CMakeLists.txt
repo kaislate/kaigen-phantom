@@ -52,6 +52,7 @@ juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/phantom.js
     Source/WebUI/spectrum.js
     Source/WebUI/recipe-wheel.js
+    Source/WebUI/juce-frontend.js
 )
 
 target_include_directories(KaigenPhantom PRIVATE Source)

@@ -5,7 +5,7 @@ import {
   getSliderState,
   getComboBoxState,
   getNativeFunction,
-} from "./index.js";
+} from "/juce-frontend.js";
 
 // =============================================================================
 // 1. Display value formatting
