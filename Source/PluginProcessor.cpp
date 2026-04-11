@@ -10,6 +10,12 @@ PhantomProcessor::PhantomProcessor()
         .withOutput("Output",    juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "PHANTOM_STATE", createParameterLayout())
 {
+    apvts.addParameterListener(ParamID::RECIPE_PRESET, this);
+}
+
+PhantomProcessor::~PhantomProcessor()
+{
+    apvts.removeParameterListener(ParamID::RECIPE_PRESET, this);
 }
 
 void PhantomProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -258,6 +264,27 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 spectrumReady.store(true, std::memory_order_release);
             }
         }
+    }
+}
+
+void PhantomProcessor::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    if (parameterID == ParamID::RECIPE_PRESET)
+    {
+        int idx = juce::roundToInt(newValue);
+        const float* tables[] = { kWarmAmps, kAggressiveAmps, kHollowAmps, kDenseAmps, nullptr };
+
+        if (idx >= 0 && idx < 4 && tables[idx] != nullptr)
+        {
+            const char* hIds[] = {
+                ParamID::RECIPE_H2, ParamID::RECIPE_H3, ParamID::RECIPE_H4,
+                ParamID::RECIPE_H5, ParamID::RECIPE_H6, ParamID::RECIPE_H7, ParamID::RECIPE_H8
+            };
+            for (int i = 0; i < 7; ++i)
+                if (auto* p = apvts.getParameter(hIds[i]))
+                    p->setValueNotifyingHost(p->convertTo0to1(tables[idx][i] * 100.0f));
+        }
+        // Index 4 = Custom — don't overwrite, user has manual control
     }
 }
 

@@ -12,11 +12,12 @@
 #include "Engines/Deconfliction/ResidueStrategy.h"
 #include "Engines/Deconfliction/BinauralStrategy.h"
 
-class PhantomProcessor : public juce::AudioProcessor
+class PhantomProcessor : public juce::AudioProcessor,
+                         private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     PhantomProcessor();
-    ~PhantomProcessor() override = default;
+    ~PhantomProcessor() override;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -54,6 +55,8 @@ public:
     std::atomic<bool> spectrumReady { false };
 
 private:
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     void syncEnginesFromApvts(bool isInstrumentMode);
