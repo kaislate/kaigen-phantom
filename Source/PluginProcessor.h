@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include "Parameters.h"
 #include "Engines/PitchTracker.h"
 #include "Engines/HarmonicGenerator.h"
 #include "Engines/BinauralStage.h"
@@ -12,11 +13,12 @@
 #include "Engines/Deconfliction/ResidueStrategy.h"
 #include "Engines/Deconfliction/BinauralStrategy.h"
 
-class PhantomProcessor : public juce::AudioProcessor
+class PhantomProcessor : public juce::AudioProcessor,
+                         private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     PhantomProcessor();
-    ~PhantomProcessor() override = default;
+    ~PhantomProcessor() override;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -24,6 +26,11 @@ public:
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
+
+    juce::AudioProcessorParameter* getBypassParameter() const override
+    {
+        return apvts.getParameter(ParamID::BYPASS);
+    }
 
     const juce::String getName() const override { return "Kaigen Phantom"; }
     bool acceptsMidi() const override { return true; }
@@ -40,8 +47,27 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
 
     juce::AudioProcessorValueTreeState apvts;
+    std::atomic<float> currentPitch { -1.0f };
+
+    // Peak levels for I/O meters
+    std::atomic<float> peakInL  { 0.0f };
+    std::atomic<float> peakInR  { 0.0f };
+    std::atomic<float> peakOutL { 0.0f };
+    std::atomic<float> peakOutR { 0.0f };
+
+    // Spectrum data — 80 log-spaced bins
+    static constexpr int kSpectrumBins = 80;
+    std::array<float, kSpectrumBins> spectrumData {};
+    std::atomic<bool> spectrumReady { false };
+
+    // Diagnostics
+    std::atomic<int>   fftRunCount   { 0 };
+    std::atomic<float> fftMaxMagnitude { 0.0f };
+    std::atomic<int>   processBlockCount { 0 };
 
 private:
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     void syncEnginesFromApvts(bool isInstrumentMode);
@@ -65,6 +91,13 @@ private:
 
     juce::AudioBuffer<float> phantomBuf;
     juce::AudioBuffer<float> dryBuf;
+
+    // FFT for spectrum analysis
+    static constexpr int kFftOrder = 11;                     // 2048-point FFT
+    static constexpr int kFftSize  = 1 << kFftOrder;         // 2048
+    juce::dsp::FFT spectrumFFT { kFftOrder };
+    std::array<float, kFftSize * 2> fftBuffer {};
+    int fftWritePos = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomProcessor)
 };

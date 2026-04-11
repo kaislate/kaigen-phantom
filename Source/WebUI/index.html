@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div style="position:fixed;top:2px;right:2px;z-index:99999;background:#0a0;color:#fff;font:bold 10px monospace;padding:2px 6px;border-radius:3px">BUILD-19</div>
+  <div class="wrap">
+    <!-- Header -->
+    <div class="hdr">
+      <div class="logo-phantom">PHANTOM</div>
+      <div class="hsp"></div>
+      <div class="mt"><div class="mb active" data-mode="0">Effect</div><div class="mb" data-mode="1">Instrument</div></div>
+      <button class="hdr-btn" id="bypass-btn" title="Bypass">&#x23FB;</button>
+      <button class="hdr-btn" id="settings-btn" title="Settings">&#x2699;</button>
+      <div class="logo-kaigen">KAIGEN</div>
+    </div>
+
+    <div class="body-grid">
+      <!-- Left: Recipe wheel -->
+      <div class="wheel-area">
+        <div class="wheel-mount">
+          <canvas id="wheelCanvas"></canvas>
+          <div class="wheel-oled">
+            <div class="oled-label">FUND</div>
+            <div class="oled-freq" id="pitchDisplay">---</div>
+            <div class="oled-preset" id="presetDisplay">Warm</div>
+          </div>
+          <!-- H2-H8 labels positioned absolutely around the wheel -->
+          <div class="h-label" style="--angle:0">H2</div>
+          <div class="h-label" style="--angle:1">H3</div>
+          <div class="h-label" style="--angle:2">H4</div>
+          <div class="h-label" style="--angle:3">H5</div>
+          <div class="h-label" style="--angle:4">H6</div>
+          <div class="h-label" style="--angle:5">H7</div>
+          <div class="h-label" style="--angle:6">H8</div>
+        </div>
+        <div class="preset-strip">
+          <div class="lps">
+            <span class="lw active" data-preset="0">Warm</span>
+            <span class="lw" data-preset="1">Aggr</span>
+            <span class="lw" data-preset="2">Hollow</span>
+            <span class="lw" data-preset="3">Dense</span>
+            <span class="lw" data-preset="4">Custom</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="gap-v"></div>
+
+      <!-- Right panel -->
+      <div class="right-panel">
+        <!-- Row 1 -->
+        <div class="ctrl-row">
+          <div class="candy-inner panel-harmonic">
+            <div class="el">Harmonic Engine</div>
+            <div class="knob-row">
+              <phantom-knob data-param="harmonic_saturation" size="large" label="Saturation" default-value="0"></phantom-knob>
+              <phantom-knob data-param="phantom_strength" size="medium" label="Strength" default-value="0.8"></phantom-knob>
+            </div>
+          </div>
+          <div class="candy-inner panel-output">
+            <div class="el">Output</div>
+            <div class="knob-row">
+              <phantom-knob data-param="output_gain" size="large" label="Gain" default-value="0.667"></phantom-knob>
+            </div>
+          </div>
+        </div>
+
+        <div class="gap-h"></div>
+
+        <!-- Row 2 -->
+        <div class="ctrl-row">
+          <div class="candy-inner panel-ghost">
+            <div class="el">Ghost <span class="toggle-group"><button class="tog active" data-gmode="0">Rpl</button><button class="tog" data-gmode="1">Add</button></span></div>
+            <div class="knob-row">
+              <phantom-knob data-param="ghost" size="large" label="Amount" default-value="1.0"></phantom-knob>
+              <phantom-knob data-param="phantom_threshold" size="medium" label="Threshold" default-value="0.462"></phantom-knob>
+            </div>
+          </div>
+          <div class="candy-inner panel-stereo">
+            <div class="el">Stereo</div>
+            <div class="knob-row">
+              <phantom-knob data-param="stereo_width" size="large" label="Width" default-value="0.5"></phantom-knob>
+            </div>
+          </div>
+        </div>
+
+        <div class="gap-h"></div>
+
+        <!-- Row 3 (mode-switched) -->
+        <div class="ctrl-row">
+          <div class="candy-inner panel-pitch" id="pitchPanel">
+            <div class="el">Pitch Tracker</div>
+            <div class="knob-row">
+              <phantom-knob data-param="tracking_sensitivity" size="medium" label="Sensitivity" default-value="0.7"></phantom-knob>
+              <phantom-knob data-param="tracking_glide" size="medium" label="Glide" default-value="0.1"></phantom-knob>
+            </div>
+          </div>
+          <div class="candy-inner panel-decon hidden" id="deconPanel">
+            <div class="el">Deconfliction</div>
+            <select id="decon-mode" class="param-select" data-param="deconfliction_mode">
+              <option>Partition</option><option>Lane</option><option>Stagger</option>
+              <option>Odd-Even</option><option>Residue</option><option>Binaural</option>
+            </select>
+            <div class="knob-row">
+              <phantom-knob data-param="max_voices" size="medium" label="Voices" default-value="0.429"></phantom-knob>
+              <phantom-knob data-param="stagger_delay" size="medium" label="Stagger" default-value="0.267"></phantom-knob>
+            </div>
+          </div>
+          <div class="candy-inner panel-sidechain">
+            <div class="el">Sidechain Duck</div>
+            <div class="knob-row">
+              <phantom-knob data-param="sidechain_duck_amount" size="medium" label="Amount" default-value="0"></phantom-knob>
+              <phantom-knob data-param="sidechain_duck_attack" size="medium" label="Attack" default-value="0.04"></phantom-knob>
+              <phantom-knob data-param="sidechain_duck_release" size="medium" label="Release" default-value="0.143"></phantom-knob>
+            </div>
+          </div>
+        </div>
+
+        <div class="gap-h"></div>
+
+        <!-- Spectrum row -->
+        <div class="spectrum-row">
+          <canvas id="meterIn" class="io-meter"></canvas>
+          <div class="spectrum-wrap">
+            <canvas id="spectrumCanvas"></canvas>
+            <button class="spectrum-toggle" id="specToggle">&#x2261;</button>
+          </div>
+          <canvas id="meterOut" class="io-meter"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+<div id="settings-overlay" class="settings-overlay hidden">
+  <div class="settings-backdrop"></div>
+  <div class="settings-panel">
+    <div class="settings-header">
+      <span class="el">SETTINGS</span>
+      <button id="settings-close" class="settings-close">&times;</button>
+    </div>
+    <div class="settings-content">
+      <div class="settings-section">
+        <div class="el">BINAURAL</div>
+        <div class="settings-row">
+          <select id="binaural-mode-select" class="param-select" data-param="binaural_mode">
+            <option value="0">Off</option>
+            <option value="1">Spread</option>
+            <option value="2">Voice-Split</option>
+          </select>
+          <phantom-knob data-param="binaural_width" size="medium" label="Width" default-value="0.5"></phantom-knob>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="el">RECIPE</div>
+        <div class="settings-row">
+          <phantom-knob data-param="recipe_rotation" size="medium" label="Rotation" default-value="0.5"></phantom-knob>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="el">HARMONIC PHASES</div>
+        <div class="settings-row phases-grid">
+          <phantom-knob data-param="recipe_phase_h2" size="medium" label="H2" default-value="0"></phantom-knob>
+          <phantom-knob data-param="recipe_phase_h3" size="medium" label="H3" default-value="0"></phantom-knob>
+          <phantom-knob data-param="recipe_phase_h4" size="medium" label="H4" default-value="0"></phantom-knob>
+          <phantom-knob data-param="recipe_phase_h5" size="medium" label="H5" default-value="0"></phantom-knob>
+          <phantom-knob data-param="recipe_phase_h6" size="medium" label="H6" default-value="0"></phantom-knob>
+          <phantom-knob data-param="recipe_phase_h7" size="medium" label="H7" default-value="0"></phantom-knob>
+          <phantom-knob data-param="recipe_phase_h8" size="medium" label="H8" default-value="0"></phantom-knob>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="/knob.js"></script>
+<script src="/juce-frontend.js"></script>
+<script src="/phantom.js"></script>
+<script src="/spectrum.js"></script>
+<script src="/recipe-wheel.js"></script>
+</body>
+</html>
