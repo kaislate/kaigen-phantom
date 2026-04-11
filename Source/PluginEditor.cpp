@@ -32,6 +32,10 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
     addAndMakeVisible(stereoPanel);
     addAndMakeVisible(deconflictionPanel);
 
+    addAndMakeVisible(spectrumAnalyzer);
+    addAndMakeVisible(inputMeter);
+    addAndMakeVisible(outputMeter);
+
     deconflictionPanel.setVisible(false);   // Effect mode is default
 
     processor.apvts.addParameterListener(ParamID::MODE, this);
@@ -49,6 +53,13 @@ PhantomEditor::~PhantomEditor()
 void PhantomEditor::timerCallback()
 {
     recipeWheelPanel.updatePitch(processor.currentPitch.load(std::memory_order_relaxed));
+
+    inputMeter.setLevel(processor.peakInL.load(std::memory_order_relaxed),
+                        processor.peakInR.load(std::memory_order_relaxed));
+    outputMeter.setLevel(processor.peakOutL.load(std::memory_order_relaxed),
+                         processor.peakOutR.load(std::memory_order_relaxed));
+
+    spectrumAnalyzer.pullSpectrum(processor);
 }
 
 void PhantomEditor::parameterChanged(const juce::String& parameterID, float newValue)
@@ -112,4 +123,10 @@ void PhantomEditor::resized()
 
     // Stereo
     stereoPanel.setBounds(row2);
+
+    // Spectrum row fills remaining space
+    auto specRow = rightArea;
+    inputMeter.setBounds(specRow.removeFromLeft(14));
+    outputMeter.setBounds(specRow.removeFromRight(14));
+    spectrumAnalyzer.setBounds(specRow);
 }

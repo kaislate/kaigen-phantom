@@ -13,6 +13,8 @@
 #include "UI/StereoPanel.h"
 #include "UI/DeconflictionPanel.h"
 #include "UI/RecipeWheelPanel.h"
+#include "UI/SpectrumAnalyzer.h"
+#include "UI/LevelMeter.h"
 
 class PhantomEditor : public juce::AudioProcessorEditor,
                       private juce::AudioProcessorValueTreeState::Listener,
@@ -48,6 +50,10 @@ private:
     SidechainPanel     sidechainPanel;
     StereoPanel        stereoPanel;
     DeconflictionPanel deconflictionPanel;
+
+    SpectrumAnalyzer spectrumAnalyzer;
+    LevelMeter inputMeter  { "IN" };
+    LevelMeter outputMeter { "OUT" };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomEditor)
 };

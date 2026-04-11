@@ -58,6 +58,8 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/DeconflictionPanel.cpp
     Source/UI/RecipeWheel.cpp
     Source/UI/RecipeWheelPanel.cpp
+    Source/UI/SpectrumAnalyzer.cpp
+    Source/UI/LevelMeter.cpp
 )
 
 target_include_directories(KaigenPhantom PRIVATE Source)
