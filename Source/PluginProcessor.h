@@ -60,8 +60,8 @@ private:
 
     double sampleRate = 44100.0;
 
-    // FFT for spectrum analysis
-    static constexpr int kFftOrder = 11;
+    // FFT for spectrum analysis — 8192-point for ~5Hz resolution
+    static constexpr int kFftOrder = 13;
     static constexpr int kFftSize  = 1 << kFftOrder;
     juce::dsp::FFT spectrumFFT { kFftOrder };
     std::array<float, kFftSize * 2> fftBuffer {};

@@ -166,6 +166,26 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
                 }
 
                 spectrumReady.store(true, std::memory_order_release);
+
+                // Detect dominant frequency from FFT (simple peak-bin method)
+                // Search bins from ~30Hz to ~500Hz for the strongest peak
+                const int lowSearchBin  = juce::jmax(1, (int)(30.0f  * fftSizeF / sr));
+                const int highSearchBin = juce::jmin(maxBin, (int)(500.0f * fftSizeF / sr));
+                float peakMag = 0.0f;
+                int   peakBin = 0;
+                for (int k = lowSearchBin; k <= highSearchBin; ++k)
+                {
+                    if (fftBuffer[(size_t) k] > peakMag)
+                    {
+                        peakMag = fftBuffer[(size_t) k];
+                        peakBin = k;
+                    }
+                }
+                // Only report pitch if it's significantly above noise floor
+                if (peakMag * normalizer > 0.01f)
+                    currentPitch.store(peakBin * sr / fftSizeF, std::memory_order_relaxed);
+                else
+                    currentPitch.store(-1.0f, std::memory_order_relaxed);
             }
         }
     }

@@ -84,7 +84,18 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 auto* obj = new juce::DynamicObject();
                 const float hz = self.processor.currentPitch.load(std::memory_order_relaxed);
                 obj->setProperty("hz", (double) hz);
-                obj->setProperty("note", "---");
+                if (hz > 0.0f)
+                {
+                    static const char* noteNames[] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+                    const int midi = juce::roundToInt(12.0f * std::log2(hz / 440.0f) + 69.0f);
+                    const int note = ((midi % 12) + 12) % 12;
+                    const int octave = (midi / 12) - 1;
+                    obj->setProperty("note", juce::String(noteNames[note]) + juce::String(octave));
+                }
+                else
+                {
+                    obj->setProperty("note", "---");
+                }
                 const int presetIdx = (int) self.processor.apvts.getRawParameterValue(ParamID::RECIPE_PRESET)->load();
                 static const char* presetNames[] = { "Warm","Aggressive","Hollow","Dense","Custom" };
                 obj->setProperty("preset", juce::String(presetNames[juce::jlimit(0, 4, presetIdx)]));
