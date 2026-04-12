@@ -12,7 +12,8 @@
  * PhantomEngine — top-level DSP container for the Kaigen Phantom plugin.
  *
  * Signal flow:
- *   input → BassExtractor.low → ZeroCrossingSynth → envelope-gated phantom
+ *   input → BassExtractor.low → ZeroCrossingSynth (Effect) or WaveletSynth (RESYN)
+ *         → envelope-gated phantom
  *         → BassExtractor.high (pass-through)
  *         → Ghost Mix (Replace/Add) → BinauralStage → Stereo Width → Output
  *

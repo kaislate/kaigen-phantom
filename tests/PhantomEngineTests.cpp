@@ -163,3 +163,41 @@ TEST_CASE("PhantomEngine: RESYN mode silence in -> silence out")
         for (int i = 0; i < buf.getNumSamples(); ++i)
             REQUIRE(std::fabs(buf.getSample(ch, i)) < 1e-4f);
 }
+
+TEST_CASE("PhantomEngine: RESYN and Effect modes produce different output for same input")
+{
+    auto runMode = [](int mode) -> float
+    {
+        PhantomEngine eng;
+        eng.prepare(44100.0, 512, 2);
+        eng.setSynthMode(mode);
+        eng.setCrossoverHz(150.0f);
+        eng.setGhostAmount(1.0f);
+        eng.setGhostReplace(false);
+        eng.setPhantomStrength(1.0f);
+        eng.setHarmonicAmplitudes({ 0.8f, 0.6f, 0.4f, 0.3f, 0.2f, 0.1f, 0.05f });
+
+        auto buf = makeSineBuffer(60.0f, 0.5f, 4096);
+        eng.process(buf);
+
+        float rms = 0.0f;
+        for (int i = 2048; i < 4096; ++i)
+        {
+            const float s = buf.getSample(0, i);
+            rms += s * s;
+        }
+        return rms;
+    };
+
+    const float rmsEffect = runMode(0);
+    const float rmsResyn  = runMode(1);
+
+    // Outputs should be nonzero in both modes
+    REQUIRE(rmsEffect > 0.01f);
+    REQUIRE(rmsResyn  > 0.01f);
+
+    // Outputs should differ — RESYN uses phase-reset wavelets while Effect uses
+    // continuous-phase ZCS, so their RMS should be meaningfully different.
+    const float ratio = rmsResyn / juce::jmax(1e-9f, rmsEffect);
+    REQUIRE((ratio < 0.9f || ratio > 1.1f));
+}

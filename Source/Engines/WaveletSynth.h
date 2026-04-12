@@ -25,7 +25,6 @@ public:
     void setStep(float step) noexcept;
     void setDutyCycle(float duty) noexcept;
     void setSkipCount(int n) noexcept;
-    void setTrackingSpeed(float speed) noexcept;
 
     float process(float x) noexcept;
     float getEstimatedHz() const noexcept;

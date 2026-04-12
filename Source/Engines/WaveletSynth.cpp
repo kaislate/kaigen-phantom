@@ -62,11 +62,6 @@ void WaveletSynth::setSkipCount(int n) noexcept
     }
 }
 
-void WaveletSynth::setTrackingSpeed(float speed) noexcept
-{
-    trackingAlpha = juce::jlimit(0.01f, 0.80f, speed);
-}
-
 float WaveletSynth::getEstimatedHz() const noexcept
 {
     return estimatedPeriod > 0.0f ? (float)(sampleRate / (double)estimatedPeriod) : 0.0f;
@@ -149,17 +144,18 @@ float WaveletSynth::process(float x) noexcept
                 accumulatedSamples = 0.0f;
                 crossingsAccum     = 0;
             }
+            // KEY DIFFERENCE from ZCS: reset phase only on valid crossings.
+            // Each valid interval is a fresh wavelet starting at phase 0.
+            currentPhase             = 0.0f;
+            samplesSinceLastCrossing = 0.0f;
         }
         else
         {
-            // Invalid crossing — reset accumulation to avoid poisoned measurements.
-            accumulatedSamples = 0.0f;
-            crossingsAccum     = 0;
+            // Invalid crossing — reset accumulation, but do NOT reset phase
+            accumulatedSamples       = 0.0f;
+            crossingsAccum           = 0;
+            samplesSinceLastCrossing = 0.0f;
         }
-
-        // KEY DIFFERENCE: reset phase at every valid crossing
-        currentPhase             = 0.0f;
-        samplesSinceLastCrossing = 0.0f;
     }
     lastSample = x;
 
