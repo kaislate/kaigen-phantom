@@ -46,8 +46,8 @@ function buildWaveformPoints(step, cx, cy, oledR) {
   const pts = [];
   for (let i = 0; i <= nPts; i++) {
     const t = (i / nPts) * TAU;
-    const wp = warpPhase(t, 0.5);
-    const y  = shapedWave(wp, step);
+    const wp = warpPhase(t, 0.5);   // duty fixed: Push affects harmonic balance, not visual shape
+    const y = shapedWave(wp, step);
     pts.push(`${(xL + (i / nPts) * (xR - xL)).toFixed(1)},${(yMid - y * yAmp).toFixed(1)}`);
   }
   return pts.join(' ');
