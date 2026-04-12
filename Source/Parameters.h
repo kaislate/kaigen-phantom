@@ -102,7 +102,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
 
     // ── Mode & Global ─────────────────────────────────────────────────
     params.push_back(std::make_unique<APC>(
-        ParamID::MODE, "Mode", StringArray{ "Effect", "Instrument" }, 0));
+        ParamID::MODE, "Mode", StringArray{ "Effect", "RESYN" }, 0));
     params.push_back(std::make_unique<AudioParameterBool>(
         ParamID::BYPASS, "Bypass", false));
     params.push_back(std::make_unique<APF>(
@@ -134,12 +134,12 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     for (int i = 0; i < 7; ++i)
         params.push_back(std::make_unique<APF>(
             ampIDs[i], ampNames[i],
-            NormalisableRange<float>(0.0f, 100.0f), kWarmAmps[i] * 100.0f,
+            NormalisableRange<float>(0.0f, 100.0f), kStableAmps[i] * 100.0f,
             AudioParameterFloatAttributes().withLabel("%")));
 
     params.push_back(std::make_unique<APC>(
         ParamID::RECIPE_PRESET, "Recipe Preset",
-        StringArray{ "Warm", "Aggressive", "Hollow", "Dense", "Stable", "Weird", "Custom" }, 0));
+        StringArray{ "Warm", "Aggressive", "Hollow", "Dense", "Stable", "Weird", "Custom" }, 4));
     params.push_back(std::make_unique<APF>(
         ParamID::HARMONIC_SATURATION, "Harmonic Saturation",
         NormalisableRange<float>(0.0f, 100.0f), 0.0f,

@@ -35,7 +35,8 @@ target_sources(KaigenPhantom PRIVATE
     Source/PluginEditor.cpp
     Source/Engines/BinauralStage.cpp
     Source/Engines/BassExtractor.cpp
-    Source/Engines/Waveshaper.cpp
+    Source/Engines/ZeroCrossingSynth.cpp
+    Source/Engines/WaveletSynth.cpp
     Source/Engines/EnvelopeFollower.cpp
     Source/Engines/PhantomEngine.cpp
 )

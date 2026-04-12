@@ -60,6 +60,7 @@ void PhantomProcessor::syncParamsToEngine()
     for (int i = 0; i < 7; ++i)
         amps[(size_t) i] = apvts.getRawParameterValue(hIds[i])->load() / 100.0f;
     engine.setHarmonicAmplitudes(amps);
+    engine.setSynthMode((int) apvts.getRawParameterValue(ParamID::MODE)->load());
 }
 
 void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
