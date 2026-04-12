@@ -189,6 +189,7 @@ float WaveletSynth::process(float x) noexcept
     // ── Advance shape smoothers (one step per audio sample) ──────────────
     const float step = smoothStep.getNextValue();
     const float duty = smoothDuty.getNextValue();
+    const float len  = smoothLength.getNextValue();
 
     // ── Synthesise H1 + H2-H8 ────────────────────────────────────────────
     // H1 at amplitude 1.0 — fundamental carrier, always present in RESYN mode
@@ -202,5 +203,18 @@ float WaveletSynth::process(float x) noexcept
         y += amps[(size_t)i] * shapedWave(warpPhase(hp, duty), step);
     }
 
+    // ── Length gate: silence output after len×2π of each wavelet ────────
+    if (len < 1.0f)
+    {
+        const float gateEnd   = len * kTwoPi;
+        const float fadeStart = gateEnd * 0.8f;   // cosine fade = last 20% of active zone
+        if (currentPhase >= gateEnd)
+            y = 0.0f;
+        else if (currentPhase >= fadeStart)
+        {
+            const float t = (currentPhase - fadeStart) / (gateEnd - fadeStart); // 0→1
+            y *= 0.5f * (1.0f + std::cos(kPi * t));  // cosine window 1→0
+        }
+    }
     return y;
 }
