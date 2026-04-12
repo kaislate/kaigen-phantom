@@ -199,28 +199,14 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer)
         {
             const float inLvl = env.process(low[i]);
 
-            // Normalise to ~unit amplitude for ZCS. Gate output below -80 dBFS.
-            // Gate ZCS period-tracking below -40 dBFS: during release, normalised
-            // noise drives rapid false crossings that push the period estimate up.
-            static constexpr float kTrackingGate = 0.01f; // -40 dBFS
-            const float normIn = (inLvl > 1e-4f)
-                ? juce::jlimit(-1.0f, 1.0f, low[i] / inLvl)
-                : 0.0f;
-            const float trackIn = (inLvl > kTrackingGate) ? normIn : 0.0f;
-
-            // Generate harmonics — ZCS (Effect) or WaveletSynth (RESYN)
-            //
-            // RESYN receives the raw bass-band signal (low[i]), NOT the normalised
-            // trackIn. WaveletSynth's internal inputPeak tracker uses the real
-            // signal amplitude to freeze period updates once the signal drops to
-            // the noise floor (~-40 dBFS, ~89 ms decay from a -6 dBFS note).
-            // This prevents the period estimate drifting upward during long
-            // envelope-follower releases regardless of the release time setting.
-            //
-            // ZCS keeps the normalised, gated trackIn (unchanged behaviour).
+            // Both engines receive the raw bass-band signal for period detection.
+            // Each tracks signal amplitude via inputPeak and scales its EMA alpha
+            // proportionally — quieter signals are trusted less, preventing
+            // harmonic-drift artifacts during note decay in both Effect and RESYN.
+            // Output is scaled by inLvl below to restore dynamics.
             float phantomSample = (synthMode.load(std::memory_order_relaxed) == 1)
                 ? resyn.process(low[i])
-                : syn.process(trackIn);
+                : syn.process(low[i]);
 
             // Optional post-synthesis tanh saturation.
             // Applied to the harmonic sum so the fundamental cannot reappear.

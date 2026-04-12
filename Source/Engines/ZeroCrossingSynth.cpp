@@ -1,4 +1,4 @@
-#include "WaveletSynth.h"
+#include "ZeroCrossingSynth.h"
 #include <cmath>
 
 static constexpr float kTwoPi = juce::MathConstants<float>::twoPi;
@@ -6,7 +6,7 @@ static constexpr float kPi    = juce::MathConstants<float>::pi;
 
 // ── Setup ──────────────────────────────────────────────────────────────────
 
-void WaveletSynth::prepare(double sr) noexcept
+void ZeroCrossingSynth::prepare(double sr) noexcept
 {
     sampleRate = sr;
 
@@ -19,55 +19,40 @@ void WaveletSynth::prepare(double sr) noexcept
     smoothDuty.reset(sr, rampSec);
     smoothStep.setCurrentAndTargetValue(0.0f);
     smoothDuty.setCurrentAndTargetValue(0.5f);
-    smoothLength.reset(sr, rampSec);
-    smoothLength.setCurrentAndTargetValue(1.0f);
-    smoothGate.reset(sr, rampSec);
-    smoothGate.setCurrentAndTargetValue(0.0f);
 
     reset();
 }
 
-void WaveletSynth::reset() noexcept
+void ZeroCrossingSynth::reset() noexcept
 {
     lastSample               = 0.0f;
     samplesSinceLastCrossing = 0.0f;
     accumulatedSamples       = 0.0f;
     crossingsAccum           = 0;
-    currentPhase             = 0.0f;
+    fundamentalPhase         = 0.0f;
     estimatedPeriod          = (float)(sampleRate / 100.0); // 100 Hz safe default
-    lastNegativePeak         = 0.0f;
     inputPeak                = 0.0f;
 }
 
 // ── Parameter setters ──────────────────────────────────────────────────────
 
-void WaveletSynth::setHarmonicAmplitudes(const std::array<float, 7>& newAmps) noexcept
+void ZeroCrossingSynth::setHarmonicAmplitudes(const std::array<float, 7>& newAmps) noexcept
 {
     for (int i = 0; i < 7; ++i)
         amps[(size_t)i] = juce::jlimit(0.0f, 1.0f, newAmps[(size_t)i]);
 }
 
-void WaveletSynth::setStep(float s) noexcept
+void ZeroCrossingSynth::setStep(float s) noexcept
 {
     smoothStep.setTargetValue(juce::jlimit(0.0f, 1.0f, s));
 }
 
-void WaveletSynth::setDutyCycle(float d) noexcept
+void ZeroCrossingSynth::setDutyCycle(float d) noexcept
 {
     smoothDuty.setTargetValue(juce::jlimit(0.05f, 0.95f, d));
 }
 
-void WaveletSynth::setWaveletLength(float len) noexcept
-{
-    smoothLength.setTargetValue(juce::jlimit(0.05f, 1.0f, len));
-}
-
-void WaveletSynth::setGateThreshold(float thr) noexcept
-{
-    smoothGate.setTargetValue(juce::jlimit(0.0f, 1.0f, thr));
-}
-
-void WaveletSynth::setSkipCount(int n) noexcept
+void ZeroCrossingSynth::setSkipCount(int n) noexcept
 {
     const int newSkip = juce::jlimit(1, 8, n);
     if (newSkip != skipCount)
@@ -78,14 +63,19 @@ void WaveletSynth::setSkipCount(int n) noexcept
     }
 }
 
-float WaveletSynth::getEstimatedHz() const noexcept
+void ZeroCrossingSynth::setTrackingSpeed(float speed) noexcept
+{
+    trackingAlpha = juce::jlimit(0.01f, 0.80f, speed);
+}
+
+float ZeroCrossingSynth::getEstimatedHz() const noexcept
 {
     return estimatedPeriod > 0.0f ? (float)(sampleRate / (double)estimatedPeriod) : 0.0f;
 }
 
 // ── Waveform helpers ───────────────────────────────────────────────────────
 
-float WaveletSynth::warpPhase(float phase, float duty) noexcept
+float ZeroCrossingSynth::warpPhase(float phase, float duty) noexcept
 {
     // Standard PWM phase warp.
     //
@@ -103,7 +93,7 @@ float WaveletSynth::warpPhase(float phase, float duty) noexcept
         return kPi + (phase - kTwoPi * d) / (2.0f * (1.0f - d));
 }
 
-float WaveletSynth::shapedWave(float wp, float step) noexcept
+float ZeroCrossingSynth::shapedWave(float wp, float step) noexcept
 {
     // Pure sine at the warped phase.
     const float s = std::sin(wp);
@@ -119,7 +109,7 @@ float WaveletSynth::shapedWave(float wp, float step) noexcept
 
 // ── Per-sample processing ──────────────────────────────────────────────────
 
-float WaveletSynth::process(float x) noexcept
+float ZeroCrossingSynth::process(float x) noexcept
 {
     // ── Period detection with skip accumulation ──────────────────────────
     //
@@ -133,17 +123,9 @@ float WaveletSynth::process(float x) noexcept
     //   estimatedPeriod ≈ 882 → phase advances at 2π/882 per sample.
     //   H2 = sin(2 × φ) completes one cycle every 441 samples → lands on 100Hz
     //   (the original fundamental). Sub-harmonic synthesis in action.
-    // Fast-attack / slow-release amplitude tracker (~520 ms from 0 dBFS to −40 dBFS floor).
-    // Period updates are frozen once inputPeak drops below kAmplitudeFloor so that
-    // noise-level zero crossings during a long envelope release cannot walk the
-    // estimate to a higher frequency.
+    // Fast-attack / slow-release amplitude tracker (~78 ms half-life at 44.1 kHz).
     const float absX = std::abs(x);
     inputPeak = (absX > inputPeak) ? absX : inputPeak * 0.9998f;
-
-    // Track most negative excursion since last valid crossing (gate hysteresis)
-    if (x < lastNegativePeak)
-        lastNegativePeak = x;
-    const float gateThr = smoothGate.getNextValue();
 
     samplesSinceLastCrossing += 1.0f;
     accumulatedSamples       += 1.0f;
@@ -153,26 +135,21 @@ float WaveletSynth::process(float x) noexcept
         // Only count this crossing if the individual interval is in range.
         // Out-of-range means noise or a frequency outside [16 Hz, 4 kHz].
         if (samplesSinceLastCrossing >= minPeriodSamples &&
-            samplesSinceLastCrossing <= maxPeriodSamples &&
-            lastNegativePeak <= -gateThr)
+            samplesSinceLastCrossing <= maxPeriodSamples)
         {
             crossingsAccum++;
 
             if (crossingsAccum >= skipCount)
             {
-                // Only update the period estimate when input amplitude is above the
-                // noise floor.  During a long envelope release the signal decays toward
-                // zero — any remaining zero crossings are noise-dominated and would
-                // otherwise walk the estimate to a higher frequency.
-                // inputPeak decays at ~0.9998/sample, so it crosses kAmplitudeFloor
-                // roughly 520 ms after the last loud sample (at 44.1 kHz).
+                // Scale tracking speed by signal amplitude.
+                // Full alpha at ≥ −12 dBFS (0.25); proportionally reduced below that.
+                // Prevents harmonic-content changes during note decay from walking
+                // the period estimate to a wrong frequency.
+                // Hard floor at −40 dBFS: stop updating entirely once signal is noise.
                 static constexpr float kAmplitudeFloor = 0.01f;  // ≈ −40 dBFS
                 static constexpr float kAlphaRef       = 0.25f;  // ≈ −12 dBFS full-speed threshold
                 if (inputPeak >= kAmplitudeFloor)
                 {
-                    // Scale tracking speed by signal amplitude.
-                    // Full alpha at ≥ −12 dBFS; proportionally reduced below that.
-                    // Prevents harmonic-drift artifacts during note decay.
                     const float alphaScale = juce::jlimit(0.0f, 1.0f, inputPeak / kAlphaRef);
                     const float maxDelta   = estimatedPeriod * 0.20f;
                     const float delta      = accumulatedSamples - estimatedPeriod;
@@ -182,56 +159,39 @@ float WaveletSynth::process(float x) noexcept
                 accumulatedSamples = 0.0f;
                 crossingsAccum     = 0;
             }
-            // KEY DIFFERENCE from ZCS: reset phase only on valid crossings.
-            // Each valid interval is a fresh wavelet starting at phase 0.
-            currentPhase             = 0.0f;
-            samplesSinceLastCrossing = 0.0f;
-            lastNegativePeak         = 0.0f;
         }
         else
         {
-            // Invalid crossing — reset accumulation, but do NOT reset phase
-            accumulatedSamples       = 0.0f;
-            crossingsAccum           = 0;
-            samplesSinceLastCrossing = 0.0f;
+            // Invalid crossing — reset accumulation to avoid poisoned measurements.
+            accumulatedSamples = 0.0f;
+            crossingsAccum     = 0;
         }
+
+        samplesSinceLastCrossing = 0.0f;
     }
     lastSample = x;
 
     // ── Phase advance ────────────────────────────────────────────────────
-    currentPhase += kTwoPi / estimatedPeriod;
-    if (currentPhase >= kTwoPi)
-        currentPhase -= kTwoPi;
+    fundamentalPhase += kTwoPi / estimatedPeriod;
+    if (fundamentalPhase >= kTwoPi)
+        fundamentalPhase -= kTwoPi;
 
     // ── Advance shape smoothers (one step per audio sample) ──────────────
     const float step = smoothStep.getNextValue();
     const float duty = smoothDuty.getNextValue();
-    const float len  = smoothLength.getNextValue();
 
-    // ── Synthesise H1 + H2-H8 ────────────────────────────────────────────
-    // H1 at amplitude 1.0 — fundamental carrier, always present in RESYN mode
-    float y = shapedWave(warpPhase(currentPhase, duty), step);
-
-    // H2-H8 additive content from recipe wheel
+    // ── Synthesise H2-H8 ─────────────────────────────────────────────────
+    // Each harmonic n advances at n × the fundamental phase.
+    // warpPhase applies PWM distortion; shapedWave applies sine→square morph.
+    // The fundamental (n=1) is never synthesised — only integer multiples ≥ 2.
+    float y = 0.0f;
     for (int i = 0; i < 7; ++i)
     {
         if (amps[(size_t)i] <= 0.0f) continue;
-        float hp = std::fmod((float)(i + 2) * currentPhase, kTwoPi);
+
+        float hp = std::fmod((float)(i + 2) * fundamentalPhase, kTwoPi);
         y += amps[(size_t)i] * shapedWave(warpPhase(hp, duty), step);
     }
 
-    // ── Length gate: silence output after len×2π of each wavelet ────────
-    if (len < 1.0f)
-    {
-        const float gateEnd   = len * kTwoPi;
-        const float fadeStart = gateEnd * 0.8f;   // cosine fade = last 20% of active zone
-        if (currentPhase >= gateEnd)
-            y = 0.0f;
-        else if (currentPhase >= fadeStart)
-        {
-            const float t = (currentPhase - fadeStart) / (gateEnd - fadeStart); // 0→1
-            y *= 0.5f * (1.0f + std::cos(kPi * t));  // cosine window 1→0
-        }
-    }
     return y;
 }
