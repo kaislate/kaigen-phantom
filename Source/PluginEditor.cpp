@@ -41,8 +41,10 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         &self.recipeH2Relay, &self.recipeH3Relay, &self.recipeH4Relay,
         &self.recipeH5Relay, &self.recipeH6Relay, &self.recipeH7Relay, &self.recipeH8Relay,
         &self.harmonicSaturationRelay,
+        &self.synthStepRelay, &self.synthDutyRelay, &self.synthSkipRelay,
         &self.envAttackRelay, &self.envReleaseRelay,
-        &self.binauralWidthRelay, &self.stereoWidthRelay
+        &self.binauralWidthRelay, &self.stereoWidthRelay,
+        &self.synthLPFRelay, &self.synthHPFRelay
     };
     for (auto* r : sliderRelays)
         options = options.withOptionsFrom(*r);
@@ -63,10 +65,16 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         .withNativeFunction("getSpectrumData",
             [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
-                juce::Array<juce::var> bins;
+                juce::Array<juce::var> inputBins, outputBins;
                 for (int i = 0; i < PhantomProcessor::kSpectrumBins; ++i)
-                    bins.add(self.processor.spectrumData[(size_t) i]);
-                complete(bins);
+                {
+                    inputBins .add(self.processor.spectrumData      [(size_t) i]);
+                    outputBins.add(self.processor.spectrumOutputData[(size_t) i]);
+                }
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty("input",  inputBins);
+                obj->setProperty("output", outputBins);
+                complete(juce::var(obj));
             })
         .withNativeFunction("getPeakLevels",
             [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
@@ -97,8 +105,27 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                     obj->setProperty("note", "---");
                 }
                 const int presetIdx = (int) self.processor.apvts.getRawParameterValue(ParamID::RECIPE_PRESET)->load();
-                static const char* presetNames[] = { "Warm","Aggressive","Hollow","Dense","Custom" };
-                obj->setProperty("preset", juce::String(presetNames[juce::jlimit(0, 4, presetIdx)]));
+                static const char* presetNames[] = { "Warm","Aggressive","Hollow","Dense","Stable","Weird","Custom" };
+                obj->setProperty("preset", juce::String(presetNames[juce::jlimit(0, 6, presetIdx)]));
+                complete(juce::var(obj));
+            })
+        .withNativeFunction("getOscilloscopeData",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                juce::Array<juce::var> inArr, synthArr, outArr;
+                for (int i = 0; i < PhantomEngine::kOscBufSize; ++i)
+                {
+                    inArr  .add((double) self.processor.oscInputBuf [(size_t) i]);
+                    synthArr.add((double) self.processor.engine.oscSynthBuf[(size_t) i]);
+                    outArr .add((double) self.processor.oscOutputBuf[(size_t) i]);
+                }
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty("input",       inArr);
+                obj->setProperty("synth",       synthArr);
+                obj->setProperty("output",      outArr);
+                obj->setProperty("inputWrPos",  (int) self.processor.oscInputWrPos .load(std::memory_order_relaxed));
+                obj->setProperty("synthWrPos",  (int) self.processor.engine.oscSynthWrPos.load(std::memory_order_relaxed));
+                obj->setProperty("outputWrPos", (int) self.processor.oscOutputWrPos.load(std::memory_order_relaxed));
                 complete(juce::var(obj));
             })
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });
@@ -134,10 +161,15 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         { ParamID::RECIPE_H7,           recipeH7Relay },
         { ParamID::RECIPE_H8,           recipeH8Relay },
         { ParamID::HARMONIC_SATURATION, harmonicSaturationRelay },
+        { ParamID::SYNTH_STEP,          synthStepRelay },
+        { ParamID::SYNTH_DUTY,          synthDutyRelay },
+        { ParamID::SYNTH_SKIP,          synthSkipRelay },
         { ParamID::ENV_ATTACK_MS,       envAttackRelay },
         { ParamID::ENV_RELEASE_MS,      envReleaseRelay },
         { ParamID::BINAURAL_WIDTH,      binauralWidthRelay },
         { ParamID::STEREO_WIDTH,        stereoWidthRelay },
+        { ParamID::SYNTH_LPF_HZ,        synthLPFRelay },
+        { ParamID::SYNTH_HPF_HZ,        synthHPFRelay },
     };
     for (auto& b : sliderBindings)
         sliderAttachments.push_back(std::make_unique<juce::WebSliderParameterAttachment>(

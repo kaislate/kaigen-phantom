@@ -40,10 +40,15 @@ private:
     juce::WebSliderRelay recipeH7Relay           { "recipe_h7" };
     juce::WebSliderRelay recipeH8Relay           { "recipe_h8" };
     juce::WebSliderRelay harmonicSaturationRelay { "harmonic_saturation" };
+    juce::WebSliderRelay synthStepRelay          { "synth_step" };
+    juce::WebSliderRelay synthDutyRelay          { "synth_duty" };
+    juce::WebSliderRelay synthSkipRelay          { "synth_skip" };
     juce::WebSliderRelay envAttackRelay          { "env_attack_ms" };
     juce::WebSliderRelay envReleaseRelay         { "env_release_ms" };
     juce::WebSliderRelay binauralWidthRelay      { "binaural_width" };
     juce::WebSliderRelay stereoWidthRelay        { "stereo_width" };
+    juce::WebSliderRelay synthLPFRelay           { "synth_lpf_hz" };
+    juce::WebSliderRelay synthHPFRelay           { "synth_hpf_hz" };
 
     // ── Combo-box relays ──────────────────────────────────────────────
     juce::WebComboBoxRelay modeRelay             { "mode" };
