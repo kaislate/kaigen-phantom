@@ -12,7 +12,7 @@ namespace ParamID
     inline constexpr auto PHANTOM_STRENGTH   = "phantom_strength";
     inline constexpr auto OUTPUT_GAIN        = "output_gain";
 
-    // ── Recipe Engine (Chebyshev polynomial coefficients for H2..H8) ─
+    // ── Recipe Engine (ZeroCrossingSynth harmonic amplitudes H2..H8) ────
     inline constexpr auto RECIPE_H2          = "recipe_h2";
     inline constexpr auto RECIPE_H3          = "recipe_h3";
     inline constexpr auto RECIPE_H4          = "recipe_h4";
@@ -22,6 +22,15 @@ namespace ParamID
     inline constexpr auto RECIPE_H8          = "recipe_h8";
     inline constexpr auto RECIPE_PRESET      = "recipe_preset";
     inline constexpr auto HARMONIC_SATURATION = "harmonic_saturation";
+
+    // ── Waveform shape ────────────────────────────────────────────────────
+    /** 0 = pure sine, 100 = square. Morphs the synthesised oscillator shape. */
+    inline constexpr auto SYNTH_STEP         = "synth_step";
+    /** Pulse width: 50 = symmetric. Controls even/odd harmonic balance. */
+    inline constexpr auto SYNTH_DUTY         = "synth_duty";
+    /** Zero-crossing skip count [1-8]. Each +1 halves the effective fundamental,
+     *  shifting all harmonics down and introducing sub-harmonic content. */
+    inline constexpr auto SYNTH_SKIP         = "synth_skip";
 
     // ── Envelope Follower ────────────────────────────────────────────
     inline constexpr auto ENV_ATTACK_MS      = "env_attack_ms";
@@ -33,6 +42,12 @@ namespace ParamID
 
     // ── Stereo ────────────────────────────────────────────────────────
     inline constexpr auto STEREO_WIDTH       = "stereo_width";
+
+    // ── Synth Filter ──────────────────────────────────────────────────
+    /** Low-pass filter on synthesised harmonics. 200–20000 Hz. Default 20000 (transparent). */
+    inline constexpr auto SYNTH_LPF_HZ      = "synth_lpf_hz";
+    /** High-pass filter on synthesised harmonics. 20–2000 Hz. Default 20 (transparent). */
+    inline constexpr auto SYNTH_HPF_HZ      = "synth_hpf_hz";
 }
 
 // ─── Preset amplitude tables — Chebyshev polynomial weights ────────────
@@ -41,6 +56,8 @@ inline constexpr float kWarmAmps[7]       = { 0.80f, 0.60f, 0.40f, 0.28f, 0.18f,
 inline constexpr float kAggressiveAmps[7] = { 0.50f, 0.70f, 0.85f, 0.75f, 0.55f, 0.35f, 0.20f };
 inline constexpr float kHollowAmps[7]     = { 0.00f, 0.80f, 0.00f, 0.60f, 0.00f, 0.40f, 0.00f };
 inline constexpr float kDenseAmps[7]      = { 0.70f, 0.70f, 0.70f, 0.70f, 0.70f, 0.70f, 0.70f };
+inline constexpr float kStableAmps[7]     = { 1.00f, 0.00f, 0.70f, 0.00f, 0.50f, 0.00f, 0.30f };
+inline constexpr float kWeirdAmps[7]      = { 0.00f, 1.00f, 0.00f, 0.80f, 0.00f, 0.60f, 0.00f };
 
 // ─── ID registry ───────────────────────────────────────────────────────
 inline std::vector<juce::String> getAllParameterIDs()
@@ -62,11 +79,16 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::RECIPE_H8,
         ParamID::RECIPE_PRESET,
         ParamID::HARMONIC_SATURATION,
+        ParamID::SYNTH_STEP,
+        ParamID::SYNTH_DUTY,
+        ParamID::SYNTH_SKIP,
         ParamID::ENV_ATTACK_MS,
         ParamID::ENV_RELEASE_MS,
         ParamID::BINAURAL_MODE,
         ParamID::BINAURAL_WIDTH,
         ParamID::STEREO_WIDTH,
+        ParamID::SYNTH_LPF_HZ,
+        ParamID::SYNTH_HPF_HZ,
     };
 }
 
@@ -92,7 +114,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         StringArray{ "Replace", "Add" }, 0));
     params.push_back(std::make_unique<APF>(
         ParamID::PHANTOM_THRESHOLD, "Phantom Threshold",
-        NormalisableRange<float>(20.0f, 250.0f), 80.0f,
+        NormalisableRange<float>(20.0f, 250.0f), 120.0f,
         AudioParameterFloatAttributes().withLabel("Hz")));
     params.push_back(std::make_unique<APF>(
         ParamID::PHANTOM_STRENGTH, "Phantom Strength",
@@ -117,21 +139,45 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
 
     params.push_back(std::make_unique<APC>(
         ParamID::RECIPE_PRESET, "Recipe Preset",
-        StringArray{ "Warm", "Aggressive", "Hollow", "Dense", "Custom" }, 0));
+        StringArray{ "Warm", "Aggressive", "Hollow", "Dense", "Stable", "Weird", "Custom" }, 0));
     params.push_back(std::make_unique<APF>(
         ParamID::HARMONIC_SATURATION, "Harmonic Saturation",
         NormalisableRange<float>(0.0f, 100.0f), 0.0f,
         AudioParameterFloatAttributes().withLabel("%")));
 
+    // ── Waveform shape ────────────────────────────────────────────────────
+    params.push_back(std::make_unique<APF>(
+        ParamID::SYNTH_STEP, "Step",
+        NormalisableRange<float>(0.0f, 100.0f), 0.0f,
+        AudioParameterFloatAttributes().withLabel("%")));
+    params.push_back(std::make_unique<APF>(
+        ParamID::SYNTH_DUTY, "Duty Cycle",
+        NormalisableRange<float>(5.0f, 95.0f), 50.0f,
+        AudioParameterFloatAttributes().withLabel("%")));
+    params.push_back(std::make_unique<APF>(
+        ParamID::SYNTH_SKIP, "Skip",
+        NormalisableRange<float>(1.0f, 8.0f, 1.0f), 1.0f,
+        AudioParameterFloatAttributes()));
+
     // ── Envelope Follower ────────────────────────────────────────────
     params.push_back(std::make_unique<APF>(
         ParamID::ENV_ATTACK_MS, "Envelope Attack",
-        NormalisableRange<float>(0.1f, 20.0f), 1.0f,
+        NormalisableRange<float>(0.1f, 2000.0f, 0.0f, 0.3f), 1.0f,
         AudioParameterFloatAttributes().withLabel("ms")));
     params.push_back(std::make_unique<APF>(
         ParamID::ENV_RELEASE_MS, "Envelope Release",
-        NormalisableRange<float>(5.0f, 500.0f), 50.0f,
+        NormalisableRange<float>(5.0f, 5000.0f, 0.0f, 0.3f), 50.0f,
         AudioParameterFloatAttributes().withLabel("ms")));
+
+    // ── Synth Filter ──────────────────────────────────────────────────
+    params.push_back(std::make_unique<APF>(
+        ParamID::SYNTH_LPF_HZ, "Synth LPF",
+        NormalisableRange<float>(200.0f, 20000.0f, 0.0f, 0.3f), 20000.0f,
+        AudioParameterFloatAttributes().withLabel("Hz")));
+    params.push_back(std::make_unique<APF>(
+        ParamID::SYNTH_HPF_HZ, "Synth HPF",
+        NormalisableRange<float>(20.0f, 2000.0f, 0.0f, 0.3f), 20.0f,
+        AudioParameterFloatAttributes().withLabel("Hz")));
 
     // ── Binaural ──────────────────────────────────────────────────────
     params.push_back(std::make_unique<APC>(
