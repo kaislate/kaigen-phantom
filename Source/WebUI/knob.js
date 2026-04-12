@@ -221,22 +221,23 @@ class PhantomKnob extends HTMLElement {
     const label = this.getAttribute('label') || '';
     const displayText = this._displayValue || this._value.toFixed(2);
 
+    // Note: data-oled="waveform" is designed for size="large" knobs only.
     const isWaveform = this.getAttribute('data-oled') === 'waveform';
-    const numY = cy + oledR * 0.55;
+    const waveNumFontSize = 9;
     const oledContent = isWaveform
       ? `
       <!-- Waveform polyline -->
       <polyline points="${buildWaveformPoints(this._value, cx, cy, oledR)}"
         fill="none" stroke="#fff" stroke-opacity="0.85" stroke-width="1.5" stroke-linecap="round"/>
       <!-- Number (triple glow stack) -->
-      <text x="${cx}" y="${numY}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', monospace" font-weight="bold" font-size="9"
+      <text x="${cx}" y="${cy + oledR * 0.55}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New', monospace" font-weight="bold" font-size="${waveNumFontSize}"
         fill="#fff" opacity="0.3">${displayText}</text>
-      <text x="${cx}" y="${numY}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', monospace" font-weight="bold" font-size="9"
+      <text x="${cx}" y="${cy + oledR * 0.55}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New', monospace" font-weight="bold" font-size="${waveNumFontSize}"
         fill="#fff" opacity="0.6">${displayText}</text>
-      <text x="${cx}" y="${numY}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', monospace" font-weight="bold" font-size="9"
+      <text x="${cx}" y="${cy + oledR * 0.55}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New', monospace" font-weight="bold" font-size="${waveNumFontSize}"
         fill="#fff" opacity="1">${displayText}</text>`
       : `
       <!-- Value text (triple glow stack) -->
