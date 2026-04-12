@@ -1,77 +1,144 @@
-# Wavelet Length Control — Design Spec
+# Wavelet Length + Gate Controls — Design Spec
 
 ## Goal
 
-Add a **Length** knob to the Harmonic Engine row that gates WaveletSynth (RESYN mode) output to the first `length × period` of each wavelet, with a cosine fade-out at the end of the active zone. Has no effect at default (1.0 = full length). Only affects RESYN mode.
+Add two knobs to the Harmonic Engine row for RESYN mode:
+
+1. **Length** — gates WaveletSynth output to the first `length × period` of each wavelet, with a cosine fade-out. Has no effect at default (1.0).
+2. **Gate** — hysteresis threshold on zero-crossing detection. A crossing only triggers resynthesis if the signal previously swung past `±threshold`. Has no effect at default (0.0).
+
+Both only affect RESYN mode (WaveletSynth). Both are transparent at their defaults — no behaviour change on existing sessions.
 
 ---
 
 ## Scope
 
-- New parameter: `synth_wavelet_length`
+- Two new parameters: `synth_wavelet_length`, `synth_gate_threshold`
 - DSP: `WaveletSynth` only (not ZeroCrossingSynth)
-- `PhantomEngine`: forwarding setter for `resynL`/`resynR`
-- `PluginProcessor`: reads param, calls engine setter
-- UI: one new medium knob in Harmonic Engine row
+- `PhantomEngine`: two new forwarding setters for `resynL`/`resynR`
+- `PluginProcessor`: reads both params in `syncParamsToEngine()`
+- UI: two new medium knobs in Harmonic Engine row (Length after Push, Gate after Length)
 
 ---
 
-## Parameter
+## Parameters
+
+### Length
 
 | Property | Value |
 |---|---|
 | ID | `synth_wavelet_length` |
-| Range | 0.05–1.0 (normalised), maps to 5%–100% in DSP |
-| Default | 1.0 (full wavelet length — current behaviour, no audible change) |
-| APVTS range | `NormalisableRange<float>(0.05f, 1.0f)` |
-| Label | `""` (dimensionless ratio) |
+| Range | `NormalisableRange<float>(0.05f, 1.0f)` |
+| Default | `1.0f` (full wavelet — no audible change) |
+| Display label | `"Length"` |
+
+### Gate
+
+| Property | Value |
+|---|---|
+| ID | `synth_gate_threshold` |
+| Range | `NormalisableRange<float>(0.0f, 1.0f)` |
+| Default | `0.0f` (no threshold — all crossings count, same as current) |
+| Display label | `"Gate"` |
 
 ---
 
 ## DSP — WaveletSynth
 
-### New member
+### New members
 
 ```cpp
-// waveletLength smoothed (target set by setWaveletLength)
+// Length
 juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothLength;
-float waveletLength = 1.0f;  // 0.05..1.0 — fraction of period to synthesise
+
+// Gate
+juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothGate;
+float lastNegativePeak = 0.0f;  // most negative value since last valid crossing
 ```
 
-`smoothLength` is initialised in `prepare()` with the same 10 ms ramp used by `smoothStep` and `smoothDuty`. Default current+target = 1.0f.
+Both smoothers initialised in `prepare()` with the same 10 ms ramp as `smoothStep`/`smoothDuty`:
+```cpp
+smoothLength.reset(sr, rampSec);  smoothLength.setCurrentAndTargetValue(1.0f);
+smoothGate.reset(sr, rampSec);    smoothGate.setCurrentAndTargetValue(0.0f);
+```
 
-### New setter
+`lastNegativePeak` reset to `0.0f` in `reset()`.
+
+### New setters
 
 ```cpp
 void WaveletSynth::setWaveletLength(float len) noexcept
 {
     smoothLength.setTargetValue(juce::jlimit(0.05f, 1.0f, len));
 }
+
+void WaveletSynth::setGateThreshold(float thr) noexcept
+{
+    smoothGate.setTargetValue(juce::jlimit(0.0f, 1.0f, thr));
+}
 ```
 
-### Gate logic in `process()`
+### Changes to `process()`
 
-After synthesising `y` (the harmonic sum), apply the length gate before returning:
+**1. Track negative peak** — add at the start of `process()`, before zero-crossing detection:
+
+```cpp
+if (x < lastNegativePeak)
+    lastNegativePeak = x;
+```
+
+**2. Gate threshold check** — add to the valid-crossing branch, alongside the existing timing check. The full valid-crossing condition becomes:
+
+```cpp
+const float gateThr = smoothGate.getNextValue();  // read once per sample at top of process()
+
+// ... existing samplesSinceLastCrossing tracking ...
+
+if (lastSample <= 0.0f && x > 0.0f)
+{
+    if (samplesSinceLastCrossing >= minPeriodSamples &&
+        samplesSinceLastCrossing <= maxPeriodSamples &&
+        lastNegativePeak <= -gateThr)              // ← new gate condition
+    {
+        // valid crossing — existing period update + phase reset logic unchanged
+        // ...
+        lastNegativePeak = 0.0f;  // ← reset peak tracker after valid crossing
+        samplesSinceLastCrossing = 0.0f;
+    }
+    else
+    {
+        // invalid crossing — existing reset logic unchanged
+        accumulatedSamples       = 0.0f;
+        crossingsAccum           = 0;
+        samplesSinceLastCrossing = 0.0f;
+        // do NOT reset lastNegativePeak here — keep accumulating
+    }
+}
+```
+
+At `gateThr = 0.0f`: `lastNegativePeak <= 0.0f` is always true (any negative excursion qualifies). Identical to current behaviour.
+
+**3. Length gate** — after synthesising `y` (the harmonic sum), read the length smoother and apply:
 
 ```cpp
 const float len = smoothLength.getNextValue();
 if (len < 1.0f)
 {
     const float gateEnd   = len * kTwoPi;
-    const float fadeStart = gateEnd * 0.8f;   // cosine fade occupies last 20% of active zone
+    const float fadeStart = gateEnd * 0.8f;   // cosine fade = last 20% of active zone
     if (currentPhase >= gateEnd)
         y = 0.0f;
     else if (currentPhase >= fadeStart)
     {
         const float t = (currentPhase - fadeStart) / (gateEnd - fadeStart); // 0→1
-        y *= 0.5f * (1.0f + std::cos(kPi * t));  // cosine window: 1→0
+        y *= 0.5f * (1.0f + std::cos(kPi * t));  // cosine window 1→0
     }
 }
 ```
 
-The `len < 1.0f` guard skips all gating when at default — zero CPU overhead at the common case.
+`len < 1.0f` guard: zero CPU overhead at default.
 
-**Why phase, not sample count:** `currentPhase` is the authoritative per-wavelet clock. It resets to 0 at every valid crossing, so the gate always aligns with wavelet boundaries regardless of pitch change lag in `estimatedPeriod`.
+**Note on smoother call order:** `smoothGate.getNextValue()` must be called exactly once per sample. Call it at the top of `process()` before the zero-crossing block so all downstream logic uses the same stepped value.
 
 ---
 
@@ -80,15 +147,23 @@ The `len < 1.0f` guard skips all gating when at default — zero CPU overhead at
 Add to `PhantomEngine.h` public setters:
 ```cpp
 void setWaveletLength(float len);
+void setGateThreshold(float thr);
 ```
 
-Implementation in `PhantomEngine.cpp`:
+`PhantomEngine.cpp`:
 ```cpp
 void PhantomEngine::setWaveletLength(float len)
 {
     resynL.setWaveletLength(len);
     resynR.setWaveletLength(len);
-    // synthL / synthR intentionally not forwarded — length is RESYN-only
+    // synthL/synthR not forwarded — RESYN only
+}
+
+void PhantomEngine::setGateThreshold(float thr)
+{
+    resynL.setGateThreshold(thr);
+    resynR.setGateThreshold(thr);
+    // synthL/synthR not forwarded — RESYN only
 }
 ```
 
@@ -100,6 +175,8 @@ In `syncParamsToEngine()`, add:
 ```cpp
 engine.setWaveletLength(
     apvts.getRawParameterValue(ParamID::SYNTH_WAVELET_LENGTH)->load());
+engine.setGateThreshold(
+    apvts.getRawParameterValue(ParamID::SYNTH_GATE_THRESHOLD)->load());
 ```
 
 ---
@@ -108,12 +185,14 @@ engine.setWaveletLength(
 
 Add to `ParamID`:
 ```cpp
-inline constexpr auto SYNTH_WAVELET_LENGTH = "synth_wavelet_length";
+inline constexpr auto SYNTH_WAVELET_LENGTH  = "synth_wavelet_length";
+inline constexpr auto SYNTH_GATE_THRESHOLD  = "synth_gate_threshold";
 ```
 
 Add to `getAllParameterIDs()`:
 ```cpp
 ParamID::SYNTH_WAVELET_LENGTH,
+ParamID::SYNTH_GATE_THRESHOLD,
 ```
 
 Add to `createParameterLayout()`:
@@ -121,36 +200,42 @@ Add to `createParameterLayout()`:
 params.push_back(std::make_unique<APF>(
     ParamID::SYNTH_WAVELET_LENGTH, "Wavelet Length",
     NormalisableRange<float>(0.05f, 1.0f), 1.0f));
+params.push_back(std::make_unique<APF>(
+    ParamID::SYNTH_GATE_THRESHOLD, "Gate Threshold",
+    NormalisableRange<float>(0.0f, 1.0f), 0.0f));
 ```
 
 ---
 
 ## UI — index.html
 
-Add one medium knob to the Harmonic Engine `knob-row`, after the Push knob and before Skip:
+Add two medium knobs to the Harmonic Engine `knob-row`, after Push and before Skip:
 
 ```html
 <phantom-knob data-param="synth_wavelet_length" size="medium" label="Length" default-value="1"></phantom-knob>
+<phantom-knob data-param="synth_gate_threshold" size="medium" label="Gate"   default-value="0"></phantom-knob>
 ```
 
-No CSS changes needed. The Harmonic Engine panel flex ratio (1.2) accommodates the additional knob.
+No CSS changes needed. The Harmonic Engine panel flex ratio (1.2) accommodates the additional knobs.
 
 ---
 
 ## Testing
 
-1. **Default (Length=1.0):** RESYN mode output identical to before — no gating audible
-2. **Length=0.5:** Each wavelet sounds for half its period, then silence; rhythm matches input pitch
-3. **Length=0.05:** Extremely short click-like bursts at pitch frequency
-4. **Cosine fade:** No clicks at any length setting; boundary is smooth
-5. **Effect mode:** Length knob has no effect on ZCS output — confirmed by checking `synthL`/`synthR` are not forwarded
-6. **Smoothing:** Sweeping Length while audio plays has no zipper noise
-7. **Unit tests:** `WaveletSynth` tests verify gated output is zero beyond `length × period` and non-zero before it
+1. **Default (Length=1.0, Gate=0.0):** RESYN output identical to before — no audible change
+2. **Length=0.5:** Each wavelet audible for half its period, then silence; gating rhythm matches input pitch
+3. **Length=0.05:** Very short burst per crossing — click-like pitched transients
+4. **Cosine fade:** No clicks at any Length setting
+5. **Gate=0.5:** Quiet signals below 50% amplitude produce no resynthesis; loud signals pass through normally
+6. **Gate=0.0:** All crossings trigger as before (identical to pre-feature behaviour)
+7. **Effect mode:** Neither knob affects ZCS output
+8. **Smoothing:** Sweeping either knob during playback produces no zipper noise
+9. **Unit tests:** `WaveletSynth` tests verify: (a) output zero beyond `length × period`; (b) crossing suppressed when `lastNegativePeak > -threshold`
 
 ---
 
 ## Out of Scope
 
-- ZeroCrossingSynth gating
+- ZeroCrossingSynth length/gate
 - Mode-conditional UI visibility
 - Fade width as a user-configurable parameter
