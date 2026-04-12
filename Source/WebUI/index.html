@@ -12,7 +12,7 @@
     <div class="hdr">
       <div class="logo-phantom">PHANTOM</div>
       <div class="hsp"></div>
-      <div class="mt"><div class="mb active" data-mode="0">Effect</div><div class="mb" data-mode="1">Instrument</div></div>
+      <div class="mt"><div class="mb active" data-mode="0">Effect</div><div class="mb" data-mode="1">Resyn</div></div>
       <button class="hdr-btn" id="bypass-btn" title="Bypass">&#x23FB;</button>
       <button class="hdr-btn" id="settings-btn" title="Settings">&#x2699;</button>
       <div class="logo-kaigen">KAIGEN</div>
@@ -39,23 +39,23 @@
         </div>
         <div class="preset-strip">
           <div class="lps">
-            <span class="lw active" data-preset="0">Warm</span>
+            <span class="lw" data-preset="0">Warm</span>
             <span class="lw" data-preset="1">Aggr</span>
             <span class="lw" data-preset="2">Hollow</span>
             <span class="lw" data-preset="3">Dense</span>
-            <span class="lw" data-preset="4">Stable</span>
+            <span class="lw active" data-preset="4">Stable</span>
             <span class="lw" data-preset="5">Weird</span>
             <span class="lw" data-preset="6">Custom</span>
           </div>
         </div>
         <!-- H2-H8 hidden parameter carriers — controlled by dragging wheel spokes -->
-        <phantom-knob data-param="recipe_h2" size="small" style="display:none"></phantom-knob>
-        <phantom-knob data-param="recipe_h3" size="small" style="display:none"></phantom-knob>
-        <phantom-knob data-param="recipe_h4" size="small" style="display:none"></phantom-knob>
-        <phantom-knob data-param="recipe_h5" size="small" style="display:none"></phantom-knob>
-        <phantom-knob data-param="recipe_h6" size="small" style="display:none"></phantom-knob>
-        <phantom-knob data-param="recipe_h7" size="small" style="display:none"></phantom-knob>
-        <phantom-knob data-param="recipe_h8" size="small" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h2" size="small" default-value="1.0" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h3" size="small" default-value="0.0" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h4" size="small" default-value="0.7" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h5" size="small" default-value="0.0" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h6" size="small" default-value="0.5" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h7" size="small" default-value="0.0" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h8" size="small" default-value="0.3" style="display:none"></phantom-knob>
       </div>
 
       <div class="gap-v"></div>
