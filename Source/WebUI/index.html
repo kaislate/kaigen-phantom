@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div style="position:fixed;top:2px;right:2px;z-index:99999;background:#0a0;color:#fff;font:bold 10px monospace;padding:2px 6px;border-radius:3px">DSP-2</div>
+  <div style="position:fixed;top:2px;right:2px;z-index:99999;background:#0a0;color:#fff;font:bold 10px monospace;padding:2px 6px;border-radius:3px">DSP-11</div>
   <div class="wrap">
     <!-- Header -->
     <div class="hdr">
@@ -43,9 +43,19 @@
             <span class="lw" data-preset="1">Aggr</span>
             <span class="lw" data-preset="2">Hollow</span>
             <span class="lw" data-preset="3">Dense</span>
-            <span class="lw" data-preset="4">Custom</span>
+            <span class="lw" data-preset="4">Stable</span>
+            <span class="lw" data-preset="5">Weird</span>
+            <span class="lw" data-preset="6">Custom</span>
           </div>
         </div>
+        <!-- H2-H8 hidden parameter carriers — controlled by dragging wheel spokes -->
+        <phantom-knob data-param="recipe_h2" size="small" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h3" size="small" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h4" size="small" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h5" size="small" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h6" size="small" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h7" size="small" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h8" size="small" style="display:none"></phantom-knob>
       </div>
 
       <div class="gap-v"></div>
@@ -59,6 +69,9 @@
             <div class="knob-row">
               <phantom-knob data-param="harmonic_saturation" size="large" label="Saturation" default-value="0"></phantom-knob>
               <phantom-knob data-param="phantom_strength" size="medium" label="Strength" default-value="0.8"></phantom-knob>
+              <phantom-knob data-param="synth_step" size="medium" label="Step" default-value="0"></phantom-knob>
+              <phantom-knob data-param="synth_duty" size="medium" label="Duty" default-value="0.5"></phantom-knob>
+              <phantom-knob data-param="synth_skip" size="medium" label="Skip" default-value="1"></phantom-knob>
             </div>
           </div>
           <div class="candy-inner panel-output">
@@ -77,7 +90,7 @@
             <div class="el">Ghost <span class="toggle-group"><button class="tog active" data-gmode="0">Rpl</button><button class="tog" data-gmode="1">Add</button></span></div>
             <div class="knob-row">
               <phantom-knob data-param="ghost" size="large" label="Amount" default-value="1.0"></phantom-knob>
-              <phantom-knob data-param="phantom_threshold" size="medium" label="Threshold" default-value="0.462"></phantom-knob>
+              <phantom-knob data-param="phantom_threshold" size="medium" label="Crossover" default-value="0.462"></phantom-knob>
             </div>
           </div>
           <div class="candy-inner panel-stereo">
@@ -90,13 +103,20 @@
 
         <div class="gap-h"></div>
 
-        <!-- Row 3: Envelope follower -->
+        <!-- Row 3: Envelope follower + Filter -->
         <div class="ctrl-row">
           <div class="candy-inner panel-envelope">
             <div class="el">Envelope Follower</div>
             <div class="knob-row">
               <phantom-knob data-param="env_attack_ms" size="medium" label="Attack" default-value="0.05"></phantom-knob>
               <phantom-knob data-param="env_release_ms" size="medium" label="Release" default-value="0.1"></phantom-knob>
+            </div>
+          </div>
+          <div class="candy-inner panel-filter">
+            <div class="el">Filter</div>
+            <div class="knob-row">
+              <phantom-knob data-param="synth_lpf_hz" size="medium" label="LPF" default-value="1"></phantom-knob>
+              <phantom-knob data-param="synth_hpf_hz" size="medium" label="HPF" default-value="0"></phantom-knob>
             </div>
           </div>
         </div>
@@ -108,7 +128,8 @@
           <canvas id="meterIn" class="io-meter"></canvas>
           <div class="spectrum-wrap">
             <canvas id="spectrumCanvas"></canvas>
-            <button class="spectrum-toggle" id="specToggle">&#x2261;</button>
+            <canvas id="oscCanvas" class="hidden"></canvas>
+            <button class="spectrum-toggle" id="specToggle" title="Toggle Spectrum / Oscilloscope">&#x2261;</button>
           </div>
           <canvas id="meterOut" class="io-meter"></canvas>
         </div>
@@ -142,5 +163,6 @@
 <script src="/phantom.js"></script>
 <script src="/spectrum.js"></script>
 <script src="/recipe-wheel.js"></script>
+<script src="/oscilloscope.js"></script>
 </body>
 </html>
