@@ -10,6 +10,8 @@ void PhantomEngine::prepare(double sr, int blockSize, int nCh)
 
     synthL.prepare(sr);
     synthR.prepare(sr);
+    resynL.prepare(sr);
+    resynR.prepare(sr);
 
     envelopeL.prepare(sr);
     envelopeR.prepare(sr);
@@ -44,6 +46,8 @@ void PhantomEngine::reset()
     bassExtractor.reset();
     synthL.reset();
     synthR.reset();
+    resynL.reset();
+    resynR.reset();
     envelopeL.reset();
     envelopeR.reset();
     lowBuf.clear();
@@ -64,6 +68,8 @@ void PhantomEngine::setHarmonicAmplitudes(const std::array<float, 7>& amps)
 {
     synthL.setHarmonicAmplitudes(amps);
     synthR.setHarmonicAmplitudes(amps);
+    resynL.setHarmonicAmplitudes(amps);
+    resynR.setHarmonicAmplitudes(amps);
 }
 
 void PhantomEngine::setSaturation(float s)
@@ -72,9 +78,21 @@ void PhantomEngine::setSaturation(float s)
     smoothSatR.setTargetValue(juce::jlimit(0.0f, 1.0f, s));
 }
 
-void PhantomEngine::setSynthStep(float step)      { synthL.setStep(step); synthR.setStep(step); }
-void PhantomEngine::setSynthDuty(float duty)      { synthL.setDutyCycle(duty); synthR.setDutyCycle(duty); }
-void PhantomEngine::setSynthSkip(int n)           { synthL.setSkipCount(n); synthR.setSkipCount(n); }
+void PhantomEngine::setSynthStep(float step)
+{
+    synthL.setStep(step); synthR.setStep(step);
+    resynL.setStep(step); resynR.setStep(step);
+}
+void PhantomEngine::setSynthDuty(float duty)
+{
+    synthL.setDutyCycle(duty); synthR.setDutyCycle(duty);
+    resynL.setDutyCycle(duty); resynR.setDutyCycle(duty);
+}
+void PhantomEngine::setSynthSkip(int n)
+{
+    synthL.setSkipCount(n); synthR.setSkipCount(n);
+    resynL.setSkipCount(n); resynR.setSkipCount(n);
+}
 void PhantomEngine::setGhostAmount(float a)       { ghostAmount    = juce::jlimit(0.0f, 1.0f, a); }
 void PhantomEngine::setGhostReplace(bool r)       { ghostReplace   = r; }
 void PhantomEngine::setPhantomStrength(float s)   { phantomStrength = juce::jlimit(0.0f, 1.0f, s); }
@@ -110,6 +128,11 @@ void PhantomEngine::setSynthHPF(float hz)
     hpfR.setCoefficients(coeff);
 }
 
+void PhantomEngine::setSynthMode(int mode)
+{
+    synthMode.store(juce::jlimit(0, 1, mode), std::memory_order_relaxed);
+}
+
 // ── Processing ─────────────────────────────────────────────────────────────
 
 void PhantomEngine::process(juce::AudioBuffer<float>& buffer)
@@ -136,18 +159,21 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer)
 
     // 2. Per-sample: detect period → synthesise harmonics → ghost mix
     //
-    // The ZeroCrossingSynth receives the amplitude-normalised bass signal so
-    // its zero crossings are consistent regardless of input level, and returns
-    // only harmonics H2-H8 with no fundamental component.
+    // Effect mode (synthMode==0): ZeroCrossingSynth — synthesises H2-H8 only,
+    // continuous phase, no fundamental component.
     //
-    // Unlike Chebyshev, no HPF is needed in Replace mode — there is no
-    // fundamental leakage to filter out.
+    // RESYN mode (synthMode==1): WaveletSynth — phase resets at every zero
+    // crossing, synthesises H1 (always 1.0) + H2-H8, grittier wavelet character.
+    //
+    // Both engines receive the amplitude-normalised bass band. No HPF is needed
+    // in Replace mode — neither engine outputs the fundamental by design.
     int oscWp = oscSynthWrPos.load(std::memory_order_relaxed);
     for (int ch = 0; ch < nCh; ++ch)
     {
-        auto& env  = (ch == 0) ? envelopeL  : envelopeR;
-        auto& syn  = (ch == 0) ? synthL     : synthR;
-        auto& sat  = (ch == 0) ? smoothSatL : smoothSatR;
+        auto& env   = (ch == 0) ? envelopeL  : envelopeR;
+        auto& syn   = (ch == 0) ? synthL     : synthR;
+        auto& resyn = (ch == 0) ? resynL     : resynR;
+        auto& sat   = (ch == 0) ? smoothSatL : smoothSatR;
         auto& lpf  = (ch == 0) ? lpfL       : lpfR;
         auto& hpf  = (ch == 0) ? hpfL       : hpfR;
 
@@ -161,13 +187,23 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer)
 
             // Normalise to ~unit amplitude so zero crossings are consistent
             // and the synthesised harmonics have a stable reference amplitude.
-            // Gate below -80 dBFS to avoid noise-driven period estimates.
+            // Gate output below -80 dBFS. Gate period-tracking below -40 dBFS:
+            // during release, the signal falls into noise before inLvl drops to
+            // 1e-4; passing that noise (normalised to unit amplitude) to the ZCS
+            // produces rapid false crossings that push the period estimate up,
+            // making harmonics jump to a higher frequency. Freezing period
+            // detection below -40 dBFS lets the synth coast at the last good
+            // estimate through the release tail.
+            static constexpr float kTrackingGate = 0.01f; // -40 dBFS
             const float normIn = (inLvl > 1e-4f)
                 ? juce::jlimit(-1.0f, 1.0f, low[i] / inLvl)
                 : 0.0f;
+            const float trackIn = (inLvl > kTrackingGate) ? normIn : 0.0f;
 
-            // Generate H2-H8 — fundamental is never synthesised
-            float phantomSample = syn.process(normIn);
+            // Generate harmonics — ZCS (Effect) or WaveletSynth (RESYN)
+            float phantomSample = (synthMode.load(std::memory_order_relaxed) == 1)
+                ? resyn.process(trackIn)
+                : syn.process(trackIn);
 
             // Optional post-synthesis tanh saturation.
             // Applied to the harmonic sum so the fundamental cannot reappear.
@@ -179,12 +215,12 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer)
                               + satCurve * saturation;
             }
 
-            // Scale by envelope so phantom tracks input dynamics
-            const float phantomOut = phantomSample * inLvl * phantomStrength;
-
-            // Synth filter: LPF then HPF, applied to harmonics only (before envelope scale)
+            // Synth filter: LPF then HPF on harmonics before envelope scaling
             phantomSample = lpf.processSingleSampleRaw(phantomSample);
             phantomSample = hpf.processSingleSampleRaw(phantomSample);
+
+            // Scale by envelope so phantom tracks input dynamics
+            const float phantomOut = phantomSample * inLvl * phantomStrength;
 
             // Oscilloscope capture (left channel only)
             if (ch == 0)

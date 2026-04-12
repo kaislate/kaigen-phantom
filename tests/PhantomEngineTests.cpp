@@ -70,7 +70,7 @@ TEST_CASE("PhantomEngine: low sine with phantom active produces nonzero output")
     eng.setGhostReplace(false);  // add mode — phantom + original
     eng.setPhantomStrength(1.0f);
     eng.setHarmonicAmplitudes({ 0.8f, 0.6f, 0.4f, 0.3f, 0.2f, 0.1f, 0.05f });
-    eng.setDrive(0.5f);
+    eng.setSaturation(0.5f);
 
     auto buf = makeSineBuffer(60.0f, 0.5f, 4096);
     eng.process(buf);
@@ -124,4 +124,42 @@ TEST_CASE("PhantomEngine: bypass configuration does nothing internally")
     eng.process(buf);
     // No crash = pass
     SUCCEED();
+}
+
+TEST_CASE("PhantomEngine: RESYN mode produces nonzero output for sine input")
+{
+    PhantomEngine eng;
+    eng.prepare(44100.0, 512, 2);
+    eng.setSynthMode(1);
+    eng.setCrossoverHz(150.0f);
+    eng.setGhostAmount(1.0f);
+    eng.setGhostReplace(false);
+    eng.setPhantomStrength(1.0f);
+
+    auto buf = makeSineBuffer(60.0f, 0.5f, 4096);
+    eng.process(buf);
+
+    float maxOut = 0.0f;
+    for (int i = 2048; i < 4096; ++i)
+        maxOut = juce::jmax(maxOut, std::fabs(buf.getSample(0, i)));
+
+    REQUIRE(maxOut > 0.1f);
+}
+
+TEST_CASE("PhantomEngine: RESYN mode silence in -> silence out")
+{
+    PhantomEngine eng;
+    eng.prepare(44100.0, 512, 2);
+    eng.setSynthMode(1);
+    eng.setGhostAmount(1.0f);
+    eng.setGhostReplace(true);
+    eng.setPhantomStrength(1.0f);
+
+    juce::AudioBuffer<float> buf(2, 1024);
+    buf.clear();
+    eng.process(buf);
+
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < buf.getNumSamples(); ++i)
+            REQUIRE(std::fabs(buf.getSample(ch, i)) < 1e-4f);
 }

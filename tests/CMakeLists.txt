@@ -20,6 +20,8 @@ add_executable(KaigenPhantomTests
     ../Source/Engines/Waveshaper.cpp
     ../Source/Engines/EnvelopeFollower.cpp
     ../Source/Engines/PhantomEngine.cpp
+    ../Source/Engines/ZeroCrossingSynth.cpp
+    ../Source/Engines/WaveletSynth.cpp
 )
 
 target_link_libraries(KaigenPhantomTests

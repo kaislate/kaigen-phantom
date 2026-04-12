@@ -3,6 +3,7 @@
 #include <array>
 #include "BassExtractor.h"
 #include "ZeroCrossingSynth.h"
+#include "WaveletSynth.h"
 #include "EnvelopeFollower.h"
 #include "BinauralStage.h"
 #include <juce_dsp/juce_dsp.h>
@@ -43,6 +44,7 @@ public:
     void setStereoWidth(float width);        // [0..2]
     void setSynthLPF(float hz);            // 200–20000 Hz, default 20000 (transparent)
     void setSynthHPF(float hz);            // 20–2000 Hz,   default 20   (transparent)
+    void setSynthMode(int mode);           // 0 = Effect (ZCS), 1 = RESYN (WaveletSynth)
 
     // ─── Audio processing ────────────────────────────────────────────────
     void process(juce::AudioBuffer<float>& buffer);
@@ -56,6 +58,9 @@ private:
     BassExtractor     bassExtractor;
     ZeroCrossingSynth synthL;
     ZeroCrossingSynth synthR;
+    WaveletSynth      resynL;
+    WaveletSynth      resynR;
+    std::atomic<int>  synthMode { 0 };    // 0 = Effect, 1 = RESYN
     EnvelopeFollower  envelopeL;
     EnvelopeFollower  envelopeR;
     BinauralStage     binaural;
