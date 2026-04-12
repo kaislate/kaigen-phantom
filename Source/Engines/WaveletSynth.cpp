@@ -132,6 +132,11 @@ float WaveletSynth::process(float x) noexcept
     //   estimatedPeriod ≈ 882 → phase advances at 2π/882 per sample.
     //   H2 = sin(2 × φ) completes one cycle every 441 samples → lands on 100Hz
     //   (the original fundamental). Sub-harmonic synthesis in action.
+    // Track most negative excursion since last valid crossing (gate hysteresis)
+    if (x < lastNegativePeak)
+        lastNegativePeak = x;
+    const float gateThr = smoothGate.getNextValue();
+
     samplesSinceLastCrossing += 1.0f;
     accumulatedSamples       += 1.0f;
 
@@ -140,7 +145,8 @@ float WaveletSynth::process(float x) noexcept
         // Only count this crossing if the individual interval is in range.
         // Out-of-range means noise or a frequency outside [16 Hz, 4 kHz].
         if (samplesSinceLastCrossing >= minPeriodSamples &&
-            samplesSinceLastCrossing <= maxPeriodSamples)
+            samplesSinceLastCrossing <= maxPeriodSamples &&
+            lastNegativePeak <= -gateThr)
         {
             crossingsAccum++;
 
@@ -163,6 +169,7 @@ float WaveletSynth::process(float x) noexcept
             // Each valid interval is a fresh wavelet starting at phase 0.
             currentPhase             = 0.0f;
             samplesSinceLastCrossing = 0.0f;
+            lastNegativePeak         = 0.0f;
         }
         else
         {
