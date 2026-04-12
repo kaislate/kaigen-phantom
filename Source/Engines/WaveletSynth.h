@@ -25,6 +25,8 @@ public:
     void setStep(float step) noexcept;
     void setDutyCycle(float duty) noexcept;
     void setSkipCount(int n) noexcept;
+    void setWaveletLength(float len) noexcept;  // 0.05–1.0: fraction of period to synthesise
+    void setGateThreshold(float thr) noexcept;  // 0.0–1.0: min negative-peak amplitude for valid crossing
 
     float process(float x) noexcept;
     float getEstimatedHz() const noexcept;
@@ -48,6 +50,9 @@ private:
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothStep;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothDuty;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothLength;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothGate;
+    float lastNegativePeak = 0.0f;
 
     static float warpPhase(float phase, float duty) noexcept;
     static float shapedWave(float wp, float step) noexcept;

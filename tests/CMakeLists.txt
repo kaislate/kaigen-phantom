@@ -9,6 +9,7 @@ FetchContent_MakeAvailable(Catch2)
 
 add_executable(KaigenPhantomTests
     ParameterTests.cpp
+    WaveletSynthTests.cpp
     BinauralStageTests.cpp
     SerializationTests.cpp
     BassExtractorTests.cpp
