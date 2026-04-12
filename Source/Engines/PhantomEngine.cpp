@@ -199,15 +199,9 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer)
         {
             const float inLvl = env.process(low[i]);
 
-            // Normalise to ~unit amplitude so zero crossings are consistent
-            // and the synthesised harmonics have a stable reference amplitude.
-            // Gate output below -80 dBFS. Gate period-tracking below -40 dBFS:
-            // during release, the signal falls into noise before inLvl drops to
-            // 1e-4; passing that noise (normalised to unit amplitude) to the ZCS
-            // produces rapid false crossings that push the period estimate up,
-            // making harmonics jump to a higher frequency. Freezing period
-            // detection below -40 dBFS lets the synth coast at the last good
-            // estimate through the release tail.
+            // Normalise to ~unit amplitude for ZCS. Gate output below -80 dBFS.
+            // Gate ZCS period-tracking below -40 dBFS: during release, normalised
+            // noise drives rapid false crossings that push the period estimate up.
             static constexpr float kTrackingGate = 0.01f; // -40 dBFS
             const float normIn = (inLvl > 1e-4f)
                 ? juce::jlimit(-1.0f, 1.0f, low[i] / inLvl)
@@ -215,8 +209,17 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer)
             const float trackIn = (inLvl > kTrackingGate) ? normIn : 0.0f;
 
             // Generate harmonics — ZCS (Effect) or WaveletSynth (RESYN)
+            //
+            // RESYN receives the raw bass-band signal (low[i]), NOT the normalised
+            // trackIn. WaveletSynth's internal inputPeak tracker uses the real
+            // signal amplitude to freeze period updates once the signal drops to
+            // the noise floor (~-40 dBFS, ~89 ms decay from a -6 dBFS note).
+            // This prevents the period estimate drifting upward during long
+            // envelope-follower releases regardless of the release time setting.
+            //
+            // ZCS keeps the normalised, gated trackIn (unchanged behaviour).
             float phantomSample = (synthMode.load(std::memory_order_relaxed) == 1)
-                ? resyn.process(trackIn)
+                ? resyn.process(low[i])
                 : syn.process(trackIn);
 
             // Optional post-synthesis tanh saturation.
