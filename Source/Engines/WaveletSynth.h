@@ -54,6 +54,11 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothGate;
     float lastNegativePeak = 0.0f;
 
+    // Fast-attack / slow-release amplitude envelope.
+    // Freezes period updates when input is too quiet to give reliable pitch info
+    // (e.g. noise during a long envelope release tail).
+    float inputPeak = 0.0f;
+
     static float warpPhase(float phase, float duty) noexcept;
     static float shapedWave(float wp, float step) noexcept;
 };

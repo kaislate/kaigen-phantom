@@ -36,6 +36,7 @@ void WaveletSynth::reset() noexcept
     currentPhase             = 0.0f;
     estimatedPeriod          = (float)(sampleRate / 100.0); // 100 Hz safe default
     lastNegativePeak         = 0.0f;
+    inputPeak                = 0.0f;
 }
 
 // ── Parameter setters ──────────────────────────────────────────────────────
@@ -132,6 +133,13 @@ float WaveletSynth::process(float x) noexcept
     //   estimatedPeriod ≈ 882 → phase advances at 2π/882 per sample.
     //   H2 = sin(2 × φ) completes one cycle every 441 samples → lands on 100Hz
     //   (the original fundamental). Sub-harmonic synthesis in action.
+    // Fast-attack / slow-release amplitude tracker (~520 ms from 0 dBFS to −40 dBFS floor).
+    // Period updates are frozen once inputPeak drops below kAmplitudeFloor so that
+    // noise-level zero crossings during a long envelope release cannot walk the
+    // estimate to a higher frequency.
+    const float absX = std::abs(x);
+    inputPeak = (absX > inputPeak) ? absX : inputPeak * 0.9998f;
+
     // Track most negative excursion since last valid crossing (gate hysteresis)
     if (x < lastNegativePeak)
         lastNegativePeak = x;
@@ -152,15 +160,21 @@ float WaveletSynth::process(float x) noexcept
 
             if (crossingsAccum >= skipCount)
             {
-                // Rate-limit period changes before applying the EMA.
-                // Without this, noisy residual signal during note release gets
-                // normalised to unit amplitude and its (higher-frequency) zero
-                // crossings cause the period estimate to snap up an octave.
-                // Clamping to ±20% per measurement lets legitimate pitch changes
-                // track freely while blocking single-crossing octave jumps.
-                const float maxDelta = estimatedPeriod * 0.20f;
-                const float delta    = accumulatedSamples - estimatedPeriod;
-                estimatedPeriod += trackingAlpha * juce::jlimit(-maxDelta, maxDelta, delta);
+                // Only update the period estimate when input amplitude is above the
+                // noise floor.  During a long envelope release the signal decays toward
+                // zero — any remaining zero crossings are noise-dominated and would
+                // otherwise walk the estimate to a higher frequency.
+                // inputPeak decays at ~0.9998/sample, so it crosses kAmplitudeFloor
+                // roughly 520 ms after the last loud sample (at 44.1 kHz).
+                static constexpr float kAmplitudeFloor = 0.01f;  // ≈ −40 dBFS
+                if (inputPeak >= kAmplitudeFloor)
+                {
+                    // Rate-limit to ±20 % per measurement so single bad crossings
+                    // cannot cause octave jumps during normal pitch changes.
+                    const float maxDelta = estimatedPeriod * 0.20f;
+                    const float delta    = accumulatedSamples - estimatedPeriod;
+                    estimatedPeriod += trackingAlpha * juce::jlimit(-maxDelta, maxDelta, delta);
+                }
 
                 accumulatedSamples = 0.0f;
                 crossingsAccum     = 0;
