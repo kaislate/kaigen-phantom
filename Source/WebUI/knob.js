@@ -221,6 +221,41 @@ class PhantomKnob extends HTMLElement {
     const label = this.getAttribute('label') || '';
     const displayText = this._displayValue || this._value.toFixed(2);
 
+    const isWaveform = this.getAttribute('data-oled') === 'waveform';
+    const numY = cy + oledR * 0.55;
+    const oledContent = isWaveform
+      ? `
+      <!-- Waveform polyline -->
+      <polyline points="${buildWaveformPoints(this._value, cx, cy, oledR)}"
+        fill="none" stroke="#fff" stroke-opacity="0.85" stroke-width="1.5" stroke-linecap="round"/>
+      <!-- Number (triple glow stack) -->
+      <text x="${cx}" y="${numY}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New', monospace" font-weight="bold" font-size="9"
+        fill="#fff" opacity="0.3">${displayText}</text>
+      <text x="${cx}" y="${numY}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New', monospace" font-weight="bold" font-size="9"
+        fill="#fff" opacity="0.6">${displayText}</text>
+      <text x="${cx}" y="${numY}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New', monospace" font-weight="bold" font-size="9"
+        fill="#fff" opacity="1">${displayText}</text>`
+      : `
+      <!-- Value text (triple glow stack) -->
+      <text x="${cx}" y="${cy - 1}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New', monospace" font-weight="bold" font-size="${fontSize}"
+        fill="#fff" opacity="0.3">${displayText}</text>
+      <text x="${cx}" y="${cy - 1}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New', monospace" font-weight="bold" font-size="${fontSize}"
+        fill="#fff" opacity="0.6">${displayText}</text>
+      <text x="${cx}" y="${cy - 1}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New', monospace" font-weight="bold" font-size="${fontSize}"
+        fill="#fff" opacity="1">${displayText}</text>
+
+      <!-- Label text -->
+      <text x="${cx}" y="${cy + fontSize / 2 + 5}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Space Grotesk', sans-serif" font-size="5" font-weight="500"
+        letter-spacing="2" fill="rgba(255,255,255,0.45)" text-transform="uppercase"
+        style="text-transform:uppercase">${label.toUpperCase()}</text>`;
+
     const valEndDeg = ARC_START + ARC_SWEEP * this._value;
 
     // Build SVG
@@ -279,22 +314,7 @@ class PhantomKnob extends HTMLElement {
         stroke="#fff" stroke-width="2.8" stroke-linecap="round"/>
       ` : ''}
 
-      <!-- Value text (triple glow stack) -->
-      <text x="${cx}" y="${cy - 1}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', monospace" font-weight="bold" font-size="${fontSize}"
-        fill="#fff" opacity="0.3">${displayText}</text>
-      <text x="${cx}" y="${cy - 1}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', monospace" font-weight="bold" font-size="${fontSize}"
-        fill="#fff" opacity="0.6">${displayText}</text>
-      <text x="${cx}" y="${cy - 1}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', monospace" font-weight="bold" font-size="${fontSize}"
-        fill="#fff" opacity="1">${displayText}</text>
-
-      <!-- Label text -->
-      <text x="${cx}" y="${cy + fontSize / 2 + 5}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Space Grotesk', sans-serif" font-size="5" font-weight="500"
-        letter-spacing="2" fill="rgba(255,255,255,0.45)" text-transform="uppercase"
-        style="text-transform:uppercase">${label.toUpperCase()}</text>
+      ${oledContent}
     `;
   }
 }
