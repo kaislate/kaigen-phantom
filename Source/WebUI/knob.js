@@ -20,6 +20,39 @@ function describeArc(cx, cy, r, startDeg, endDeg) {
   return `M ${s.x} ${s.y} A ${r} ${r} 0 ${largeArc} 1 ${e.x} ${e.y}`;
 }
 
+// ── Waveform helpers (exact replica of DSP warpPhase / shapedWave) ──────────
+function warpPhase(phase, duty) {
+  const d = Math.min(0.95, Math.max(0.05, duty));
+  if (phase < TAU * d)
+    return phase / (2 * d);
+  else
+    return Math.PI + (phase - TAU * d) / (2 * (1 - d));
+}
+
+function shapedWave(wp, step) {
+  const s = Math.sin(wp);
+  if (step <= 0) return s;
+  const drive = 1 + step * 19;
+  const tanhD = Math.tanh(drive);
+  return Math.tanh(s * drive) / tanhD;
+}
+
+function buildWaveformPoints(step, cx, cy, oledR) {
+  const nPts = 64;
+  const xL = cx - (oledR - 5);
+  const xR = cx + (oledR - 5);
+  const yMid = cy - oledR * 0.15;
+  const yAmp = oledR * 0.45;
+  const pts = [];
+  for (let i = 0; i <= nPts; i++) {
+    const t = (i / nPts) * TAU;
+    const wp = warpPhase(t, 0.5);
+    const y  = shapedWave(wp, step);
+    pts.push(`${(xL + (i / nPts) * (xR - xL)).toFixed(1)},${(yMid - y * yAmp).toFixed(1)}`);
+  }
+  return pts.join(' ');
+}
+
 const TEMPLATE = document.createElement('template');
 TEMPLATE.innerHTML = `
 <style>
@@ -32,6 +65,7 @@ TEMPLATE.innerHTML = `
 }
 :host([size="large"]) { width: 100px; height: 100px; }
 :host([size="medium"]) { width: 72px; height: 72px; }
+:host([size="small"]) { width: 38px; height: 38px; }
 svg { display: block; width: 100%; height: 100%; }
 .label-below {
   text-align: center;
