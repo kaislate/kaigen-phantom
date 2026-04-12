@@ -19,6 +19,10 @@ void WaveletSynth::prepare(double sr) noexcept
     smoothDuty.reset(sr, rampSec);
     smoothStep.setCurrentAndTargetValue(0.0f);
     smoothDuty.setCurrentAndTargetValue(0.5f);
+    smoothLength.reset(sr, rampSec);
+    smoothLength.setCurrentAndTargetValue(1.0f);
+    smoothGate.reset(sr, rampSec);
+    smoothGate.setCurrentAndTargetValue(0.0f);
 
     reset();
 }
@@ -31,6 +35,7 @@ void WaveletSynth::reset() noexcept
     crossingsAccum           = 0;
     currentPhase             = 0.0f;
     estimatedPeriod          = (float)(sampleRate / 100.0); // 100 Hz safe default
+    lastNegativePeak         = 0.0f;
 }
 
 // ── Parameter setters ──────────────────────────────────────────────────────
@@ -49,6 +54,16 @@ void WaveletSynth::setStep(float s) noexcept
 void WaveletSynth::setDutyCycle(float d) noexcept
 {
     smoothDuty.setTargetValue(juce::jlimit(0.05f, 0.95f, d));
+}
+
+void WaveletSynth::setWaveletLength(float len) noexcept
+{
+    smoothLength.setTargetValue(juce::jlimit(0.05f, 1.0f, len));
+}
+
+void WaveletSynth::setGateThreshold(float thr) noexcept
+{
+    smoothGate.setTargetValue(juce::jlimit(0.0f, 1.0f, thr));
 }
 
 void WaveletSynth::setSkipCount(int n) noexcept
