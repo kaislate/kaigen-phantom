@@ -41,7 +41,18 @@ TEST_CASE("createParameterLayout contains all required parameter IDs")
     // Stereo
     REQUIRE(has(ParamID::STEREO_WIDTH));
 
-    REQUIRE(ids.size() == 21u);
+    // Synth filters
+    REQUIRE(has(ParamID::SYNTH_STEP));
+    REQUIRE(has(ParamID::SYNTH_DUTY));
+    REQUIRE(has(ParamID::SYNTH_SKIP));
+    REQUIRE(has(ParamID::SYNTH_LPF_HZ));
+    REQUIRE(has(ParamID::SYNTH_HPF_HZ));
+
+    // RESYN controls
+    REQUIRE(has(ParamID::SYNTH_WAVELET_LENGTH));
+    REQUIRE(has(ParamID::SYNTH_GATE_THRESHOLD));
+
+    REQUIRE(ids.size() == 28u);
 }
 
 TEST_CASE("ghost parameter default is 100 percent")

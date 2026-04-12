@@ -128,6 +128,20 @@ void PhantomEngine::setSynthHPF(float hz)
     hpfR.setCoefficients(coeff);
 }
 
+void PhantomEngine::setWaveletLength(float len)
+{
+    resynL.setWaveletLength(len);
+    resynR.setWaveletLength(len);
+    // synthL/synthR not forwarded — Length is RESYN-only
+}
+
+void PhantomEngine::setGateThreshold(float thr)
+{
+    resynL.setGateThreshold(thr);
+    resynR.setGateThreshold(thr);
+    // synthL/synthR not forwarded — Gate is RESYN-only
+}
+
 void PhantomEngine::setSynthMode(int mode)
 {
     synthMode.store(juce::jlimit(0, 1, mode), std::memory_order_relaxed);

@@ -46,6 +46,8 @@ public:
     void setSynthLPF(float hz);            // 200–20000 Hz, default 20000 (transparent)
     void setSynthHPF(float hz);            // 20–2000 Hz,   default 20   (transparent)
     void setSynthMode(int mode);           // 0 = Effect (ZCS), 1 = RESYN (WaveletSynth)
+    void setWaveletLength(float len);      // RESYN only: 0.05–1.0 fraction of period
+    void setGateThreshold(float thr);      // RESYN only: 0.0–1.0 min negative-peak threshold
 
     // ─── Audio processing ────────────────────────────────────────────────
     void process(juce::AudioBuffer<float>& buffer);

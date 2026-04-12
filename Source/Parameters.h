@@ -48,6 +48,12 @@ namespace ParamID
     inline constexpr auto SYNTH_LPF_HZ      = "synth_lpf_hz";
     /** High-pass filter on synthesised harmonics. 20–2000 Hz. Default 20 (transparent). */
     inline constexpr auto SYNTH_HPF_HZ      = "synth_hpf_hz";
+
+    // ── RESYN (WaveletSynth) controls ─────────────────────────────────────
+    /** Fraction of each wavelet period to synthesise. 0.05–1.0. Default 1.0 (full). */
+    inline constexpr auto SYNTH_WAVELET_LENGTH = "synth_wavelet_length";
+    /** Gate threshold: min negative-peak amplitude for a crossing to be valid. 0–1. Default 0. */
+    inline constexpr auto SYNTH_GATE_THRESHOLD = "synth_gate_threshold";
 }
 
 // ─── Preset amplitude tables — Chebyshev polynomial weights ────────────
@@ -89,6 +95,8 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::STEREO_WIDTH,
         ParamID::SYNTH_LPF_HZ,
         ParamID::SYNTH_HPF_HZ,
+        ParamID::SYNTH_WAVELET_LENGTH,
+        ParamID::SYNTH_GATE_THRESHOLD,
     };
 }
 
@@ -178,6 +186,14 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         ParamID::SYNTH_HPF_HZ, "Synth HPF",
         NormalisableRange<float>(20.0f, 2000.0f, 0.0f, 0.3f), 20.0f,
         AudioParameterFloatAttributes().withLabel("Hz")));
+
+    // ── RESYN controls ────────────────────────────────────────────────
+    params.push_back(std::make_unique<APF>(
+        ParamID::SYNTH_WAVELET_LENGTH, "Wavelet Length",
+        NormalisableRange<float>(0.05f, 1.0f), 1.0f));
+    params.push_back(std::make_unique<APF>(
+        ParamID::SYNTH_GATE_THRESHOLD, "Gate Threshold",
+        NormalisableRange<float>(0.0f, 1.0f), 0.0f));
 
     // ── Binaural ──────────────────────────────────────────────────────
     params.push_back(std::make_unique<APC>(
