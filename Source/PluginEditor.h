@@ -47,9 +47,14 @@ private:
     juce::WebSliderRelay envReleaseRelay         { "env_release_ms" };
     juce::WebSliderRelay binauralWidthRelay      { "binaural_width" };
     juce::WebSliderRelay stereoWidthRelay        { "stereo_width" };
-    juce::WebSliderRelay synthLPFRelay           { "synth_lpf_hz" };
-    juce::WebSliderRelay synthHPFRelay           { "synth_hpf_hz" };
-    juce::WebSliderRelay punchAmountRelay        { "punch_amount" };
+    juce::WebSliderRelay synthLPFRelay              { "synth_lpf_hz" };
+    juce::WebSliderRelay synthHPFRelay              { "synth_hpf_hz" };
+    juce::WebSliderRelay synthWaveletLengthRelay    { "synth_wavelet_length" };
+    juce::WebSliderRelay synthGateThresholdRelay    { "synth_gate_threshold" };
+    juce::WebSliderRelay synthH1Relay               { "synth_h1" };
+    juce::WebSliderRelay synthMaxTrackHzRelay       { "synth_max_track_hz" };
+    juce::WebSliderRelay trackingSpeedRelay         { "tracking_speed" };
+    juce::WebSliderRelay punchAmountRelay           { "punch_amount" };
 
     // ── Combo-box relays ──────────────────────────────────────────────
     juce::WebComboBoxRelay modeRelay             { "mode" };

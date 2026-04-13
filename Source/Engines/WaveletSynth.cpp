@@ -209,16 +209,21 @@ float WaveletSynth::process(float x) noexcept
 
                 accumulatedSamples = 0.0f;
                 crossingsAccum     = 0;
+
+                // Phase reset at the measurement crossing (every skipCount crossings).
+                // Moving this inside skipCount ensures skip > 1 creates genuine sub-octave
+                // wavelets — the phase spans skipCount crossing intervals before resetting,
+                // so H2 of that period lands on the actual fundamental.
+                // Gated by amplitude: let the phase free-run during decay to avoid
+                // pitch artifacts when the signal is below the noise floor.
+                if (inputPeak >= kAmplitudeFloor)
+                    currentPhase = 0.0f;
+
+                // Latch wavelet peak at measurement crossing — captures amplitude of the
+                // full skipCount-crossing interval, not just each individual sub-interval.
+                lastWaveletPeak    = currentWaveletPeak;
+                currentWaveletPeak = 0.0f;
             }
-            // KEY DIFFERENCE from ZCS: reset phase only on valid crossings.
-            // Phase reset is also gated by amplitude — when the signal decays below
-            // the noise floor, let the phase free-run rather than resetting on each
-            // crossing, which would otherwise cause pitch artifacts during note decay.
-            if (inputPeak >= kAmplitudeFloor)
-                currentPhase = 0.0f;
-            // Latch wavelet peak for Punch feature: capture peak amplitude of completed cycle.
-            lastWaveletPeak    = currentWaveletPeak;
-            currentWaveletPeak = 0.0f;
             samplesSinceLastCrossing = 0.0f;
             lastNegativePeak         = 0.0f;
         }

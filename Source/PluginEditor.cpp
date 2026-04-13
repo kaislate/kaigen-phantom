@@ -45,6 +45,8 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         &self.envAttackRelay, &self.envReleaseRelay,
         &self.binauralWidthRelay, &self.stereoWidthRelay,
         &self.synthLPFRelay, &self.synthHPFRelay,
+        &self.synthWaveletLengthRelay, &self.synthGateThresholdRelay,
+        &self.synthH1Relay, &self.synthMaxTrackHzRelay, &self.trackingSpeedRelay,
         &self.punchAmountRelay
     };
     for (auto* r : sliderRelays)
@@ -170,9 +172,14 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         { ParamID::ENV_RELEASE_MS,      envReleaseRelay },
         { ParamID::BINAURAL_WIDTH,      binauralWidthRelay },
         { ParamID::STEREO_WIDTH,        stereoWidthRelay },
-        { ParamID::SYNTH_LPF_HZ,        synthLPFRelay },
-        { ParamID::SYNTH_HPF_HZ,        synthHPFRelay },
-        { ParamID::PUNCH_AMOUNT,         punchAmountRelay },
+        { ParamID::SYNTH_LPF_HZ,            synthLPFRelay },
+        { ParamID::SYNTH_HPF_HZ,            synthHPFRelay },
+        { ParamID::SYNTH_WAVELET_LENGTH,    synthWaveletLengthRelay },
+        { ParamID::SYNTH_GATE_THRESHOLD,    synthGateThresholdRelay },
+        { ParamID::SYNTH_H1,                synthH1Relay },
+        { ParamID::SYNTH_MAX_TRACK_HZ,      synthMaxTrackHzRelay },
+        { ParamID::TRACKING_SPEED,          trackingSpeedRelay },
+        { ParamID::PUNCH_AMOUNT,            punchAmountRelay },
     };
     for (auto& b : sliderBindings)
         sliderAttachments.push_back(std::make_unique<juce::WebSliderParameterAttachment>(
