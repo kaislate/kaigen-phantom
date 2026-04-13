@@ -72,7 +72,7 @@ void PhantomProcessor::syncParamsToEngine()
     engine.setGateThreshold(apvts.getRawParameterValue(ParamID::SYNTH_GATE_THRESHOLD)->load() / 100.0f);
     engine.setH1Amplitude  (apvts.getRawParameterValue(ParamID::SYNTH_H1)->load() / 100.0f);
     engine.setMaxTrackHz   (apvts.getRawParameterValue(ParamID::SYNTH_MAX_TRACK_HZ)->load());
-    engine.setTrackingSpeed(apvts.getRawParameterValue(ParamID::TRACKING_SPEED)->load() / 1000.0f);
+    engine.setTrackingSpeed(apvts.getRawParameterValue(ParamID::TRACKING_SPEED)->load() / 100.0f);
     engine.setUsePunch     (apvts.getRawParameterValue(ParamID::PUNCH_ENABLED)->load() > 0.5f);
     engine.setPunchAmount  (apvts.getRawParameterValue(ParamID::PUNCH_AMOUNT)->load() / 100.0f);
 }
@@ -164,23 +164,7 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
 
                 spectrumReady.store(true, std::memory_order_release);
 
-                // Pitch detection: search 30-500Hz for strongest peak
-                const int lowSearchBin  = juce::jmax(1, (int)(30.0f  * fftSizeF / sr));
-                const int highSearchBin = juce::jmin(maxBin, (int)(500.0f * fftSizeF / sr));
-                float peakMag = 0.0f;
-                int   peakBin = 0;
-                for (int k = lowSearchBin; k <= highSearchBin; ++k)
-                {
-                    if (fftBuffer[(size_t) k] > peakMag)
-                    {
-                        peakMag = fftBuffer[(size_t) k];
-                        peakBin = k;
-                    }
-                }
-                if (peakMag * normalizer > 0.01f)
-                    currentPitch.store(peakBin * sr / fftSizeF, std::memory_order_relaxed);
-                else
-                    currentPitch.store(-1.0f, std::memory_order_relaxed);
+                // (pitch is now sourced from the synth's crossing tracker — see below)
             }
         }
         oscInputWrPos.store(oscInWp, std::memory_order_relaxed);
@@ -214,6 +198,11 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         }
     }
     engine.process(buffer, sidechainPtr);
+
+    // Pitch display: use the synth's zero-crossing tracker directly — it reflects exactly
+    // what is being synthesised and covers the full frequency range (not FFT's 30-500 Hz).
+    // Returns 0 when input is quiet (so UI shows "---").
+    currentPitch.store(engine.getEstimatedHz(), std::memory_order_relaxed);
 
     // ── Output peak levels + output spectrum FFT ─────────────────────
     {

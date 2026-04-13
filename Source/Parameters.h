@@ -64,8 +64,8 @@ namespace ParamID
     inline constexpr auto SYNTH_MAX_TRACK_HZ = "synth_max_track_hz";
 
     // ── Pitch tracking ────────────────────────────────────────────────────
-    /** Period-tracking EMA speed. 1–80 (stored as %; divide by 100 to get alpha).
-     *  Low = stable/glide. High = fast/responsive. Default 15 (alpha 0.15). */
+    /** Period-tracking EMA speed. 0.1–80 stored; ÷100 in processor → alpha 0.001–0.800.
+     *  Low = stable/glide. High = fast/responsive. Default 15 → alpha 0.15. */
     inline constexpr auto TRACKING_SPEED = "tracking_speed";
 
     // ── Punch (per-wavelet peak amplitude modulation) ─────────────────────

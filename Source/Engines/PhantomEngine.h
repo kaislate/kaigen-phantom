@@ -55,6 +55,10 @@ public:
     void setUsePunch(bool on);             // enable per-wavelet peak amplitude modulation
     void setPunchAmount(float amount);     // [0–1]: 0 = pure envelope, 1 = pure wavelet peak
 
+    /** Current tracked pitch in Hz (from the active engine's zero-crossing tracker).
+     *  Returns 0 when the input is too quiet to give reliable pitch info. */
+    float getEstimatedHz() const noexcept;
+
     // ─── Audio processing ────────────────────────────────────────────────
     void process(juce::AudioBuffer<float>& buffer, const juce::AudioBuffer<float>* sidechain = nullptr);
 

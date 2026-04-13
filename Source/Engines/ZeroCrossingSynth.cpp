@@ -81,6 +81,8 @@ void ZeroCrossingSynth::setMaxTrackHz(float hz) noexcept
 
 float ZeroCrossingSynth::getEstimatedHz() const noexcept
 {
+    // Return 0 when the input is below the noise floor — callers can show "---" in that case.
+    if (inputPeak < 0.01f) return 0.0f;
     return estimatedPeriod > 0.0f ? (float)(sampleRate / (double)estimatedPeriod) : 0.0f;
 }
 

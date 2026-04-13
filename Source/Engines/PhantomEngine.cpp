@@ -174,6 +174,13 @@ void PhantomEngine::setH1Amplitude(float amp)
 void PhantomEngine::setUsePunch(bool on)          { usePunch    = on; }
 void PhantomEngine::setPunchAmount(float amount)  { punchAmount = juce::jlimit(0.0f, 1.0f, amount); }
 
+float PhantomEngine::getEstimatedHz() const noexcept
+{
+    return synthMode.load(std::memory_order_relaxed) == 1
+        ? resynL.getEstimatedHz()
+        : synthL.getEstimatedHz();
+}
+
 // ── Processing ─────────────────────────────────────────────────────────────
 
 void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioBuffer<float>* sidechain)
