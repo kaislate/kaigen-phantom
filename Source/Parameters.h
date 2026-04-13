@@ -190,10 +190,12 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     // ── RESYN controls ────────────────────────────────────────────────
     params.push_back(std::make_unique<APF>(
         ParamID::SYNTH_WAVELET_LENGTH, "Wavelet Length",
-        NormalisableRange<float>(0.05f, 1.0f), 1.0f));
+        NormalisableRange<float>(5.0f, 100.0f), 100.0f,
+        AudioParameterFloatAttributes().withLabel("%")));
     params.push_back(std::make_unique<APF>(
         ParamID::SYNTH_GATE_THRESHOLD, "Gate Threshold",
-        NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+        NormalisableRange<float>(0.0f, 100.0f), 0.0f,
+        AudioParameterFloatAttributes().withLabel("%")));
 
     // ── Binaural ──────────────────────────────────────────────────────
     params.push_back(std::make_unique<APC>(
