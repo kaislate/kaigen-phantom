@@ -60,7 +60,7 @@ void PhantomEngine::reset()
 
 void PhantomEngine::setCrossoverHz(float hz)
 {
-    crossoverHz = juce::jlimit(20.0f, 500.0f, hz);
+    crossoverHz = juce::jlimit(20.0f, 20000.0f, hz);
     bassExtractor.setCrossoverHz(crossoverHz);
 }
 

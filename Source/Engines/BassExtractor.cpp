@@ -21,7 +21,7 @@ void BassExtractor::reset()
 
 void BassExtractor::setCrossoverHz(float hz)
 {
-    crossoverHz = juce::jlimit(20.0f, 500.0f, hz);
+    crossoverHz = juce::jlimit(20.0f, 20000.0f, hz);
     filter.setCutoffFrequency(crossoverHz);
 }
 
