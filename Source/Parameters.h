@@ -55,6 +55,13 @@ namespace ParamID
     inline constexpr auto SYNTH_WAVELET_LENGTH = "synth_wavelet_length";
     /** Gate threshold: min negative-peak amplitude for a crossing to be valid. 0–1. Default 0. */
     inline constexpr auto SYNTH_GATE_THRESHOLD = "synth_gate_threshold";
+    /** H1 (fundamental) amplitude in RESYN mode. 0–100%. Default 100. */
+    inline constexpr auto SYNTH_H1 = "synth_h1";
+
+    // ── Crossing detection ────────────────────────────────────────────────
+    /** Maximum frequency to track. Crossings faster than this are rejected.
+     *  200–20000 Hz. Default 4000 Hz. Low = bass-only. High = vocal/full-range. */
+    inline constexpr auto SYNTH_MAX_TRACK_HZ = "synth_max_track_hz";
 
     // ── Pitch tracking ────────────────────────────────────────────────────
     /** Period-tracking EMA speed. 1–80 (stored as %; divide by 100 to get alpha).
@@ -104,6 +111,8 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::SYNTH_HPF_HZ,
         ParamID::SYNTH_WAVELET_LENGTH,
         ParamID::SYNTH_GATE_THRESHOLD,
+        ParamID::SYNTH_H1,
+        ParamID::SYNTH_MAX_TRACK_HZ,
         ParamID::TRACKING_SPEED,
     };
 }
@@ -207,6 +216,17 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         ParamID::SYNTH_GATE_THRESHOLD, "Gate Threshold",
         NormalisableRange<float>(0.0f, 100.0f), 0.0f,
         AudioParameterFloatAttributes().withLabel("%")));
+    params.push_back(std::make_unique<APF>(
+        ParamID::SYNTH_H1, "H1 Amp",
+        NormalisableRange<float>(0.0f, 100.0f), 100.0f,
+        AudioParameterFloatAttributes().withLabel("%")));
+
+    // ── Crossing detection ────────────────────────────────────────────
+    // Skew 0.25: logarithmic feel — fine control in bass range, coarser toward 20kHz.
+    params.push_back(std::make_unique<APF>(
+        ParamID::SYNTH_MAX_TRACK_HZ, "Max Track",
+        NormalisableRange<float>(200.0f, 20000.0f, 0.0f, 0.25f), 4000.0f,
+        AudioParameterFloatAttributes().withLabel("Hz")));
 
     // ── Pitch tracking ────────────────────────────────────────────────
     // Skew 0.4 gives finer control at lower (more musical) tracking speeds.

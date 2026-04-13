@@ -10,8 +10,8 @@ void ZeroCrossingSynth::prepare(double sr) noexcept
 {
     sampleRate = sr;
 
-    // Valid period range: 16 Hz (sub) to 4 kHz (high harmonics)
-    minPeriodSamples = (float)(sr / 4000.0);
+    // Valid period range: 16 Hz (sub) to maxTrackHz
+    minPeriodSamples = (float)(sr / (double)maxTrackHz);
     maxPeriodSamples = (float)(sr / 16.0);
 
     const double rampSec = 0.010; // 10 ms parameter smoothing
@@ -69,6 +69,12 @@ void ZeroCrossingSynth::setSkipCount(int n) noexcept
 void ZeroCrossingSynth::setTrackingSpeed(float speed) noexcept
 {
     trackingAlpha = juce::jlimit(0.01f, 0.80f, speed);
+}
+
+void ZeroCrossingSynth::setMaxTrackHz(float hz) noexcept
+{
+    maxTrackHz       = juce::jlimit(200.0f, 20000.0f, hz);
+    minPeriodSamples = (float)(sampleRate / (double)maxTrackHz);
 }
 
 float ZeroCrossingSynth::getEstimatedHz() const noexcept

@@ -50,6 +50,8 @@ public:
     void setGateThreshold(float thr);      // RESYN only: 0.0–1.0 min negative-peak threshold
     void setEnvSource(int s);
     void setTrackingSpeed(float speed);    // EMA alpha [0.01–0.8]: low=stable/glide, high=fast
+    void setMaxTrackHz(float hz);          // max crossing frequency [200–20000 Hz]
+    void setH1Amplitude(float amp);        // RESYN only: H1 level [0–1]
 
     // ─── Audio processing ────────────────────────────────────────────────
     void process(juce::AudioBuffer<float>& buffer, const juce::AudioBuffer<float>* sidechain = nullptr);

@@ -10,8 +10,8 @@ void WaveletSynth::prepare(double sr) noexcept
 {
     sampleRate = sr;
 
-    // Valid period range: 16 Hz (sub) to 4 kHz (high harmonics)
-    minPeriodSamples = (float)(sr / 4000.0);
+    // Valid period range: 16 Hz (sub) to maxTrackHz
+    minPeriodSamples = (float)(sr / (double)maxTrackHz);
     maxPeriodSamples = (float)(sr / 16.0);
 
     const double rampSec = 0.010; // 10 ms parameter smoothing
@@ -70,6 +70,17 @@ void WaveletSynth::setGateThreshold(float thr) noexcept
 void WaveletSynth::setTrackingSpeed(float speed) noexcept
 {
     trackingAlpha = juce::jlimit(0.01f, 0.8f, speed);
+}
+
+void WaveletSynth::setMaxTrackHz(float hz) noexcept
+{
+    maxTrackHz       = juce::jlimit(200.0f, 20000.0f, hz);
+    minPeriodSamples = (float)(sampleRate / (double)maxTrackHz);
+}
+
+void WaveletSynth::setH1Amplitude(float amp) noexcept
+{
+    h1Amp = juce::jlimit(0.0f, 1.0f, amp);
 }
 
 void WaveletSynth::setSkipCount(int n) noexcept
@@ -223,8 +234,9 @@ float WaveletSynth::process(float x) noexcept
     const float len  = smoothLength.getNextValue();
 
     // ── Synthesise H1 + H2-H8 ────────────────────────────────────────────
-    // H1 at amplitude 1.0 — fundamental carrier, always present in RESYN mode
-    float y = shapedWave(warpPhase(currentPhase, duty), step);
+    // H1 amplitude is user-controllable — default 1.0 (full reconstruction).
+    // Setting to 0 produces harmonic-only output, matching Effect mode character.
+    float y = h1Amp * shapedWave(warpPhase(currentPhase, duty), step);
 
     // H2-H8 additive content from recipe wheel
     const float nyquist     = (float)(sampleRate * 0.5);

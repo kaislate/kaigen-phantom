@@ -66,6 +66,9 @@ public:
      *  Low = stable but slow to track pitch changes.
      *  High = fast tracking but noisier on complex polyphonic input. */
     void setTrackingSpeed(float speed) noexcept;
+    /** Maximum frequency to track [200–20000 Hz]. Crossings faster than this are rejected.
+     *  Low = only deep/bass content synthesised. High = full-range / vocal mode. */
+    void setMaxTrackHz(float hz) noexcept;
 
     // ── Processing ───────────────────────────────────────────────────────────
     /** Process one sample of the raw bass-band signal.
@@ -87,6 +90,7 @@ private:
     int   skipCount               = 1;      // crossings needed per measurement
     float estimatedPeriod         = 441.0f; // default ~100 Hz
     float trackingAlpha           = 0.15f;
+    float maxTrackHz              = 4000.0f;
     float minPeriodSamples        = 0.0f;   // set in prepare() — per individual crossing
     float maxPeriodSamples        = 0.0f;
 

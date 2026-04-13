@@ -156,6 +156,21 @@ void PhantomEngine::setTrackingSpeed(float speed)
     resynR.setTrackingSpeed(speed);
 }
 
+void PhantomEngine::setMaxTrackHz(float hz)
+{
+    synthL.setMaxTrackHz(hz);
+    synthR.setMaxTrackHz(hz);
+    resynL.setMaxTrackHz(hz);
+    resynR.setMaxTrackHz(hz);
+}
+
+void PhantomEngine::setH1Amplitude(float amp)
+{
+    // H1 only exists in WaveletSynth (RESYN mode) — ZCS never synthesises the fundamental
+    resynL.setH1Amplitude(amp);
+    resynR.setH1Amplitude(amp);
+}
+
 // ── Processing ─────────────────────────────────────────────────────────────
 
 void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioBuffer<float>* sidechain)
