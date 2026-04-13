@@ -148,6 +148,13 @@ void PhantomEngine::setSynthMode(int mode)
 }
 
 void PhantomEngine::setEnvSource(int s)   { envSource = juce::jlimit(0, 1, s); }
+void PhantomEngine::setTrackingSpeed(float speed)
+{
+    synthL.setTrackingSpeed(speed);
+    synthR.setTrackingSpeed(speed);
+    resynL.setTrackingSpeed(speed);
+    resynR.setTrackingSpeed(speed);
+}
 
 // ── Processing ─────────────────────────────────────────────────────────────
 

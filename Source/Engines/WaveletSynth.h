@@ -25,8 +25,10 @@ public:
     void setStep(float step) noexcept;
     void setDutyCycle(float duty) noexcept;
     void setSkipCount(int n) noexcept;
-    void setWaveletLength(float len) noexcept;  // 0.05–1.0: fraction of period to synthesise
-    void setGateThreshold(float thr) noexcept;  // 0.0–1.0: min negative-peak amplitude for valid crossing
+    void setWaveletLength(float len) noexcept;    // 0.05–1.0: fraction of period to synthesise
+    void setGateThreshold(float thr) noexcept;   // 0.0–1.0: min negative-peak amplitude for valid crossing
+    /** Period-tracking EMA speed [0.01, 0.8]. Low = stable/glide, high = fast/responsive. */
+    void setTrackingSpeed(float speed) noexcept;
 
     float process(float x) noexcept;
     float getEstimatedHz() const noexcept;

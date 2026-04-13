@@ -67,6 +67,11 @@ void WaveletSynth::setGateThreshold(float thr) noexcept
     smoothGate.setTargetValue(juce::jlimit(0.0f, 1.0f, thr));
 }
 
+void WaveletSynth::setTrackingSpeed(float speed) noexcept
+{
+    trackingAlpha = juce::jlimit(0.01f, 0.8f, speed);
+}
+
 void WaveletSynth::setSkipCount(int n) noexcept
 {
     const int newSkip = juce::jlimit(1, 8, n);
@@ -155,6 +160,10 @@ float WaveletSynth::process(float x) noexcept
 
     if (lastSample <= 0.0f && x > 0.0f)
     {
+        // inputPeak decays at ~0.9998/sample, so it crosses kAmplitudeFloor
+        // roughly 520 ms after the last loud sample (at 44.1 kHz).
+        static constexpr float kAmplitudeFloor = 0.01f;  // ≈ −40 dBFS
+
         // Only count this crossing if the individual interval is in range.
         // Out-of-range means noise or a frequency outside [16 Hz, 4 kHz].
         if (samplesSinceLastCrossing >= minPeriodSamples &&
@@ -169,10 +178,7 @@ float WaveletSynth::process(float x) noexcept
                 // noise floor.  During a long envelope release the signal decays toward
                 // zero — any remaining zero crossings are noise-dominated and would
                 // otherwise walk the estimate to a higher frequency.
-                // inputPeak decays at ~0.9998/sample, so it crosses kAmplitudeFloor
-                // roughly 520 ms after the last loud sample (at 44.1 kHz).
-                static constexpr float kAmplitudeFloor = 0.01f;  // ≈ −40 dBFS
-                static constexpr float kAlphaRef       = 0.25f;  // ≈ −12 dBFS full-speed threshold
+                static constexpr float kAlphaRef = 0.25f;  // ≈ −12 dBFS full-speed threshold
                 if (inputPeak >= kAmplitudeFloor)
                 {
                     // Scale tracking speed by signal amplitude.
@@ -188,8 +194,11 @@ float WaveletSynth::process(float x) noexcept
                 crossingsAccum     = 0;
             }
             // KEY DIFFERENCE from ZCS: reset phase only on valid crossings.
-            // Each valid interval is a fresh wavelet starting at phase 0.
-            currentPhase             = 0.0f;
+            // Phase reset is also gated by amplitude — when the signal decays below
+            // the noise floor, let the phase free-run rather than resetting on each
+            // crossing, which would otherwise cause pitch artifacts during note decay.
+            if (inputPeak >= kAmplitudeFloor)
+                currentPhase = 0.0f;
             samplesSinceLastCrossing = 0.0f;
             lastNegativePeak         = 0.0f;
         }

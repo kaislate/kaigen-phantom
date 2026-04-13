@@ -55,6 +55,11 @@ namespace ParamID
     inline constexpr auto SYNTH_WAVELET_LENGTH = "synth_wavelet_length";
     /** Gate threshold: min negative-peak amplitude for a crossing to be valid. 0–1. Default 0. */
     inline constexpr auto SYNTH_GATE_THRESHOLD = "synth_gate_threshold";
+
+    // ── Pitch tracking ────────────────────────────────────────────────────
+    /** Period-tracking EMA speed. 1–80 (stored as %; divide by 100 to get alpha).
+     *  Low = stable/glide. High = fast/responsive. Default 15 (alpha 0.15). */
+    inline constexpr auto TRACKING_SPEED = "tracking_speed";
 }
 
 // ─── Preset amplitude tables — Chebyshev polynomial weights ────────────
@@ -99,6 +104,7 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::SYNTH_HPF_HZ,
         ParamID::SYNTH_WAVELET_LENGTH,
         ParamID::SYNTH_GATE_THRESHOLD,
+        ParamID::TRACKING_SPEED,
     };
 }
 
@@ -200,6 +206,14 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     params.push_back(std::make_unique<APF>(
         ParamID::SYNTH_GATE_THRESHOLD, "Gate Threshold",
         NormalisableRange<float>(0.0f, 100.0f), 0.0f,
+        AudioParameterFloatAttributes().withLabel("%")));
+
+    // ── Pitch tracking ────────────────────────────────────────────────
+    // Skew 0.4 gives finer control at lower (more musical) tracking speeds.
+    // Default 15 lands at ~0.5 normalised — centre of the knob.
+    params.push_back(std::make_unique<APF>(
+        ParamID::TRACKING_SPEED, "Tracking Speed",
+        NormalisableRange<float>(1.0f, 80.0f, 0.0f, 0.4f), 15.0f,
         AudioParameterFloatAttributes().withLabel("%")));
 
     // ── Binaural ──────────────────────────────────────────────────────

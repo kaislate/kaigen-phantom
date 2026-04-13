@@ -49,6 +49,7 @@ public:
     void setWaveletLength(float len);      // RESYN only: 0.05–1.0 fraction of period
     void setGateThreshold(float thr);      // RESYN only: 0.0–1.0 min negative-peak threshold
     void setEnvSource(int s);
+    void setTrackingSpeed(float speed);    // EMA alpha [0.01–0.8]: low=stable/glide, high=fast
 
     // ─── Audio processing ────────────────────────────────────────────────
     void process(juce::AudioBuffer<float>& buffer, const juce::AudioBuffer<float>* sidechain = nullptr);
