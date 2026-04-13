@@ -1,7 +1,10 @@
 /**
- * spectrum.js — Professional EQ-style spectrum analyzer
- * Smooth curve over log-frequency axis (20Hz - 20kHz), dB scale (-60 to 0),
- * with fill beneath the curve.
+ * spectrum.js — dual-layer spectrum analyzer
+ *
+ * Input signal:  dark gray fill (shows what you're feeding in)
+ * Output signal: bright white curve (shows generated harmonics on top)
+ *
+ * Anywhere white rises above gray = phantom harmonics added.
  */
 
 (function(){
@@ -26,30 +29,29 @@ window.addEventListener('resize', resize);
 
 // ─── State ──────────────────────────────────────────────────────────────────
 const BIN_COUNT = 80;
-const BIN_FREQ_LOW  = 30;     // matches C++ FFT binning
+const BIN_FREQ_LOW  = 30;
 const BIN_FREQ_HIGH = 16000;
-const DISPLAY_FREQ_LOW  = 20;    // display axis
+const DISPLAY_FREQ_LOW  = 20;
 const DISPLAY_FREQ_HIGH = 20000;
 
-const smoothed = new Float32Array(BIN_COUNT);
-const peakHold = new Float32Array(BIN_COUNT);
+const smoothedIn  = new Float32Array(BIN_COUNT);  // input (gray)
+const smoothedOut = new Float32Array(BIN_COUNT);  // output (white)
+const peakOut     = new Float32Array(BIN_COUNT);  // peak hold for output only
 
 let inL = 0, inR = 0, outL = 0, outR = 0;
 let inLSmooth = 0, inRSmooth = 0, outLSmooth = 0, outRSmooth = 0;
 
-const SMOOTH_UP = 0.5;    // fast attack
-const SMOOTH_DN = 0.08;   // slow release
+const SMOOTH_UP  = 0.5;
+const SMOOTH_DN  = 0.08;
 const PEAK_DECAY = 0.003;
 
-// ─── Frequency → X position (log scale) ─────────────────────────────────────
+// ─── Frequency → X (log scale) ───────────────────────────────────────────────
 function freqToX(freq, w) {
     const logLo = Math.log10(DISPLAY_FREQ_LOW);
     const logHi = Math.log10(DISPLAY_FREQ_HIGH);
-    const logF  = Math.log10(Math.max(freq, DISPLAY_FREQ_LOW));
-    return ((logF - logLo) / (logHi - logLo)) * w;
+    return ((Math.log10(Math.max(freq, DISPLAY_FREQ_LOW)) - logLo) / (logHi - logLo)) * w;
 }
 
-// ─── Bin index → frequency (matches C++ log-spaced binning) ─────────────────
 function binToFreq(bin) {
     const logLo = Math.log10(BIN_FREQ_LOW);
     const logHi = Math.log10(BIN_FREQ_HIGH);
@@ -58,12 +60,12 @@ function binToFreq(bin) {
 
 // ─── Grid + labels ──────────────────────────────────────────────────────────
 const FREQ_LABELS = [
-    { hz: 30,   label: '30'  },
-    { hz: 100,  label: '100' },
-    { hz: 300,  label: '300' },
-    { hz: 1000, label: '1k'  },
-    { hz: 3000, label: '3k'  },
-    { hz: 10000,label: '10k' },
+    { hz: 30,    label: '30'  },
+    { hz: 100,   label: '100' },
+    { hz: 300,   label: '300' },
+    { hz: 1000,  label: '1k'  },
+    { hz: 3000,  label: '3k'  },
+    { hz: 10000, label: '10k' },
 ];
 const DB_LINES = [-12, -24, -36, -48];
 
@@ -71,28 +73,19 @@ function drawGrid(ctx, w, h) {
     ctx.save();
     ctx.lineWidth = 1;
 
-    // Horizontal dB grid
     ctx.strokeStyle = 'rgba(255,255,255,0.04)';
     for (const db of DB_LINES) {
         const y = Math.round(h * (-db) / 60) + 0.5;
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
     }
 
-    // Vertical freq grid at major frequencies
     const majors = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
     ctx.strokeStyle = 'rgba(255,255,255,0.035)';
     for (const f of majors) {
         const x = Math.round(freqToX(f, w)) + 0.5;
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, h);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
     }
 
-    // Frequency labels
     const labelFontPx = Math.max(9, Math.round(h * 0.04));
     ctx.font = labelFontPx + 'px monospace';
     ctx.fillStyle = 'rgba(255,255,255,0.22)';
@@ -104,7 +97,6 @@ function drawGrid(ctx, w, h) {
         ctx.fillText(label, x, h - 2);
     }
 
-    // dB labels (right edge)
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     for (const db of [0, -12, -24, -36, -48]) {
@@ -113,6 +105,38 @@ function drawGrid(ctx, w, h) {
     }
 
     ctx.restore();
+}
+
+// ─── Build a smooth curve path from bin data ─────────────────────────────────
+function buildCurvePoints(data, w, h) {
+    const pts = [];
+    for (let i = 0; i < BIN_COUNT; i++) {
+        const f = binToFreq(i);
+        if (f < DISPLAY_FREQ_LOW || f > DISPLAY_FREQ_HIGH) continue;
+        pts.push({ x: freqToX(f, w), y: h * (1 - data[i]) });
+    }
+    return pts;
+}
+
+function strokeCurve(ctx, pts) {
+    if (pts.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length - 1; i++) {
+        const xc = (pts[i].x + pts[i + 1].x) / 2;
+        const yc = (pts[i].y + pts[i + 1].y) / 2;
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+    }
+    ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+}
+
+function fillCurve(ctx, pts, h) {
+    if (pts.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, h);
+    for (const p of pts) ctx.lineTo(p.x, p.y);
+    ctx.lineTo(pts[pts.length - 1].x, h);
+    ctx.closePath();
 }
 
 // ─── Main spectrum draw ─────────────────────────────────────────────────────
@@ -124,74 +148,81 @@ function drawSpectrum() {
     const w = specCanvas.width;
     const h = specCanvas.height;
 
-    // Clear with solid black
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, w, h);
 
     drawGrid(ctx, w, h);
 
-    // Build smooth path: one point per bin at its center freq
-    // Skip bins outside display range
-    const points = [];
-    for (let i = 0; i < BIN_COUNT; i++) {
-        const f = binToFreq(i);
-        if (f < DISPLAY_FREQ_LOW || f > DISPLAY_FREQ_HIGH) continue;
-        const x = freqToX(f, w);
-        // smoothed[i] is 0..1 where 1 = 0dB, 0 = -60dB
-        const y = h * (1 - smoothed[i]);
-        points.push({ x, y });
+    const inPts  = buildCurvePoints(smoothedIn,  w, h);
+    const outPts = buildCurvePoints(smoothedOut, w, h);
+
+    // ── Layer 1: input signal — dark gray fill + subtle line ──────────
+    if (inPts.length >= 2) {
+        fillCurve(ctx, inPts, h);
+        const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
+        fillGrad.addColorStop(0, 'rgba(180,180,180,0.14)');
+        fillGrad.addColorStop(1, 'rgba(100,100,100,0.04)');
+        ctx.fillStyle = fillGrad;
+        ctx.fill();
+
+        strokeCurve(ctx, inPts);
+        ctx.strokeStyle = 'rgba(200,200,200,0.30)';
+        ctx.lineWidth = Math.max(1, h * 0.004);
+        ctx.stroke();
     }
 
-    if (points.length < 2) return;
+    // ── Layer 2: output signal — bright white fill + glowing line ─────
+    if (outPts.length >= 2) {
+        fillCurve(ctx, outPts, h);
+        const outFill = ctx.createLinearGradient(0, 0, 0, h);
+        outFill.addColorStop(0, 'rgba(255,255,255,0.28)');
+        outFill.addColorStop(0.5, 'rgba(255,255,255,0.10)');
+        outFill.addColorStop(1, 'rgba(255,255,255,0.02)');
+        ctx.fillStyle = outFill;
+        ctx.fill();
 
-    // Fill under curve
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, h);
-    for (const p of points) ctx.lineTo(p.x, p.y);
-    ctx.lineTo(points[points.length - 1].x, h);
-    ctx.closePath();
-    const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
-    fillGrad.addColorStop(0, 'rgba(255,255,255,0.28)');
-    fillGrad.addColorStop(0.5, 'rgba(255,255,255,0.12)');
-    fillGrad.addColorStop(1, 'rgba(255,255,255,0.02)');
-    ctx.fillStyle = fillGrad;
-    ctx.fill();
-
-    // Stroke curve on top
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    // Smooth curve via quadratic midpoints
-    for (let i = 1; i < points.length - 1; i++) {
-        const xc = (points[i].x + points[i + 1].x) / 2;
-        const yc = (points[i].y + points[i + 1].y) / 2;
-        ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+        strokeCurve(ctx, outPts);
+        ctx.strokeStyle = 'rgba(255,255,255,0.90)';
+        ctx.lineWidth = Math.max(1.2, h * 0.006);
+        ctx.shadowColor = 'rgba(255,255,255,0.6)';
+        ctx.shadowBlur  = 4;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
     }
-    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    ctx.lineWidth = Math.max(1.2, h * 0.006);
-    ctx.shadowColor = 'rgba(255,255,255,0.6)';
-    ctx.shadowBlur = 4;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
 
-    // Peak hold line (dim, no fill)
-    const peakPoints = [];
-    for (let i = 0; i < BIN_COUNT; i++) {
-        const f = binToFreq(i);
-        if (f < DISPLAY_FREQ_LOW || f > DISPLAY_FREQ_HIGH) continue;
-        const x = freqToX(f, w);
-        const y = h * (1 - peakHold[i]);
-        peakPoints.push({ x, y });
-    }
-    if (peakPoints.length >= 2) {
-        ctx.beginPath();
-        ctx.moveTo(peakPoints[0].x, peakPoints[0].y);
-        for (let i = 1; i < peakPoints.length; i++) {
-            ctx.lineTo(peakPoints[i].x, peakPoints[i].y);
-        }
+    // ── Output peak hold line ─────────────────────────────────────────
+    const peakPts = buildCurvePoints(peakOut, w, h);
+    if (peakPts.length >= 2) {
+        strokeCurve(ctx, peakPts);
         ctx.strokeStyle = 'rgba(255,255,255,0.25)';
         ctx.lineWidth = 1;
         ctx.stroke();
+    }
+
+    // ── Crossover frequency line ───────────────────────────────────────
+    const xoverState = window.Juce?.getSliderState?.('phantom_threshold');
+    if (xoverState) {
+        const xoverHz = xoverState.getScaledValue();
+        if (xoverHz > 20 && xoverHz < 20000) {
+            const xPos = Math.round(freqToX(xoverHz, w));
+            const labelFontPx = Math.max(8, Math.round(h * 0.10));
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255,178,38,0.35)';
+            ctx.lineWidth   = 1;
+            ctx.setLineDash([3, 4]);
+            ctx.beginPath();
+            ctx.moveTo(xPos + 0.5, 0);
+            ctx.lineTo(xPos + 0.5, h);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle    = 'rgba(255,178,38,0.55)';
+            ctx.font         = labelFontPx + 'px monospace';
+            ctx.textAlign    = 'left';
+            ctx.textBaseline = 'top';
+            const labelText = Math.round(xoverHz) + 'Hz';
+            ctx.fillText(labelText, xPos + 3, 2);
+            ctx.restore();
+        }
     }
 }
 
@@ -215,14 +246,12 @@ function drawMeter(canvas, level, peak, label) {
         ctx.fillRect(1, h - fillH, w - 2, fillH);
     }
 
-    // Peak hold
     if (peak > 0) {
         const py = h - peak * h * 0.9;
         ctx.fillStyle = 'rgba(255,255,255,0.7)';
         ctx.fillRect(1, py, w - 2, 1);
     }
 
-    // Label
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.font = Math.max(8, Math.round(h * 0.04)) + 'px monospace';
     ctx.textAlign = 'center';
@@ -230,22 +259,29 @@ function drawMeter(canvas, level, peak, label) {
     ctx.fillText(label, w / 2, h - 2);
 }
 
-// ─── Data ingest (from phantom.js polling) ──────────────────────────────────
+// ─── Data ingest ─────────────────────────────────────────────────────────────
 document.addEventListener('spectrum-data', (e) => {
     const data = e.detail;
-    if (!data || data.length < BIN_COUNT) return;
-    for (let i = 0; i < BIN_COUNT; i++) {
-        const v = +data[i] || 0;
-        // Asymmetric smoothing — fast up, slow down
-        if (v > smoothed[i])
-            smoothed[i] += (v - smoothed[i]) * SMOOTH_UP;
-        else
-            smoothed[i] += (v - smoothed[i]) * SMOOTH_DN;
+    if (!data) return;
 
-        if (smoothed[i] > peakHold[i])
-            peakHold[i] = smoothed[i];
-        else
-            peakHold[i] = Math.max(0, peakHold[i] - PEAK_DECAY);
+    // Accept both old flat-array format and new {input, output} object format
+    const inp = Array.isArray(data) ? data : data.input;
+    const out = Array.isArray(data) ? null  : data.output;
+
+    if (inp && inp.length >= BIN_COUNT) {
+        for (let i = 0; i < BIN_COUNT; i++) {
+            const v = +inp[i] || 0;
+            smoothedIn[i] += (v - smoothedIn[i]) * (v > smoothedIn[i] ? SMOOTH_UP : SMOOTH_DN);
+        }
+    }
+
+    if (out && out.length >= BIN_COUNT) {
+        for (let i = 0; i < BIN_COUNT; i++) {
+            const v = +out[i] || 0;
+            smoothedOut[i] += (v - smoothedOut[i]) * (v > smoothedOut[i] ? SMOOTH_UP : SMOOTH_DN);
+            if (smoothedOut[i] > peakOut[i]) peakOut[i] = smoothedOut[i];
+            else peakOut[i] = Math.max(0, peakOut[i] - PEAK_DECAY);
+        }
     }
 });
 
@@ -258,11 +294,10 @@ document.addEventListener('peak-data', (e) => {
     outR = +d.outR || 0;
 });
 
-// ─── Animation loop — renders at 60fps ──────────────────────────────────────
+// ─── Animation loop ──────────────────────────────────────────────────────────
 function tick() {
     requestAnimationFrame(tick);
 
-    // Smooth meters
     const tgtIn  = Math.max(inL, inR);
     const tgtOut = Math.max(outL, outR);
     inLSmooth  += (tgtIn  - inLSmooth)  * (tgtIn  > inLSmooth  ? 0.5 : 0.08);
@@ -278,7 +313,5 @@ function tick() {
 }
 tick();
 
-// Mode toggle button (bar/line) — no-op now, we only do line style
-const toggleBtn = document.getElementById('specToggle');
-if (toggleBtn) toggleBtn.style.display = 'none';
+// Toggle button visibility handled by oscilloscope.js
 })();
