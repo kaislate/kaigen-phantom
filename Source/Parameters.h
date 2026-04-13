@@ -130,7 +130,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         StringArray{ "Replace", "Add" }, 0));
     params.push_back(std::make_unique<APF>(
         ParamID::PHANTOM_THRESHOLD, "Phantom Threshold",
-        NormalisableRange<float>(20.0f, 250.0f), 120.0f,
+        NormalisableRange<float>(20.0f, 500.0f), 120.0f,
         AudioParameterFloatAttributes().withLabel("Hz")));
     params.push_back(std::make_unique<APF>(
         ParamID::PHANTOM_STRENGTH, "Phantom Strength",
