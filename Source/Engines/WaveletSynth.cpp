@@ -218,11 +218,17 @@ float WaveletSynth::process(float x) noexcept
     float y = shapedWave(warpPhase(currentPhase, duty), step);
 
     // H2-H8 additive content from recipe wheel
+    const float nyquist     = (float)(sampleRate * 0.5);
+    const float aaFadeStart = nyquist * 0.5f;  // fade starts 1 octave below Nyquist
     for (int i = 0; i < 7; ++i)
     {
         if (amps[(size_t)i] <= 0.0f) continue;
+        const float harmonicHz = (float)(i + 2) / estimatedPeriod * (float)sampleRate;
+        const float aaMul      = juce::jlimit(0.0f, 1.0f,
+                                   (nyquist - harmonicHz) / (nyquist - aaFadeStart));
+        if (aaMul <= 0.0f) continue;
         float hp = std::fmod((float)(i + 2) * currentPhase, kTwoPi);
-        y += amps[(size_t)i] * shapedWave(warpPhase(hp, duty), step);
+        y += amps[(size_t)i] * aaMul * shapedWave(warpPhase(hp, duty), step);
     }
 
     // Soft-clip the harmonic sum to prevent hard clipping on dense recipes.
