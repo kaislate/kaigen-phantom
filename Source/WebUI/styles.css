@@ -3,7 +3,7 @@
 
 body{
   background:#06060c;margin:0;overflow:hidden;
-  width:920px;height:620px;
+  width:1200px;height:700px;
   font-family:'Space Grotesk',sans-serif;
   color:#fff;
 }
@@ -13,7 +13,7 @@ body{
 
 /* ═══ WRAP ═══ */
 .wrap{
-  position:relative;width:920px;height:620px;overflow:hidden;
+  position:relative;width:1200px;height:700px;overflow:hidden;
   display:grid;
   grid-template-columns:1fr;
   grid-template-rows:46px 1fr;
@@ -308,9 +308,25 @@ phantom-knob.mode-inactive {
   position:relative;z-index:1;
 }
 
-/* ═══ SPECTRUM + I/O METERS ═══ */
+/* ═══ VISUALIZATION SECTION (osc above spectrum) ═══ */
+.viz-section{
+  display:flex;flex-direction:column;flex:1;min-height:0;margin:2px;gap:2px;
+}
+
+/* Oscilloscope strip — always visible, fixed height */
+.osc-row{
+  height:90px;flex-shrink:0;position:relative;overflow:hidden;
+  background:#000;border-radius:5px;border:1px solid rgba(255,255,255,0.025);
+  box-shadow:inset 3px 3px 12px rgba(0,0,0,1),inset -1px -1px 4px rgba(255,255,255,0.006),
+    -3px -3px 8px rgba(255,255,255,0.01),4px 4px 10px rgba(0,0,0,0.5);
+}
+.osc-row canvas{
+  position:absolute;inset:0;width:100%;height:100%;
+}
+
+/* Spectrum + I/O meters */
 .spectrum-row{
-  display:flex;gap:0;flex:1;margin:2px;min-height:0;
+  display:flex;gap:0;flex:1;min-height:0;
 }
 .spectrum-wrap{
   background:#000;border-radius:5px;border:1px solid rgba(255,255,255,0.025);flex:1;
@@ -318,17 +334,9 @@ phantom-knob.mode-inactive {
     -3px -3px 8px rgba(255,255,255,0.01),4px 4px 10px rgba(0,0,0,0.5);
   position:relative;overflow:hidden;display:flex;align-items:flex-end;padding:3px 5px 2px;
 }
-.spectrum-wrap #spectrumCanvas,
-.spectrum-wrap #oscCanvas{
+.spectrum-wrap #spectrumCanvas{
   width:100%;height:100%;position:relative;z-index:1;
 }
-.spectrum-toggle{
-  position:absolute;top:3px;right:5px;z-index:2;
-  background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.04);
-  border-radius:3px;color:rgba(255,255,255,0.3);font-size:10px;
-  cursor:pointer;padding:1px 4px;line-height:1;
-}
-.spectrum-toggle:hover{color:rgba(255,255,255,0.6)}
 
 /* I/O meters */
 .io-meter{

@@ -138,7 +138,7 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
       processor(p),
       webView(buildWebViewOptions(*this))
 {
-    setSize(920, 620);
+    setSize(1200, 700);
     addAndMakeVisible(webView);
 
     juce::MessageManager::callAsync([this]()

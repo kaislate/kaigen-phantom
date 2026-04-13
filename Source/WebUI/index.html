@@ -79,17 +79,11 @@
               <phantom-knob data-param="tracking_speed" size="medium" label="Track" default-value="0.5"></phantom-knob>
             </div>
           </div>
-          <div class="candy-inner panel-output">
-            <div class="el">Output</div>
-            <div class="knob-row">
-              <phantom-knob data-param="output_gain" size="large" label="Gain" default-value="0.667"></phantom-knob>
-            </div>
-          </div>
         </div>
 
         <div class="gap-h"></div>
 
-        <!-- Row 2 -->
+        <!-- Row 2: Ghost + Stereo + Envelope + Filter -->
         <div class="ctrl-row">
           <div class="candy-inner panel-ghost">
             <div class="el">Ghost <span class="toggle-group"><button class="tog active" data-gmode="0">Rpl</button><button class="tog" data-gmode="1">Add</button></span></div>
@@ -104,14 +98,8 @@
               <phantom-knob data-param="stereo_width" size="large" label="Width" default-value="0.5"></phantom-knob>
             </div>
           </div>
-        </div>
-
-        <div class="gap-h"></div>
-
-        <!-- Row 3: Envelope follower + Filter -->
-        <div class="ctrl-row">
           <div class="candy-inner panel-envelope">
-            <div class="el">Envelope Follower</div>
+            <div class="el">Envelope</div>
             <div class="knob-row">
               <phantom-knob data-param="env_attack_ms" size="medium" label="Attack" default-value="0.05"></phantom-knob>
               <phantom-knob data-param="env_release_ms" size="medium" label="Release" default-value="0.1"></phantom-knob>
@@ -124,19 +112,28 @@
               <phantom-knob data-param="synth_hpf_hz" size="medium" label="HPF" default-value="0"></phantom-knob>
             </div>
           </div>
+          <div class="candy-inner panel-output">
+            <div class="el">Output</div>
+            <div class="knob-row">
+              <phantom-knob data-param="output_gain" size="large" label="Gain" default-value="0.667"></phantom-knob>
+            </div>
+          </div>
         </div>
 
         <div class="gap-h"></div>
 
-        <!-- Spectrum row -->
-        <div class="spectrum-row">
-          <canvas id="meterIn" class="io-meter"></canvas>
-          <div class="spectrum-wrap">
-            <canvas id="spectrumCanvas"></canvas>
-            <canvas id="oscCanvas" class="hidden"></canvas>
-            <button class="spectrum-toggle" id="specToggle" title="Toggle Spectrum / Oscilloscope">&#x2261;</button>
+        <!-- Visualization: oscilloscope always above spectrum -->
+        <div class="viz-section">
+          <div class="osc-row">
+            <canvas id="oscCanvas"></canvas>
           </div>
-          <canvas id="meterOut" class="io-meter"></canvas>
+          <div class="spectrum-row">
+            <canvas id="meterIn" class="io-meter"></canvas>
+            <div class="spectrum-wrap">
+              <canvas id="spectrumCanvas"></canvas>
+            </div>
+            <canvas id="meterOut" class="io-meter"></canvas>
+          </div>
         </div>
       </div>
     </div>

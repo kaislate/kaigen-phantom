@@ -188,32 +188,8 @@ function tick() {
         });
     }
 
-    // Only render when the canvas is visible
-    if (!canvas.classList.contains('hidden')) draw();
+    draw();
 }
 tick();
-
-// ── Spectrum ↔ Oscilloscope toggle ──────────────────────────────────────────
-const toggleBtn = document.getElementById('specToggle');
-const specCanvas = document.getElementById('spectrumCanvas');
-
-if (toggleBtn) {
-    toggleBtn.style.display = ''; // make visible (spectrum.js hid it)
-    let showingOsc = false;
-
-    toggleBtn.addEventListener('click', () => {
-        showingOsc = !showingOsc;
-        if (showingOsc) {
-            specCanvas?.classList.add('hidden');
-            canvas.classList.remove('hidden');
-            resize(); // match canvas size to newly-visible element
-            toggleBtn.innerHTML = '&#x25CC;'; // dotted circle ◌ = oscilloscope
-        } else {
-            canvas.classList.add('hidden');
-            specCanvas?.classList.remove('hidden');
-            toggleBtn.innerHTML = '&#x2261;'; // ≡ = spectrum
-        }
-    });
-}
 
 })();
