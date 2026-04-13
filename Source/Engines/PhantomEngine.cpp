@@ -200,8 +200,8 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
         for (int i = 0; i < n; ++i)
         {
             // Envelope source: main input bass band (default) or sidechain ch0
-            const float envIn = (envSource == 1 && sidechain != nullptr && ch < sidechain->getNumChannels())
-                ? sidechain->getReadPointer(ch)[i]
+            const float envIn = (envSource == 1 && sidechain != nullptr && sidechain->getNumChannels() > 0)
+                ? sidechain->getReadPointer(juce::jmin(ch, sidechain->getNumChannels() - 1))[i]
                 : low[i];
             const float inLvl = env.process(envIn);
 

@@ -196,9 +196,11 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             // Find where sidechain channels start in the processBlock buffer.
             // Main input (bus 0) is stereo (2 channels); sidechain starts at ch 2.
             const int scStartCh = getTotalNumInputChannels() - nSCBusChannels;
-            if (scStartCh >= 0 && scStartCh + nSCBusChannels <= buffer.getNumChannels())
+            if (scStartCh >= 0 && scStartCh + nSCBusChannels <= buffer.getNumChannels()
+                && buffer.getNumSamples() <= sidechainBuf.getNumSamples())
             {
-                // Use pre-allocated member buffer (avoidReallocating=true is safe here)
+                // Use pre-allocated member buffer — avoidReallocating is safe because
+                // we guard against oversized blocks above.
                 sidechainBuf.setSize(nSCBusChannels, buffer.getNumSamples(), false, false, true);
                 for (int c = 0; c < nSCBusChannels; ++c)
                     sidechainBuf.copyFrom(c, 0, buffer, scStartCh + c, 0, buffer.getNumSamples());
