@@ -196,5 +196,13 @@ float ZeroCrossingSynth::process(float x) noexcept
         y += amps[(size_t)i] * shapedWave(warpPhase(hp, duty), step);
     }
 
+    // Soft-clip harmonic sum — prevents hard clipping on dense recipes.
+    // Amplitude 1.0 passes through unchanged; larger sums are gently compressed.
+    {
+        static const float kClipRef  = 1.5f;
+        static const float kClipNorm = std::tanh(1.0f / kClipRef);
+        y = std::tanh(y / kClipRef) / kClipNorm;
+    }
+
     return y;
 }

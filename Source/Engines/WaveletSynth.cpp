@@ -225,6 +225,15 @@ float WaveletSynth::process(float x) noexcept
         y += amps[(size_t)i] * shapedWave(warpPhase(hp, duty), step);
     }
 
+    // Soft-clip the harmonic sum to prevent hard clipping on dense recipes.
+    // tanh(y / kClipRef) / tanh(1/kClipRef) normalises so amplitude 1.0 passes
+    // through unchanged while gently compressing larger sums.
+    {
+        static const float kClipRef  = 1.5f;
+        static const float kClipNorm = std::tanh(1.0f / kClipRef);
+        y = std::tanh(y / kClipRef) / kClipNorm;
+    }
+
     // ── Length gate: silence output after len×2π of each wavelet ────────
     if (len < 1.0f)
     {
