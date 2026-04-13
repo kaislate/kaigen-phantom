@@ -27,11 +27,15 @@ void EnvelopeFollower::setReleaseMs(float ms) noexcept
 
 void EnvelopeFollower::recomputeCoefs() noexcept
 {
-    // One-pole: coef = 1 - exp(-1 / (t * sr))
-    // Larger coef = faster response. At t→0, coef→1 (instant). At t→∞, coef→0.
-    const double srd = juce::jmax(1.0, sampleRate);
-    attackCoef  = 1.0f - static_cast<float>(std::exp(-1.0 / (attackMs  * 0.001 * srd)));
-    releaseCoef = 1.0f - static_cast<float>(std::exp(-1.0 / (releaseMs * 0.001 * srd)));
+    // One-pole: coef = 1 - exp(-ln(1000) / (t * sr))
+    // Defines t as the time to decay from peak to −60 dBFS (factor 0.001),
+    // matching the standard audio engineering definition used by compressors.
+    // Using -1 instead of -ln(1000) would give the RC time constant (1/e in t),
+    // making the audible release ~7× longer than the labelled value.
+    const double srd    = juce::jmax(1.0, sampleRate);
+    const double ln1000 = 6.907755278982137; // ln(1000) = 3 * ln(10)
+    attackCoef  = 1.0f - static_cast<float>(std::exp(-ln1000 / (attackMs  * 0.001 * srd)));
+    releaseCoef = 1.0f - static_cast<float>(std::exp(-ln1000 / (releaseMs * 0.001 * srd)));
 }
 
 float EnvelopeFollower::process(float input) noexcept
