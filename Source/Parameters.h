@@ -229,11 +229,11 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         AudioParameterFloatAttributes().withLabel("Hz")));
 
     // ── Pitch tracking ────────────────────────────────────────────────
-    // Skew 0.4 gives finer control at lower (more musical) tracking speeds.
-    // Default 15 lands at ~0.5 normalised — centre of the knob.
+    // Range 0.1–80 maps to alpha 0.001–0.800 (÷1000 in processor).
+    // Skew 0.25: most knob travel covers the slow/glide region.
     params.push_back(std::make_unique<APF>(
         ParamID::TRACKING_SPEED, "Tracking Speed",
-        NormalisableRange<float>(1.0f, 80.0f, 0.0f, 0.4f), 15.0f,
+        NormalisableRange<float>(0.1f, 80.0f, 0.0f, 0.25f), 15.0f,
         AudioParameterFloatAttributes().withLabel("%")));
 
     // ── Binaural ──────────────────────────────────────────────────────

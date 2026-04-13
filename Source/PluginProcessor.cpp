@@ -72,7 +72,7 @@ void PhantomProcessor::syncParamsToEngine()
     engine.setGateThreshold(apvts.getRawParameterValue(ParamID::SYNTH_GATE_THRESHOLD)->load() / 100.0f);
     engine.setH1Amplitude  (apvts.getRawParameterValue(ParamID::SYNTH_H1)->load() / 100.0f);
     engine.setMaxTrackHz   (apvts.getRawParameterValue(ParamID::SYNTH_MAX_TRACK_HZ)->load());
-    engine.setTrackingSpeed(apvts.getRawParameterValue(ParamID::TRACKING_SPEED)->load() / 100.0f);
+    engine.setTrackingSpeed(apvts.getRawParameterValue(ParamID::TRACKING_SPEED)->load() / 1000.0f);
 }
 
 void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)

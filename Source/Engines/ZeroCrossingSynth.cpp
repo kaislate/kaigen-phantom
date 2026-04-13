@@ -68,7 +68,7 @@ void ZeroCrossingSynth::setSkipCount(int n) noexcept
 
 void ZeroCrossingSynth::setTrackingSpeed(float speed) noexcept
 {
-    trackingAlpha = juce::jlimit(0.01f, 0.80f, speed);
+    trackingAlpha = juce::jlimit(0.001f, 0.80f, speed);
 }
 
 void ZeroCrossingSynth::setMaxTrackHz(float hz) noexcept

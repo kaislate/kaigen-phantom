@@ -69,7 +69,7 @@ void WaveletSynth::setGateThreshold(float thr) noexcept
 
 void WaveletSynth::setTrackingSpeed(float speed) noexcept
 {
-    trackingAlpha = juce::jlimit(0.01f, 0.8f, speed);
+    trackingAlpha = juce::jlimit(0.001f, 0.8f, speed);
 }
 
 void WaveletSynth::setMaxTrackHz(float hz) noexcept
