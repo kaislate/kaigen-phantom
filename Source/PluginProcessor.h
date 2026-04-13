@@ -25,7 +25,11 @@ public:
     const juce::String getName() const override { return "Kaigen Phantom"; }
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return false; }
-    double getTailLengthSeconds() const override { return 0.5; }
+    double getTailLengthSeconds() const override
+    {
+        const float releaseMs = apvts.getRawParameterValue(ParamID::ENV_RELEASE_MS)->load();
+        return (double)(releaseMs / 1000.0f) + 0.1;
+    }
 
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
@@ -47,8 +51,19 @@ public:
     std::atomic<float> peakOutR { 0.0f };
 
     static constexpr int kSpectrumBins = 80;
-    std::array<float, kSpectrumBins> spectrumData {};
+    std::array<float, kSpectrumBins> spectrumData {};       // input (pre-engine)
+    std::array<float, kSpectrumBins> spectrumOutputData {}; // output (post-engine)
     std::atomic<bool> spectrumReady { false };
+
+    // Oscilloscope ring buffers (written by audio thread, read by editor)
+    static constexpr int kOscBufSize = PhantomEngine::kOscBufSize;
+    std::array<float, kOscBufSize> oscInputBuf  {};
+    std::array<float, kOscBufSize> oscOutputBuf {};
+    std::atomic<int>               oscInputWrPos  { 0 };
+    std::atomic<int>               oscOutputWrPos { 0 };
+
+    // Engine — public so editor can read oscilloscope synth capture
+    PhantomEngine engine;
 
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
@@ -56,16 +71,16 @@ private:
 
     void syncParamsToEngine();
 
-    PhantomEngine engine;
-
     double sampleRate = 44100.0;
 
     // FFT for spectrum analysis — 8192-point for ~5Hz resolution
     static constexpr int kFftOrder = 13;
     static constexpr int kFftSize  = 1 << kFftOrder;
     juce::dsp::FFT spectrumFFT { kFftOrder };
-    std::array<float, kFftSize * 2> fftBuffer {};
-    int fftWritePos = 0;
+    std::array<float, kFftSize * 2> fftBuffer {};       // input (pre-engine)
+    std::array<float, kFftSize * 2> fftOutputBuffer {}; // output (post-engine)
+    int fftWritePos       = 0;
+    int fftOutputWritePos = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomProcessor)
 };
