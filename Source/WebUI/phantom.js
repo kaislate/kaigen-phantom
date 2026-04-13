@@ -126,6 +126,8 @@ document.addEventListener('spoke-change', e => {
   if (!id) return;
   const state = getSliderState(id);
   if (!state) return;
+  // Snap to Custom preset (index 6) when user manually drags a spoke
+  presetState.setChoiceIndex(6);
   state.sliderDragStarted();
   state.setNormalisedValue(value);
   state.sliderDragEnded();
