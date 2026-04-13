@@ -112,10 +112,10 @@ function draw() {
     if (!hasData) return;
 
     // Gate threshold lines (RESYN mode only, Gate > 0)
-    const gateState = window.Juce?.getSliderState?.('synth_gate_threshold');
-    const modeState = window.Juce?.getSliderState?.('mode');
-    const gateThr   = gateState ? gateState.getValue()  : 0;
-    const isResyn   = modeState ? modeState.getValue() >= 0.5 : false;
+    const gateState  = window.Juce?.getSliderState?.('synth_gate_threshold');
+    const modeCombo  = window.Juce?.getComboBoxState?.('mode');
+    const gateThr    = gateState  ? gateState.getNormalisedValue() : 0;
+    const isResyn    = modeCombo  ? modeCombo.getChoiceIndex() === 1 : false;
 
     if (isResyn && gateThr > 0) {
         const mid    = h * 0.5;
