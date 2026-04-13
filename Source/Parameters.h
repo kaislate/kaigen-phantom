@@ -67,6 +67,12 @@ namespace ParamID
     /** Period-tracking EMA speed. 1–80 (stored as %; divide by 100 to get alpha).
      *  Low = stable/glide. High = fast/responsive. Default 15 (alpha 0.15). */
     inline constexpr auto TRACKING_SPEED = "tracking_speed";
+
+    // ── Punch (per-wavelet peak amplitude modulation) ─────────────────────
+    /** Toggle: replace smooth envelope with per-wavelet peak amplitude. */
+    inline constexpr auto PUNCH_ENABLED = "punch_enabled";
+    /** Blend amount 0–100%: 0 = pure envelope, 100 = pure wavelet peak. */
+    inline constexpr auto PUNCH_AMOUNT  = "punch_amount";
 }
 
 // ─── Preset amplitude tables — Chebyshev polynomial weights ────────────
@@ -114,6 +120,8 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::SYNTH_H1,
         ParamID::SYNTH_MAX_TRACK_HZ,
         ParamID::TRACKING_SPEED,
+        ParamID::PUNCH_ENABLED,
+        ParamID::PUNCH_AMOUNT,
     };
 }
 
@@ -234,6 +242,14 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     params.push_back(std::make_unique<APF>(
         ParamID::TRACKING_SPEED, "Tracking Speed",
         NormalisableRange<float>(0.1f, 80.0f, 0.0f, 0.25f), 15.0f,
+        AudioParameterFloatAttributes().withLabel("%")));
+
+    // ── Punch ─────────────────────────────────────────────────────────
+    params.push_back(std::make_unique<AudioParameterBool>(
+        ParamID::PUNCH_ENABLED, "Punch", false));
+    params.push_back(std::make_unique<APF>(
+        ParamID::PUNCH_AMOUNT, "Punch Amount",
+        NormalisableRange<float>(0.0f, 100.0f), 100.0f,
         AudioParameterFloatAttributes().withLabel("%")));
 
     // ── Binaural ──────────────────────────────────────────────────────

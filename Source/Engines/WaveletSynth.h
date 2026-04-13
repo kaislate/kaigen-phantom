@@ -37,6 +37,9 @@ public:
 
     float process(float x) noexcept;
     float getEstimatedHz() const noexcept;
+    /** Per-wavelet peak: amplitude of the last completed wavelet cycle. Updated at every
+     *  valid crossing. Used by PhantomEngine Punch feature to blend envelope vs peak scaling. */
+    float getWaveletPeak() const noexcept { return lastWaveletPeak; }
 
 private:
     double sampleRate = 44100.0;
@@ -52,6 +55,11 @@ private:
     float minPeriodSamples         = 0.0f;
     float maxPeriodSamples         = 0.0f;
     float h1Amp                    = 1.0f;
+
+    // Per-wavelet peak: resets on each valid crossing, latches on completion.
+    // Used by PhantomEngine to scale output per-wavelet rather than per-envelope.
+    float currentWaveletPeak       = 0.0f;
+    float lastWaveletPeak          = 0.0f;
 
     float currentPhase = 0.0f;   // resets to 0.0 at every positive zero crossing
 

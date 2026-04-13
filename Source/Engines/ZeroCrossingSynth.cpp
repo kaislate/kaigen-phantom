@@ -32,6 +32,8 @@ void ZeroCrossingSynth::reset() noexcept
     fundamentalPhase         = 0.0f;
     estimatedPeriod          = (float)(sampleRate / 100.0); // 100 Hz safe default
     inputPeak                = 0.0f;
+    currentWaveletPeak       = 0.0f;
+    lastWaveletPeak          = 0.0f;
 }
 
 // ── Parameter setters ──────────────────────────────────────────────────────
@@ -135,6 +137,8 @@ float ZeroCrossingSynth::process(float x) noexcept
     // Fast-attack / slow-release amplitude tracker (~78 ms half-life at 44.1 kHz).
     const float absX = std::abs(x);
     inputPeak = (absX > inputPeak) ? absX : inputPeak * 0.9998f;
+    // Per-wavelet peak: track max |x| within current crossing interval.
+    if (absX > currentWaveletPeak) currentWaveletPeak = absX;
 
     samplesSinceLastCrossing += 1.0f;
     accumulatedSamples       += 1.0f;
@@ -168,6 +172,9 @@ float ZeroCrossingSynth::process(float x) noexcept
                 accumulatedSamples = 0.0f;
                 crossingsAccum     = 0;
             }
+            // Latch wavelet peak for Punch feature: capture peak amplitude of completed interval.
+            lastWaveletPeak    = currentWaveletPeak;
+            currentWaveletPeak = 0.0f;
         }
         else
         {

@@ -49,6 +49,7 @@ private:
     juce::WebSliderRelay stereoWidthRelay        { "stereo_width" };
     juce::WebSliderRelay synthLPFRelay           { "synth_lpf_hz" };
     juce::WebSliderRelay synthHPFRelay           { "synth_hpf_hz" };
+    juce::WebSliderRelay punchAmountRelay        { "punch_amount" };
 
     // ── Combo-box relays ──────────────────────────────────────────────
     juce::WebComboBoxRelay modeRelay             { "mode" };
@@ -58,6 +59,7 @@ private:
 
     // ── Toggle relay for bypass ───────────────────────────────────────
     juce::WebToggleButtonRelay bypassRelay       { "bypass" };
+    juce::WebToggleButtonRelay punchEnabledRelay { "punch_enabled" };
 
     // WebView — constructed in .cpp via buildWebViewOptions()
     SinglePageBrowser webView;
@@ -66,6 +68,7 @@ private:
     std::vector<std::unique_ptr<juce::WebSliderParameterAttachment>> sliderAttachments;
     std::vector<std::unique_ptr<juce::WebComboBoxParameterAttachment>> comboAttachments;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          bypassAttachment;
+    std::unique_ptr<juce::WebToggleButtonParameterAttachment>          punchEnabledAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomEditor)
 };

@@ -27,6 +27,22 @@ if (bypassBtn && bypassState) {
   updateBypassUI();
 }
 
+// ── Punch toggle ──────────────────────────────────────────────────────────────
+const punchEnabledState = getToggleState?.("punch_enabled");
+const punchBtn = document.getElementById("punch-btn");
+if (punchBtn && punchEnabledState) {
+  punchBtn.addEventListener("click", () => {
+    punchEnabledState.setValue(!punchEnabledState.getValue());
+  });
+  function updatePunchUI() {
+    punchBtn.classList.toggle("active", punchEnabledState.getValue());
+    const amountKnob = document.querySelector('phantom-knob[data-param="punch_amount"]');
+    if (amountKnob) amountKnob.classList.toggle('mode-inactive', !punchEnabledState.getValue());
+  }
+  punchEnabledState.valueChangedEvent.addListener(updatePunchUI);
+  updatePunchUI();
+}
+
 // =============================================================================
 // 1. Display value formatting
 // =============================================================================

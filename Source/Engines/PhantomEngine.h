@@ -52,6 +52,8 @@ public:
     void setTrackingSpeed(float speed);    // EMA alpha [0.01–0.8]: low=stable/glide, high=fast
     void setMaxTrackHz(float hz);          // max crossing frequency [200–20000 Hz]
     void setH1Amplitude(float amp);        // RESYN only: H1 level [0–1]
+    void setUsePunch(bool on);             // enable per-wavelet peak amplitude modulation
+    void setPunchAmount(float amount);     // [0–1]: 0 = pure envelope, 1 = pure wavelet peak
 
     // ─── Audio processing ────────────────────────────────────────────────
     void process(juce::AudioBuffer<float>& buffer, const juce::AudioBuffer<float>* sidechain = nullptr);
@@ -97,4 +99,7 @@ private:
     float  crossoverHz  = 120.0f;
     int    maxBlockSize = 0;
     int    numChannels  = 2;
+
+    bool  usePunch    = false;
+    float punchAmount = 1.0f;
 };

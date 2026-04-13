@@ -44,7 +44,8 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         &self.synthStepRelay, &self.synthDutyRelay, &self.synthSkipRelay,
         &self.envAttackRelay, &self.envReleaseRelay,
         &self.binauralWidthRelay, &self.stereoWidthRelay,
-        &self.synthLPFRelay, &self.synthHPFRelay
+        &self.synthLPFRelay, &self.synthHPFRelay,
+        &self.punchAmountRelay
     };
     for (auto* r : sliderRelays)
         options = options.withOptionsFrom(*r);
@@ -57,8 +58,9 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
     for (auto* r : comboRelays)
         options = options.withOptionsFrom(*r);
 
-    // ── Toggle relay ──────────────────────────────────────────────────
+    // ── Toggle relays ────────────────────────────────────────────────
     options = options.withOptionsFrom(self.bypassRelay);
+    options = options.withOptionsFrom(self.punchEnabledRelay);
 
     // ── Native functions for real-time data ──────────────────────────
     options = options
@@ -170,6 +172,7 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         { ParamID::STEREO_WIDTH,        stereoWidthRelay },
         { ParamID::SYNTH_LPF_HZ,        synthLPFRelay },
         { ParamID::SYNTH_HPF_HZ,        synthHPFRelay },
+        { ParamID::PUNCH_AMOUNT,         punchAmountRelay },
     };
     for (auto& b : sliderBindings)
         sliderAttachments.push_back(std::make_unique<juce::WebSliderParameterAttachment>(
@@ -187,9 +190,11 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         comboAttachments.push_back(std::make_unique<juce::WebComboBoxParameterAttachment>(
             *processor.apvts.getParameter(b.paramId), b.relay, nullptr));
 
-    // ── Bypass toggle attachment ──────────────────────────────────────
+    // ── Toggle attachments ────────────────────────────────────────────
     bypassAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
         *processor.apvts.getParameter(ParamID::BYPASS), bypassRelay, nullptr);
+    punchEnabledAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
+        *processor.apvts.getParameter(ParamID::PUNCH_ENABLED), punchEnabledRelay, nullptr);
 }
 
 PhantomEditor::~PhantomEditor() = default;

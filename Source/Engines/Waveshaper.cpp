@@ -7,14 +7,23 @@ void Waveshaper::setHarmonicAmplitudes(const std::array<float, 7>& newAmps) noex
         amps[(size_t) i] = juce::jlimit(0.0f, 1.0f, newAmps[(size_t) i]);
 }
 
+void Waveshaper::prepare(double sampleRate) noexcept
+{
+    const double rampMs = 10.0;  // 10 ms ramp — imperceptible lag, eliminates clicks
+    smoothDrive.reset(sampleRate, rampMs / 1000.0);
+    smoothSat  .reset(sampleRate, rampMs / 1000.0);
+    smoothDrive.setCurrentAndTargetValue(smoothDrive.getTargetValue());
+    smoothSat  .setCurrentAndTargetValue(smoothSat  .getTargetValue());
+}
+
 void Waveshaper::setDrive(float d) noexcept
 {
-    drive = juce::jlimit(0.0f, 1.0f, d);
+    smoothDrive.setTargetValue(juce::jlimit(0.0f, 1.0f, d));
 }
 
 void Waveshaper::setSaturation(float s) noexcept
 {
-    saturation = juce::jlimit(0.0f, 1.0f, s);
+    smoothSat.setTargetValue(juce::jlimit(0.0f, 1.0f, s));
 }
 
 void Waveshaper::chebyshev(float x, float* t) noexcept
@@ -32,10 +41,16 @@ void Waveshaper::chebyshev(float x, float* t) noexcept
     t[6] = 2.0f * x * t[5] - t[4];          // T_8
 }
 
-float Waveshaper::shape(float x) const noexcept
+float Waveshaper::shape(float x) noexcept
 {
+    // Advance smoothers one sample step — this is what makes knob moves artifact-free.
+    const float drive      = smoothDrive.getNextValue();
+    const float saturation = smoothSat  .getNextValue();
+
     // Apply drive: scale input into the nonlinearity. Drive 0 = unity, 1 = 5x.
-    const float driven = juce::jlimit(-1.0f, 1.0f, x * (1.0f + drive * 4.0f));
+    // tanh soft-clips instead of hard jlimit — eliminates click artifacts from
+    // sudden transients (e.g., filter settling on note changes).
+    const float driven = std::tanh(x * (1.0f + drive * 4.0f));
 
     // Evaluate Chebyshev polynomials
     float t[7];
@@ -46,10 +61,12 @@ float Waveshaper::shape(float x) const noexcept
     for (int i = 0; i < 7; ++i)
         y += amps[(size_t) i] * t[i];
 
-    // Blend in a tanh saturation curve for harmonic richness
+    // Blend in a tanh saturation curve for harmonic richness.
+    // Apply tanh to the harmonic sum (y), NOT the input (driven), so that
+    // the saturation never leaks the fundamental back into the output.
     if (saturation > 0.0f)
     {
-        const float satCurve = std::tanh(driven * 3.0f);
+        const float satCurve = std::tanh(y * 3.0f);
         y = y * (1.0f - saturation * 0.5f) + satCurve * saturation;
     }
 

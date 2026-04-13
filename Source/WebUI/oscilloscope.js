@@ -139,6 +139,43 @@ function draw() {
     };
     const trig = findTrigger(lin.in);
 
+    // ── Zero-crossing markers ────────────────────────────────────────────────
+    // Draw vertical lines at each positive-slope zero crossing in the display window.
+    // Valid crossings (interval ≥ minPeriodSamples) are amber; too-fast ones are dim/dashed.
+    {
+        const maxTrackState = window.Juce?.getSliderState?.('synth_max_track_hz');
+        const maxTrackHz    = maxTrackState ? maxTrackState.getScaledValue() : 4000;
+        const minPeriod     = 44100 / maxTrackHz; // ~samples per cycle at max track frequency
+
+        let lastCross = -Infinity;
+        for (let i = trig + 1; i < trig + OSC_DISPLAY_SAMPLES - 1; i++) {
+            const idx = i & (OSC_BUF_SIZE - 1);
+            const prv = (i - 1) & (OSC_BUF_SIZE - 1);
+            if (lin.in[prv] <= 0.0 && lin.in[idx] > 0.0) {
+                const isValid = (i - lastCross) >= minPeriod;
+                const px = Math.round((i - trig) * w / OSC_DISPLAY_SAMPLES) + 0.5;
+
+                ctx.save();
+                if (isValid) {
+                    ctx.strokeStyle = 'rgba(255,178,38,0.30)';
+                    ctx.lineWidth   = 1;
+                } else {
+                    ctx.strokeStyle = 'rgba(255,100,60,0.14)';
+                    ctx.lineWidth   = 1;
+                    ctx.setLineDash([2, 4]);
+                }
+                ctx.beginPath();
+                ctx.moveTo(px, 0);
+                ctx.lineTo(px, h);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+
+                lastCross = i;
+            }
+        }
+    }
+
     // Layer order: input (back), synth (mid), output (front)
     drawWave(ctx, lin.in,  trig, w, h, 'rgba(160,160,175,0.28)', 1.0, false);
     drawWave(ctx, lin.syn, trig, w, h, 'rgba(255,178,38,0.82)',  1.5, true);

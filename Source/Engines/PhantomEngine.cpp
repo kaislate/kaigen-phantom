@@ -171,6 +171,9 @@ void PhantomEngine::setH1Amplitude(float amp)
     resynR.setH1Amplitude(amp);
 }
 
+void PhantomEngine::setUsePunch(bool on)          { usePunch    = on; }
+void PhantomEngine::setPunchAmount(float amount)  { punchAmount = juce::jlimit(0.0f, 1.0f, amount); }
+
 // ── Processing ─────────────────────────────────────────────────────────────
 
 void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioBuffer<float>* sidechain)
@@ -205,6 +208,10 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
     //
     // Both engines receive the amplitude-normalised bass band. No HPF is needed
     // in Replace mode — neither engine outputs the fundamental by design.
+    const int  mode  = synthMode.load(std::memory_order_relaxed);
+    const bool punch = usePunch;
+    const float punchAmt = punchAmount;
+
     int oscWp = oscSynthWrPos.load(std::memory_order_relaxed);
     for (int ch = 0; ch < nCh; ++ch)
     {
@@ -232,7 +239,7 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
             // proportionally — quieter signals are trusted less, preventing
             // harmonic-drift artifacts during note decay in both Effect and RESYN.
             // Output is scaled by inLvl below to restore dynamics.
-            float phantomSample = (synthMode.load(std::memory_order_relaxed) == 1)
+            float phantomSample = (mode == 1)
                 ? resyn.process(low[i])
                 : syn.process(low[i]);
 
@@ -250,8 +257,19 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
             phantomSample = lpf.processSingleSampleRaw(phantomSample);
             phantomSample = hpf.processSingleSampleRaw(phantomSample);
 
+            // Punch: blend smooth envelope with per-wavelet peak amplitude.
+            // At punchAmt=0 → pure envelope (default). At punchAmt=1 → pure wavelet peak
+            // (stepped, transient-accurate). Gives each cycle's amplitude a punchy, discrete feel.
+            float level = inLvl;
+            if (punch)
+            {
+                const float wvPeak = (mode == 1) ? resyn.getWaveletPeak() : syn.getWaveletPeak();
+                level = inLvl + (wvPeak - inLvl) * punchAmt;
+                level = juce::jlimit(0.0f, 1.0f, level);
+            }
+
             // Scale by envelope so phantom tracks input dynamics
-            const float phantomOut = phantomSample * inLvl * phantomStrength;
+            const float phantomOut = phantomSample * level * phantomStrength;
 
             // Oscilloscope capture (left channel only)
             if (ch == 0)

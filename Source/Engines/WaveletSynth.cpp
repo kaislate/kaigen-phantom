@@ -37,6 +37,8 @@ void WaveletSynth::reset() noexcept
     estimatedPeriod          = (float)(sampleRate / 100.0); // 100 Hz safe default
     lastNegativePeak         = 0.0f;
     inputPeak                = 0.0f;
+    currentWaveletPeak       = 0.0f;
+    lastWaveletPeak          = 0.0f;
 }
 
 // ── Parameter setters ──────────────────────────────────────────────────────
@@ -160,6 +162,8 @@ float WaveletSynth::process(float x) noexcept
     // estimate to a higher frequency.
     const float absX = std::abs(x);
     inputPeak = (absX > inputPeak) ? absX : inputPeak * 0.9998f;
+    // Per-wavelet peak: track max |x| within current cycle; latch on valid crossing.
+    if (absX > currentWaveletPeak) currentWaveletPeak = absX;
 
     // Track most negative excursion since last valid crossing (gate hysteresis)
     if (x < lastNegativePeak)
@@ -210,6 +214,9 @@ float WaveletSynth::process(float x) noexcept
             // crossing, which would otherwise cause pitch artifacts during note decay.
             if (inputPeak >= kAmplitudeFloor)
                 currentPhase = 0.0f;
+            // Latch wavelet peak for Punch feature: capture peak amplitude of completed cycle.
+            lastWaveletPeak    = currentWaveletPeak;
+            currentWaveletPeak = 0.0f;
             samplesSinceLastCrossing = 0.0f;
             lastNegativePeak         = 0.0f;
         }

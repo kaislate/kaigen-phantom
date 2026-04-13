@@ -271,6 +271,7 @@ phantom-knob.mode-inactive {
 /* Panel flex sizing — Row 2 */
 .panel-ghost{flex:1.0}
 .panel-stereo{flex:0.65;align-items:center}
+.panel-punch{flex:0.55;align-items:center}
 
 /* Panel flex sizing — Row 3 */
 .panel-pitch{flex:0.45}

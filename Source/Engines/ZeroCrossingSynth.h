@@ -78,6 +78,9 @@ public:
 
     /** Estimated fundamental frequency in Hz at this moment. */
     float getEstimatedHz() const noexcept;
+    /** Per-wavelet peak: amplitude of the last completed crossing interval.
+     *  Updated at every valid crossing. Used by PhantomEngine Punch feature. */
+    float getWaveletPeak() const noexcept { return lastWaveletPeak; }
 
 private:
     double sampleRate = 44100.0;
@@ -98,6 +101,11 @@ private:
     // Scales trackingAlpha proportionally so quiet signals drift the period
     // estimate less than loud ones. Freezes updates entirely below −40 dBFS.
     float inputPeak = 0.0f;
+
+    // Per-crossing peak: max |x| within the current crossing interval.
+    // Latched to lastWaveletPeak on each valid crossing for Punch feature.
+    float currentWaveletPeak = 0.0f;
+    float lastWaveletPeak    = 0.0f;
 
     // ── Synthesis phase ───────────────────────────────────────────────────────
     float fundamentalPhase = 0.0f;
