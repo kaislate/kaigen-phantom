@@ -147,9 +147,11 @@ void PhantomEngine::setSynthMode(int mode)
     synthMode.store(juce::jlimit(0, 1, mode), std::memory_order_relaxed);
 }
 
+void PhantomEngine::setEnvSource(int s)   { envSource = juce::jlimit(0, 1, s); }
+
 // ── Processing ─────────────────────────────────────────────────────────────
 
-void PhantomEngine::process(juce::AudioBuffer<float>& buffer)
+void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioBuffer<float>* sidechain)
 {
     const int n   = buffer.getNumSamples();
     const int nCh = juce::jmin(buffer.getNumChannels(), numChannels);
@@ -197,7 +199,11 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer)
 
         for (int i = 0; i < n; ++i)
         {
-            const float inLvl = env.process(low[i]);
+            // Envelope source: main input bass band (default) or sidechain ch0
+            const float envIn = (envSource == 1 && sidechain != nullptr && ch < sidechain->getNumChannels())
+                ? sidechain->getReadPointer(ch)[i]
+                : low[i];
+            const float inLvl = env.process(envIn);
 
             // Both engines receive the raw bass-band signal for period detection.
             // Each tracks signal amplitude via inputPeak and scales its EMA alpha

@@ -46,6 +46,7 @@ void PhantomProcessor::syncParamsToEngine()
     engine.setOutputGainDb (apvts.getRawParameterValue(ParamID::OUTPUT_GAIN)->load());
     engine.setEnvelopeAttackMs (apvts.getRawParameterValue(ParamID::ENV_ATTACK_MS)->load());
     engine.setEnvelopeReleaseMs(apvts.getRawParameterValue(ParamID::ENV_RELEASE_MS)->load());
+    engine.setEnvSource((int) apvts.getRawParameterValue(ParamID::ENV_SOURCE)->load());
     engine.setBinauralMode ((int) apvts.getRawParameterValue(ParamID::BINAURAL_MODE)->load());
     engine.setBinauralWidth(apvts.getRawParameterValue(ParamID::BINAURAL_WIDTH)->load() / 100.0f);
     engine.setStereoWidth  (apvts.getRawParameterValue(ParamID::STEREO_WIDTH)->load() / 100.0f);
@@ -180,7 +181,26 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     syncParamsToEngine();
 
     // ── Process through the waveshaper engine ────────────────────────
-    engine.process(buffer);
+    // Read sidechain bus (bus index 1) if enabled
+    const juce::AudioBuffer<float>* sidechainPtr = nullptr;
+    juce::AudioBuffer<float> scBuf;
+    {
+        const int nSCBusChannels = getChannelCountOfBus(true, 1);
+        if (nSCBusChannels > 0)
+        {
+            // Find where sidechain channels start in the processBlock buffer.
+            // Main input (bus 0) is stereo (2 channels); sidechain starts at ch 2.
+            const int scStartCh = getTotalNumInputChannels() - nSCBusChannels;
+            if (scStartCh >= 0 && scStartCh + nSCBusChannels <= buffer.getNumChannels())
+            {
+                scBuf.setSize(nSCBusChannels, buffer.getNumSamples(), false, false, true);
+                for (int c = 0; c < nSCBusChannels; ++c)
+                    scBuf.copyFrom(c, 0, buffer, scStartCh + c, 0, buffer.getNumSamples());
+                sidechainPtr = &scBuf;
+            }
+        }
+    }
+    engine.process(buffer, sidechainPtr);
 
     // ── Output peak levels + output spectrum FFT ─────────────────────
     {

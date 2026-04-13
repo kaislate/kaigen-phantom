@@ -35,6 +35,7 @@ namespace ParamID
     // ── Envelope Follower ────────────────────────────────────────────
     inline constexpr auto ENV_ATTACK_MS      = "env_attack_ms";
     inline constexpr auto ENV_RELEASE_MS     = "env_release_ms";
+    inline constexpr auto ENV_SOURCE           = "env_source";
 
     // ── Binaural ──────────────────────────────────────────────────────
     inline constexpr auto BINAURAL_MODE      = "binaural_mode";
@@ -90,6 +91,7 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::SYNTH_SKIP,
         ParamID::ENV_ATTACK_MS,
         ParamID::ENV_RELEASE_MS,
+        ParamID::ENV_SOURCE,
         ParamID::BINAURAL_MODE,
         ParamID::BINAURAL_WIDTH,
         ParamID::STEREO_WIDTH,
@@ -176,6 +178,9 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         ParamID::ENV_RELEASE_MS, "Envelope Release",
         NormalisableRange<float>(5.0f, 5000.0f, 0.0f, 0.3f), 50.0f,
         AudioParameterFloatAttributes().withLabel("ms")));
+    params.push_back(std::make_unique<APC>(
+        ParamID::ENV_SOURCE, "Envelope Source",
+        StringArray{ "Input", "Sidechain" }, 0));
 
     // ── Synth Filter ──────────────────────────────────────────────────
     params.push_back(std::make_unique<APF>(

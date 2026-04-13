@@ -285,4 +285,22 @@ if (binauralSelect) {
   }
 }
 
+// =============================================================================
+// 10. Wire envelope source select
+// =============================================================================
+
+const envSourceSelect = document.getElementById("env-source-select");
+if (envSourceSelect) {
+  const envSourceState = getComboBoxState?.("env_source");
+  if (envSourceState) {
+    envSourceSelect.addEventListener("change", () => {
+      envSourceState.setChoiceIndex(parseInt(envSourceSelect.value));
+    });
+    envSourceState.valueChangedEvent?.addListener(() => {
+      envSourceSelect.value = String(envSourceState.getChoiceIndex());
+    });
+    envSourceSelect.value = String(envSourceState.getChoiceIndex());
+  }
+}
+
 })();

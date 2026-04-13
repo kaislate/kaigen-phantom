@@ -48,9 +48,10 @@ public:
     void setSynthMode(int mode);           // 0 = Effect (ZCS), 1 = RESYN (WaveletSynth)
     void setWaveletLength(float len);      // RESYN only: 0.05–1.0 fraction of period
     void setGateThreshold(float thr);      // RESYN only: 0.0–1.0 min negative-peak threshold
+    void setEnvSource(int s);
 
     // ─── Audio processing ────────────────────────────────────────────────
-    void process(juce::AudioBuffer<float>& buffer);
+    void process(juce::AudioBuffer<float>& buffer, const juce::AudioBuffer<float>* sidechain = nullptr);
 
     // ─── Oscilloscope capture (written by audio thread) ──────────────────
     static constexpr int kOscBufSize = 2048;
@@ -87,6 +88,7 @@ private:
     float phantomStrength = 0.8f;
     float outputGainLin   = 1.0f;
     float stereoWidth     = 1.0f;
+    int envSource = 0;  // 0 = main input bass band, 1 = sidechain
 
     double sampleRate   = 44100.0;
     float  crossoverHz  = 120.0f;
