@@ -145,6 +145,13 @@ function applyMode(idx) {
     .forEach((b) =>
       b.classList.toggle("active", parseInt(b.dataset.mode) === idx)
     );
+  // Dim RESYN-only controls when in Effect mode (idx=0)
+  const resynOnly = ['synth_wavelet_length', 'synth_gate_threshold'];
+  const isEffect  = idx === 0;
+  resynOnly.forEach(param => {
+    const el = document.querySelector(`phantom-knob[data-param="${param}"]`);
+    if (el) el.classList.toggle('mode-inactive', isEffect);
+  });
 }
 
 document.querySelectorAll(".mb[data-mode]").forEach((btn) => {

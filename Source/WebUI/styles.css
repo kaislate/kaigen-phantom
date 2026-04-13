@@ -98,6 +98,13 @@ body{
   box-shadow: 0 0 6px rgba(255,178,38,0.25);
 }
 
+/* Mode-inactive state for RESYN-only controls */
+phantom-knob.mode-inactive {
+  opacity: 0.38;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
 /* ═══ BODY GRID ═══ */
 .body-grid{
   display:grid;
