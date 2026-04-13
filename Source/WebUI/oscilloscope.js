@@ -120,8 +120,8 @@ function draw() {
     if (isResyn && gateThr > 0) {
         const mid    = h * 0.5;
         const scaleY = h * 0.38;
-        const lineAbove = mid - gateThr * scaleY;
-        const lineBelow = mid + gateThr * scaleY;
+        const lineAbove = Math.max(0, Math.min(h, mid - gateThr * scaleY));
+        const lineBelow = Math.max(0, Math.min(h, mid + gateThr * scaleY));
         ctx.save();
         ctx.strokeStyle = 'rgba(255,178,38,0.50)';
         ctx.lineWidth   = 1;
