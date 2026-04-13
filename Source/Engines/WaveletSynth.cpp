@@ -72,9 +72,14 @@ void WaveletSynth::setSkipCount(int n) noexcept
     const int newSkip = juce::jlimit(1, 8, n);
     if (newSkip != skipCount)
     {
+        // Scale accumulated samples proportionally so the EMA has a warm start.
+        // e.g. going from skip=1 to skip=2: double the accumulation so the
+        // first new measurement lands near the current estimate.
+        if (accumulatedSamples > 0.0f)
+            accumulatedSamples *= (float)newSkip / (float)skipCount;
         skipCount      = newSkip;
-        crossingsAccum = 0;       // restart accumulation on skip change
-        accumulatedSamples = 0.0f;
+        crossingsAccum = 0;
+        // estimatedPeriod is intentionally NOT reset
     }
 }
 

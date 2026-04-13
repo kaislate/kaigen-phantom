@@ -57,9 +57,12 @@ void ZeroCrossingSynth::setSkipCount(int n) noexcept
     const int newSkip = juce::jlimit(1, 8, n);
     if (newSkip != skipCount)
     {
+        // Scale accumulated samples proportionally so the EMA has a warm start.
+        if (accumulatedSamples > 0.0f)
+            accumulatedSamples *= (float)newSkip / (float)skipCount;
         skipCount      = newSkip;
-        crossingsAccum = 0;       // restart accumulation on skip change
-        accumulatedSamples = 0.0f;
+        crossingsAccum = 0;
+        // estimatedPeriod is intentionally NOT reset
     }
 }
 
