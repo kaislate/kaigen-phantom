@@ -20,7 +20,8 @@ if (bypassBtn && bypassState) {
     bypassState.setValue(!bypassState.getValue());
   });
   function updateBypassUI() {
-    bypassBtn.classList.toggle("active", !!bypassState.getValue());
+    // Active = lit = plugin is ON (not bypassed). Invert the bypass value.
+    bypassBtn.classList.toggle("active", !bypassState.getValue());
   }
   bypassState.valueChangedEvent.addListener(updateBypassUI);
   updateBypassUI();
@@ -96,7 +97,42 @@ document.querySelectorAll("phantom-knob[data-param]").forEach((el) => {
 });
 
 // =============================================================================
-// 3. Wire mode toggle (Effect / Instrument)
+// 3. Wire H2-H8 knobs → recipe wheel (live amplitude update)
+// =============================================================================
+
+const harmonicParamIds = [
+  'recipe_h2','recipe_h3','recipe_h4','recipe_h5','recipe_h6','recipe_h7','recipe_h8'
+];
+
+function updateWheelAmplitudes() {
+  if (!window.PhantomRecipeWheel) return;
+  const amps = harmonicParamIds.map(id => {
+    const state = getSliderState(id);
+    return state ? state.getNormalisedValue() : 0;
+  });
+  window.PhantomRecipeWheel.setAmplitudes(amps);
+}
+
+harmonicParamIds.forEach(id => {
+  const state = getSliderState(id);
+  if (state) state.valueChangedEvent.addListener(updateWheelAmplitudes);
+});
+updateWheelAmplitudes();
+
+// Route spoke drag events back to JUCE parameters
+document.addEventListener('spoke-change', e => {
+  const { index, value } = e.detail;
+  const id = harmonicParamIds[index];
+  if (!id) return;
+  const state = getSliderState(id);
+  if (!state) return;
+  state.sliderDragStarted();
+  state.setNormalisedValue(value);
+  state.sliderDragEnded();
+});
+
+// =============================================================================
+// 4. Wire mode toggle (Effect / Instrument)
 // =============================================================================
 
 const modeState = getComboBoxState("mode");
@@ -169,26 +205,6 @@ function updateGhostModeUI() {
 
 ghostModeState.valueChangedEvent.addListener(updateGhostModeUI);
 updateGhostModeUI();
-
-// =============================================================================
-// 6. Wire deconfliction mode select
-// =============================================================================
-
-const deconModeState = getComboBoxState("deconfliction_mode");
-const deconSelect = document.getElementById("decon-mode");
-
-if (deconSelect) {
-  deconSelect.addEventListener("change", () => {
-    deconModeState.setChoiceIndex(deconSelect.selectedIndex);
-  });
-
-  function updateDeconUI() {
-    deconSelect.selectedIndex = deconModeState.getChoiceIndex();
-  }
-
-  deconModeState.valueChangedEvent.addListener(updateDeconUI);
-  updateDeconUI();
-}
 
 // =============================================================================
 // 7. Real-time data polling loop
