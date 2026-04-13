@@ -73,6 +73,9 @@ private:
 
     double sampleRate = 44100.0;
 
+    // Pre-allocated sidechain buffer (avoid heap allocation on audio thread)
+    juce::AudioBuffer<float> sidechainBuf;
+
     // FFT for spectrum analysis — 8192-point for ~5Hz resolution
     static constexpr int kFftOrder = 13;
     static constexpr int kFftSize  = 1 << kFftOrder;

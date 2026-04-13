@@ -25,6 +25,12 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
 {
     sampleRate = sr;
     engine.prepare(sr, samplesPerBlock, 2);
+
+    // Pre-allocate sidechain buffer to avoid heap allocation on the audio thread
+    const int scChannels = getChannelCountOfBus(true, 1);
+    if (scChannels > 0)
+        sidechainBuf.setSize(scChannels, samplesPerBlock, false, true, false);
+
     fftWritePos = 0;
     fftBuffer.fill(0.0f);
     spectrumData.fill(0.0f);
@@ -183,7 +189,6 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     // ── Process through the waveshaper engine ────────────────────────
     // Read sidechain bus (bus index 1) if enabled
     const juce::AudioBuffer<float>* sidechainPtr = nullptr;
-    juce::AudioBuffer<float> scBuf;
     {
         const int nSCBusChannels = getChannelCountOfBus(true, 1);
         if (nSCBusChannels > 0)
@@ -193,10 +198,11 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             const int scStartCh = getTotalNumInputChannels() - nSCBusChannels;
             if (scStartCh >= 0 && scStartCh + nSCBusChannels <= buffer.getNumChannels())
             {
-                scBuf.setSize(nSCBusChannels, buffer.getNumSamples(), false, false, true);
+                // Use pre-allocated member buffer (avoidReallocating=true is safe here)
+                sidechainBuf.setSize(nSCBusChannels, buffer.getNumSamples(), false, false, true);
                 for (int c = 0; c < nSCBusChannels; ++c)
-                    scBuf.copyFrom(c, 0, buffer, scStartCh + c, 0, buffer.getNumSamples());
-                sidechainPtr = &scBuf;
+                    sidechainBuf.copyFrom(c, 0, buffer, scStartCh + c, 0, buffer.getNumSamples());
+                sidechainPtr = &sidechainBuf;
             }
         }
     }
