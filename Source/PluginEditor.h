@@ -34,6 +34,7 @@ private:
     PhantomProcessor& processor;
 
     // ── Slider relays (one per APVTS slider parameter) ────────────────
+    juce::WebSliderRelay inputGainRelay          { "input_gain" };
     juce::WebSliderRelay ghostRelay              { "ghost" };
     juce::WebSliderRelay phantomThresholdRelay   { "phantom_threshold" };
     juce::WebSliderRelay phantomStrengthRelay    { "phantom_strength" };

@@ -10,6 +10,7 @@ namespace ParamID
     inline constexpr auto GHOST_MODE         = "ghost_mode";
     inline constexpr auto PHANTOM_THRESHOLD  = "phantom_threshold";
     inline constexpr auto PHANTOM_STRENGTH   = "phantom_strength";
+    inline constexpr auto INPUT_GAIN         = "input_gain";
     inline constexpr auto OUTPUT_GAIN        = "output_gain";
 
     // ── Recipe Engine (ZeroCrossingSynth harmonic amplitudes H2..H8) ────
@@ -55,17 +56,19 @@ namespace ParamID
     inline constexpr auto SYNTH_WAVELET_LENGTH = "synth_wavelet_length";
     /** Gate threshold: min negative-peak amplitude for a crossing to be valid. 0–1. Default 0. */
     inline constexpr auto SYNTH_GATE_THRESHOLD = "synth_gate_threshold";
-    /** H1 (fundamental) amplitude in RESYN mode. 0–100%. Default 100. */
+    /** H1 (fundamental) amplitude in RESYN mode. 0–200%. Default 100. */
     inline constexpr auto SYNTH_H1 = "synth_h1";
+    /** Sub-harmonic (one octave below fundamental) amplitude. 0–200%. Default 0. */
+    inline constexpr auto SYNTH_SUB = "synth_sub";
 
     // ── Crossing detection ────────────────────────────────────────────────
-    /** Maximum frequency to track. Crossings faster than this are rejected.
-     *  200–20000 Hz. Default 4000 Hz. Low = bass-only. High = vocal/full-range. */
-    inline constexpr auto SYNTH_MAX_TRACK_HZ = "synth_max_track_hz";
+    /** Minimum waveset length in samples. Crossings closer than this are rejected (noise gate).
+     *  2–500 samples. Default 11 (≈4 kHz at 44.1 kHz). Low = allow high-freq wavesets. High = bass-only. */
+    inline constexpr auto SYNTH_MIN_SAMPLES = "synth_min_samples";
 
-    /** Minimum frequency to track. Crossings slower than this are rejected.
-     *  8–200 Hz. Default 8 Hz. Replaces hardcoded 16Hz floor. */
-    inline constexpr auto SYNTH_MIN_FREQ_HZ = "synth_min_freq_hz";
+    /** Maximum waveset length in samples. Crossings further apart than this are rejected.
+     *  100–8000 samples. Default 5513 (≈8 Hz at 44.1 kHz). */
+    inline constexpr auto SYNTH_MAX_SAMPLES = "synth_max_samples";
 
     // ── Pitch tracking ────────────────────────────────────────────────────
     /** Period-tracking EMA speed. 0.1–80 stored; ÷100 in processor → alpha 0.001–0.800.
@@ -103,6 +106,7 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::GHOST_MODE,
         ParamID::PHANTOM_THRESHOLD,
         ParamID::PHANTOM_STRENGTH,
+        ParamID::INPUT_GAIN,
         ParamID::OUTPUT_GAIN,
         ParamID::RECIPE_H2,
         ParamID::RECIPE_H3,
@@ -127,8 +131,9 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::SYNTH_WAVELET_LENGTH,
         ParamID::SYNTH_GATE_THRESHOLD,
         ParamID::SYNTH_H1,
-        ParamID::SYNTH_MAX_TRACK_HZ,
-        ParamID::SYNTH_MIN_FREQ_HZ,
+        ParamID::SYNTH_SUB,
+        ParamID::SYNTH_MIN_SAMPLES,
+        ParamID::SYNTH_MAX_SAMPLES,
         ParamID::TRACKING_SPEED,
         ParamID::PUNCH_ENABLED,
         ParamID::PUNCH_AMOUNT,
@@ -166,6 +171,10 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         NormalisableRange<float>(0.0f, 100.0f), 80.0f,
         AudioParameterFloatAttributes().withLabel("%")));
     params.push_back(std::make_unique<APF>(
+        ParamID::INPUT_GAIN, "Input Gain",
+        NormalisableRange<float>(-12.0f, 24.0f), 0.0f,
+        AudioParameterFloatAttributes().withLabel("dB")));
+    params.push_back(std::make_unique<APF>(
         ParamID::OUTPUT_GAIN, "Output Gain",
         NormalisableRange<float>(-24.0f, 12.0f), 0.0f,
         AudioParameterFloatAttributes().withLabel("dB")));
@@ -201,7 +210,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         AudioParameterFloatAttributes().withLabel("%")));
     params.push_back(std::make_unique<APF>(
         ParamID::SYNTH_SKIP, "Skip",
-        NormalisableRange<float>(1.0f, 8.0f, 1.0f), 1.0f,
+        NormalisableRange<float>(0.0f, 8.0f, 1.0f), 0.0f,
         AudioParameterFloatAttributes()));
 
     // ── Envelope Follower ────────────────────────────────────────────
@@ -238,27 +247,31 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         AudioParameterFloatAttributes().withLabel("%")));
     params.push_back(std::make_unique<APF>(
         ParamID::SYNTH_H1, "H1 Amp",
-        NormalisableRange<float>(0.0f, 100.0f), 100.0f,
+        NormalisableRange<float>(0.0f, 200.0f), 100.0f,
+        AudioParameterFloatAttributes().withLabel("%")));
+    params.push_back(std::make_unique<APF>(
+        ParamID::SYNTH_SUB, "Sub Amp",
+        NormalisableRange<float>(0.0f, 200.0f), 0.0f,
         AudioParameterFloatAttributes().withLabel("%")));
 
     // ── Crossing detection ────────────────────────────────────────────
-    // Skew 0.25: logarithmic feel — fine control in bass range, coarser toward 20kHz.
+    // Skew 0.35: more resolution at the low end where most useful values live.
     params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_MAX_TRACK_HZ, "Max Track",
-        NormalisableRange<float>(200.0f, 20000.0f, 0.0f, 0.25f), 4000.0f,
-        AudioParameterFloatAttributes().withLabel("Hz")));
+        ParamID::SYNTH_MIN_SAMPLES, "Min Waveset",
+        NormalisableRange<float>(2.0f, 500.0f, 1.0f, 0.35f), 11.0f,
+        AudioParameterFloatAttributes().withLabel("smp")));
 
     params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_MIN_FREQ_HZ, "Min Track",
-        NormalisableRange<float>(8.0f, 200.0f, 0.0f, 0.25f), 8.0f,
-        AudioParameterFloatAttributes().withLabel("Hz")));
+        ParamID::SYNTH_MAX_SAMPLES, "Max Waveset",
+        NormalisableRange<float>(100.0f, 8000.0f, 1.0f, 0.35f), 5513.0f,
+        AudioParameterFloatAttributes().withLabel("smp")));
 
     // ── Pitch tracking ────────────────────────────────────────────────
     // Range 0.1–80 maps to alpha 0.001–0.800 (÷1000 in processor).
     // Skew 0.25: most knob travel covers the slow/glide region.
     params.push_back(std::make_unique<APF>(
         ParamID::TRACKING_SPEED, "Tracking Speed",
-        NormalisableRange<float>(0.1f, 80.0f, 0.0f, 0.25f), 15.0f,
+        NormalisableRange<float>(0.1f, 100.0f, 0.0f, 0.25f), 15.0f,
         AudioParameterFloatAttributes().withLabel("%")));
 
     // ── Punch ─────────────────────────────────────────────────────────

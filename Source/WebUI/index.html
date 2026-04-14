@@ -48,6 +48,14 @@
             <span class="lw" data-preset="6">Custom</span>
           </div>
         </div>
+        <!-- Ghost section — below recipe wheel -->
+        <div class="candy-inner panel-ghost" style="margin-top:auto;width:100%">
+          <div class="el">Ghost <span class="toggle-group"><button class="tog active" data-gmode="0">Rpl</button><button class="tog" data-gmode="1">Add</button></span></div>
+          <div class="knob-row">
+            <phantom-knob data-param="ghost" size="large" label="Amount" default-value="1.0"></phantom-knob>
+            <phantom-knob data-param="phantom_threshold" size="medium" label="Crossover" default-value="0.462"></phantom-knob>
+          </div>
+        </div>
         <!-- H2-H8 hidden parameter carriers — controlled by dragging wheel spokes -->
         <phantom-knob data-param="recipe_h2" size="small" default-value="1.0" style="display:none"></phantom-knob>
         <phantom-knob data-param="recipe_h3" size="small" default-value="0.0" style="display:none"></phantom-knob>
@@ -71,12 +79,13 @@
               <phantom-knob data-param="phantom_strength" size="medium" label="Strength" default-value="0.8"></phantom-knob>
               <phantom-knob data-param="synth_step" size="large" label="Shape" default-value="0" data-oled="waveform"></phantom-knob>
               <phantom-knob data-param="synth_duty" size="medium" label="Push" default-value="0.5"></phantom-knob>
-              <phantom-knob data-param="synth_h1" size="medium" label="H1" default-value="1"></phantom-knob>
+              <phantom-knob data-param="synth_h1" size="medium" label="H1" default-value="0.5"></phantom-knob>
+              <phantom-knob data-param="synth_sub" size="medium" label="Sub" default-value="0"></phantom-knob>
               <phantom-knob data-param="synth_wavelet_length" size="medium" label="Length" default-value="1"></phantom-knob>
               <phantom-knob data-param="synth_gate_threshold" size="medium" label="Gate"   default-value="0"></phantom-knob>
-              <phantom-knob data-param="synth_skip" size="medium" label="Skip" default-value="1"></phantom-knob>
-              <phantom-knob data-param="synth_min_freq_hz" size="medium" label="Lo" default-value="0"></phantom-knob>
-              <phantom-knob data-param="synth_max_track_hz" size="medium" label="Hi" default-value="0.5"></phantom-knob>
+              <phantom-knob data-param="synth_skip" size="medium" label="Skip" default-value="0"></phantom-knob>
+              <phantom-knob data-param="synth_min_samples" size="medium" label="Min" default-value="0"></phantom-knob>
+              <phantom-knob data-param="synth_max_samples" size="medium" label="Max" default-value="0.9"></phantom-knob>
               <phantom-knob data-param="tracking_speed" size="medium" label="Track" default-value="0.5"></phantom-knob>
             </div>
           </div>
@@ -84,15 +93,8 @@
 
         <div class="gap-h"></div>
 
-        <!-- Row 2: Ghost + Stereo + Envelope + Filter -->
+        <!-- Row 2: Stereo + Envelope + Filter + Punch + Output -->
         <div class="ctrl-row">
-          <div class="candy-inner panel-ghost">
-            <div class="el">Ghost <span class="toggle-group"><button class="tog active" data-gmode="0">Rpl</button><button class="tog" data-gmode="1">Add</button></span></div>
-            <div class="knob-row">
-              <phantom-knob data-param="ghost" size="large" label="Amount" default-value="1.0"></phantom-knob>
-              <phantom-knob data-param="phantom_threshold" size="medium" label="Crossover" default-value="0.462"></phantom-knob>
-            </div>
-          </div>
           <div class="candy-inner panel-stereo">
             <div class="el">Stereo</div>
             <div class="knob-row">
@@ -124,7 +126,8 @@
           <div class="candy-inner panel-output">
             <div class="el">Output</div>
             <div class="knob-row">
-              <phantom-knob data-param="output_gain" size="large" label="Gain" default-value="0.667"></phantom-knob>
+              <phantom-knob data-param="input_gain" size="medium" label="In" default-value="0.333"></phantom-knob>
+              <phantom-knob data-param="output_gain" size="large" label="Out" default-value="0.667"></phantom-knob>
             </div>
           </div>
         </div>

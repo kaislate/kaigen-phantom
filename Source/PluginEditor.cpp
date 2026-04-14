@@ -85,6 +85,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
 
     // ── Slider relays ─────────────────────────────────────────────────
     juce::WebSliderRelay* sliderRelays[] = {
+        &self.inputGainRelay,
         &self.ghostRelay, &self.phantomThresholdRelay, &self.phantomStrengthRelay,
         &self.outputGainRelay,
         &self.recipeH2Relay, &self.recipeH3Relay, &self.recipeH4Relay,
@@ -206,6 +207,7 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
     // ── Slider attachments ────────────────────────────────────────────
     struct SliderBinding { const char* paramId; juce::WebSliderRelay& relay; };
     SliderBinding sliderBindings[] = {
+        { ParamID::INPUT_GAIN,          inputGainRelay },
         { ParamID::GHOST,               ghostRelay },
         { ParamID::PHANTOM_THRESHOLD,   phantomThresholdRelay },
         { ParamID::PHANTOM_STRENGTH,    phantomStrengthRelay },

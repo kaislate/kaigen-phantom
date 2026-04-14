@@ -39,6 +39,20 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
 
 void PhantomProcessor::releaseResources() {}
 
+bool PhantomProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+{
+    // Accept stereo or mono main output. Input must match output channel count.
+    const auto& mainOut = layouts.getMainOutputChannelSet();
+    const auto& mainIn  = layouts.getMainInputChannelSet();
+
+    if (mainOut != juce::AudioChannelSet::stereo() &&
+        mainOut != juce::AudioChannelSet::mono())
+        return false;
+
+    // Input must match output (stereo→stereo or mono→mono)
+    return mainIn == mainOut;
+}
+
 void PhantomProcessor::syncParamsToEngine()
 {
     engine.setCrossoverHz    (apvts.getRawParameterValue(ParamID::PHANTOM_THRESHOLD)->load());
@@ -71,8 +85,9 @@ void PhantomProcessor::syncParamsToEngine()
     engine.setWaveletLength(apvts.getRawParameterValue(ParamID::SYNTH_WAVELET_LENGTH)->load() / 100.0f);
     engine.setGateThreshold(apvts.getRawParameterValue(ParamID::SYNTH_GATE_THRESHOLD)->load() / 100.0f);
     engine.setH1Amplitude  (apvts.getRawParameterValue(ParamID::SYNTH_H1)->load() / 100.0f);
-    engine.setMaxTrackHz   (apvts.getRawParameterValue(ParamID::SYNTH_MAX_TRACK_HZ)->load());
-    engine.setMinFreqHz    (apvts.getRawParameterValue(ParamID::SYNTH_MIN_FREQ_HZ)->load());
+    engine.setSubAmplitude (apvts.getRawParameterValue(ParamID::SYNTH_SUB)->load() / 100.0f);
+    engine.setMinPeriodSamples(apvts.getRawParameterValue(ParamID::SYNTH_MIN_SAMPLES)->load());
+    engine.setMaxPeriodSamples(apvts.getRawParameterValue(ParamID::SYNTH_MAX_SAMPLES)->load());
     engine.setTrackingSpeed(apvts.getRawParameterValue(ParamID::TRACKING_SPEED)->load() / 100.0f);
     engine.setUsePunch     (apvts.getRawParameterValue(ParamID::PUNCH_ENABLED)->load() > 0.5f);
     engine.setPunchAmount  (apvts.getRawParameterValue(ParamID::PUNCH_AMOUNT)->load() / 100.0f);
@@ -104,6 +119,15 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         peakOutL.store(pL, std::memory_order_relaxed);
         peakOutR.store(pR, std::memory_order_relaxed);
         return;
+    }
+
+    // ── Input gain ────────────────────────────────────────────────────
+    {
+        const float gainLin = juce::Decibels::decibelsToGain(
+            apvts.getRawParameterValue(ParamID::INPUT_GAIN)->load());
+        if (gainLin != 1.0f)
+            for (int c = 0; c < nCh; ++c)
+                buffer.applyGain(c, 0, n, gainLin);
     }
 
     // ── Input peak levels + FFT/pitch capture (pre-engine) ──────────
