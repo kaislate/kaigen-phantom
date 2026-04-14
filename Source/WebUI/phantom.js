@@ -27,6 +27,23 @@ if (bypassBtn && bypassState) {
   updateBypassUI();
 }
 
+// ── Auto input gain toggle ────────────────────────────────────────────────────
+const inputGainAutoState = getToggleState?.("input_gain_auto");
+const autoGainBtn = document.getElementById("auto-gain-btn");
+if (autoGainBtn && inputGainAutoState) {
+  autoGainBtn.addEventListener("click", () => {
+    inputGainAutoState.setValue(!inputGainAutoState.getValue());
+  });
+  function updateAutoGainUI() {
+    const on = inputGainAutoState.getValue();
+    autoGainBtn.classList.toggle("active", on);
+    const inKnob = document.getElementById("input-gain-knob");
+    if (inKnob) inKnob.classList.toggle("mode-inactive", on);
+  }
+  inputGainAutoState.valueChangedEvent.addListener(updateAutoGainUI);
+  updateAutoGainUI();
+}
+
 // ── Punch toggle ──────────────────────────────────────────────────────────────
 const punchEnabledState = getToggleState?.("punch_enabled");
 const punchBtn = document.getElementById("punch-btn");

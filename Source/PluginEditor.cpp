@@ -114,6 +114,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
     // ── Toggle relays ────────────────────────────────────────────────
     options = options.withOptionsFrom(self.bypassRelay);
     options = options.withOptionsFrom(self.punchEnabledRelay);
+    options = options.withOptionsFrom(self.inputGainAutoRelay);
 
     // ── Native functions for real-time data ──────────────────────────
     options = options
@@ -261,6 +262,8 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         *processor.apvts.getParameter(ParamID::BYPASS), bypassRelay, nullptr);
     punchEnabledAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
         *processor.apvts.getParameter(ParamID::PUNCH_ENABLED), punchEnabledRelay, nullptr);
+    inputGainAutoAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
+        *processor.apvts.getParameter(ParamID::INPUT_GAIN_AUTO), inputGainAutoRelay, nullptr);
 }
 
 PhantomEditor::~PhantomEditor() = default;

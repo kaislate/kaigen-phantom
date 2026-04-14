@@ -11,6 +11,7 @@ namespace ParamID
     inline constexpr auto PHANTOM_THRESHOLD  = "phantom_threshold";
     inline constexpr auto PHANTOM_STRENGTH   = "phantom_strength";
     inline constexpr auto INPUT_GAIN         = "input_gain";
+    inline constexpr auto INPUT_GAIN_AUTO    = "input_gain_auto";
     inline constexpr auto OUTPUT_GAIN        = "output_gain";
 
     // ── Recipe Engine (ZeroCrossingSynth harmonic amplitudes H2..H8) ────
@@ -107,6 +108,7 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::PHANTOM_THRESHOLD,
         ParamID::PHANTOM_STRENGTH,
         ParamID::INPUT_GAIN,
+        ParamID::INPUT_GAIN_AUTO,
         ParamID::OUTPUT_GAIN,
         ParamID::RECIPE_H2,
         ParamID::RECIPE_H3,
@@ -174,6 +176,8 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         ParamID::INPUT_GAIN, "Input Gain",
         NormalisableRange<float>(-12.0f, 24.0f), 0.0f,
         AudioParameterFloatAttributes().withLabel("dB")));
+    params.push_back(std::make_unique<AudioParameterBool>(
+        ParamID::INPUT_GAIN_AUTO, "Input Auto Gain", false));
     params.push_back(std::make_unique<APF>(
         ParamID::OUTPUT_GAIN, "Output Gain",
         NormalisableRange<float>(-24.0f, 12.0f), 0.0f,

@@ -26,6 +26,19 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
     sampleRate = sr;
     engine.prepare(sr, samplesPerBlock, 2);
 
+    // Auto input gain coefficients.
+    // Per-sample rates converted to per-block by raising (1-alpha) to the power of blockSize,
+    // which is the exact equivalent of running the IIR on every sample in the block.
+    const float perSampleAttack  = 1.0f - std::exp(-1.0f / (0.005f  * (float) sr)); // 5ms
+    const float perSampleRelease = 1.0f - std::exp(-1.0f / (0.400f  * (float) sr)); // 400ms
+    const float perSampleSmooth  = 1.0f - std::exp(-1.0f / (0.050f  * (float) sr)); // 50ms
+    const float n = (float) samplesPerBlock;
+    autoAttackCoef  = 1.0f - std::pow(1.0f - perSampleAttack,  n);
+    autoReleaseCoef = 1.0f - std::pow(1.0f - perSampleRelease, n);
+    autoSmoothCoef  = 1.0f - std::pow(1.0f - perSampleSmooth,  n);
+    autoEnvelope = 0.0f;
+    autoGain     = 1.0f;
+
     // Pre-allocate sidechain buffer to avoid heap allocation on the audio thread
     const int scChannels = getChannelCountOfBus(true, 1);
     if (scChannels > 0)
@@ -123,11 +136,50 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
 
     // ── Input gain ────────────────────────────────────────────────────
     {
-        const float gainLin = juce::Decibels::decibelsToGain(
-            apvts.getRawParameterValue(ParamID::INPUT_GAIN)->load());
-        if (gainLin != 1.0f)
+        const bool autoMode = apvts.getRawParameterValue(ParamID::INPUT_GAIN_AUTO)->load() > 0.5f;
+
+        if (autoMode)
+        {
+            // Measure peak of this block across all channels.
+            float blockPeak = 0.0f;
             for (int c = 0; c < nCh; ++c)
-                buffer.applyGain(c, 0, n, gainLin);
+            {
+                const float* ch = buffer.getReadPointer(c);
+                for (int i = 0; i < n; ++i)
+                    blockPeak = juce::jmax(blockPeak, std::abs(ch[i]));
+            }
+
+            // Update peak envelope: fast attack so we don't over-drive,
+            // slow release so gain holds steady between notes.
+            const float coef = (blockPeak > autoEnvelope) ? autoAttackCoef : autoReleaseCoef;
+            autoEnvelope += coef * (blockPeak - autoEnvelope);
+
+            // Compute gain needed to reach -12 dBFS target.
+            // Below -60 dBFS freeze the envelope to avoid amplifying noise.
+            constexpr float kTarget  = 0.25f;   // -12 dBFS
+            constexpr float kFloor   = 0.001f;  // -60 dBFS — below this, hold current gain
+            constexpr float kMaxGain = 16.0f;   // +24 dB ceiling
+            const float desiredGain = (autoEnvelope > kFloor)
+                ? juce::jmin(kMaxGain, kTarget / autoEnvelope)
+                : autoGain;
+
+            // Smooth toward desired gain to prevent zipper noise.
+            autoGain += autoSmoothCoef * (desiredGain - autoGain);
+
+            for (int c = 0; c < nCh; ++c)
+                buffer.applyGain(c, 0, n, autoGain);
+        }
+        else
+        {
+            autoEnvelope = 0.0f; // reset so auto is fresh next time it's enabled
+            autoGain     = 1.0f;
+
+            const float gainLin = juce::Decibels::decibelsToGain(
+                apvts.getRawParameterValue(ParamID::INPUT_GAIN)->load());
+            if (gainLin != 1.0f)
+                for (int c = 0; c < nCh; ++c)
+                    buffer.applyGain(c, 0, n, gainLin);
+        }
     }
 
     // ── Input peak levels + FFT/pitch capture (pre-engine) ──────────

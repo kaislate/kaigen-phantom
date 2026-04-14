@@ -12,6 +12,7 @@ public:
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
+    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
@@ -75,6 +76,15 @@ private:
 
     // Pre-allocated sidechain buffer (avoid heap allocation on audio thread)
     juce::AudioBuffer<float> sidechainBuf;
+
+    // Auto input gain state
+    // Peak envelope follower: fast attack, slow release.
+    // Gain smoothed separately to prevent zipper noise on level changes.
+    float autoEnvelope   = 0.0f;  // running peak envelope
+    float autoGain       = 1.0f;  // current applied gain (smoothed)
+    float autoAttackCoef  = 0.0f; // per-block attack coefficient (computed in prepareToPlay)
+    float autoReleaseCoef = 0.0f; // per-block release coefficient
+    float autoSmoothCoef  = 0.0f; // per-block gain-smoothing coefficient
 
     // FFT for spectrum analysis — 8192-point for ~5Hz resolution
     static constexpr int kFftOrder = 13;
