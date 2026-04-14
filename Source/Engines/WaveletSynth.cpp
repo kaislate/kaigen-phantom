@@ -185,6 +185,16 @@ float WaveletSynth::process(float x) noexcept
 
     if (lastSample <= 0.0f && x > 0.0f)
     {
+        // ── Sub-sample interpolation ────────────────────────────────────
+        // Linear interpolation gives the fractional offset (0..1) from the
+        // previous sample to the true zero crossing. Correcting the timing
+        // accumulators eliminates up to 1 sample of jitter per crossing.
+        const float denom    = x - lastSample;
+        const float fraction = (std::abs(denom) > 1e-12f) ? (-lastSample / denom) : 0.5f;
+        const float correction = 1.0f - fraction;
+        samplesSinceLastCrossing -= correction;
+        accumulatedSamples       -= correction;
+
         // inputPeak decays at ~0.9998/sample, so it crosses kAmplitudeFloor
         // roughly 520 ms after the last loud sample (at 44.1 kHz).
         static constexpr float kAmplitudeFloor = 0.01f;  // ≈ −40 dBFS
@@ -213,7 +223,10 @@ float WaveletSynth::process(float x) noexcept
 
                 // ── Phase reset (always — gate controls gain, not firing) ────
                 if (inputPeak >= kAmplitudeFloor)
-                    currentPhase = 0.0f;
+                {
+                    const float resetPeriod = juce::jlimit(minPeriodSamples, maxPeriodSamples, estimatedPeriod);
+                    currentPhase = correction * (kTwoPi / resetPeriod);
+                }
 
                 // ── Latch wavelet peak (always) ──────────────────────────────
                 lastWaveletPeak    = currentWaveletPeak;

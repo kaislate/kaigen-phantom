@@ -155,6 +155,13 @@ float ZeroCrossingSynth::process(float x) noexcept
 
     if (lastSample <= 0.0f && x > 0.0f)
     {
+        // ── Sub-sample interpolation ────────────────────────────────────
+        const float denom    = x - lastSample;
+        const float fraction = (std::abs(denom) > 1e-12f) ? (-lastSample / denom) : 0.5f;
+        const float correction = 1.0f - fraction;
+        samplesSinceLastCrossing -= correction;
+        accumulatedSamples       -= correction;
+
         // Only count this crossing if the individual interval is in range.
         // Out-of-range means noise or a frequency outside [16 Hz, 4 kHz].
         if (samplesSinceLastCrossing >= minPeriodSamples &&

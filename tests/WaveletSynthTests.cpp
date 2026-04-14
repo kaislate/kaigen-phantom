@@ -332,3 +332,20 @@ TEST_CASE("WaveletSynth: minFreq rejects crossings below the floor")
     // default 100 Hz.
     REQUIRE(syn.getEstimatedHz() == Catch::Approx(100.0f).margin(5.0f));
 }
+
+TEST_CASE("WaveletSynth: sub-sample interpolation improves pitch accuracy")
+{
+    // At 44100 Hz, a 100 Hz signal has period = 441.0 samples exactly.
+    // Without interpolation, snapping to integer boundaries introduces
+    // up to 1 sample of error per crossing. With interpolation, the
+    // fractional offset is accounted for.
+    WaveletSynth syn;
+    syn.prepare(kSR);
+    syn.setTrackingSpeed(0.25f);
+
+    feedSine(syn, 100.0f, (int)(2.0 * kSR));  // 2 seconds for stable estimate
+
+    // With interpolation, the estimate should be within ~1 Hz of 100 Hz.
+    // (Without interpolation the margin needed to be 5 Hz.)
+    REQUIRE(syn.getEstimatedHz() == Catch::Approx(100.0f).margin(1.0f));
+}
