@@ -51,6 +51,7 @@ public:
     void setEnvSource(int s);
     void setTrackingSpeed(float speed);    // EMA alpha [0.01–0.8]: low=stable/glide, high=fast
     void setMaxTrackHz(float hz);          // max crossing frequency [200–20000 Hz]
+    void setMinFreqHz(float hz);           // min crossing frequency [8–200 Hz]
     void setH1Amplitude(float amp);        // RESYN only: H1 level [0–1]
     void setUsePunch(bool on);             // enable per-wavelet peak amplitude modulation
     void setPunchAmount(float amount);     // [0–1]: 0 = pure envelope, 1 = pure wavelet peak
@@ -58,6 +59,10 @@ public:
     /** Current tracked pitch in Hz (from the active engine's zero-crossing tracker).
      *  Returns 0 when the input is too quiet to give reliable pitch info. */
     float getEstimatedHz() const noexcept;
+    /** Running peak of the bass-band signal seen by the active synth engine.
+     *  Used by the UI to position gate threshold lines accurately — the gate
+     *  operates on the bass band, not the full input signal shown in the scope. */
+    float getSynthInputPeak() const noexcept;
 
     // ─── Audio processing ────────────────────────────────────────────────
     void process(juce::AudioBuffer<float>& buffer, const juce::AudioBuffer<float>* sidechain = nullptr);

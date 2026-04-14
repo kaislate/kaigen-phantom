@@ -75,7 +75,8 @@
               <phantom-knob data-param="synth_wavelet_length" size="medium" label="Length" default-value="1"></phantom-knob>
               <phantom-knob data-param="synth_gate_threshold" size="medium" label="Gate"   default-value="0"></phantom-knob>
               <phantom-knob data-param="synth_skip" size="medium" label="Skip" default-value="1"></phantom-knob>
-              <phantom-knob data-param="synth_max_track_hz" size="medium" label="Max Freq" default-value="0.5"></phantom-knob>
+              <phantom-knob data-param="synth_min_freq_hz" size="medium" label="Lo" default-value="0"></phantom-knob>
+              <phantom-knob data-param="synth_max_track_hz" size="medium" label="Hi" default-value="0.5"></phantom-knob>
               <phantom-knob data-param="tracking_speed" size="medium" label="Track" default-value="0.5"></phantom-knob>
             </div>
           </div>
@@ -128,18 +129,20 @@
 
         <div class="gap-h"></div>
 
-        <!-- Visualization: oscilloscope always above spectrum -->
+        <!-- Visualization: meters span full height, osc+spectrum stacked in center -->
         <div class="viz-section">
-          <div class="osc-row">
-            <canvas id="oscCanvas"></canvas>
-          </div>
-          <div class="spectrum-row">
-            <canvas id="meterIn" class="io-meter"></canvas>
-            <div class="spectrum-wrap">
-              <canvas id="spectrumCanvas"></canvas>
+          <canvas id="meterIn" class="io-meter"></canvas>
+          <div class="viz-center">
+            <div class="osc-row">
+              <canvas id="oscCanvas"></canvas>
             </div>
-            <canvas id="meterOut" class="io-meter"></canvas>
+            <div class="spectrum-row">
+              <div class="spectrum-wrap">
+                <canvas id="spectrumCanvas"></canvas>
+              </div>
+            </div>
           </div>
+          <canvas id="meterOut" class="io-meter"></canvas>
         </div>
       </div>
     </div>

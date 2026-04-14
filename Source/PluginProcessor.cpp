@@ -72,6 +72,7 @@ void PhantomProcessor::syncParamsToEngine()
     engine.setGateThreshold(apvts.getRawParameterValue(ParamID::SYNTH_GATE_THRESHOLD)->load() / 100.0f);
     engine.setH1Amplitude  (apvts.getRawParameterValue(ParamID::SYNTH_H1)->load() / 100.0f);
     engine.setMaxTrackHz   (apvts.getRawParameterValue(ParamID::SYNTH_MAX_TRACK_HZ)->load());
+    engine.setMinFreqHz    (apvts.getRawParameterValue(ParamID::SYNTH_MIN_FREQ_HZ)->load());
     engine.setTrackingSpeed(apvts.getRawParameterValue(ParamID::TRACKING_SPEED)->load() / 100.0f);
     engine.setUsePunch     (apvts.getRawParameterValue(ParamID::PUNCH_ENABLED)->load() > 0.5f);
     engine.setPunchAmount  (apvts.getRawParameterValue(ParamID::PUNCH_AMOUNT)->load() / 100.0f);

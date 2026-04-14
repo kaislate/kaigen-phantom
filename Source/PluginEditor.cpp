@@ -46,7 +46,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         &self.binauralWidthRelay, &self.stereoWidthRelay,
         &self.synthLPFRelay, &self.synthHPFRelay,
         &self.synthWaveletLengthRelay, &self.synthGateThresholdRelay,
-        &self.synthH1Relay, &self.synthMaxTrackHzRelay, &self.trackingSpeedRelay,
+        &self.synthH1Relay, &self.synthMaxTrackHzRelay, &self.synthMinFreqHzRelay, &self.trackingSpeedRelay,
         &self.punchAmountRelay
     };
     for (auto* r : sliderRelays)
@@ -130,6 +130,8 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 obj->setProperty("inputWrPos",  (int) self.processor.oscInputWrPos .load(std::memory_order_relaxed));
                 obj->setProperty("synthWrPos",  (int) self.processor.engine.oscSynthWrPos.load(std::memory_order_relaxed));
                 obj->setProperty("outputWrPos", (int) self.processor.oscOutputWrPos.load(std::memory_order_relaxed));
+                obj->setProperty("sampleRate",   (double) self.processor.getSampleRate());
+                obj->setProperty("synthPeak",    (double) self.processor.engine.getSynthInputPeak());
                 complete(juce::var(obj));
             })
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });
@@ -142,7 +144,7 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
       processor(p),
       webView(buildWebViewOptions(*this))
 {
-    setSize(1200, 700);
+    setSize(1400, 820);
     addAndMakeVisible(webView);
 
     juce::MessageManager::callAsync([this]()
@@ -178,6 +180,7 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         { ParamID::SYNTH_GATE_THRESHOLD,    synthGateThresholdRelay },
         { ParamID::SYNTH_H1,                synthH1Relay },
         { ParamID::SYNTH_MAX_TRACK_HZ,      synthMaxTrackHzRelay },
+        { ParamID::SYNTH_MIN_FREQ_HZ,      synthMinFreqHzRelay },
         { ParamID::TRACKING_SPEED,          trackingSpeedRelay },
         { ParamID::PUNCH_AMOUNT,            punchAmountRelay },
     };

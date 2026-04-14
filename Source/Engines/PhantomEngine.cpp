@@ -164,6 +164,14 @@ void PhantomEngine::setMaxTrackHz(float hz)
     resynR.setMaxTrackHz(hz);
 }
 
+void PhantomEngine::setMinFreqHz(float hz)
+{
+    synthL.setMinFreqHz(hz);
+    synthR.setMinFreqHz(hz);
+    resynL.setMinFreqHz(hz);
+    resynR.setMinFreqHz(hz);
+}
+
 void PhantomEngine::setH1Amplitude(float amp)
 {
     // H1 only exists in WaveletSynth (RESYN mode) — ZCS never synthesises the fundamental
@@ -179,6 +187,12 @@ float PhantomEngine::getEstimatedHz() const noexcept
     return synthMode.load(std::memory_order_relaxed) == 1
         ? resynL.getEstimatedHz()
         : synthL.getEstimatedHz();
+}
+
+float PhantomEngine::getSynthInputPeak() const noexcept
+{
+    // Gate only exists in RESYN mode; return the RESYN synth's bass-band peak.
+    return resynL.getInputPeak();
 }
 
 // ── Processing ─────────────────────────────────────────────────────────────

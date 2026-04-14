@@ -53,6 +53,7 @@ private:
     juce::WebSliderRelay synthGateThresholdRelay    { "synth_gate_threshold" };
     juce::WebSliderRelay synthH1Relay               { "synth_h1" };
     juce::WebSliderRelay synthMaxTrackHzRelay       { "synth_max_track_hz" };
+    juce::WebSliderRelay synthMinFreqHzRelay        { "synth_min_freq_hz" };
     juce::WebSliderRelay trackingSpeedRelay         { "tracking_speed" };
     juce::WebSliderRelay punchAmountRelay           { "punch_amount" };
 

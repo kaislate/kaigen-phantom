@@ -69,6 +69,7 @@ public:
     /** Maximum frequency to track [200–20000 Hz]. Crossings faster than this are rejected.
      *  Low = only deep/bass content synthesised. High = full-range / vocal mode. */
     void setMaxTrackHz(float hz) noexcept;
+    void setMinFreqHz(float hz) noexcept;
 
     // ── Processing ───────────────────────────────────────────────────────────
     /** Process one sample of the raw bass-band signal.
@@ -94,6 +95,7 @@ private:
     float estimatedPeriod         = 441.0f; // default ~100 Hz
     float trackingAlpha           = 0.15f;
     float maxTrackHz              = 4000.0f;
+    float minFreqHz               = 8.0f;
     float minPeriodSamples        = 0.0f;   // set in prepare() — per individual crossing
     float maxPeriodSamples        = 0.0f;
 
@@ -114,8 +116,8 @@ private:
     std::array<float, 7> amps {};
 
     // ── Shape parameters (per-sample smoothed to prevent clicks) ─────────────
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothStep;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothDuty;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothStep { 0.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothDuty { 0.5f };
 
     // ── Waveform helpers ──────────────────────────────────────────────────────
     /** Standard PWM phase warp. Duty 0.5 = identity. */

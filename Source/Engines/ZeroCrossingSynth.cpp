@@ -12,13 +12,12 @@ void ZeroCrossingSynth::prepare(double sr) noexcept
 
     // Valid period range: 16 Hz (sub) to maxTrackHz
     minPeriodSamples = (float)(sr / (double)maxTrackHz);
-    maxPeriodSamples = (float)(sr / 16.0);
+    maxPeriodSamples = (float)(sr / (double)minFreqHz);
 
     const double rampSec = 0.010; // 10 ms parameter smoothing
+    // Preserve current/target values across repeated prepareToPlay() calls.
     smoothStep.reset(sr, rampSec);
     smoothDuty.reset(sr, rampSec);
-    smoothStep.setCurrentAndTargetValue(0.0f);
-    smoothDuty.setCurrentAndTargetValue(0.5f);
 
     reset();
 }
@@ -77,6 +76,12 @@ void ZeroCrossingSynth::setMaxTrackHz(float hz) noexcept
 {
     maxTrackHz       = juce::jlimit(200.0f, 20000.0f, hz);
     minPeriodSamples = (float)(sampleRate / (double)maxTrackHz);
+}
+
+void ZeroCrossingSynth::setMinFreqHz(float hz) noexcept
+{
+    minFreqHz        = juce::jlimit(8.0f, 200.0f, hz);
+    maxPeriodSamples = (float)(sampleRate / (double)minFreqHz);
 }
 
 float ZeroCrossingSynth::getEstimatedHz() const noexcept
@@ -141,6 +146,9 @@ float ZeroCrossingSynth::process(float x) noexcept
     inputPeak = (absX > inputPeak) ? absX : inputPeak * 0.9998f;
     // Per-wavelet peak: track max |x| within current crossing interval.
     if (absX > currentWaveletPeak) currentWaveletPeak = absX;
+    // Decay lastWaveletPeak alongside inputPeak so Punch doesn't hold a stale
+    // amplitude during silence and cause self-oscillation.
+    lastWaveletPeak *= 0.9998f;
 
     samplesSinceLastCrossing += 1.0f;
     accumulatedSamples       += 1.0f;
@@ -190,7 +198,10 @@ float ZeroCrossingSynth::process(float x) noexcept
     lastSample = x;
 
     // ── Phase advance ────────────────────────────────────────────────────
-    fundamentalPhase += kTwoPi / estimatedPeriod;
+    // Clamp period to valid range before dividing — prevents NaN/inf if the
+    // EMA somehow drifts out of bounds (e.g., first block before any crossings).
+    const float safePeriod = juce::jlimit(minPeriodSamples, maxPeriodSamples, estimatedPeriod);
+    fundamentalPhase += kTwoPi / safePeriod;
     if (fundamentalPhase >= kTwoPi)
         fundamentalPhase -= kTwoPi;
 

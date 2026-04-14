@@ -63,6 +63,10 @@ namespace ParamID
      *  200–20000 Hz. Default 4000 Hz. Low = bass-only. High = vocal/full-range. */
     inline constexpr auto SYNTH_MAX_TRACK_HZ = "synth_max_track_hz";
 
+    /** Minimum frequency to track. Crossings slower than this are rejected.
+     *  8–200 Hz. Default 8 Hz. Replaces hardcoded 16Hz floor. */
+    inline constexpr auto SYNTH_MIN_FREQ_HZ = "synth_min_freq_hz";
+
     // ── Pitch tracking ────────────────────────────────────────────────────
     /** Period-tracking EMA speed. 0.1–80 stored; ÷100 in processor → alpha 0.001–0.800.
      *  Low = stable/glide. High = fast/responsive. Default 15 → alpha 0.15. */
@@ -119,6 +123,7 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::SYNTH_GATE_THRESHOLD,
         ParamID::SYNTH_H1,
         ParamID::SYNTH_MAX_TRACK_HZ,
+        ParamID::SYNTH_MIN_FREQ_HZ,
         ParamID::TRACKING_SPEED,
         ParamID::PUNCH_ENABLED,
         ParamID::PUNCH_AMOUNT,
@@ -234,6 +239,11 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     params.push_back(std::make_unique<APF>(
         ParamID::SYNTH_MAX_TRACK_HZ, "Max Track",
         NormalisableRange<float>(200.0f, 20000.0f, 0.0f, 0.25f), 4000.0f,
+        AudioParameterFloatAttributes().withLabel("Hz")));
+
+    params.push_back(std::make_unique<APF>(
+        ParamID::SYNTH_MIN_FREQ_HZ, "Min Track",
+        NormalisableRange<float>(8.0f, 200.0f, 0.0f, 0.25f), 8.0f,
         AudioParameterFloatAttributes().withLabel("Hz")));
 
     // ── Pitch tracking ────────────────────────────────────────────────

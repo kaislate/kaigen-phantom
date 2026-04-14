@@ -32,6 +32,7 @@ public:
     /** Maximum frequency to track [200–20000 Hz]. Crossings faster than this are rejected.
      *  Low = only deep/bass content synthesised. High = full-range / vocal mode. */
     void setMaxTrackHz(float hz) noexcept;
+    void setMinFreqHz(float hz) noexcept;
     /** H1 amplitude [0–1]. Controls fundamental reconstruction in RESYN mode. Default 1.0. */
     void setH1Amplitude(float amp) noexcept;
 
@@ -40,6 +41,9 @@ public:
     /** Per-wavelet peak: amplitude of the last completed wavelet cycle. Updated at every
      *  valid crossing. Used by PhantomEngine Punch feature to blend envelope vs peak scaling. */
     float getWaveletPeak() const noexcept { return lastWaveletPeak; }
+    /** Running peak of the bass-band input signal. Used by the UI to position gate threshold
+     *  lines accurately relative to the actual signal the gate is operating on. */
+    float getInputPeak() const noexcept { return inputPeak; }
 
 private:
     double sampleRate = 44100.0;
@@ -52,6 +56,7 @@ private:
     float estimatedPeriod          = 441.0f;
     float trackingAlpha            = 0.15f;
     float maxTrackHz               = 4000.0f;
+    float minFreqHz                = 8.0f;
     float minPeriodSamples         = 0.0f;
     float maxPeriodSamples         = 0.0f;
     float h1Amp                    = 1.0f;
@@ -65,11 +70,13 @@ private:
 
     std::array<float, 7> amps {};   // H2..H8 amplitudes
 
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothStep;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothDuty;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothLength;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothGate;
-    float lastNegativePeak = 0.0f;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothStep   { 0.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothDuty   { 0.5f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothLength { 1.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothGate   { 0.0f };
+    // Miya-style amplitude gate: gain applied to each wavelet based on its peak
+    // amplitude vs threshold. Soft knee (k=0.75) for smooth transitions.
+    float lastGateGain = 1.0f;
 
     // Fast-attack / slow-release amplitude envelope.
     // Freezes period updates when input is too quiet to give reliable pitch info
