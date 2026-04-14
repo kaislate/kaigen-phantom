@@ -21,6 +21,12 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
+    bool keyPressed(const juce::KeyPress&) override { return false; }
+    bool keyStateChanged(bool) override { return false; }
+#if JUCE_WINDOWS
+    void parentHierarchyChanged() override;
+#endif
+
 private:
     std::optional<juce::WebBrowserComponent::Resource> getResource(const juce::String& url);
     static juce::WebBrowserComponent::Options buildWebViewOptions(PhantomEditor&);
@@ -52,8 +58,9 @@ private:
     juce::WebSliderRelay synthWaveletLengthRelay    { "synth_wavelet_length" };
     juce::WebSliderRelay synthGateThresholdRelay    { "synth_gate_threshold" };
     juce::WebSliderRelay synthH1Relay               { "synth_h1" };
-    juce::WebSliderRelay synthMaxTrackHzRelay       { "synth_max_track_hz" };
-    juce::WebSliderRelay synthMinFreqHzRelay        { "synth_min_freq_hz" };
+    juce::WebSliderRelay synthSubRelay              { "synth_sub" };
+    juce::WebSliderRelay synthMinSamplesRelay        { "synth_min_samples" };
+    juce::WebSliderRelay synthMaxSamplesRelay        { "synth_max_samples" };
     juce::WebSliderRelay trackingSpeedRelay         { "tracking_speed" };
     juce::WebSliderRelay punchAmountRelay           { "punch_amount" };
     juce::WebSliderRelay synthBoostThresholdRelay   { "synth_boost_threshold" };

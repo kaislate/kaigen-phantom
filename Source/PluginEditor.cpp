@@ -3,6 +3,8 @@
 
 #if JUCE_WINDOWS
 #include <windows.h>
+#include <commctrl.h>
+#pragma comment(lib, "comctl32.lib")
 #endif
 
 static const char* getMimeForExtension(const juce::String& extension)
@@ -19,6 +21,53 @@ static const char* getMimeForExtension(const juce::String& extension)
         return it->second;
     return "application/octet-stream";
 }
+
+#if JUCE_WINDOWS
+namespace {
+
+constexpr UINT_PTR kFocusRedirectId = 0x4B4750; // 'KGP'
+
+LRESULT CALLBACK webViewFocusSubclass(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
+                                       UINT_PTR id, DWORD_PTR)
+{
+    if (msg == WM_SETFOCUS)
+    {
+        // Redirect focus to the parent HWND so the DAW keeps keyboard MIDI
+        if (HWND parent = GetParent(hwnd))
+            SetFocus(parent);
+        return 0;
+    }
+    if (msg == WM_NCDESTROY)
+        RemoveWindowSubclass(hwnd, webViewFocusSubclass, id);
+    return DefSubclassProc(hwnd, msg, wParam, lParam);
+}
+
+BOOL CALLBACK installOnChromeWindows(HWND hwnd, LPARAM)
+{
+    wchar_t cls[256] = {};
+    GetClassNameW(hwnd, cls, 255);
+    if (wcsncmp(cls, L"Chrome_WidgetWin", 16) == 0)
+        SetWindowSubclass(hwnd, webViewFocusSubclass, kFocusRedirectId, 0);
+    EnumChildWindows(hwnd, installOnChromeWindows, 0);
+    return TRUE;
+}
+
+} // namespace
+
+void PhantomEditor::parentHierarchyChanged()
+{
+    // WebView2 creates its Chrome_WidgetWin HWNDs asynchronously, so we retry
+    // at increasing intervals until they exist.
+    auto tryInstall = [this]()
+    {
+        if (auto* peer = getPeer())
+            installOnChromeWindows((HWND) peer->getNativeHandle(), 0);
+    };
+
+    for (int delayMs : { 50, 200, 500, 1000, 2000 })
+        juce::Timer::callAfterDelay(delayMs, tryInstall);
+}
+#endif
 
 juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEditor& self)
 {
@@ -46,7 +95,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         &self.binauralWidthRelay, &self.stereoWidthRelay,
         &self.synthLPFRelay, &self.synthHPFRelay,
         &self.synthWaveletLengthRelay, &self.synthGateThresholdRelay,
-        &self.synthH1Relay, &self.synthMaxTrackHzRelay, &self.synthMinFreqHzRelay, &self.trackingSpeedRelay,
+        &self.synthH1Relay, &self.synthSubRelay, &self.synthMinSamplesRelay, &self.synthMaxSamplesRelay, &self.trackingSpeedRelay,
         &self.punchAmountRelay,
         &self.synthBoostThresholdRelay, &self.synthBoostAmountRelay
     };
@@ -145,7 +194,8 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
       processor(p),
       webView(buildWebViewOptions(*this))
 {
-    setSize(1400, 820);
+    setWantsKeyboardFocus(false);
+    setSize(1600, 820);
     addAndMakeVisible(webView);
 
     juce::MessageManager::callAsync([this]()
@@ -180,8 +230,9 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         { ParamID::SYNTH_WAVELET_LENGTH,    synthWaveletLengthRelay },
         { ParamID::SYNTH_GATE_THRESHOLD,    synthGateThresholdRelay },
         { ParamID::SYNTH_H1,                synthH1Relay },
-        { ParamID::SYNTH_MAX_TRACK_HZ,      synthMaxTrackHzRelay },
-        { ParamID::SYNTH_MIN_FREQ_HZ,      synthMinFreqHzRelay },
+        { ParamID::SYNTH_SUB,               synthSubRelay },
+        { ParamID::SYNTH_MIN_SAMPLES,       synthMinSamplesRelay },
+        { ParamID::SYNTH_MAX_SAMPLES,       synthMaxSamplesRelay },
         { ParamID::TRACKING_SPEED,          trackingSpeedRelay },
         { ParamID::PUNCH_AMOUNT,            punchAmountRelay },
         { ParamID::SYNTH_BOOST_THRESHOLD,   synthBoostThresholdRelay },
