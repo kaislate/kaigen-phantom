@@ -47,7 +47,8 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         &self.synthLPFRelay, &self.synthHPFRelay,
         &self.synthWaveletLengthRelay, &self.synthGateThresholdRelay,
         &self.synthH1Relay, &self.synthMaxTrackHzRelay, &self.synthMinFreqHzRelay, &self.trackingSpeedRelay,
-        &self.punchAmountRelay
+        &self.punchAmountRelay,
+        &self.synthBoostThresholdRelay, &self.synthBoostAmountRelay
     };
     for (auto* r : sliderRelays)
         options = options.withOptionsFrom(*r);
@@ -183,6 +184,8 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         { ParamID::SYNTH_MIN_FREQ_HZ,      synthMinFreqHzRelay },
         { ParamID::TRACKING_SPEED,          trackingSpeedRelay },
         { ParamID::PUNCH_AMOUNT,            punchAmountRelay },
+        { ParamID::SYNTH_BOOST_THRESHOLD,   synthBoostThresholdRelay },
+        { ParamID::SYNTH_BOOST_AMOUNT,      synthBoostAmountRelay },
     };
     for (auto& b : sliderBindings)
         sliderAttachments.push_back(std::make_unique<juce::WebSliderParameterAttachment>(

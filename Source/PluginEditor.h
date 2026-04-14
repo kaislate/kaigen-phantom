@@ -56,6 +56,8 @@ private:
     juce::WebSliderRelay synthMinFreqHzRelay        { "synth_min_freq_hz" };
     juce::WebSliderRelay trackingSpeedRelay         { "tracking_speed" };
     juce::WebSliderRelay punchAmountRelay           { "punch_amount" };
+    juce::WebSliderRelay synthBoostThresholdRelay   { "synth_boost_threshold" };
+    juce::WebSliderRelay synthBoostAmountRelay      { "synth_boost_amount" };
 
     // ── Combo-box relays ──────────────────────────────────────────────
     juce::WebComboBoxRelay modeRelay             { "mode" };

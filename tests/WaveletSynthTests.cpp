@@ -349,3 +349,66 @@ TEST_CASE("WaveletSynth: sub-sample interpolation improves pitch accuracy")
     // (Without interpolation the margin needed to be 5 Hz.)
     REQUIRE(syn.getEstimatedHz() == Catch::Approx(100.0f).margin(1.0f));
 }
+
+TEST_CASE("WaveletSynth: boost increases output RMS when wavelet peak exceeds threshold")
+{
+    auto measureRMS = [](float boostThr, float boostAmt) -> float {
+        WaveletSynth syn;
+        syn.prepare(kSR);
+        syn.setTrackingSpeed(0.25f);
+        syn.setBoostThreshold(boostThr);
+        syn.setBoostAmount(boostAmt);
+
+        // Warm up
+        feedSine(syn, 200.0f, (int)(0.5 * kSR));
+
+        // Measure
+        float sum = 0.0f;
+        const int N = (int)(0.5 * kSR);
+        const float w = 2.0f * juce::MathConstants<float>::pi * 200.0f / (float)kSR;
+        for (int i = 0; i < N; ++i)
+        {
+            const float y = syn.process(std::sin(w * (float)(i + (int)(0.5 * kSR))));
+            sum += y * y;
+        }
+        return std::sqrt(sum / (float)N);
+    };
+
+    const float rmsNoBoost = measureRMS(0.0f, 0.0f);   // boost off
+    const float rmsBoosted = measureRMS(0.3f, 1.0f);    // threshold 30%, boost 100% (+1x)
+
+    // Wavelet peak is ~1.0 (full sine), well above 30% threshold.
+    // Boost gain = 1.0 + 1.0 = 2.0 -> output should be ~2x louder.
+    REQUIRE(rmsBoosted > rmsNoBoost * 1.5f);
+}
+
+TEST_CASE("WaveletSynth: boost with threshold=0 (off) produces no extra gain")
+{
+    // When boost threshold is 0 (default), boost should never fire regardless
+    // of input level — lastBoostGain stays at 1.0.
+    auto measureRMS = [](float boostThr, float boostAmt) -> float {
+        WaveletSynth syn;
+        syn.prepare(kSR);
+        syn.setTrackingSpeed(0.25f);
+        syn.setBoostThreshold(boostThr);
+        syn.setBoostAmount(boostAmt);
+
+        feedSine(syn, 200.0f, (int)(0.5 * kSR));
+
+        float sum = 0.0f;
+        const int N = (int)(0.5 * kSR);
+        const float w = 2.0f * juce::MathConstants<float>::pi * 200.0f / (float)kSR;
+        for (int i = 0; i < N; ++i)
+        {
+            const float y = syn.process(std::sin(w * (float)(i + (int)(0.5 * kSR))));
+            sum += y * y;
+        }
+        return std::sqrt(sum / (float)N);
+    };
+
+    const float rmsOff  = measureRMS(0.0f, 1.0f);   // threshold=0 → boost disabled
+    const float rmsNone = measureRMS(0.0f, 0.0f);   // both off
+
+    // With threshold=0 the boost should never fire, so output is identical
+    REQUIRE(rmsOff == Catch::Approx(rmsNone).margin(0.01f));
+}

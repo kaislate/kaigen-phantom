@@ -77,6 +77,11 @@ namespace ParamID
     inline constexpr auto PUNCH_ENABLED = "punch_enabled";
     /** Blend amount 0–100%: 0 = pure envelope, 100 = pure wavelet peak. */
     inline constexpr auto PUNCH_AMOUNT  = "punch_amount";
+
+    /** Upward expansion threshold: wavelets above this level get boosted. 0–100%. Default 0 (off). */
+    inline constexpr auto SYNTH_BOOST_THRESHOLD = "synth_boost_threshold";
+    /** Upward expansion amount: additional gain for wavelets above threshold. 0–200%. Default 0. */
+    inline constexpr auto SYNTH_BOOST_AMOUNT    = "synth_boost_amount";
 }
 
 // ─── Preset amplitude tables — Chebyshev polynomial weights ────────────
@@ -127,6 +132,8 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::TRACKING_SPEED,
         ParamID::PUNCH_ENABLED,
         ParamID::PUNCH_AMOUNT,
+        ParamID::SYNTH_BOOST_THRESHOLD,
+        ParamID::SYNTH_BOOST_AMOUNT,
     };
 }
 
@@ -260,6 +267,14 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     params.push_back(std::make_unique<APF>(
         ParamID::PUNCH_AMOUNT, "Punch Amount",
         NormalisableRange<float>(0.0f, 100.0f), 100.0f,
+        AudioParameterFloatAttributes().withLabel("%")));
+    params.push_back(std::make_unique<APF>(
+        ParamID::SYNTH_BOOST_THRESHOLD, "Boost Threshold",
+        NormalisableRange<float>(0.0f, 100.0f), 0.0f,
+        AudioParameterFloatAttributes().withLabel("%")));
+    params.push_back(std::make_unique<APF>(
+        ParamID::SYNTH_BOOST_AMOUNT, "Boost Amount",
+        NormalisableRange<float>(0.0f, 200.0f), 0.0f,
         AudioParameterFloatAttributes().withLabel("%")));
 
     // ── Binaural ──────────────────────────────────────────────────────

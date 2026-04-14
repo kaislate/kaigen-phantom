@@ -55,6 +55,8 @@ public:
     void setH1Amplitude(float amp);        // RESYN only: H1 level [0–1]
     void setUsePunch(bool on);             // enable per-wavelet peak amplitude modulation
     void setPunchAmount(float amount);     // [0–1]: 0 = pure envelope, 1 = pure wavelet peak
+    void setBoostThreshold(float thr);     // RESYN only: upward expansion threshold [0–1]
+    void setBoostAmount(float amt);        // RESYN only: upward expansion gain [0–2]
 
     /** Current tracked pitch in Hz (from the active engine's zero-crossing tracker).
      *  Returns 0 when the input is too quiet to give reliable pitch info. */

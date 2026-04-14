@@ -23,6 +23,8 @@ void WaveletSynth::prepare(double sr) noexcept
     smoothDuty  .reset(sr, rampSec);
     smoothLength.reset(sr, rampSec);
     smoothGate  .reset(sr, rampSec);
+    smoothBoostThr.reset(sr, rampSec);
+    smoothBoostAmt.reset(sr, rampSec);
 
     reset();
 }
@@ -39,6 +41,7 @@ void WaveletSynth::reset() noexcept
     currentWaveletPeak       = 0.0f;
     lastWaveletPeak          = 0.0f;
     lastGateGain             = 1.0f;
+    lastBoostGain            = 1.0f;
 }
 
 // ── Parameter setters ──────────────────────────────────────────────────────
@@ -89,6 +92,16 @@ void WaveletSynth::setMinFreqHz(float hz) noexcept
 void WaveletSynth::setH1Amplitude(float amp) noexcept
 {
     h1Amp = juce::jlimit(0.0f, 1.0f, amp);
+}
+
+void WaveletSynth::setBoostThreshold(float thr) noexcept
+{
+    smoothBoostThr.setTargetValue(juce::jlimit(0.0f, 1.0f, thr));
+}
+
+void WaveletSynth::setBoostAmount(float amt) noexcept
+{
+    smoothBoostAmt.setTargetValue(juce::jlimit(0.0f, 2.0f, amt));
 }
 
 void WaveletSynth::setSkipCount(int n) noexcept
@@ -179,6 +192,8 @@ float WaveletSynth::process(float x) noexcept
 
     // Advance gate smoother every sample (must not skip for correct ramp behaviour).
     const float rawGateVal = smoothGate.getNextValue();
+    const float rawBoostThr = smoothBoostThr.getNextValue();
+    const float rawBoostAmt = smoothBoostAmt.getNextValue();
 
     samplesSinceLastCrossing += 1.0f;
     accumulatedSamples       += 1.0f;
@@ -256,6 +271,14 @@ float WaveletSynth::process(float x) noexcept
                         lastGateGain = (lastWaveletPeak - lowerBound)
                                      / (threshold - lowerBound);
                 }
+
+                // ── Upward expansion (Miya-style Threshold & Boost) ─────────
+                // If the wavelet peak exceeds the threshold, boost the output.
+                // This emphasises transients and strong harmonics.
+                if (rawBoostThr <= 0.0f || lastWaveletPeak < rawBoostThr * inputPeak)
+                    lastBoostGain = 1.0f;
+                else
+                    lastBoostGain = 1.0f + rawBoostAmt;
             }
             samplesSinceLastCrossing = 0.0f;
         }
@@ -316,6 +339,7 @@ float WaveletSynth::process(float x) noexcept
 
     // ── Amplitude gate: scale wavelet by gate gain (Miya-style) ────────
     y *= lastGateGain;
+    y *= lastBoostGain;
 
     // ── Length gate: silence output after len×2π of each wavelet ────────
     if (len < 1.0f)

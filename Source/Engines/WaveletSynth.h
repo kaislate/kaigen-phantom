@@ -35,6 +35,10 @@ public:
     void setMinFreqHz(float hz) noexcept;
     /** H1 amplitude [0–1]. Controls fundamental reconstruction in RESYN mode. Default 1.0. */
     void setH1Amplitude(float amp) noexcept;
+    /** Upward expansion threshold [0–1]. Normalised to inputPeak. Default 0 (off). */
+    void setBoostThreshold(float thr) noexcept;
+    /** Upward expansion amount [0–2]. Additional gain multiplier. Default 0. */
+    void setBoostAmount(float amt) noexcept;
 
     float process(float x) noexcept;
     float getEstimatedHz() const noexcept;
@@ -77,6 +81,10 @@ private:
     // Miya-style amplitude gate: gain applied to each wavelet based on its peak
     // amplitude vs threshold. Soft knee (k=0.75) for smooth transitions.
     float lastGateGain = 1.0f;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothBoostThr { 0.0f };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothBoostAmt { 0.0f };
+    float lastBoostGain = 1.0f;
 
     // Fast-attack / slow-release amplitude envelope.
     // Freezes period updates when input is too quiet to give reliable pitch info
