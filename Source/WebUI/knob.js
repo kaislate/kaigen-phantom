@@ -245,7 +245,7 @@ class PhantomKnob extends HTMLElement {
       <!-- Label: dot-matrix amber, bottom of OLED -->
       <text x="${cx}" y="${labelY}" text-anchor="middle" dominant-baseline="central"
         font-family="'Courier New',monospace" font-size="${labelFontSize}" font-weight="400"
-        letter-spacing="1" fill="rgba(255,178,38,0.7)"
+        letter-spacing="1" fill="rgba(75,138,210,0.80)"
         style="text-transform:uppercase">${label.toUpperCase()}</text>`;
 
     const valEndDeg = ARC_START + ARC_SWEEP * this._value;
@@ -263,11 +263,13 @@ class PhantomKnob extends HTMLElement {
     svg.innerHTML = `
       <defs>
         <radialGradient id="vg-${sz}" cx="32%" cy="28%" r="72%" fx="32%" fy="28%">
-          <stop offset="0%"   stop-color="rgba(82,84,96,1)"/>
-          <stop offset="14%"  stop-color="rgba(48,50,62,1)"/>
-          <stop offset="38%"  stop-color="rgba(20,20,28,1)"/>
-          <stop offset="68%"  stop-color="rgba(8,8,14,1)"/>
-          <stop offset="100%" stop-color="rgba(2,2,6,1)"/>
+          <!-- Plastic ring matches bezel — bright top-left, shadowed bottom-right -->
+          <stop offset="0%"   stop-color="rgba(210,212,215,1)"/>
+          <stop offset="32%"  stop-color="rgba(218,220,222,1)"/>
+          <stop offset="50%"  stop-color="rgba(200,202,204,1)"/>
+          <stop offset="65%"  stop-color="rgba(178,180,182,1)"/>
+          <stop offset="80%"  stop-color="rgba(148,150,152,1)"/>
+          <stop offset="100%" stop-color="rgba(100,102,104,1)"/>
         </radialGradient>
         <filter id="glow-${sz}" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>

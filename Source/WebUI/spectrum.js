@@ -207,7 +207,7 @@ function drawSpectrum() {
             const xPos = Math.round(freqToX(xoverHz, w));
             const labelFontPx = Math.max(8, Math.round(h * 0.10));
             ctx.save();
-            ctx.strokeStyle = 'rgba(255,178,38,0.35)';
+            ctx.strokeStyle = 'rgba(80,142,215,0.38)';
             ctx.lineWidth   = 1;
             ctx.setLineDash([3, 4]);
             ctx.beginPath();
@@ -215,7 +215,7 @@ function drawSpectrum() {
             ctx.lineTo(xPos + 0.5, h);
             ctx.stroke();
             ctx.setLineDash([]);
-            ctx.fillStyle    = 'rgba(255,178,38,0.55)';
+            ctx.fillStyle    = 'rgba(80,142,215,0.60)';
             ctx.font         = labelFontPx + 'px monospace';
             ctx.textAlign    = 'left';
             ctx.textBaseline = 'top';

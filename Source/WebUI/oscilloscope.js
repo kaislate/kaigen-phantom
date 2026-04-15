@@ -39,7 +39,34 @@ const inBuf  = new Float32Array(OSC_BUF_SIZE);
 const synBuf = new Float32Array(OSC_BUF_SIZE);
 const outBuf = new Float32Array(OSC_BUF_SIZE);
 let inWrPos = 0, synWrPos = 0, outWrPos = 0;
+let sampleRate = 44100;
+let synthPeak = 1.0;   // running peak of the bass band (what the gate actually sees)
 let hasData = false;
+let autoScale = false;
+
+// ── Auto-scale button ────────────────────────────────────────────────────────
+const oscRow = canvas.parentElement;
+if (oscRow) {
+    const btn = document.createElement('button');
+    btn.id = 'osc-autoscale-btn';
+    btn.textContent = 'AUTO';
+    btn.title = 'Toggle auto-scale (normalise to signal peak)';
+    btn.style.cssText = [
+        'position:absolute', 'bottom:4px', 'right:4px',
+        'font:bold 8px monospace', 'padding:1px 4px', 'border-radius:2px',
+        'border:1px solid rgba(255,255,255,0.15)',
+        'background:rgba(0,0,0,0.55)', 'color:rgba(255,255,255,0.35)',
+        'cursor:pointer', 'z-index:2', 'line-height:1.4', 'user-select:none',
+    ].join(';');
+    btn.addEventListener('click', () => {
+        autoScale = !autoScale;
+        btn.style.color    = autoScale ? 'rgba(80,142,215,0.9)' : 'rgba(255,255,255,0.35)';
+        btn.style.border   = autoScale
+            ? '1px solid rgba(80,142,215,0.45)'
+            : '1px solid rgba(255,255,255,0.15)';
+    });
+    oscRow.appendChild(btn);
+}
 
 // ── Ring buffer → chronological linear array ────────────────────────────────
 // wrPos points to the slot that will be written next, so wrPos is the oldest.
@@ -61,9 +88,9 @@ function findTrigger(data) {
 }
 
 // ── Draw a single waveform layer ────────────────────────────────────────────
-function drawWave(ctx, data, trigStart, w, h, color, lineWidth, glow) {
+function drawWave(ctx, data, trigStart, w, h, color, lineWidth, glow, normScale) {
     const mid    = h * 0.5;
-    const scaleY = h * 0.38;
+    const scaleY = h * 0.38 * normScale;
 
     ctx.save();
     ctx.beginPath();
@@ -111,7 +138,26 @@ function draw() {
 
     if (!hasData) return;
 
-    // Gate threshold lines (RESYN mode only, Gate > 0)
+    const lin = {
+        in:  linearize(inBuf,  inWrPos),
+        syn: linearize(synBuf, synWrPos),
+        out: linearize(outBuf, outWrPos),
+    };
+    const trig = findTrigger(lin.in);
+
+    // ── Auto-scale: find peak across all visible channels ────────────────────
+    let normScale = 1.0;
+    if (autoScale) {
+        let peak = 1e-6;
+        for (let i = trig; i < trig + OSC_DISPLAY_SAMPLES && i < OSC_BUF_SIZE; i++) {
+            peak = Math.max(peak, Math.abs(lin.in[i]), Math.abs(lin.out[i]));
+        }
+        normScale = Math.min(1.0 / peak, 8.0); // cap at 8× to avoid noise blowup on silence
+    }
+
+    // ── Gate threshold lines (RESYN mode only, Gate > 0) ─────────────────────
+    // Gate is an absolute noise gate: wavelet peaks below the threshold are
+    // silenced.  Lines show the threshold as an absolute amplitude level.
     const gateState  = window.Juce?.getSliderState?.('synth_gate_threshold');
     const modeCombo  = window.Juce?.getComboBoxState?.('mode');
     const gateThr    = gateState  ? gateState.getNormalisedValue() : 0;
@@ -119,11 +165,11 @@ function draw() {
 
     if (isResyn && gateThr > 0) {
         const mid    = h * 0.5;
-        const scaleY = h * 0.38;
-        const lineAbove = Math.max(0, Math.min(h, mid - gateThr * scaleY));
-        const lineBelow = Math.max(0, Math.min(h, mid + gateThr * scaleY));
+        const rawScaleY = h * 0.38;  // absolute amplitude → pixel scale (no auto-scale)
+        const lineAbove = Math.max(0, Math.min(h, mid - gateThr * rawScaleY));
+        const lineBelow = Math.max(0, Math.min(h, mid + gateThr * rawScaleY));
         ctx.save();
-        ctx.strokeStyle = 'rgba(255,178,38,0.50)';
+        ctx.strokeStyle = 'rgba(80,142,215,0.50)';
         ctx.lineWidth   = 1;
         ctx.setLineDash([4, 4]);
         ctx.beginPath(); ctx.moveTo(0, lineAbove); ctx.lineTo(w, lineAbove); ctx.stroke();
@@ -132,20 +178,10 @@ function draw() {
         ctx.restore();
     }
 
-    const lin = {
-        in:  linearize(inBuf,  inWrPos),
-        syn: linearize(synBuf, synWrPos),
-        out: linearize(outBuf, outWrPos),
-    };
-    const trig = findTrigger(lin.in);
-
     // ── Zero-crossing markers ────────────────────────────────────────────────
-    // Draw vertical lines at each positive-slope zero crossing in the display window.
-    // Valid crossings (interval ≥ minPeriodSamples) are amber; too-fast ones are dim/dashed.
     {
-        const maxTrackState = window.Juce?.getSliderState?.('synth_max_track_hz');
-        const maxTrackHz    = maxTrackState ? maxTrackState.getScaledValue() : 4000;
-        const minPeriod     = 44100 / maxTrackHz; // ~samples per cycle at max track frequency
+        const minSamplesState = window.Juce?.getSliderState?.('synth_min_samples');
+        const minPeriod       = minSamplesState ? minSamplesState.getScaledValue() : 11;
 
         let lastCross = -Infinity;
         for (let i = trig + 1; i < trig + OSC_DISPLAY_SAMPLES - 1; i++) {
@@ -157,7 +193,7 @@ function draw() {
 
                 ctx.save();
                 if (isValid) {
-                    ctx.strokeStyle = 'rgba(255,178,38,0.30)';
+                    ctx.strokeStyle = 'rgba(80,142,215,0.30)';
                     ctx.lineWidth   = 1;
                 } else {
                     ctx.strokeStyle = 'rgba(255,100,60,0.14)';
@@ -177,9 +213,9 @@ function draw() {
     }
 
     // Layer order: input (back), synth (mid), output (front)
-    drawWave(ctx, lin.in,  trig, w, h, 'rgba(160,160,175,0.28)', 1.0, false);
-    drawWave(ctx, lin.syn, trig, w, h, 'rgba(255,178,38,0.82)',  1.5, true);
-    drawWave(ctx, lin.out, trig, w, h, 'rgba(255,255,255,0.62)', 1.0, false);
+    drawWave(ctx, lin.in,  trig, w, h, 'rgba(160,160,175,0.28)', 1.0, false, normScale);
+    drawWave(ctx, lin.syn, trig, w, h, 'rgba(80,142,215,0.82)',  1.5, true,  normScale);
+    drawWave(ctx, lin.out, trig, w, h, 'rgba(255,255,255,0.62)', 1.0, false, normScale);
 
     // Legend
     const fs = Math.max(7, Math.round(h * 0.10));
@@ -187,7 +223,7 @@ function draw() {
     ctx.textBaseline = 'top';
     const gap = fs * 3.4;
     ctx.fillStyle = 'rgba(160,160,175,0.45)';  ctx.fillText('IN',    4,               3);
-    ctx.fillStyle = 'rgba(255,178,38,0.90)';   ctx.fillText('SYNTH', 4 + gap,         3);
+    ctx.fillStyle = 'rgba(80,142,215,0.90)';    ctx.fillText('SYNTH', 4 + gap,         3);
     ctx.fillStyle = 'rgba(255,255,255,0.62)';  ctx.fillText('OUT',   4 + gap * 2.65,  3);
 }
 
@@ -203,9 +239,11 @@ document.addEventListener('osc-data', (e) => {
     if (d.output && d.output.length >= OSC_BUF_SIZE)
         for (let i = 0; i < OSC_BUF_SIZE; i++) outBuf[i] = +d.output[i] || 0;
 
-    if (typeof d.inputWrPos  === 'number') inWrPos  = d.inputWrPos;
-    if (typeof d.synthWrPos  === 'number') synWrPos = d.synthWrPos;
-    if (typeof d.outputWrPos === 'number') outWrPos = d.outputWrPos;
+    if (typeof d.inputWrPos  === 'number') inWrPos    = d.inputWrPos;
+    if (typeof d.synthWrPos  === 'number') synWrPos   = d.synthWrPos;
+    if (typeof d.outputWrPos === 'number') outWrPos   = d.outputWrPos;
+    if (typeof d.sampleRate  === 'number') sampleRate = d.sampleRate;
+    if (typeof d.synthPeak   === 'number' && d.synthPeak > 0) synthPeak = d.synthPeak;
 
     hasData = true;
 });

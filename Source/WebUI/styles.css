@@ -99,9 +99,9 @@ body{
 }
 .hdr-btn:hover{color:rgba(0,0,0,0.55)}
 .hdr-btn.active{
-  color:rgba(160,100,20,0.85);
+  color:rgba(55,115,195,0.88);
   box-shadow:inset 1.5px 1.5px 4px rgba(0,0,0,0.14),inset -1.5px -1.5px 3px rgba(255,255,255,0.48),
-    0 0 5px rgba(200,130,30,0.25);
+    0 0 6px rgba(70,130,210,0.28);
 }
 
 /* Mode-inactive state for RESYN-only controls */
