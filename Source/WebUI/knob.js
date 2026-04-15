@@ -46,11 +46,18 @@ function buildWaveformPoints(step, cx, cy, oledR) {
   const pts = [];
   for (let i = 0; i <= nPts; i++) {
     const t = (i / nPts) * TAU;
-    const wp = warpPhase(t, 0.5);   // duty fixed: Push affects harmonic balance, not visual shape
+    const wp = warpPhase(t, 0.5);
     const y = shapedWave(wp, step);
     pts.push(`${(xL + (i / nPts) * (xR - xL)).toFixed(1)},${(yMid - y * yAmp).toFixed(1)}`);
   }
   return pts.join(' ');
+}
+
+// ── Size tier lookup ─────────────────────────────────────────────────────────
+function getSizeTier(attr) {
+  if (attr === 'large')  return { sz: 114, inset: 14 };
+  if (attr === 'small')  return { sz: 40,  inset: 6  };
+  return                        { sz: 88,  inset: 11 };  // 'medium' and default
 }
 
 const TEMPLATE = document.createElement('template');
@@ -58,27 +65,17 @@ TEMPLATE.innerHTML = `
 <style>
 :host {
   display: inline-block;
-  filter: drop-shadow(-5px -5px 12px rgba(255,255,255,0.03)) drop-shadow(6px 6px 16px rgba(0,0,0,0.75));
+  /* Light plastic: bright highlight top-left, grounded shadow bottom-right */
+  filter: drop-shadow(-3px -4px 8px rgba(255,255,255,0.52)) drop-shadow(4px 5px 11px rgba(0,0,0,0.38));
   cursor: ns-resize;
   user-select: none;
   -webkit-user-select: none;
 }
-:host([size="large"]) { width: 100px; height: 100px; }
-:host([size="medium"]) { width: 72px; height: 72px; }
-:host([size="small"]) { width: 38px; height: 38px; }
+:host([size="large"])  { width: 114px; height: 114px; }
+:host([size="medium"]) { width: 88px;  height: 88px;  }
+:host([size="small"])  { width: 40px;  height: 40px;  }
 svg { display: block; width: 100%; height: 100%; }
-.label-below {
-  text-align: center;
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 5px;
-  font-weight: 500;
-  letter-spacing: 2px;
-  color: rgba(255,255,255,0.45);
-  text-transform: uppercase;
-  white-space: nowrap;
-  margin-top: 2px;
-  pointer-events: none;
-}
+.label-below { display: none; }
 </style>
 <svg></svg>
 <div class="label-below"></div>
@@ -100,7 +97,6 @@ class PhantomKnob extends HTMLElement {
     this._dragging = false;
     this._lastY = 0;
 
-    // Bind handlers
     this._onPointerDown = this._onPointerDown.bind(this);
     this._onPointerMove = this._onPointerMove.bind(this);
     this._onPointerUp = this._onPointerUp.bind(this);
@@ -108,15 +104,11 @@ class PhantomKnob extends HTMLElement {
   }
 
   connectedCallback() {
-    // Initialize value from default-value if not explicitly set
     if (!this.hasAttribute('value')) {
       const def = parseFloat(this.getAttribute('default-value')) || 0;
       this._value = Math.max(0, Math.min(1, def));
     }
-
-    this._labelEl.textContent = this.getAttribute('label') || '';
     this._render();
-
     this.addEventListener('pointerdown', this._onPointerDown);
     this.addEventListener('dblclick', this._onDblClick);
   }
@@ -138,16 +130,12 @@ class PhantomKnob extends HTMLElement {
         this._displayValue = val || '';
         this._render();
         break;
-      case 'label':
-        if (this._labelEl) this._labelEl.textContent = val || '';
-        break;
       case 'size':
         this._render();
         break;
     }
   }
 
-  // --- Public API ---
   get value() { return this._value; }
   set value(v) {
     this._value = Math.max(0, Math.min(1, parseFloat(v) || 0));
@@ -162,7 +150,6 @@ class PhantomKnob extends HTMLElement {
 
   get name() { return this.dataset.param; }
 
-  // --- Interaction ---
   _onPointerDown(e) {
     if (e.button !== 0) return;
     this._dragging = true;
@@ -207,67 +194,68 @@ class PhantomKnob extends HTMLElement {
     }));
   }
 
-  // --- Render ---
   _render() {
-    const isLarge = this.getAttribute('size') !== 'medium';
-    const sz = isLarge ? 100 : 72;
-    const inset = isLarge ? 13 : 9;
+    const sizeAttr = this.getAttribute('size') || 'medium';
+    const { sz, inset } = getSizeTier(sizeAttr);
+    const isLarge = sizeAttr === 'large';
     const cx = sz / 2;
     const cy = sz / 2;
     const volcanoR = sz / 2;
     const oledR = volcanoR - inset;
     const arcR = oledR - 4;
-    const fontSize = isLarge ? 12 : 10;
+
+    // Value text: large inside OLED. Label: small at bottom of OLED in Silkscreen.
+    const valueFontSize = isLarge ? 17 : 12;
+    const labelFontSize = isLarge ? 7  : 6;
     const label = this.getAttribute('label') || '';
     const displayText = this._displayValue || this._value.toFixed(2);
 
-    // Note: data-oled="waveform" is designed for size="large" knobs only.
     const isWaveform = this.getAttribute('data-oled') === 'waveform';
-    const waveNumFontSize = 9;
+    const waveNumFontSize = isLarge ? 10 : 8;
+
+    // Value positioned slightly above OLED center; label sits near the bottom edge.
+    const valueY = cy - (isLarge ? 4 : 3);
+    const labelY = cy + oledR - (isLarge ? 9 : 8);
+
     const oledContent = isWaveform
       ? `
-      <!-- Waveform polyline -->
       <polyline points="${buildWaveformPoints(this._value, cx, cy, oledR)}"
         fill="none" stroke="#fff" stroke-opacity="0.85" stroke-width="1.5" stroke-linecap="round"/>
-      <!-- Number (triple glow stack) -->
-      <text x="${cx}" y="${cy + oledR * 0.55}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', monospace" font-weight="bold" font-size="${waveNumFontSize}"
+      <text x="${cx}" y="${cy + oledR * 0.5}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New',monospace" font-weight="700" font-size="${waveNumFontSize}"
         fill="#fff" opacity="0.3">${displayText}</text>
-      <text x="${cx}" y="${cy + oledR * 0.55}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', monospace" font-weight="bold" font-size="${waveNumFontSize}"
+      <text x="${cx}" y="${cy + oledR * 0.5}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New',monospace" font-weight="700" font-size="${waveNumFontSize}"
         fill="#fff" opacity="0.6">${displayText}</text>
-      <text x="${cx}" y="${cy + oledR * 0.55}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', monospace" font-weight="bold" font-size="${waveNumFontSize}"
+      <text x="${cx}" y="${cy + oledR * 0.5}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New',monospace" font-weight="700" font-size="${waveNumFontSize}"
         fill="#fff" opacity="1">${displayText}</text>`
       : `
       <!-- Value text (triple glow stack) -->
-      <text x="${cx}" y="${cy - 1}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', monospace" font-weight="bold" font-size="${fontSize}"
+      <text x="${cx}" y="${valueY}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New',monospace" font-weight="700" font-size="${valueFontSize}"
         fill="#fff" opacity="0.3">${displayText}</text>
-      <text x="${cx}" y="${cy - 1}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', monospace" font-weight="bold" font-size="${fontSize}"
+      <text x="${cx}" y="${valueY}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New',monospace" font-weight="700" font-size="${valueFontSize}"
         fill="#fff" opacity="0.6">${displayText}</text>
-      <text x="${cx}" y="${cy - 1}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New', monospace" font-weight="bold" font-size="${fontSize}"
+      <text x="${cx}" y="${valueY}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New',monospace" font-weight="700" font-size="${valueFontSize}"
         fill="#fff" opacity="1">${displayText}</text>
 
-      <!-- Label text -->
-      <text x="${cx}" y="${cy + fontSize / 2 + 5}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Space Grotesk', sans-serif" font-size="5" font-weight="500"
-        letter-spacing="2" fill="rgba(255,255,255,0.45)" text-transform="uppercase"
+      <!-- Label: dot-matrix amber, bottom of OLED -->
+      <text x="${cx}" y="${labelY}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New',monospace" font-size="${labelFontSize}" font-weight="400"
+        letter-spacing="1" fill="rgba(255,178,38,0.7)"
         style="text-transform:uppercase">${label.toUpperCase()}</text>`;
 
     const valEndDeg = ARC_START + ARC_SWEEP * this._value;
 
-    // Build SVG
     const svg = this._svg;
     svg.setAttribute('viewBox', `0 0 ${sz} ${sz}`);
     svg.setAttribute('width', sz);
     svg.setAttribute('height', sz);
 
-    // Full arc track path
     const trackPath = describeArc(cx, cy, arcR, ARC_START, ARC_END - 0.01);
-    // Value arc path (avoid zero-length path)
     const valPath = this._value > 0.001
       ? describeArc(cx, cy, arcR, ARC_START, valEndDeg)
       : '';
@@ -275,11 +263,11 @@ class PhantomKnob extends HTMLElement {
     svg.innerHTML = `
       <defs>
         <radialGradient id="vg-${sz}" cx="32%" cy="28%" r="72%" fx="32%" fy="28%">
-          <stop offset="0%" stop-color="rgba(255,255,255,0.13)"/>
-          <stop offset="12%" stop-color="rgba(255,255,255,0.06)"/>
-          <stop offset="30%" stop-color="rgba(255,255,255,0.025)"/>
-          <stop offset="65%" stop-color="rgba(6,6,14,0.5)"/>
-          <stop offset="100%" stop-color="rgba(0,0,0,0.6)"/>
+          <stop offset="0%"   stop-color="rgba(82,84,96,1)"/>
+          <stop offset="14%"  stop-color="rgba(48,50,62,1)"/>
+          <stop offset="38%"  stop-color="rgba(20,20,28,1)"/>
+          <stop offset="68%"  stop-color="rgba(8,8,14,1)"/>
+          <stop offset="100%" stop-color="rgba(2,2,6,1)"/>
         </radialGradient>
         <filter id="glow-${sz}" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
@@ -292,13 +280,13 @@ class PhantomKnob extends HTMLElement {
       <!-- OLED well -->
       <circle cx="${cx}" cy="${cy}" r="${oledR}" fill="#000"/>
 
-      <!-- Lip / ridge -->
+      <!-- Lip / ridge — inner bright ring, outer dark bevel, outer glow -->
       <circle cx="${cx}" cy="${cy}" r="${oledR}" fill="none"
-        stroke="rgba(255,255,255,0.16)" stroke-width="1.5"/>
+        stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
       <circle cx="${cx}" cy="${cy}" r="${oledR + 1.5}" fill="none"
-        stroke="rgba(0,0,0,0.7)" stroke-width="1.5"/>
+        stroke="rgba(0,0,0,0.80)" stroke-width="1.5"/>
       <circle cx="${cx}" cy="${cy}" r="${oledR + 3}" fill="none"
-        stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+        stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
 
       <!-- Arc track (full 270 deg) -->
       <path d="${trackPath}" fill="none"
