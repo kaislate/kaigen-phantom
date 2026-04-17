@@ -272,7 +272,7 @@ class PhantomKnob extends HTMLElement {
 
       <!-- Label: Kalam handwritten, icy white, bottom of OLED -->
       <text class="label-text" x="${cx}" y="${labelY}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Kalam', cursive" font-weight="400"
+        font-family="'Kalam', 'Segoe Script', cursive" font-weight="400"
         fill="#FFFFFF">${label.toLowerCase()}</text>`;
 
     const valEndDeg = ARC_START + ARC_SWEEP * this._value;
