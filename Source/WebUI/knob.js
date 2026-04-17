@@ -242,11 +242,10 @@ class PhantomKnob extends HTMLElement {
         font-family="'Courier New',monospace" font-weight="700" font-size="${valueFontSize}"
         fill="#fff" opacity="1">${displayText}</text>
 
-      <!-- Label: dot-matrix amber, bottom of OLED -->
+      <!-- Label: Kalam handwritten, icy white, bottom of OLED -->
       <text x="${cx}" y="${labelY}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New',monospace" font-size="${labelFontSize}" font-weight="400"
-        letter-spacing="1" fill="rgba(75,138,210,0.80)"
-        style="text-transform:uppercase">${label.toUpperCase()}</text>`;
+        font-family="'Kalam', cursive" font-size="${labelFontSize}" font-weight="400"
+        fill="#FFFFFF">${label.toLowerCase()}</text>`;
 
     const valEndDeg = ARC_START + ARC_SWEEP * this._value;
 
