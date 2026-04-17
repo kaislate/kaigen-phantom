@@ -65,6 +65,11 @@ TEMPLATE.innerHTML = `
 <style>
 :host {
   display: inline-block;
+  border-radius: 50%;
+  /* Icy halo — soft white radial glow behind the knob, blending into bezel */
+  box-shadow:
+    0 0 24px 6px rgba(255,255,255,0.22),
+    0 0 48px 14px rgba(255,255,255,0.10);
   cursor: ns-resize;
   user-select: none;
   -webkit-user-select: none;
