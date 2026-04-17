@@ -66,10 +66,11 @@ TEMPLATE.innerHTML = `
 :host {
   display: inline-block;
   border-radius: 50%;
-  /* Icy halo — soft white radial glow behind the knob, blending into bezel */
-  box-shadow:
-    0 0 24px 6px rgba(255,255,255,0.22),
-    0 0 48px 14px rgba(255,255,255,0.10);
+  /* Directional 3D lighting — long soft blur so the edges fade invisibly into bezel.
+     TL highlight reads as light on plastic; BR shadow reads as a soft cast shadow. */
+  filter:
+    drop-shadow(-3px -4px 18px rgba(255,255,255,0.28))
+    drop-shadow(3px 4px 20px rgba(0,0,0,0.16));
   cursor: ns-resize;
   user-select: none;
   -webkit-user-select: none;
@@ -289,11 +290,12 @@ class PhantomKnob extends HTMLElement {
 
     svg.innerHTML = `
       <defs>
-        <radialGradient id="vg-${sz}" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-          <!-- Inverted volcano: bright at OLED lip, fades to exact bezel color at outer edge -->
-          <stop offset="0%"   stop-color="rgba(220,222,225,1)"/>
-          <stop offset="70%"  stop-color="rgba(220,222,225,1)"/>
-          <stop offset="85%"  stop-color="rgba(198,200,203,1)"/>
+        <radialGradient id="vg-${sz}" cx="35%" cy="30%" r="72%" fx="35%" fy="30%">
+          <!-- Directional volcano: top-left lit, slope fades to bezel color at outer edge -->
+          <stop offset="0%"   stop-color="rgba(232,234,237,1)"/>
+          <stop offset="30%"  stop-color="rgba(218,220,223,1)"/>
+          <stop offset="60%"  stop-color="rgba(200,202,205,1)"/>
+          <stop offset="85%"  stop-color="rgba(184,186,188,1)"/>
           <stop offset="100%" stop-color="rgba(171,172,174,1)"/>
         </radialGradient>
         <filter id="glow-${sz}" x="-20%" y="-20%" width="140%" height="140%">
