@@ -283,20 +283,20 @@ class PhantomKnob extends HTMLElement {
 
       <!-- Lip / ridge — inner bright ring, outer dark bevel, outer glow -->
       <circle cx="${cx}" cy="${cy}" r="${oledR}" fill="none"
-        stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+        stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
       <circle cx="${cx}" cy="${cy}" r="${oledR + 1.5}" fill="none"
-        stroke="rgba(0,0,0,0.80)" stroke-width="1.5"/>
+        stroke="rgba(0,0,0,0.92)" stroke-width="1.5"/>
       <circle cx="${cx}" cy="${cy}" r="${oledR + 3}" fill="none"
         stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
 
       <!-- Arc track (full 270 deg) -->
       <path d="${trackPath}" fill="none"
-        stroke="rgba(255,255,255,0.07)" stroke-width="3.5" stroke-linecap="round"/>
+        stroke="rgba(255,255,255,0.06)" stroke-width="3.5" stroke-linecap="round"/>
 
       ${valPath ? `
       <!-- Arc glow -->
       <path d="${valPath}" fill="none"
-        stroke="rgba(255,255,255,0.3)" stroke-width="6" stroke-linecap="round"
+        stroke="rgba(255,255,255,0.45)" stroke-width="6" stroke-linecap="round"
         filter="url(#glow-${sz})"/>
 
       <!-- Arc value -->
