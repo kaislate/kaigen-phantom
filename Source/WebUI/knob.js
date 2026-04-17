@@ -120,7 +120,6 @@ class PhantomKnob extends HTMLElement {
     this._value = 0;
     this._displayValue = '';
     this._dragging = false;
-    this._isDragging = false;
     this._lastY = 0;
 
     this._onPointerDown = this._onPointerDown.bind(this);
@@ -179,7 +178,6 @@ class PhantomKnob extends HTMLElement {
   _onPointerDown(e) {
     if (e.button !== 0) return;
     this._dragging = true;
-    this._isDragging = true;
     this._updateDragState();
     this._lastY = e.clientY;
     this.setPointerCapture(e.pointerId);
@@ -206,7 +204,6 @@ class PhantomKnob extends HTMLElement {
 
   _onPointerUp(e) {
     this._dragging = false;
-    this._isDragging = false;
     this._updateDragState();
     document.body.style.pointerEvents = '';
     document.removeEventListener('pointermove', this._onPointerMove);
@@ -225,7 +222,7 @@ class PhantomKnob extends HTMLElement {
   }
 
   _updateDragState() {
-    if (this._svg) this._svg.setAttribute('data-dragging', this._isDragging ? 'true' : 'false');
+    if (this._svg) this._svg.setAttribute('data-dragging', this._dragging ? 'true' : 'false');
   }
 
   _render() {
