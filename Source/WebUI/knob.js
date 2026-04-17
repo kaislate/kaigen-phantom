@@ -55,9 +55,9 @@ function buildWaveformPoints(step, cx, cy, oledR) {
 
 // ── Size tier lookup ─────────────────────────────────────────────────────────
 function getSizeTier(attr) {
-  if (attr === 'large')  return { sz: 114, inset: 7 };
-  if (attr === 'small')  return { sz: 56,  inset: 4 };
-  return                        { sz: 88,  inset: 6 };  // 'medium' and default
+  if (attr === 'large')  return { sz: 114, inset: 6 };
+  if (attr === 'small')  return { sz: 56,  inset: 3 };
+  return                        { sz: 88,  inset: 5 };  // 'medium' and default
 }
 
 const TEMPLATE = document.createElement('template');
@@ -75,10 +75,15 @@ TEMPLATE.innerHTML = `
     rgba(0,0,0,0.02) 60%,
     rgba(0,0,0,0.07) 100%);
   box-shadow:
-    -3px -3px 14px rgba(255,255,255,0.62),
-    3px 4px 16px rgba(0,0,0,0.28),
-    inset -1.5px -1.5px 5px rgba(255,255,255,0.26),
-    inset 2px 2px 7px rgba(0,0,0,0.12);
+    /* Two-layer TL highlight: sharper inner defines direction, wider outer wraps around. */
+    -3px -3px 12px rgba(255,255,255,0.70),
+    -5px -6px 22px rgba(255,255,255,0.34),
+    /* Two-layer BR shadow: same pattern, wraps further around the knob. */
+    3px 4px 14px rgba(0,0,0,0.34),
+    5px 7px 24px rgba(0,0,0,0.16),
+    /* Inset bevel on the ridge itself. */
+    inset -1.5px -1.5px 5px rgba(255,255,255,0.28),
+    inset 2px 2px 7px rgba(0,0,0,0.14);
   cursor: ns-resize;
   user-select: none;
   -webkit-user-select: none;
