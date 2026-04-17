@@ -55,9 +55,9 @@ function buildWaveformPoints(step, cx, cy, oledR) {
 
 // ── Size tier lookup ─────────────────────────────────────────────────────────
 function getSizeTier(attr) {
-  if (attr === 'large')  return { sz: 114, inset: 14 };
-  if (attr === 'small')  return { sz: 56,  inset: 8  };
-  return                        { sz: 88,  inset: 11 };  // 'medium' and default
+  if (attr === 'large')  return { sz: 114, inset: 7 };
+  if (attr === 'small')  return { sz: 56,  inset: 4 };
+  return                        { sz: 88,  inset: 6 };  // 'medium' and default
 }
 
 const TEMPLATE = document.createElement('template');
