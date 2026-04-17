@@ -66,12 +66,8 @@ TEMPLATE.innerHTML = `
 :host {
   display: inline-block;
   border-radius: 50%;
-  /* Directional 3D lighting — very long soft blur + low opacity so nothing reads
-     as a circular line at the knob perimeter. Bezel acquires a subtle directional
-     tint rather than a visible outline. */
-  filter:
-    drop-shadow(-2px -3px 32px rgba(255,255,255,0.14))
-    drop-shadow(2px 3px 36px rgba(0,0,0,0.08));
+  /* All 3D shading comes from SVG feDiffuseLighting inside the knob itself.
+     No CSS drop-shadow — that was the source of the visible perimeter ring. */
   cursor: ns-resize;
   user-select: none;
   -webkit-user-select: none;
@@ -289,24 +285,35 @@ class PhantomKnob extends HTMLElement {
       ? describeArc(cx, cy, arcR, ARC_START, valEndDeg)
       : '';
 
+    const lightBlur = Math.max(2, (volcanoR / 4).toFixed(2));
+    const lightScale = Math.max(3, Math.round(volcanoR / 2));
+
     svg.innerHTML = `
       <defs>
-        <radialGradient id="vg-${sz}" cx="35%" cy="30%" r="75%" fx="35%" fy="30%">
-          <!-- Directional volcano: TL lit, slope ends just above bezel so the base
-               reads as a faint raised disc rather than a darker ring. -->
-          <stop offset="0%"   stop-color="rgba(235,237,239,1)"/>
-          <stop offset="35%"  stop-color="rgba(222,224,227,1)"/>
-          <stop offset="65%"  stop-color="rgba(205,207,210,1)"/>
-          <stop offset="90%"  stop-color="rgba(190,192,194,1)"/>
-          <stop offset="100%" stop-color="rgba(182,184,186,1)"/>
+        <radialGradient id="vg-${sz}" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+          <!-- Neutral base tone; directional shading is computed by the lit filter. -->
+          <stop offset="0%"   stop-color="rgba(224,226,228,1)"/>
+          <stop offset="85%"  stop-color="rgba(216,218,220,1)"/>
+          <stop offset="100%" stop-color="rgba(200,202,204,1)"/>
         </radialGradient>
         <filter id="glow-${sz}" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
         </filter>
+        <!-- Real diffuse-lighting pass: blur the source alpha to fake a dome
+             heightmap, light it with a distant source from the top-left, then
+             multiply the lit intensity into the gradient fill. Azimuth 135°,
+             elevation 50° ≈ light placed up-and-to-the-left of the surface. -->
+        <filter id="lit-${sz}" x="-5%" y="-5%" width="110%" height="110%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="${lightBlur}" result="heightmap"/>
+          <feDiffuseLighting in="heightmap" surfaceScale="${lightScale}" diffuseConstant="1.45" lighting-color="#ffffff" result="lit">
+            <feDistantLight azimuth="135" elevation="50"/>
+          </feDiffuseLighting>
+          <feComposite in="lit" in2="SourceGraphic" operator="arithmetic" k1="1" k2="0" k3="0" k4="0"/>
+        </filter>
       </defs>
 
-      <!-- Volcano surface -->
-      <circle cx="${cx}" cy="${cy}" r="${volcanoR}" fill="url(#vg-${sz})"/>
+      <!-- Volcano surface — lit by SVG diffuse-lighting filter -->
+      <circle cx="${cx}" cy="${cy}" r="${volcanoR}" fill="url(#vg-${sz})" filter="url(#lit-${sz})"/>
 
       <!-- OLED well -->
       <circle cx="${cx}" cy="${cy}" r="${oledR}" fill="#000"/>
