@@ -66,11 +66,12 @@ TEMPLATE.innerHTML = `
 :host {
   display: inline-block;
   border-radius: 50%;
-  /* Directional 3D lighting — long soft blur so the edges fade invisibly into bezel.
-     TL highlight reads as light on plastic; BR shadow reads as a soft cast shadow. */
+  /* Directional 3D lighting — very long soft blur + low opacity so nothing reads
+     as a circular line at the knob perimeter. Bezel acquires a subtle directional
+     tint rather than a visible outline. */
   filter:
-    drop-shadow(-3px -4px 18px rgba(255,255,255,0.28))
-    drop-shadow(3px 4px 20px rgba(0,0,0,0.16));
+    drop-shadow(-2px -3px 32px rgba(255,255,255,0.14))
+    drop-shadow(2px 3px 36px rgba(0,0,0,0.08));
   cursor: ns-resize;
   user-select: none;
   -webkit-user-select: none;
@@ -290,13 +291,14 @@ class PhantomKnob extends HTMLElement {
 
     svg.innerHTML = `
       <defs>
-        <radialGradient id="vg-${sz}" cx="35%" cy="30%" r="72%" fx="35%" fy="30%">
-          <!-- Directional volcano: top-left lit, slope fades to bezel color at outer edge -->
-          <stop offset="0%"   stop-color="rgba(232,234,237,1)"/>
-          <stop offset="30%"  stop-color="rgba(218,220,223,1)"/>
-          <stop offset="60%"  stop-color="rgba(200,202,205,1)"/>
-          <stop offset="85%"  stop-color="rgba(184,186,188,1)"/>
-          <stop offset="100%" stop-color="rgba(171,172,174,1)"/>
+        <radialGradient id="vg-${sz}" cx="35%" cy="30%" r="75%" fx="35%" fy="30%">
+          <!-- Directional volcano: TL lit, slope ends just above bezel so the base
+               reads as a faint raised disc rather than a darker ring. -->
+          <stop offset="0%"   stop-color="rgba(235,237,239,1)"/>
+          <stop offset="35%"  stop-color="rgba(222,224,227,1)"/>
+          <stop offset="65%"  stop-color="rgba(205,207,210,1)"/>
+          <stop offset="90%"  stop-color="rgba(190,192,194,1)"/>
+          <stop offset="100%" stop-color="rgba(182,184,186,1)"/>
         </radialGradient>
         <filter id="glow-${sz}" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
