@@ -285,8 +285,8 @@ class PhantomKnob extends HTMLElement {
       ? describeArc(cx, cy, arcR, ARC_START, valEndDeg)
       : '';
 
-    const lightBlur = Math.max(2, (volcanoR / 4).toFixed(2));
-    const lightScale = Math.max(3, Math.round(volcanoR / 2));
+    const lightBlur = Math.max(2, (volcanoR / 3).toFixed(2));
+    const lightScale = Math.max(3, Math.round(volcanoR / 3));
 
     svg.innerHTML = `
       <defs>
@@ -299,16 +299,18 @@ class PhantomKnob extends HTMLElement {
         <filter id="glow-${sz}" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
         </filter>
-        <!-- Real diffuse-lighting pass: blur the source alpha to fake a dome
-             heightmap, light it with a distant source from the top-left, then
-             multiply the lit intensity into the gradient fill. Azimuth 135°,
-             elevation 50° ≈ light placed up-and-to-the-left of the surface. -->
+        <!-- Real diffuse-lighting pass with heavy ambient bias so shading stays soft.
+             Azimuth 225° = top-left of the screen (SVG filter coords have Y pointing
+             down; TL is halfway between -X=180 and -Y=270). Elevation 55° is high
+             enough that the light wraps most of the dome rather than grazing.
+             The arithmetic composite adds 75% ambient (pure gradient) to 35% of the
+             lit×gradient product, so the dark side of the dome stays ~0.73× of base. -->
         <filter id="lit-${sz}" x="-5%" y="-5%" width="110%" height="110%">
           <feGaussianBlur in="SourceAlpha" stdDeviation="${lightBlur}" result="heightmap"/>
-          <feDiffuseLighting in="heightmap" surfaceScale="${lightScale}" diffuseConstant="1.45" lighting-color="#ffffff" result="lit">
-            <feDistantLight azimuth="135" elevation="50"/>
+          <feDiffuseLighting in="heightmap" surfaceScale="${lightScale}" diffuseConstant="0.9" lighting-color="#ffffff" result="lit">
+            <feDistantLight azimuth="225" elevation="55"/>
           </feDiffuseLighting>
-          <feComposite in="lit" in2="SourceGraphic" operator="arithmetic" k1="1" k2="0" k3="0" k4="0"/>
+          <feComposite in="lit" in2="SourceGraphic" operator="arithmetic" k1="0.35" k2="0" k3="0.75" k4="0"/>
         </filter>
       </defs>
 
