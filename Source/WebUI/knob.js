@@ -78,6 +78,28 @@ TEMPLATE.innerHTML = `
 :host([size="medium"]) { width: 88px;  height: 88px;  }
 :host([size="small"])  { width: 56px;  height: 56px;  }
 svg { display: block; width: 100%; height: 100%; }
+/* Transition font-size between rest and drag states */
+.value-text, .label-text { transition: font-size 150ms ease; }
+
+/* Rest sizes (default) */
+:host([size="small"])  .value-text,
+:host([size="small"])  .label-text { font-size: 9px; }
+:host([size="medium"]) .value-text,
+:host([size="medium"]) .label-text { font-size: 12px; }
+:host([size="large"])  .value-text,
+:host([size="large"])  .label-text { font-size: 14px; }
+:host(:not([size="small"]):not([size="medium"]):not([size="large"])) .value-text,
+:host(:not([size="small"]):not([size="medium"]):not([size="large"])) .label-text { font-size: 12px; }
+
+/* Drag sizes (when svg has data-dragging="true") */
+:host([size="small"])  svg[data-dragging="true"] .value-text { font-size: 13px; }
+:host([size="small"])  svg[data-dragging="true"] .label-text { font-size: 6px; }
+:host([size="medium"]) svg[data-dragging="true"] .value-text { font-size: 18px; }
+:host([size="medium"]) svg[data-dragging="true"] .label-text { font-size: 9px; }
+:host([size="large"])  svg[data-dragging="true"] .value-text { font-size: 22px; }
+:host([size="large"])  svg[data-dragging="true"] .label-text { font-size: 10px; }
+:host(:not([size="small"]):not([size="medium"]):not([size="large"])) svg[data-dragging="true"] .value-text { font-size: 18px; }
+:host(:not([size="small"]):not([size="medium"]):not([size="large"])) svg[data-dragging="true"] .label-text { font-size: 9px; }
 .label-below { display: none; }
 </style>
 <svg></svg>
@@ -98,6 +120,7 @@ class PhantomKnob extends HTMLElement {
     this._value = 0;
     this._displayValue = '';
     this._dragging = false;
+    this._isDragging = false;
     this._lastY = 0;
 
     this._onPointerDown = this._onPointerDown.bind(this);
@@ -156,6 +179,8 @@ class PhantomKnob extends HTMLElement {
   _onPointerDown(e) {
     if (e.button !== 0) return;
     this._dragging = true;
+    this._isDragging = true;
+    this._updateDragState();
     this._lastY = e.clientY;
     this.setPointerCapture(e.pointerId);
     document.body.style.pointerEvents = 'none';
@@ -181,6 +206,8 @@ class PhantomKnob extends HTMLElement {
 
   _onPointerUp(e) {
     this._dragging = false;
+    this._isDragging = false;
+    this._updateDragState();
     document.body.style.pointerEvents = '';
     document.removeEventListener('pointermove', this._onPointerMove);
     document.removeEventListener('pointerup', this._onPointerUp);
@@ -197,6 +224,10 @@ class PhantomKnob extends HTMLElement {
     }));
   }
 
+  _updateDragState() {
+    if (this._svg) this._svg.setAttribute('data-dragging', this._isDragging ? 'true' : 'false');
+  }
+
   _render() {
     const sizeAttr = this.getAttribute('size') || 'medium';
     const { sz, inset } = getSizeTier(sizeAttr);
@@ -208,13 +239,10 @@ class PhantomKnob extends HTMLElement {
     const arcR = oledR - 4;
 
     // Value text: large inside OLED. Label: small at bottom of OLED in Silkscreen.
-    const valueFontSize = isLarge ? 17 : 12;
-    const labelFontSize = isLarge ? 7  : 6;
     const label = this.getAttribute('label') || '';
     const displayText = this._displayValue || this._value.toFixed(2);
 
     const isWaveform = this.getAttribute('data-oled') === 'waveform';
-    const waveNumFontSize = isLarge ? 10 : 8;
 
     // Value positioned slightly above OLED center; label sits near the bottom edge.
     const valueY = cy - (isLarge ? 4 : 3);
@@ -224,30 +252,30 @@ class PhantomKnob extends HTMLElement {
       ? `
       <polyline points="${buildWaveformPoints(this._value, cx, cy, oledR)}"
         fill="none" stroke="#fff" stroke-opacity="0.85" stroke-width="1.5" stroke-linecap="round"/>
-      <text x="${cx}" y="${cy + oledR * 0.5}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New',monospace" font-weight="700" font-size="${waveNumFontSize}"
+      <text class="value-text" x="${cx}" y="${cy + oledR * 0.5}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New',monospace" font-weight="700"
         fill="#fff" opacity="0.3">${displayText}</text>
-      <text x="${cx}" y="${cy + oledR * 0.5}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New',monospace" font-weight="700" font-size="${waveNumFontSize}"
+      <text class="value-text" x="${cx}" y="${cy + oledR * 0.5}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New',monospace" font-weight="700"
         fill="#fff" opacity="0.6">${displayText}</text>
-      <text x="${cx}" y="${cy + oledR * 0.5}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New',monospace" font-weight="700" font-size="${waveNumFontSize}"
+      <text class="value-text" x="${cx}" y="${cy + oledR * 0.5}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New',monospace" font-weight="700"
         fill="#fff" opacity="1">${displayText}</text>`
       : `
       <!-- Value text (triple glow stack) -->
-      <text x="${cx}" y="${valueY}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New',monospace" font-weight="700" font-size="${valueFontSize}"
+      <text class="value-text" x="${cx}" y="${valueY}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New',monospace" font-weight="700"
         fill="#fff" opacity="0.3">${displayText}</text>
-      <text x="${cx}" y="${valueY}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New',monospace" font-weight="700" font-size="${valueFontSize}"
+      <text class="value-text" x="${cx}" y="${valueY}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New',monospace" font-weight="700"
         fill="#fff" opacity="0.6">${displayText}</text>
-      <text x="${cx}" y="${valueY}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New',monospace" font-weight="700" font-size="${valueFontSize}"
+      <text class="value-text" x="${cx}" y="${valueY}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Courier New',monospace" font-weight="700"
         fill="#fff" opacity="1">${displayText}</text>
 
       <!-- Label: Kalam handwritten, icy white, bottom of OLED -->
-      <text x="${cx}" y="${labelY}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Kalam', cursive" font-size="${labelFontSize}" font-weight="400"
+      <text class="label-text" x="${cx}" y="${labelY}" text-anchor="middle" dominant-baseline="central"
+        font-family="'Kalam', cursive" font-weight="400"
         fill="#FFFFFF">${label.toLowerCase()}</text>`;
 
     const valEndDeg = ARC_START + ARC_SWEEP * this._value;
