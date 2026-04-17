@@ -65,8 +65,6 @@ TEMPLATE.innerHTML = `
 <style>
 :host {
   display: inline-block;
-  /* Light plastic: bright highlight top-left, grounded shadow bottom-right */
-  filter: drop-shadow(-3px -4px 8px rgba(255,255,255,0.52)) drop-shadow(4px 5px 11px rgba(0,0,0,0.38));
   cursor: ns-resize;
   user-select: none;
   -webkit-user-select: none;
@@ -261,14 +259,12 @@ class PhantomKnob extends HTMLElement {
 
     svg.innerHTML = `
       <defs>
-        <radialGradient id="vg-${sz}" cx="32%" cy="28%" r="72%" fx="32%" fy="28%">
-          <!-- Plastic ring matches bezel — bright top-left, shadowed bottom-right -->
-          <stop offset="0%"   stop-color="rgba(210,212,215,1)"/>
-          <stop offset="32%"  stop-color="rgba(218,220,222,1)"/>
-          <stop offset="50%"  stop-color="rgba(200,202,204,1)"/>
-          <stop offset="65%"  stop-color="rgba(178,180,182,1)"/>
-          <stop offset="80%"  stop-color="rgba(148,150,152,1)"/>
-          <stop offset="100%" stop-color="rgba(100,102,104,1)"/>
+        <radialGradient id="vg-${sz}" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+          <!-- Inverted volcano: bright at OLED lip, fades to exact bezel color at outer edge -->
+          <stop offset="0%"   stop-color="rgba(220,222,225,1)"/>
+          <stop offset="70%"  stop-color="rgba(220,222,225,1)"/>
+          <stop offset="85%"  stop-color="rgba(198,200,203,1)"/>
+          <stop offset="100%" stop-color="rgba(171,172,174,1)"/>
         </radialGradient>
         <filter id="glow-${sz}" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
