@@ -56,7 +56,7 @@ function buildWaveformPoints(step, cx, cy, oledR) {
 // ── Size tier lookup ─────────────────────────────────────────────────────────
 function getSizeTier(attr) {
   if (attr === 'large')  return { sz: 114, inset: 14 };
-  if (attr === 'small')  return { sz: 40,  inset: 6  };
+  if (attr === 'small')  return { sz: 56,  inset: 8  };
   return                        { sz: 88,  inset: 11 };  // 'medium' and default
 }
 
@@ -76,7 +76,7 @@ TEMPLATE.innerHTML = `
 }
 :host([size="large"])  { width: 114px; height: 114px; }
 :host([size="medium"]) { width: 88px;  height: 88px;  }
-:host([size="small"])  { width: 40px;  height: 40px;  }
+:host([size="small"])  { width: 56px;  height: 56px;  }
 svg { display: block; width: 100%; height: 100%; }
 .label-below { display: none; }
 </style>
