@@ -75,10 +75,10 @@ TEMPLATE.innerHTML = `
     rgba(0,0,0,0.02) 60%,
     rgba(0,0,0,0.07) 100%);
   box-shadow:
-    -3px -3px 10px rgba(255,255,255,0.45),
-    3px 4px 12px rgba(0,0,0,0.18),
-    inset -1.5px -1.5px 5px rgba(255,255,255,0.20),
-    inset 2px 2px 6px rgba(0,0,0,0.08);
+    -3px -3px 14px rgba(255,255,255,0.62),
+    3px 4px 16px rgba(0,0,0,0.28),
+    inset -1.5px -1.5px 5px rgba(255,255,255,0.26),
+    inset 2px 2px 7px rgba(0,0,0,0.12);
   cursor: ns-resize;
   user-select: none;
   -webkit-user-select: none;
