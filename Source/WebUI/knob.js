@@ -74,23 +74,34 @@ TEMPLATE.innerHTML = `
     rgba(255,255,255,0.12) 22%,
     rgba(0,0,0,0.02) 60%,
     rgba(0,0,0,0.07) 100%);
+  /* Default (medium 88px): two-layer TL highlight + two-layer BR shadow.
+     Sharp inner layer defines direction; wider outer layer wraps around. */
   box-shadow:
-    /* Two-layer TL highlight: sharper inner defines direction, wider outer wraps around. */
     -3px -3px 12px rgba(255,255,255,0.70),
     -5px -6px 22px rgba(255,255,255,0.34),
-    /* Two-layer BR shadow: same pattern, wraps further around the knob. */
     3px 4px 14px rgba(0,0,0,0.34),
-    5px 7px 24px rgba(0,0,0,0.16),
-    /* Inset bevel on the ridge itself. */
-    inset -1.5px -1.5px 5px rgba(255,255,255,0.28),
-    inset 2px 2px 7px rgba(0,0,0,0.14);
+    5px 7px 24px rgba(0,0,0,0.16);
   cursor: ns-resize;
   user-select: none;
   -webkit-user-select: none;
 }
-:host([size="large"])  { width: 114px; height: 114px; }
-:host([size="medium"]) { width: 88px;  height: 88px;  }
-:host([size="small"])  { width: 56px;  height: 56px;  }
+:host([size="large"]) {
+  width: 114px; height: 114px;
+  box-shadow:
+    -4px -4px 16px rgba(255,255,255,0.70),
+    -7px -8px 30px rgba(255,255,255,0.36),
+    4px 5px 18px rgba(0,0,0,0.36),
+    7px 9px 32px rgba(0,0,0,0.18);
+}
+:host([size="medium"]) { width: 88px; height: 88px; }
+:host([size="small"]) {
+  width: 56px; height: 56px;
+  box-shadow:
+    -2px -2px 9px rgba(255,255,255,0.66),
+    -3px -4px 15px rgba(255,255,255,0.30),
+    2px 3px 10px rgba(0,0,0,0.30),
+    3px 5px 17px rgba(0,0,0,0.14);
+}
 svg { display: block; width: 100%; height: 100%; }
 /* Transition font-size between rest and drag states */
 .value-text, .label-text { transition: font-size 150ms ease; }
