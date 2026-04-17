@@ -206,42 +206,53 @@ phantom-knob.mode-inactive{
 .h-label[style*="--angle:5"]{top:55%;left:1%}
 .h-label[style*="--angle:6"]{top:18%;left:4%}
 
-/* Preset strip — 3×3 grid with vertical separators */
+/* Preset strip — 3×3 grid with etched separators */
 .preset-strip{
   margin-top:auto;z-index:2;width:100%;padding:12px 8px 10px;
 }
 .preset-grid{
   display:grid;
-  grid-template-columns:1fr 1px 1fr 1px 1fr;
+  grid-template-columns:1fr 2px 1fr 2px 1fr;
   grid-template-rows:auto auto auto;
   gap:14px 8px;
   align-items:center;
   justify-items:center;
   position:relative;z-index:2;
 }
+/* Etched vertical separator — dark line + bright highlight (same pair
+   as .el labels use: rgba(0,0,0,0.22) + white 0.50). */
 .preset-sep{
-  width:1px;height:14px;background:rgba(0,0,0,0.30);
-  align-self:center;
+  width:2px;height:14px;align-self:center;
+  background:linear-gradient(90deg,
+    rgba(0,0,0,0.22) 0%,
+    rgba(0,0,0,0.22) 50%,
+    rgba(255,255,255,0.55) 50%,
+    rgba(255,255,255,0.55) 100%);
 }
 .preset-blank{}
+/* Preset labels — matches .el section-label style (etched, Space Grotesk). */
 .lw{
-  font-family:'Courier New',monospace;
-  font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
-  color:rgba(0,0,0,0.42);cursor:pointer;position:relative;z-index:1;
+  font-size:10px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;
+  position:relative;z-index:2;
+  color:rgba(0,0,0,0.22);
+  text-shadow:0 1px 0 rgba(255,255,255,0.50);
+  cursor:pointer;
   transition:color 0.2s;
   padding-bottom:5px;
 }
 .lw::after{
   content:'';position:absolute;
   left:22%;right:22%;bottom:0;
-  height:1px;background:rgba(0,0,0,0.40);
+  height:1px;
+  background:rgba(0,0,0,0.22);
+  box-shadow:0 1px 0 rgba(255,255,255,0.50);
 }
 .lw.active{
-  color:rgba(0,0,0,0.82);
+  color:rgba(0,0,0,0.65);
   text-shadow:0 1px 0 rgba(255,255,255,0.70);
 }
 .lw.active::after{
-  background:rgba(0,0,0,0.72);height:1.5px;
+  background:rgba(0,0,0,0.45);
 }
 
 /* H2-H8 harmonic amplitude mini-knobs below preset strip */
