@@ -66,8 +66,19 @@ TEMPLATE.innerHTML = `
 :host {
   display: inline-block;
   border-radius: 50%;
-  /* All 3D shading comes from SVG feDiffuseLighting inside the knob itself.
-     No CSS drop-shadow — that was the source of the visible perimeter ring. */
+  /* Volcano face — same pattern as .wheel-mount in styles.css. Transparent
+     radial-gradient stops let the bezel alpha-blend through at the edge, so
+     the slope base dissolves into the panel with no perceptible line. */
+  background: radial-gradient(circle at 35% 30%,
+    rgba(255,255,255,0.24) 0%,
+    rgba(255,255,255,0.12) 22%,
+    rgba(0,0,0,0.02) 60%,
+    rgba(0,0,0,0.07) 100%);
+  box-shadow:
+    -3px -3px 10px rgba(255,255,255,0.45),
+    3px 4px 12px rgba(0,0,0,0.18),
+    inset -1.5px -1.5px 5px rgba(255,255,255,0.20),
+    inset 2px 2px 6px rgba(0,0,0,0.08);
   cursor: ns-resize;
   user-select: none;
   -webkit-user-select: none;
@@ -285,37 +296,15 @@ class PhantomKnob extends HTMLElement {
       ? describeArc(cx, cy, arcR, ARC_START, valEndDeg)
       : '';
 
-    const lightBlur = Math.max(2, (volcanoR / 3).toFixed(2));
-    const lightScale = Math.max(3, Math.round(volcanoR / 3));
-
     svg.innerHTML = `
       <defs>
-        <radialGradient id="vg-${sz}" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-          <!-- Neutral base tone; directional shading is computed by the lit filter. -->
-          <stop offset="0%"   stop-color="rgba(224,226,228,1)"/>
-          <stop offset="85%"  stop-color="rgba(216,218,220,1)"/>
-          <stop offset="100%" stop-color="rgba(200,202,204,1)"/>
-        </radialGradient>
         <filter id="glow-${sz}" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
         </filter>
-        <!-- Real diffuse-lighting pass with heavy ambient bias so shading stays soft.
-             Azimuth 225° = top-left of the screen (SVG filter coords have Y pointing
-             down; TL is halfway between -X=180 and -Y=270). Elevation 55° is high
-             enough that the light wraps most of the dome rather than grazing.
-             The arithmetic composite adds 75% ambient (pure gradient) to 35% of the
-             lit×gradient product, so the dark side of the dome stays ~0.73× of base. -->
-        <filter id="lit-${sz}" x="-5%" y="-5%" width="110%" height="110%">
-          <feGaussianBlur in="SourceAlpha" stdDeviation="${lightBlur}" result="heightmap"/>
-          <feDiffuseLighting in="heightmap" surfaceScale="${lightScale}" diffuseConstant="0.9" lighting-color="#ffffff" result="lit">
-            <feDistantLight azimuth="225" elevation="55"/>
-          </feDiffuseLighting>
-          <feComposite in="lit" in2="SourceGraphic" operator="arithmetic" k1="0.35" k2="0" k3="0.75" k4="0"/>
-        </filter>
       </defs>
 
-      <!-- Volcano surface — lit by SVG diffuse-lighting filter -->
-      <circle cx="${cx}" cy="${cy}" r="${volcanoR}" fill="url(#vg-${sz})" filter="url(#lit-${sz})"/>
+      <!-- Volcano face is painted by :host background + box-shadow (CSS). -->
+
 
       <!-- OLED well -->
       <circle cx="${cx}" cy="${cy}" r="${oledR}" fill="#000"/>
