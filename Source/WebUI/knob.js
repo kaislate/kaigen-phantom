@@ -309,13 +309,13 @@ class PhantomKnob extends HTMLElement {
       <!-- OLED well -->
       <circle cx="${cx}" cy="${cy}" r="${oledR}" fill="#000"/>
 
-      <!-- Lip / ridge — inner bright ring, outer dark bevel, outer glow -->
+      <!-- Lip / ridge — thin rim above the OLED: inner bright, dark bevel, outer soft -->
       <circle cx="${cx}" cy="${cy}" r="${oledR}" fill="none"
-        stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
+        stroke="rgba(255,255,255,0.28)" stroke-width="0.75"/>
+      <circle cx="${cx}" cy="${cy}" r="${oledR + 0.75}" fill="none"
+        stroke="rgba(0,0,0,0.92)" stroke-width="0.75"/>
       <circle cx="${cx}" cy="${cy}" r="${oledR + 1.5}" fill="none"
-        stroke="rgba(0,0,0,0.92)" stroke-width="1.5"/>
-      <circle cx="${cx}" cy="${cy}" r="${oledR + 3}" fill="none"
-        stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+        stroke="rgba(255,255,255,0.10)" stroke-width="0.5"/>
 
       <!-- Arc track (full 270 deg) -->
       <path d="${trackPath}" fill="none"
