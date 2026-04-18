@@ -9,10 +9,8 @@ static constexpr float kPi    = juce::MathConstants<float>::pi;
 void ZeroCrossingSynth::prepare(double sr) noexcept
 {
     sampleRate = sr;
-
-    // Valid period range: 16 Hz (sub) to maxTrackHz
-    minPeriodSamples = (float)(sr / (double)maxTrackHz);
-    maxPeriodSamples = (float)(sr / (double)minFreqHz);
+    // minPeriodSamples / maxPeriodSamples configured via setMinPeriodSamples /
+    // setMaxPeriodSamples after prepareToPlay. Member defaults handle first sync.
 
     const double rampSec = 0.010; // 10 ms parameter smoothing
     // Preserve current/target values across repeated prepareToPlay() calls.
@@ -55,12 +53,15 @@ void ZeroCrossingSynth::setDutyCycle(float d) noexcept
 
 void ZeroCrossingSynth::setSkipCount(int n) noexcept
 {
-    const int newSkip = juce::jlimit(1, 8, n);
+    const int newSkip = juce::jlimit(0, 8, n);  // 0 = muted
     if (newSkip != skipCount)
     {
         // Scale accumulated samples proportionally so the EMA has a warm start.
-        if (accumulatedSamples > 0.0f)
+        // Guard: don't scale when either side is 0 (would div-by-zero or produce nothing).
+        if (newSkip > 0 && skipCount > 0 && accumulatedSamples > 0.0f)
             accumulatedSamples *= (float)newSkip / (float)skipCount;
+        else
+            accumulatedSamples = 0.0f;
         skipCount      = newSkip;
         crossingsAccum = 0;
         // estimatedPeriod is intentionally NOT reset
@@ -69,19 +70,17 @@ void ZeroCrossingSynth::setSkipCount(int n) noexcept
 
 void ZeroCrossingSynth::setTrackingSpeed(float speed) noexcept
 {
-    trackingAlpha = juce::jlimit(0.001f, 0.80f, speed);
+    trackingAlpha = juce::jlimit(0.001f, 1.0f, speed);
 }
 
-void ZeroCrossingSynth::setMaxTrackHz(float hz) noexcept
+void ZeroCrossingSynth::setMinPeriodSamples(float samples) noexcept
 {
-    maxTrackHz       = juce::jlimit(200.0f, 20000.0f, hz);
-    minPeriodSamples = (float)(sampleRate / (double)maxTrackHz);
+    minPeriodSamples = juce::jlimit(2.0f, 500.0f, samples);
 }
 
-void ZeroCrossingSynth::setMinFreqHz(float hz) noexcept
+void ZeroCrossingSynth::setMaxPeriodSamples(float samples) noexcept
 {
-    minFreqHz        = juce::jlimit(8.0f, 200.0f, hz);
-    maxPeriodSamples = (float)(sampleRate / (double)minFreqHz);
+    maxPeriodSamples = juce::jlimit(100.0f, 8000.0f, samples);
 }
 
 float ZeroCrossingSynth::getEstimatedHz() const noexcept
@@ -169,7 +168,7 @@ float ZeroCrossingSynth::process(float x) noexcept
         {
             crossingsAccum++;
 
-            if (crossingsAccum >= skipCount)
+            if (crossingsAccum > skipCount)
             {
                 // Scale tracking speed by signal amplitude.
                 // Full alpha at ≥ −12 dBFS (0.25); proportionally reduced below that.
@@ -181,7 +180,7 @@ float ZeroCrossingSynth::process(float x) noexcept
                 if (inputPeak >= kAmplitudeFloor)
                 {
                     const float alphaScale = juce::jlimit(0.0f, 1.0f, inputPeak / kAlphaRef);
-                    const float maxDelta   = estimatedPeriod * 0.20f;
+                    const float maxDelta   = estimatedPeriod * 0.50f;
                     const float delta      = accumulatedSamples - estimatedPeriod;
                     estimatedPeriod += trackingAlpha * alphaScale * juce::jlimit(-maxDelta, maxDelta, delta);
                 }

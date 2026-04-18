@@ -29,12 +29,16 @@ public:
     void setGateThreshold(float thr) noexcept;   // 0.0–1.0: min negative-peak amplitude for valid crossing
     /** Period-tracking EMA speed [0.01, 0.8]. Low = stable/glide, high = fast/responsive. */
     void setTrackingSpeed(float speed) noexcept;
-    /** Maximum frequency to track [200–20000 Hz]. Crossings faster than this are rejected.
-     *  Low = only deep/bass content synthesised. High = full-range / vocal mode. */
-    void setMaxTrackHz(float hz) noexcept;
-    void setMinFreqHz(float hz) noexcept;
-    /** H1 amplitude [0–1]. Controls fundamental reconstruction in RESYN mode. Default 1.0. */
+    /** Minimum waveset length [2–500 samples]. Crossings closer than this are rejected.
+     *  Low = allow high-frequency wavesets. High = bass-only. Default 11 (≈4 kHz at 44.1 kHz). */
+    void setMinPeriodSamples(float samples) noexcept;
+    /** Maximum waveset length [100–8000 samples]. Crossings further apart than this are rejected.
+     *  Default 5513 (≈8 Hz at 44.1 kHz). */
+    void setMaxPeriodSamples(float samples) noexcept;
+    /** H1 amplitude [0–2]. Controls fundamental reconstruction in RESYN mode. Default 1.0. */
     void setH1Amplitude(float amp) noexcept;
+    /** Sub-harmonic amplitude [0–2]. Synthesises one octave below the fundamental. Default 0. */
+    void setSubAmplitude(float amp) noexcept;
     /** Upward expansion threshold [0–1]. Normalised to inputPeak. Default 0 (off). */
     void setBoostThreshold(float thr) noexcept;
     /** Upward expansion amount [0–2]. Additional gain multiplier. Default 0. */
@@ -56,14 +60,13 @@ private:
     float samplesSinceLastCrossing = 0.0f;
     float accumulatedSamples       = 0.0f;
     int   crossingsAccum           = 0;
-    int   skipCount                = 1;
+    int   skipCount                = 0;
     float estimatedPeriod          = 441.0f;
     float trackingAlpha            = 0.15f;
-    float maxTrackHz               = 4000.0f;
-    float minFreqHz                = 8.0f;
-    float minPeriodSamples         = 0.0f;
-    float maxPeriodSamples         = 0.0f;
+    float minPeriodSamples         = 11.0f;    // default ≈ 4 kHz at 44.1 kHz
+    float maxPeriodSamples         = 5513.0f;  // default ≈ 8 Hz at 44.1 kHz
     float h1Amp                    = 1.0f;
+    float subAmp                   = 0.0f;  // sub-harmonic (half fundamental freq)
 
     // Per-wavelet peak: resets on each valid crossing, latches on completion.
     // Used by PhantomEngine to scale output per-wavelet rather than per-envelope.
@@ -78,13 +81,21 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothDuty   { 0.5f };
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothLength { 1.0f };
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothGate   { 0.0f };
-    // Miya-style amplitude gate: gain applied to each wavelet based on its peak
-    // amplitude vs threshold. Soft knee (k=0.75) for smooth transitions.
-    float lastGateGain = 1.0f;
+    // Miya-style waveset gate: hard gating with hysteresis.
+    // Measures RMS energy per waveset interval. Binary OPEN/CLOSED state.
+    float currentWaveletSumSq      = 0.0f;   // running sum of x^2 for RMS
+    int   currentWaveletSampleCount = 0;      // sample count for RMS
+    float lastWaveletRMS           = 0.0f;    // RMS of last completed waveset
+    bool  gateOpen                 = true;    // gate state with hysteresis
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothBoostThr { 0.0f };
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothBoostAmt { 0.0f };
-    float lastBoostGain = 1.0f;
+    // Smoothed gate gain: ramps 0↔1 over ~5 ms instead of hard-cutting.
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> gateGainSmooth { 1.0f };
+    // Boost gain one-pole smoother: target is set at each valid crossing,
+    // smoothedBoostGain tracks it per-sample to avoid step discontinuities.
+    float targetBoostGain   = 1.0f;
+    float smoothedBoostGain = 1.0f;
 
     // Fast-attack / slow-release amplitude envelope.
     // Freezes period updates when input is too quiet to give reliable pitch info

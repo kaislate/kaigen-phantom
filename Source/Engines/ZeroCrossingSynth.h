@@ -66,10 +66,10 @@ public:
      *  Low = stable but slow to track pitch changes.
      *  High = fast tracking but noisier on complex polyphonic input. */
     void setTrackingSpeed(float speed) noexcept;
-    /** Maximum frequency to track [200–20000 Hz]. Crossings faster than this are rejected.
-     *  Low = only deep/bass content synthesised. High = full-range / vocal mode. */
-    void setMaxTrackHz(float hz) noexcept;
-    void setMinFreqHz(float hz) noexcept;
+    /** Minimum waveset length [2–500 samples]. Crossings closer than this are rejected. */
+    void setMinPeriodSamples(float samples) noexcept;
+    /** Maximum waveset length [100–8000 samples]. Crossings further apart than this are rejected. */
+    void setMaxPeriodSamples(float samples) noexcept;
 
     // ── Processing ───────────────────────────────────────────────────────────
     /** Process one sample of the raw bass-band signal.
@@ -91,13 +91,11 @@ private:
     float samplesSinceLastCrossing = 0.0f;  // resets each crossing — for validation
     float accumulatedSamples      = 0.0f;   // resets each measurement — actual period source
     int   crossingsAccum          = 0;      // how many valid crossings since last measurement
-    int   skipCount               = 1;      // crossings needed per measurement
+    int   skipCount               = 0;      // crossings before firing (0 = every crossing)
     float estimatedPeriod         = 441.0f; // default ~100 Hz
     float trackingAlpha           = 0.15f;
-    float maxTrackHz              = 4000.0f;
-    float minFreqHz               = 8.0f;
-    float minPeriodSamples        = 0.0f;   // set in prepare() — per individual crossing
-    float maxPeriodSamples        = 0.0f;
+    float minPeriodSamples        = 11.0f;    // default ≈ 4 kHz at 44.1 kHz
+    float maxPeriodSamples        = 5513.0f;  // default ≈ 8 Hz at 44.1 kHz
 
     // Fast-attack / slow-release amplitude tracker.
     // Scales trackingAlpha proportionally so quiet signals drift the period
