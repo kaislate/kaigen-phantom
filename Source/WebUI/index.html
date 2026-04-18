@@ -16,6 +16,11 @@
       <div class="mt"><div class="mb active" data-mode="0">Effect</div><div class="mb" data-mode="1">Resyn</div></div>
       <button class="hdr-btn" id="bypass-btn" title="Bypass">&#x23FB;</button>
       <button class="hdr-btn" id="settings-btn" title="Settings">&#x2699;</button>
+      <button class="hdr-btn" id="advanced-btn" title="Advanced controls">
+        <svg viewBox="0 0 14 14" width="14" height="14">
+          <path d="M2 5 L7 10 L12 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
       <div class="logo-kaigen">KAIGEN</div>
     </div>
 
@@ -143,10 +148,64 @@
           </div>
         </div>
 
+        <!-- Advanced panel — revealed by #advanced-btn / #seamLatch -->
+        <div class="advanced-panel" id="advancedPanel">
+          <canvas id="circuitCanvas" class="circuit-canvas"></canvas>
+          <div class="adv-content">
+            <div class="adv-section adv-phantom">
+              <div class="adv-section-label">Phantom</div>
+              <div class="adv-knob-row">
+                <phantom-mini-knob data-param="phantom_threshold" label="Crossover" default-value="0.462"></phantom-mini-knob>
+              </div>
+            </div>
+            <div class="preset-sep adv-sep"></div>
+            <div class="adv-section adv-wavelet">
+              <div class="adv-section-label">Wavelet</div>
+              <div class="adv-knob-row">
+                <phantom-mini-knob data-param="synth_duty" label="Push" default-value="0.5"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_h1" label="H1" default-value="0.5"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_sub" label="Sub" default-value="0"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_wavelet_length" label="Length" default-value="1"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_gate_threshold" label="Gate" default-value="0"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_min_samples" label="Min" default-value="0"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_max_samples" label="Max" default-value="0.9"></phantom-mini-knob>
+                <phantom-mini-knob data-param="tracking_speed" label="Track" default-value="0.5"></phantom-mini-knob>
+              </div>
+            </div>
+            <div class="preset-sep adv-sep"></div>
+            <div class="adv-section adv-punch-env">
+              <div class="adv-section-label">Punch &amp; Envelope</div>
+              <div class="adv-knob-row">
+                <phantom-mini-knob data-param="punch_amount" label="Amount" default-value="1"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_boost_threshold" label="Threshold" default-value="0"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_boost_amount" label="Boost" default-value="0"></phantom-mini-knob>
+                <phantom-mini-knob data-param="env_attack_ms" label="Attack" default-value="0.05"></phantom-mini-knob>
+                <phantom-mini-knob data-param="env_release_ms" label="Release" default-value="0.1"></phantom-mini-knob>
+              </div>
+            </div>
+            <div class="preset-sep adv-sep"></div>
+            <div class="adv-section adv-binaural">
+              <div class="adv-section-label">Binaural</div>
+              <div class="adv-knob-row">
+                <select id="binaural-mode-select-adv" class="param-select adv-select" data-param="binaural_mode">
+                  <option value="0">Off</option>
+                  <option value="1">Spread</option>
+                  <option value="2">Voice-Split</option>
+                </select>
+                <phantom-mini-knob data-param="binaural_width" label="Width" default-value="0.5"></phantom-mini-knob>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="gap-h"></div>
 
         <!-- Visualization: meters span full height, osc+spectrum stacked in center -->
         <div class="viz-section">
+          <div class="seam-latch" id="seamLatch" title="Advanced controls">
+            <span class="seam-dot"></span>
+            <span class="seam-dot"></span>
+          </div>
           <canvas id="meterIn" class="io-meter"></canvas>
           <div class="viz-center">
             <div class="osc-row">
@@ -200,5 +259,6 @@
 <script src="/spectrum.js"></script>
 <script src="/recipe-wheel.js"></script>
 <script src="/oscilloscope.js"></script>
+<script src="/circuit-board.js"></script>
 </body>
 </html>
