@@ -5,12 +5,14 @@ void EnvelopeFollower::prepare(double sr) noexcept
 {
     sampleRate = sr;
     env = 0.0f;
+    peakHold = 0.0f;
     recomputeCoefs();
 }
 
 void EnvelopeFollower::reset() noexcept
 {
     env = 0.0f;
+    peakHold = 0.0f;
 }
 
 void EnvelopeFollower::setAttackMs(float ms) noexcept
@@ -41,11 +43,21 @@ void EnvelopeFollower::recomputeCoefs() noexcept
     // sounded like ~1.7s.  ln(10) fixes this perceptual mismatch.
     static constexpr double kReleaseLn = 2.302585092994046;  // ln(10)
     releaseCoef = 1.0f - static_cast<float>(std::exp(-kReleaseLn / (releaseMs * 0.001 * srd)));
+
+    // Peak-hold decay: reaches -20 dB in kPeakHoldMs. 30 ms bridges the rectified
+    // troughs of pitched audio down to ~17 Hz fundamentals so the one-pole
+    // receives a stable "recent peak" target rather than an oscillating signal.
+    static constexpr double kPeakHoldMs = 30.0;
+    peakHoldCoef = static_cast<float>(std::exp(-kReleaseLn / (kPeakHoldMs * 0.001 * srd)));
 }
 
 float EnvelopeFollower::process(float input) noexcept
 {
-    const float target = std::fabs(input);
+    const float rectified = std::fabs(input);
+    if (rectified > peakHold) peakHold = rectified;   // instant attack on new peaks
+    else                      peakHold *= peakHoldCoef;
+
+    const float target = peakHold;
     const float coef   = (target > env) ? attackCoef : releaseCoef;
     env += (target - env) * coef;
     return env;

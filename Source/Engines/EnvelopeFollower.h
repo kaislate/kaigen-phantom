@@ -4,10 +4,12 @@
 /**
  * EnvelopeFollower — peak envelope detector with asymmetric attack/release.
  *
- * Feeds a rectified input into a one-pole smoothing filter with separate
- * attack and release coefficients. Output is sample-accurate and never
- * overshoots or hangs — when the input stops, the envelope decays to zero
- * within the release time.
+ * Rectified input feeds a short peak-hold stage (~30 ms) that bridges the
+ * per-cycle troughs of pitched audio, then a one-pole smoother with separate
+ * attack and release coefficients. Without the peak-hold stage, a long attack
+ * combined with a short release would cause env to settle below peak on
+ * oscillating input; with it, env can actually reach the input's peak level
+ * over the user-set attack time.
  */
 class EnvelopeFollower
 {
@@ -28,12 +30,14 @@ public:
     float getValue() const noexcept { return env; }
 
 private:
-    double sampleRate = 44100.0;
-    float  env        = 0.0f;
-    float  attackMs   = 1.0f;
-    float  releaseMs  = 50.0f;
-    float  attackCoef = 0.0f;
+    double sampleRate  = 44100.0;
+    float  env         = 0.0f;
+    float  peakHold    = 0.0f;
+    float  attackMs    = 1.0f;
+    float  releaseMs   = 50.0f;
+    float  attackCoef  = 0.0f;
     float  releaseCoef = 0.0f;
+    float  peakHoldCoef = 0.0f;  // per-sample decay multiplier for peak-hold stage
 
     void recomputeCoefs() noexcept;
 };
