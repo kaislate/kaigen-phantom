@@ -276,21 +276,26 @@ phantom-knob.mode-inactive{
   padding:5px 6px;display:flex;flex-direction:column;gap:3px;
 }
 
-/* Panel flex sizing — Row 1 */
-.panel-harmonic{flex:1.2}
-.panel-output{flex:0.45;align-items:center}
+/* Panel flex sizing — right column top row */
+.panel-harmonic{flex:2.3}
+.panel-stereo{flex:0.7;align-items:center}
+.panel-output{flex:1.4;align-items:center}
 
-/* Panel flex sizing — Row 2 */
-.panel-ghost{flex:1.0}
-.panel-stereo{flex:0.65;align-items:center}
-.panel-punch{flex:0.55;align-items:center}
+/* Left column panel sizing */
+.panel-ghost{min-height:140px}
+.panel-filter-left{min-height:168px;margin-top:auto}
 
-/* Panel flex sizing — Row 3 */
-.panel-pitch{flex:0.45}
-.panel-decon{flex:0.45}
-.panel-sidechain{flex:0.55}
-.panel-envelope{flex:0.65}
-.panel-filter{flex:0.5;align-items:center}
+/* Centered labels for all .candy-inner panels */
+.candy-inner > .el{
+  display:block;text-align:center;width:100%;margin-bottom:6px;
+}
+
+/* Ghost panel — toggle sits above the Crossover knob */
+.ghost-row{align-items:flex-end;}
+.ghost-crossover-col{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+}
+.ghost-mode-toggle{margin-left:0;}
 
 /* Knob rows */
 .knob-row{

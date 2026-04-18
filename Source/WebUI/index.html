@@ -66,10 +66,13 @@
         </div>
         <!-- Ghost section — below recipe wheel -->
         <div class="candy-inner panel-ghost" style="width:100%">
-          <div class="el">Ghost <span class="toggle-group"><button class="tog active" data-gmode="0">Rpl</button><button class="tog" data-gmode="1">Add</button></span></div>
-          <div class="knob-row">
+          <div class="el">Ghost</div>
+          <div class="knob-row ghost-row">
             <phantom-knob data-param="ghost" size="large" label="Amount" default-value="1.0"></phantom-knob>
-            <phantom-knob data-param="phantom_threshold" size="medium" label="Crossover" default-value="0.462"></phantom-knob>
+            <div class="ghost-crossover-col">
+              <span class="toggle-group ghost-mode-toggle"><button class="tog active" data-gmode="0">Rpl</button><button class="tog" data-gmode="1">Add</button></span>
+              <phantom-knob data-param="phantom_threshold" size="medium" label="Crossover" default-value="0.462"></phantom-knob>
+            </div>
           </div>
         </div>
         <!-- Filter panel — under Ghost -->
