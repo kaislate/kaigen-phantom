@@ -316,7 +316,8 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
 
     // ── Advanced mode toggle ──────────────────────────────────────────────
     params.push_back(std::make_unique<AudioParameterBool>(
-        ParamID::ADVANCED_OPEN, "Advanced Open", false));
+        ParamID::ADVANCED_OPEN, "Advanced Panel", false,
+        juce::AudioParameterBoolAttributes().withAutomatable(false)));
 
     return { params.begin(), params.end() };
 }
