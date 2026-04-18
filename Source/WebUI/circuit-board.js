@@ -5,10 +5,14 @@
 (function() {
   let canvas = null, ctx = null;
   let width = 0, height = 0;
-  let traces = [];     // [{ points: [[x,y],[x,y],...] }, ...]
-  let joints = [];     // [{ x, y }]
+  let traces = [];     // [{ points: [[x,y],[x,y],...], length: number }, ...]
+  let joints = [];     // [{ x, y, flashUntil: number }]
+  let pulses = [];     // [{ traceIdx, t: 0..1, speed }]
   let rafId = 0;
+  let lastFrameMs = 0;
+  let nextSpawnMs = 0;
   let running = false;
+  const MAX_PULSES = 5;
 
   function resize() {
     if (!canvas) return;
@@ -34,14 +38,21 @@
       [[55, 30], [70, 30], [70, 10], [90, 10]],
       [[8, 60], [8, 35], [18, 35]],
     ];
-    traces = defs.map(points => ({
-      points: points.map(([px, py]) => [px * width / 100, py * height / 100])
-    }));
+    traces = defs.map(points => {
+      const p = points.map(([px, py]) => [px * width / 100, py * height / 100]);
+      let len = 0;
+      for (let i = 1; i < p.length; i++) {
+        const dx = p[i][0] - p[i-1][0];
+        const dy = p[i][1] - p[i-1][1];
+        len += Math.hypot(dx, dy);
+      }
+      return { points: p, length: len };
+    });
     const jset = new Map();
     for (const tr of traces) {
       for (const [x, y] of tr.points) {
         const key = `${Math.round(x)}_${Math.round(y)}`;
-        if (!jset.has(key)) jset.set(key, { x, y });
+        if (!jset.has(key)) jset.set(key, { x, y, flashUntil: 0 });
       }
     }
     joints = [...jset.values()];
@@ -81,8 +92,95 @@
     }
   }
 
-  function tick() {
+  function pointOnTrace(tr, t) {
+    const target = tr.length * Math.max(0, Math.min(1, t));
+    let travelled = 0;
+    for (let i = 1; i < tr.points.length; i++) {
+      const a = tr.points[i-1], b = tr.points[i];
+      const seg = Math.hypot(b[0]-a[0], b[1]-a[1]);
+      if (travelled + seg >= target) {
+        const local = (target - travelled) / seg;
+        return [a[0] + (b[0]-a[0]) * local, a[1] + (b[1]-a[1]) * local];
+      }
+      travelled += seg;
+    }
+    const last = tr.points[tr.points.length - 1];
+    return [last[0], last[1]];
+  }
+
+  function spawnPulse() {
+    if (pulses.length >= MAX_PULSES || traces.length === 0) return;
+    const traceIdx = Math.floor(Math.random() * traces.length);
+    const speed = 120 / Math.max(1, traces[traceIdx].length) / 1000;
+    pulses.push({ traceIdx, t: 0, speed });
+  }
+
+  function flashNearestJoint(x, y) {
+    let best = null, bestD = Infinity;
+    for (const j of joints) {
+      const d = Math.hypot(j.x - x, j.y - y);
+      if (d < bestD) { bestD = d; best = j; }
+    }
+    if (best) best.flashUntil = performance.now() + 300;
+  }
+
+  function drawAnimated(nowMs) {
+    drawStatic();
+
+    for (const j of joints) {
+      const remaining = j.flashUntil - nowMs;
+      const alpha = remaining > 0
+        ? 0.20 + 0.80 * (remaining / 300)
+        : 0.20;
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx.beginPath();
+      ctx.arc(j.x, j.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      if (remaining > 0) {
+        ctx.shadowColor = 'rgba(255,255,255,0.8)';
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.arc(j.x, j.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    for (const p of pulses) {
+      const tr = traces[p.traceIdx];
+      const [x, y] = pointOnTrace(tr, p.t);
+      ctx.shadowColor = 'rgba(255,255,255,0.9)';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  function tick(nowMs) {
     if (!running) return;
+    const dt = lastFrameMs ? (nowMs - lastFrameMs) : 16;
+    lastFrameMs = nowMs;
+
+    if (nowMs >= nextSpawnMs) {
+      spawnPulse();
+      nextSpawnMs = nowMs + 800 + Math.random() * 700;
+    }
+
+    for (let i = pulses.length - 1; i >= 0; i--) {
+      const p = pulses[i];
+      p.t += p.speed * dt;
+      if (p.t >= 1) {
+        const tr = traces[p.traceIdx];
+        const end = tr.points[tr.points.length - 1];
+        flashNearestJoint(end[0], end[1]);
+        pulses.splice(i, 1);
+      }
+    }
+
+    drawAnimated(nowMs);
     rafId = requestAnimationFrame(tick);
   }
 
@@ -94,6 +192,9 @@
       resize();
       window.addEventListener('resize', resize);
       running = true;
+      pulses = [];
+      lastFrameMs = 0;
+      nextSpawnMs = performance.now() + 300;
       rafId = requestAnimationFrame(tick);
     },
     stop() {
