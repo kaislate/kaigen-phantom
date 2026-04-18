@@ -86,6 +86,10 @@ namespace ParamID
     inline constexpr auto SYNTH_BOOST_THRESHOLD = "synth_boost_threshold";
     /** Upward expansion amount: additional gain for wavelets above threshold. 0–200%. Default 0. */
     inline constexpr auto SYNTH_BOOST_AMOUNT    = "synth_boost_amount";
+
+    // ── Advanced mode toggle (UI state; not automated) ────────────────────
+    /** True if the advanced controls panel is open. UI-only; DSP never reads. */
+    inline constexpr auto ADVANCED_OPEN = "advanced_open";
 }
 
 // ─── Preset amplitude tables — Chebyshev polynomial weights ────────────
@@ -141,6 +145,7 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::PUNCH_AMOUNT,
         ParamID::SYNTH_BOOST_THRESHOLD,
         ParamID::SYNTH_BOOST_AMOUNT,
+        ParamID::ADVANCED_OPEN,
     };
 }
 
@@ -308,6 +313,10 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         ParamID::STEREO_WIDTH, "Stereo Width",
         NormalisableRange<float>(0.0f, 200.0f), 100.0f,
         AudioParameterFloatAttributes().withLabel("%")));
+
+    // ── Advanced mode toggle ──────────────────────────────────────────────
+    params.push_back(std::make_unique<AudioParameterBool>(
+        ParamID::ADVANCED_OPEN, "Advanced Open", false));
 
     return { params.begin(), params.end() };
 }

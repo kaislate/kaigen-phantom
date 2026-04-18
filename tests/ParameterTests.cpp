@@ -52,15 +52,16 @@ TEST_CASE("createParameterLayout contains all required parameter IDs")
     REQUIRE(has(ParamID::SYNTH_WAVELET_LENGTH));
     REQUIRE(has(ParamID::SYNTH_GATE_THRESHOLD));
     REQUIRE(has(ParamID::SYNTH_H1));
-    REQUIRE(has(ParamID::SYNTH_MAX_TRACK_HZ));
+    REQUIRE(has(ParamID::SYNTH_MIN_SAMPLES));
     REQUIRE(has(ParamID::TRACKING_SPEED));
     REQUIRE(has(ParamID::PUNCH_ENABLED));
     REQUIRE(has(ParamID::PUNCH_AMOUNT));
-    REQUIRE(has(ParamID::SYNTH_MIN_FREQ_HZ));
+    REQUIRE(has(ParamID::SYNTH_MAX_SAMPLES));
+    REQUIRE(has(ParamID::SYNTH_SUB));
     REQUIRE(has(ParamID::SYNTH_BOOST_THRESHOLD));
     REQUIRE(has(ParamID::SYNTH_BOOST_AMOUNT));
 
-    REQUIRE(ids.size() == 37u);
+    REQUIRE(ids.size() == 41u);
 }
 
 TEST_CASE("ghost parameter default is 100 percent")
