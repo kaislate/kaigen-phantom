@@ -393,3 +393,84 @@ phantom-knob.mode-inactive{
   outline:none;cursor:pointer;
 }
 .settings-panel .param-select option{background:#BBBDBF;color:#333;}
+
+/* ═══ ADVANCED PANEL ═══ */
+.advanced-panel{
+  max-height:0;opacity:0;
+  overflow:hidden;
+  position:relative;
+  background:#0A0B0C;
+  transform:scaleY(0);
+  transform-origin:center;
+  transition:max-height 400ms ease-out, opacity 400ms ease-out, transform 400ms ease-out;
+  margin:0;
+}
+.wrap.advanced-open .advanced-panel{
+  max-height:200px;
+  opacity:1;
+  transform:scaleY(1);
+}
+.circuit-canvas{
+  position:absolute;inset:0;width:100%;height:100%;
+  display:block;z-index:0;pointer-events:none;
+  opacity:0;transition:opacity 400ms ease;
+}
+.wrap.advanced-open .circuit-canvas{opacity:1;}
+
+.adv-content{
+  position:relative;z-index:2;
+  height:200px;
+  display:flex;flex-direction:row;align-items:stretch;
+  padding:0 20px;gap:0;
+}
+.adv-section{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:0 12px;gap:6px;
+}
+.adv-section-label{
+  font-size:9px;font-weight:600;letter-spacing:2px;text-transform:uppercase;
+  color:rgba(255,255,255,0.32);
+  text-shadow:0 1px 0 rgba(0,0,0,0.45);
+}
+.adv-knob-row{
+  display:flex;flex-direction:row;align-items:center;gap:6px;
+}
+.adv-sep{
+  width:2px;height:80%;align-self:center;margin:0 6px;
+  background:linear-gradient(90deg,
+    rgba(255,255,255,0.22) 0%,
+    rgba(255,255,255,0.22) 50%,
+    rgba(0,0,0,0.65) 50%,
+    rgba(0,0,0,0.65) 100%);
+}
+.adv-select{
+  background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.85);
+  border:none;border-radius:3px;padding:2px 6px;font-size:10px;
+  font-family:'Courier New',monospace;
+}
+
+/* ═══ HEADER ADVANCED BUTTON ═══ */
+#advanced-btn svg{transition:transform 250ms ease;}
+#advanced-btn.active svg{transform:rotate(180deg);}
+
+/* ═══ SEAM LATCH ═══ */
+.viz-section{position:relative;}
+.seam-latch{
+  position:absolute;top:-10px;left:50%;transform:translateX(-50%);
+  width:80px;height:16px;border-radius:8px;
+  background:rgba(0,0,0,0.08);
+  box-shadow:inset 1.5px 1.5px 4px rgba(0,0,0,0.14),
+    inset -1.5px -1.5px 3px rgba(255,255,255,0.48),
+    0 1px 3px rgba(0,0,0,0.07);
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  cursor:pointer;z-index:20;
+  transition:background 200ms ease;
+}
+.seam-dot{
+  width:3px;height:3px;border-radius:50%;
+  background:rgba(0,0,0,0.32);transition:background 200ms, box-shadow 200ms;
+}
+.seam-latch:hover .seam-dot{
+  background:rgba(255,255,255,0.88);
+  box-shadow:0 0 4px rgba(255,255,255,0.6);
+}
