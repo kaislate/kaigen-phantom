@@ -97,6 +97,7 @@ void PhantomEngine::setGhostAmount(float a)       { ghostAmount    = juce::jlimi
 void PhantomEngine::setGhostReplace(bool r)       { ghostReplace   = r; }
 void PhantomEngine::setPhantomStrength(float s)   { phantomStrength = juce::jlimit(0.0f, 1.0f, s); }
 void PhantomEngine::setOutputGainDb(float db)     { outputGainLin  = std::pow(10.0f, db * 0.05f); }
+void PhantomEngine::setInputDetectionGain(float lin) { inputDetectionGain = juce::jmax(1e-4f, lin); }
 void PhantomEngine::setEnvelopeAttackMs(float ms) { envelopeL.setAttackMs(ms);  envelopeR.setAttackMs(ms); }
 void PhantomEngine::setEnvelopeReleaseMs(float ms){ envelopeL.setReleaseMs(ms); envelopeR.setReleaseMs(ms); }
 void PhantomEngine::setBinauralMode(int m)
@@ -249,6 +250,8 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
     const int  mode  = synthMode.load(std::memory_order_relaxed);
     const bool punch = usePunch;
     const float punchAmt = punchAmount;
+    const float detGain    = inputDetectionGain;
+    const float detGainInv = 1.0f / detGain;
 
     int oscWp = oscSynthWrPos.load(std::memory_order_relaxed);
     for (int ch = 0; ch < nCh; ++ch)
@@ -266,22 +269,19 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
 
         for (int i = 0; i < n; ++i)
         {
-            // Envelope source: full input signal (default) or sidechain ch0.
-            // Uses low+high (full input) rather than just the bass band so the
-            // envelope tracks input dynamics regardless of crossover setting.
+            // Envelope drives phantom output amplitude — it sees the natural signal so
+            // Input Gain does not raise phantom loudness.
             const float envIn = (envSource == 1 && sidechain != nullptr && sidechain->getNumChannels() > 0)
                 ? sidechain->getReadPointer(juce::jmin(ch, sidechain->getNumChannels() - 1))[i]
                 : (low[i] + high[i]);
             const float inLvl = env.process(envIn);
 
-            // Both engines receive the raw bass-band signal for period detection.
-            // Each tracks signal amplitude via inputPeak and scales its EMA alpha
-            // proportionally — quieter signals are trusted less, preventing
-            // harmonic-drift artifacts during note decay in both Effect and RESYN.
-            // Output is scaled by inLvl below to restore dynamics.
+            // Synth receives detection-scaled input (period, gate RMS, upward-expander
+            // benefit from a hotter signal). Output is amplitude-normalised internally.
+            const float synIn = low[i] * detGain;
             float phantomSample = (mode == 1)
-                ? resyn.process(low[i])
-                : syn.process(low[i]);
+                ? resyn.process(synIn)
+                : syn.process(synIn);
 
             // Optional post-synthesis tanh saturation.
             // Applied to the harmonic sum so the fundamental cannot reappear.
@@ -297,13 +297,13 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
             phantomSample = lpf.processSingleSampleRaw(phantomSample);
             phantomSample = hpf.processSingleSampleRaw(phantomSample);
 
-            // Punch: blend smooth envelope with per-wavelet peak amplitude.
-            // At punchAmt=0 → pure envelope (default). At punchAmt=1 → pure wavelet peak
-            // (stepped, transient-accurate). Gives each cycle's amplitude a punchy, discrete feel.
+            // Punch: blend envelope with per-wavelet peak. getWaveletPeak() is on the
+            // detection-scaled signal, so de-scale before blending with natural inLvl.
             float level = inLvl;
             if (punch)
             {
-                const float wvPeak = (mode == 1) ? resyn.getWaveletPeak() : syn.getWaveletPeak();
+                const float wvPeakRaw = (mode == 1) ? resyn.getWaveletPeak() : syn.getWaveletPeak();
+                const float wvPeak    = wvPeakRaw * detGainInv;
                 level = inLvl + (wvPeak - inLvl) * punchAmt;
                 level = juce::jlimit(0.0f, 1.0f, level);
             }

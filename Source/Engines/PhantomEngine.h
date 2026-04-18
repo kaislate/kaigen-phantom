@@ -58,6 +58,7 @@ public:
     void setPunchAmount(float amount);     // [0–1]: 0 = pure envelope, 1 = pure wavelet peak
     void setBoostThreshold(float thr);     // RESYN only: upward expansion threshold [0–1]
     void setBoostAmount(float amt);        // RESYN only: upward expansion gain [0–2]
+    void setInputDetectionGain(float lin); // scales what the synth's period/gate/boost detection sees; audio path stays at unity
 
     /** Current tracked pitch in Hz (from the active engine's zero-crossing tracker).
      *  Returns 0 when the input is too quiet to give reliable pitch info. */
@@ -114,4 +115,6 @@ private:
 
     bool  usePunch    = false;
     float punchAmount = 1.0f;
+
+    float inputDetectionGain = 1.0f;
 };

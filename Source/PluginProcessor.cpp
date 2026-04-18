@@ -134,13 +134,17 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         return;
     }
 
-    // ── Input gain ────────────────────────────────────────────────────
+    // ── Input Gain → engine detection only ────────────────────────────
+    // Buffer audio stays at unity. The gain is forwarded to the engine where
+    // it scales the signal feeding the synth's period/gate/upward-expander
+    // detectors only — so raising Input Gain helps the engine track quiet
+    // material without raising output level.
+    float detectionGainLin;
     {
         const bool autoMode = apvts.getRawParameterValue(ParamID::INPUT_GAIN_AUTO)->load() > 0.5f;
 
         if (autoMode)
         {
-            // Measure peak of this block across all channels.
             float blockPeak = 0.0f;
             for (int c = 0; c < nCh; ++c)
             {
@@ -149,38 +153,29 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
                     blockPeak = juce::jmax(blockPeak, std::abs(ch[i]));
             }
 
-            // Update peak envelope: fast attack so we don't over-drive,
-            // slow release so gain holds steady between notes.
             const float coef = (blockPeak > autoEnvelope) ? autoAttackCoef : autoReleaseCoef;
             autoEnvelope += coef * (blockPeak - autoEnvelope);
 
-            // Compute gain needed to reach -12 dBFS target.
-            // Below -60 dBFS freeze the envelope to avoid amplifying noise.
-            constexpr float kTarget  = 0.25f;   // -12 dBFS
-            constexpr float kFloor   = 0.001f;  // -60 dBFS — below this, hold current gain
+            constexpr float kTarget  = 0.25f;   // -12 dBFS target for detection
+            constexpr float kFloor   = 0.001f;  // below -60 dBFS, hold current gain
             constexpr float kMaxGain = 16.0f;   // +24 dB ceiling
             const float desiredGain = (autoEnvelope > kFloor)
                 ? juce::jmin(kMaxGain, kTarget / autoEnvelope)
                 : autoGain;
 
-            // Smooth toward desired gain to prevent zipper noise.
             autoGain += autoSmoothCoef * (desiredGain - autoGain);
-
-            for (int c = 0; c < nCh; ++c)
-                buffer.applyGain(c, 0, n, autoGain);
+            detectionGainLin = autoGain;
         }
         else
         {
-            autoEnvelope = 0.0f; // reset so auto is fresh next time it's enabled
+            autoEnvelope = 0.0f;
             autoGain     = 1.0f;
 
-            const float gainLin = juce::Decibels::decibelsToGain(
+            detectionGainLin = juce::Decibels::decibelsToGain(
                 apvts.getRawParameterValue(ParamID::INPUT_GAIN)->load());
-            if (gainLin != 1.0f)
-                for (int c = 0; c < nCh; ++c)
-                    buffer.applyGain(c, 0, n, gainLin);
         }
     }
+    engine.setInputDetectionGain(detectionGainLin);
 
     // ── Input peak levels + FFT/pitch capture (pre-engine) ──────────
     // Reading input here ensures pitch detection sees the dry fundamental,
