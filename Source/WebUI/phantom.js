@@ -382,10 +382,14 @@ function applyAdvancedMode(isOpen, { persist = true } = {}) {
     wrap.classList.add('advanced-open');
     if (btn) btn.classList.add('active');
     setEditorHeightViaNative(1020);
-    const canvas = getCircuitCanvas();
-    if (canvas && window.PhantomCircuitBoard) {
-      window.PhantomCircuitBoard.start(canvas);
-    }
+    // Delay canvas start until the panel has finished expanding — getBoundingClientRect
+    // returns 0-height while max-height is mid-transition, which produces a blank canvas.
+    setTimeout(() => {
+      const canvas = getCircuitCanvas();
+      if (canvas && window.PhantomCircuitBoard) {
+        window.PhantomCircuitBoard.start(canvas);
+      }
+    }, 450);
   } else {
     wrap.classList.remove('advanced-open');
     if (btn) btn.classList.remove('active');

@@ -69,7 +69,6 @@
           <div class="el">Ghost <span class="toggle-group"><button class="tog active" data-gmode="0">Rpl</button><button class="tog" data-gmode="1">Add</button></span></div>
           <div class="knob-row">
             <phantom-knob data-param="ghost" size="large" label="Amount" default-value="1.0"></phantom-knob>
-            <phantom-knob data-param="phantom_threshold" size="medium" label="Crossover" default-value="0.462"></phantom-knob>
           </div>
         </div>
         <!-- H2-H8 hidden parameter carriers — controlled by dragging wheel spokes -->
@@ -94,15 +93,7 @@
               <phantom-knob data-param="harmonic_saturation" size="large" label="Saturation" default-value="0"></phantom-knob>
               <phantom-knob data-param="phantom_strength" size="medium" label="Strength" default-value="0.8"></phantom-knob>
               <phantom-knob data-param="synth_step" size="large" label="Shape" default-value="0" data-oled="waveform"></phantom-knob>
-              <phantom-knob data-param="synth_duty" size="medium" label="Push" default-value="0.5"></phantom-knob>
-              <phantom-knob data-param="synth_h1" size="medium" label="H1" default-value="0.5"></phantom-knob>
-              <phantom-knob data-param="synth_sub" size="medium" label="Sub" default-value="0"></phantom-knob>
-              <phantom-knob data-param="synth_wavelet_length" size="medium" label="Length" default-value="1"></phantom-knob>
-              <phantom-knob data-param="synth_gate_threshold" size="medium" label="Gate"   default-value="0"></phantom-knob>
               <phantom-knob data-param="synth_skip" size="medium" label="Skip" default-value="0"></phantom-knob>
-              <phantom-knob data-param="synth_min_samples" size="medium" label="Min" default-value="0"></phantom-knob>
-              <phantom-knob data-param="synth_max_samples" size="medium" label="Max" default-value="0.9"></phantom-knob>
-              <phantom-knob data-param="tracking_speed" size="medium" label="Track" default-value="0.5"></phantom-knob>
             </div>
           </div>
         </div>
@@ -117,26 +108,11 @@
               <phantom-knob data-param="stereo_width" size="large" label="Width" default-value="0.5"></phantom-knob>
             </div>
           </div>
-          <div class="candy-inner panel-envelope">
-            <div class="el">Envelope</div>
-            <div class="knob-row">
-              <phantom-knob data-param="env_attack_ms" size="medium" label="Attack" default-value="0.05"></phantom-knob>
-              <phantom-knob data-param="env_release_ms" size="medium" label="Release" default-value="0.1"></phantom-knob>
-            </div>
-          </div>
           <div class="candy-inner panel-filter">
             <div class="el">Filter</div>
             <div class="knob-row">
               <phantom-knob data-param="synth_lpf_hz" size="medium" label="LPF" default-value="1"></phantom-knob>
               <phantom-knob data-param="synth_hpf_hz" size="medium" label="HPF" default-value="0"></phantom-knob>
-            </div>
-          </div>
-          <div class="candy-inner panel-punch">
-            <div class="el">Punch <span class="toggle-group"><button class="tog" id="punch-btn">On</button></span></div>
-            <div class="knob-row">
-              <phantom-knob data-param="punch_amount" size="medium" label="Amount" default-value="1"></phantom-knob>
-              <phantom-knob data-param="synth_boost_threshold" size="medium" label="Threshold" default-value="0"></phantom-knob>
-              <phantom-knob data-param="synth_boost_amount" size="medium" label="Boost" default-value="0"></phantom-knob>
             </div>
           </div>
           <div class="candy-inner panel-output">
