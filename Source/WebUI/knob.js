@@ -3,13 +3,14 @@
 
 const TAU = Math.PI * 2;
 const DEG = Math.PI / 180;
+const SVG_NS = 'http://www.w3.org/2000/svg';
 const ARC_START = 135;           // degrees
 const ARC_SWEEP = 270;           // degrees
 const ARC_END = ARC_START + ARC_SWEEP; // 405 degrees
 
 function polarToXY(cx, cy, r, angleDeg) {
   const rad = angleDeg * DEG;
-  return { x: cx + r * Math.cos(rad), y: cx + r * Math.sin(rad) };
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
 function describeArc(cx, cy, r, startDeg, endDeg) {
@@ -105,28 +106,24 @@ TEMPLATE.innerHTML = `
     3px 5px 17px rgba(0,0,0,0.14);
 }
 svg { display: block; width: 100%; height: 100%; }
-/* Transition font-size between rest and drag states */
-.value-text, .label-text { transition: font-size 150ms ease; }
+/* Label is fixed across states. Only value-text transitions between rest and drag. */
+.value-text { transition: font-size 150ms ease; }
 
-/* Rest sizes (default) */
-:host([size="small"])  .value-text,
-:host([size="small"])  .label-text { font-size: 9px; }
-:host([size="medium"]) .value-text,
-:host([size="medium"]) .label-text { font-size: 12px; }
-:host([size="large"])  .value-text,
-:host([size="large"])  .label-text { font-size: 14px; }
-:host(:not([size="small"]):not([size="medium"]):not([size="large"])) .value-text,
-:host(:not([size="small"]):not([size="medium"]):not([size="large"])) .label-text { font-size: 12px; }
+/* Rest sizes (label sizes are final — unchanged on drag) */
+:host([size="small"])  .value-text { font-size: 9px; }
+:host([size="small"])  .label-text { font-size: 6px; }
+:host([size="medium"]) .value-text { font-size: 12px; }
+:host([size="medium"]) .label-text { font-size: 9px; }
+:host([size="large"])  .value-text { font-size: 14px; }
+:host([size="large"])  .label-text { font-size: 10px; }
+:host(:not([size="small"]):not([size="medium"]):not([size="large"])) .value-text { font-size: 12px; }
+:host(:not([size="small"]):not([size="medium"]):not([size="large"])) .label-text { font-size: 9px; }
 
-/* Drag sizes (when svg has data-dragging="true") */
+/* Drag sizes — value-text only */
 :host([size="small"])  svg[data-dragging="true"] .value-text { font-size: 13px; }
-:host([size="small"])  svg[data-dragging="true"] .label-text { font-size: 6px; }
 :host([size="medium"]) svg[data-dragging="true"] .value-text { font-size: 18px; }
-:host([size="medium"]) svg[data-dragging="true"] .label-text { font-size: 9px; }
 :host([size="large"])  svg[data-dragging="true"] .value-text { font-size: 22px; }
-:host([size="large"])  svg[data-dragging="true"] .label-text { font-size: 10px; }
 :host(:not([size="small"]):not([size="medium"]):not([size="large"])) svg[data-dragging="true"] .value-text { font-size: 18px; }
-:host(:not([size="small"]):not([size="medium"]):not([size="large"])) svg[data-dragging="true"] .label-text { font-size: 9px; }
 .label-below { display: none; }
 </style>
 <svg></svg>
@@ -148,6 +145,11 @@ class PhantomKnob extends HTMLElement {
     this._displayValue = '';
     this._dragging = false;
     this._lastY = 0;
+
+    this._scaffoldSize = null;
+    this._scaffoldIsWaveform = null;
+    this._geom = null;
+    this._parts = null;
 
     this._onPointerDown = this._onPointerDown.bind(this);
     this._onPointerMove = this._onPointerMove.bind(this);
@@ -252,106 +254,141 @@ class PhantomKnob extends HTMLElement {
     if (this._svg) this._svg.setAttribute('data-dragging', this._dragging ? 'true' : 'false');
   }
 
-  _render() {
+  _ensureScaffold() {
     const sizeAttr = this.getAttribute('size') || 'medium';
+    const isWaveform = this.getAttribute('data-oled') === 'waveform';
+    if (this._parts &&
+        this._scaffoldSize === sizeAttr &&
+        this._scaffoldIsWaveform === isWaveform) return;
+
+    this._scaffoldSize = sizeAttr;
+    this._scaffoldIsWaveform = isWaveform;
+
     const { sz, inset } = getSizeTier(sizeAttr);
     const isLarge = sizeAttr === 'large';
     const cx = sz / 2;
     const cy = sz / 2;
-    const volcanoR = sz / 2;
-    const oledR = volcanoR - inset;
+    const oledR = sz / 2 - inset;
     const arcR = oledR - 4;
-
-    // Value text: large inside OLED. Label: small at bottom of OLED in Silkscreen.
-    const label = this.getAttribute('label') || '';
-    const displayText = this._displayValue || this._value.toFixed(2);
-
-    const isWaveform = this.getAttribute('data-oled') === 'waveform';
-
-    // Value positioned slightly above OLED center; label sits near the bottom edge.
-    const valueY = cy - (isLarge ? 4 : 3);
-    const labelY = cy + oledR - (isLarge ? 9 : 8);
-
-    const oledContent = isWaveform
-      ? `
-      <polyline points="${buildWaveformPoints(this._value, cx, cy, oledR)}"
-        fill="none" stroke="#fff" stroke-opacity="0.85" stroke-width="1.5" stroke-linecap="round"/>
-      <text class="value-text" x="${cx}" y="${cy + oledR * 0.5}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New',monospace" font-weight="700"
-        fill="#fff" opacity="0.3">${displayText}</text>
-      <text class="value-text" x="${cx}" y="${cy + oledR * 0.5}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New',monospace" font-weight="700"
-        fill="#fff" opacity="0.6">${displayText}</text>
-      <text class="value-text" x="${cx}" y="${cy + oledR * 0.5}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New',monospace" font-weight="700"
-        fill="#fff" opacity="1">${displayText}</text>`
-      : `
-      <!-- Value text (triple glow stack) -->
-      <text class="value-text" x="${cx}" y="${valueY}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New',monospace" font-weight="700"
-        fill="#fff" opacity="0.3">${displayText}</text>
-      <text class="value-text" x="${cx}" y="${valueY}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New',monospace" font-weight="700"
-        fill="#fff" opacity="0.6">${displayText}</text>
-      <text class="value-text" x="${cx}" y="${valueY}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Courier New',monospace" font-weight="700"
-        fill="#fff" opacity="1">${displayText}</text>
-
-      <!-- Label: Kalam handwritten, icy white, bottom of OLED -->
-      <text class="label-text" x="${cx}" y="${labelY}" text-anchor="middle" dominant-baseline="central"
-        font-family="'Kalam', 'Segoe Script', cursive" font-weight="400"
-        fill="#FFFFFF">${label.toLowerCase()}</text>`;
-
-    const valEndDeg = ARC_START + ARC_SWEEP * this._value;
+    this._geom = { cx, cy, oledR, arcR };
 
     const svg = this._svg;
     svg.setAttribute('viewBox', `0 0 ${sz} ${sz}`);
     svg.setAttribute('width', sz);
     svg.setAttribute('height', sz);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
 
-    const trackPath = describeArc(cx, cy, arcR, ARC_START, ARC_END - 0.01);
-    const valPath = this._value > 0.001
-      ? describeArc(cx, cy, arcR, ARC_START, valEndDeg)
-      : '';
+    const defs = document.createElementNS(SVG_NS, 'defs');
+    defs.innerHTML =
+      `<filter id="glow-${sz}" x="-20%" y="-20%" width="140%" height="140%">` +
+        `<feGaussianBlur in="SourceGraphic" stdDeviation="2"/>` +
+      `</filter>`;
+    svg.appendChild(defs);
 
-    svg.innerHTML = `
-      <defs>
-        <filter id="glow-${sz}" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
-        </filter>
-      </defs>
+    const mkCircle = (r, fill, stroke, sw) => {
+      const c = document.createElementNS(SVG_NS, 'circle');
+      c.setAttribute('cx', cx);
+      c.setAttribute('cy', cy);
+      c.setAttribute('r', r);
+      if (fill) c.setAttribute('fill', fill); else c.setAttribute('fill', 'none');
+      if (stroke) { c.setAttribute('stroke', stroke); c.setAttribute('stroke-width', sw); }
+      svg.appendChild(c);
+      return c;
+    };
+    mkCircle(oledR, '#000');                                          // OLED well
+    mkCircle(oledR,        null, 'rgba(255,255,255,0.28)', 0.75);     // inner bright
+    mkCircle(oledR + 0.75, null, 'rgba(0,0,0,0.92)',       0.75);     // dark bevel
+    mkCircle(oledR + 1.5,  null, 'rgba(255,255,255,0.10)', 0.5);      // outer soft
 
-      <!-- Volcano face is painted by :host background + box-shadow (CSS). -->
+    const mkPath = (stroke, sw, filter) => {
+      const p = document.createElementNS(SVG_NS, 'path');
+      p.setAttribute('fill', 'none');
+      p.setAttribute('stroke', stroke);
+      p.setAttribute('stroke-width', sw);
+      p.setAttribute('stroke-linecap', 'round');
+      if (filter) p.setAttribute('filter', filter);
+      svg.appendChild(p);
+      return p;
+    };
+    const trackPath = mkPath('rgba(255,255,255,0.06)', 3.5);
+    trackPath.setAttribute('d', describeArc(cx, cy, arcR, ARC_START, ARC_END - 0.01));
+    const glowPath = mkPath('rgba(255,255,255,0.45)', 6, `url(#glow-${sz})`);
+    const valPath  = mkPath('#fff', 2.8);
+    glowPath.style.display = 'none';
+    valPath.style.display  = 'none';
 
+    const valueTexts = [];
+    let waveformPoly = null;
+    let labelText = null;
 
-      <!-- OLED well -->
-      <circle cx="${cx}" cy="${cy}" r="${oledR}" fill="#000"/>
+    const mkText = (cls, x, y, family, weight, opacity) => {
+      const t = document.createElementNS(SVG_NS, 'text');
+      t.setAttribute('class', cls);
+      t.setAttribute('x', x);
+      t.setAttribute('y', y);
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('dominant-baseline', 'central');
+      t.setAttribute('font-family', family);
+      t.setAttribute('font-weight', weight);
+      t.setAttribute('fill', '#fff');
+      if (opacity != null) t.setAttribute('opacity', opacity);
+      svg.appendChild(t);
+      return t;
+    };
 
-      <!-- Lip / ridge — thin rim above the OLED: inner bright, dark bevel, outer soft -->
-      <circle cx="${cx}" cy="${cy}" r="${oledR}" fill="none"
-        stroke="rgba(255,255,255,0.28)" stroke-width="0.75"/>
-      <circle cx="${cx}" cy="${cy}" r="${oledR + 0.75}" fill="none"
-        stroke="rgba(0,0,0,0.92)" stroke-width="0.75"/>
-      <circle cx="${cx}" cy="${cy}" r="${oledR + 1.5}" fill="none"
-        stroke="rgba(255,255,255,0.10)" stroke-width="0.5"/>
+    if (isWaveform) {
+      waveformPoly = document.createElementNS(SVG_NS, 'polyline');
+      waveformPoly.setAttribute('fill', 'none');
+      waveformPoly.setAttribute('stroke', '#fff');
+      waveformPoly.setAttribute('stroke-opacity', '0.85');
+      waveformPoly.setAttribute('stroke-width', '1.5');
+      waveformPoly.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(waveformPoly);
 
-      <!-- Arc track (full 270 deg) -->
-      <path d="${trackPath}" fill="none"
-        stroke="rgba(255,255,255,0.06)" stroke-width="3.5" stroke-linecap="round"/>
+      const vy = cy + oledR * 0.5;
+      for (const op of [0.3, 0.6, 1]) {
+        valueTexts.push(mkText('value-text', cx, vy, "'Courier New',monospace", 700, op));
+      }
+    } else {
+      const valueY = cy - (isLarge ? 4 : 3);
+      const labelY = cy + oledR - (isLarge ? 9 : 8);
+      for (const op of [0.3, 0.6, 1]) {
+        valueTexts.push(mkText('value-text', cx, valueY, "'Courier New',monospace", 700, op));
+      }
+      labelText = mkText('label-text', cx, labelY, "'Kalam', 'Segoe Script', cursive", 400, null);
+      labelText.textContent = (this.getAttribute('label') || '').toLowerCase();
+    }
 
-      ${valPath ? `
-      <!-- Arc glow -->
-      <path d="${valPath}" fill="none"
-        stroke="rgba(255,255,255,0.45)" stroke-width="6" stroke-linecap="round"
-        filter="url(#glow-${sz})"/>
+    this._parts = { glowPath, valPath, valueTexts, waveformPoly, labelText };
+  }
 
-      <!-- Arc value -->
-      <path d="${valPath}" fill="none"
-        stroke="#fff" stroke-width="2.8" stroke-linecap="round"/>
-      ` : ''}
+  _render() {
+    this._ensureScaffold();
+    const { cx, cy, oledR, arcR } = this._geom;
+    const { glowPath, valPath, valueTexts, waveformPoly, labelText } = this._parts;
 
-      ${oledContent}
-    `;
+    const displayText = this._displayValue || this._value.toFixed(2);
+    for (const t of valueTexts) t.textContent = displayText;
+
+    if (this._value > 0.001) {
+      const d = describeArc(cx, cy, arcR, ARC_START, ARC_START + ARC_SWEEP * this._value);
+      glowPath.setAttribute('d', d);
+      valPath.setAttribute('d', d);
+      glowPath.style.display = '';
+      valPath.style.display  = '';
+    } else {
+      glowPath.style.display = 'none';
+      valPath.style.display  = 'none';
+    }
+
+    if (waveformPoly) {
+      waveformPoly.setAttribute('points', buildWaveformPoints(this._value, cx, cy, oledR));
+    }
+
+    if (labelText) {
+      const l = (this.getAttribute('label') || '').toLowerCase();
+      if (labelText.textContent !== l) labelText.textContent = l;
+    }
   }
 }
 

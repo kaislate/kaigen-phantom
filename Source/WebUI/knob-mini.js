@@ -1,7 +1,6 @@
 // phantom-mini-knob — compact dark-mode rotary for the advanced panel.
 // Basic-mode knobs are in knob.js (separate component).
 
-const MK_TAU = Math.PI * 2;
 const MK_DEG = Math.PI / 180;
 const MK_ARC_START = 135;
 const MK_ARC_SWEEP = 270;

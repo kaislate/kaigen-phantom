@@ -184,6 +184,16 @@
     rafId = requestAnimationFrame(tick);
   }
 
+  function onVisibilityChange() {
+    if (!running) return;
+    if (document.hidden) {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    } else if (!rafId) {
+      lastFrameMs = 0;
+      rafId = requestAnimationFrame(tick);
+    }
+  }
+
   window.PhantomCircuitBoard = {
     start(canvasEl) {
       if (running) return;
@@ -191,16 +201,18 @@
       ctx = canvas.getContext('2d');
       resize();
       window.addEventListener('resize', resize);
+      document.addEventListener('visibilitychange', onVisibilityChange);
       running = true;
       pulses = [];
       lastFrameMs = 0;
       nextSpawnMs = performance.now() + 300;
-      rafId = requestAnimationFrame(tick);
+      if (!document.hidden) rafId = requestAnimationFrame(tick);
     },
     stop() {
       running = false;
-      if (rafId) cancelAnimationFrame(rafId);
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
       window.removeEventListener('resize', resize);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     }
   };
 })();
