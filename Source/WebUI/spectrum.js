@@ -156,17 +156,17 @@ function drawSpectrum() {
     const inPts  = buildCurvePoints(smoothedIn,  w, h);
     const outPts = buildCurvePoints(smoothedOut, w, h);
 
-    // ── Layer 1: input signal — dark gray fill + subtle line ──────────
+    // ── Layer 1: input signal — warm amber fill + subtle line ─────────
     if (inPts.length >= 2) {
         fillCurve(ctx, inPts, h);
         const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
-        fillGrad.addColorStop(0, 'rgba(180,180,180,0.14)');
-        fillGrad.addColorStop(1, 'rgba(100,100,100,0.04)');
+        fillGrad.addColorStop(0, 'rgba(220,170,80,0.20)');
+        fillGrad.addColorStop(1, 'rgba(180,130,60,0.04)');
         ctx.fillStyle = fillGrad;
         ctx.fill();
 
         strokeCurve(ctx, inPts);
-        ctx.strokeStyle = 'rgba(200,200,200,0.30)';
+        ctx.strokeStyle = 'rgba(230,180,90,0.50)';
         ctx.lineWidth = Math.max(1, h * 0.004);
         ctx.stroke();
     }
