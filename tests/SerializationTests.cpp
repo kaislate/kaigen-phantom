@@ -67,7 +67,7 @@ TEST_CASE("Default parameter values match spec")
     };
 
     REQUIRE(getFloat(ParamID::GHOST)             == Catch::Approx(100.0f).margin(0.1f));
-    REQUIRE(getFloat(ParamID::PHANTOM_THRESHOLD) == Catch::Approx(80.0f).margin(0.1f));
+    REQUIRE(getFloat(ParamID::PHANTOM_THRESHOLD) == Catch::Approx(120.0f).margin(0.1f));
     REQUIRE(getFloat(ParamID::PHANTOM_STRENGTH)  == Catch::Approx(80.0f).margin(0.1f));
     REQUIRE(getFloat(ParamID::BINAURAL_WIDTH)    == Catch::Approx(50.0f).margin(0.1f));
     REQUIRE(getFloat(ParamID::ENV_ATTACK_MS)     == Catch::Approx(1.0f).margin(0.1f));

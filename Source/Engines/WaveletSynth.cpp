@@ -9,10 +9,9 @@ static constexpr float kPi    = juce::MathConstants<float>::pi;
 void WaveletSynth::prepare(double sr) noexcept
 {
     sampleRate = sr;
-
-    // Valid period range: 16 Hz (sub) to maxTrackHz
-    minPeriodSamples = (float)(sr / (double)maxTrackHz);
-    maxPeriodSamples = (float)(sr / (double)minFreqHz);
+    // minPeriodSamples / maxPeriodSamples are configured via setMinPeriodSamples /
+    // setMaxPeriodSamples (called from syncParamsToEngine after prepareToPlay).
+    // Member defaults handle the brief window before the first sync.
 
     const double rampSec = 0.010; // 10 ms parameter smoothing
     // reset(sr, rampSec) recalculates ramp duration without touching the
@@ -25,6 +24,7 @@ void WaveletSynth::prepare(double sr) noexcept
     smoothGate  .reset(sr, rampSec);
     smoothBoostThr.reset(sr, rampSec);
     smoothBoostAmt.reset(sr, rampSec);
+    gateGainSmooth.reset(sr, 0.005); // 5 ms — smooths gate open/close transitions
 
     reset();
 }
@@ -35,13 +35,18 @@ void WaveletSynth::reset() noexcept
     samplesSinceLastCrossing = 0.0f;
     accumulatedSamples       = 0.0f;
     crossingsAccum           = 0;
-    currentPhase             = 0.0f;
+    currentPhase             = kTwoPi;  // start silent; reset to 0 at first valid crossing
     estimatedPeriod          = (float)(sampleRate / 100.0); // 100 Hz safe default
     inputPeak                = 0.0f;
     currentWaveletPeak       = 0.0f;
     lastWaveletPeak          = 0.0f;
-    lastGateGain             = 1.0f;
-    lastBoostGain            = 1.0f;
+    currentWaveletSumSq      = 0.0f;
+    currentWaveletSampleCount = 0;
+    lastWaveletRMS           = 0.0f;
+    gateOpen                 = true;
+    gateGainSmooth.setCurrentAndTargetValue(1.0f);
+    targetBoostGain   = 1.0f;
+    smoothedBoostGain = 1.0f;
 }
 
 // ── Parameter setters ──────────────────────────────────────────────────────
@@ -74,24 +79,27 @@ void WaveletSynth::setGateThreshold(float thr) noexcept
 
 void WaveletSynth::setTrackingSpeed(float speed) noexcept
 {
-    trackingAlpha = juce::jlimit(0.001f, 0.8f, speed);
+    trackingAlpha = juce::jlimit(0.001f, 1.0f, speed);
 }
 
-void WaveletSynth::setMaxTrackHz(float hz) noexcept
+void WaveletSynth::setMinPeriodSamples(float samples) noexcept
 {
-    maxTrackHz       = juce::jlimit(200.0f, 20000.0f, hz);
-    minPeriodSamples = (float)(sampleRate / (double)maxTrackHz);
+    minPeriodSamples = juce::jlimit(2.0f, 500.0f, samples);
 }
 
-void WaveletSynth::setMinFreqHz(float hz) noexcept
+void WaveletSynth::setMaxPeriodSamples(float samples) noexcept
 {
-    minFreqHz        = juce::jlimit(8.0f, 200.0f, hz);
-    maxPeriodSamples = (float)(sampleRate / (double)minFreqHz);
+    maxPeriodSamples = juce::jlimit(100.0f, 8000.0f, samples);
 }
 
 void WaveletSynth::setH1Amplitude(float amp) noexcept
 {
-    h1Amp = juce::jlimit(0.0f, 1.0f, amp);
+    h1Amp = juce::jlimit(0.0f, 2.0f, amp);
+}
+
+void WaveletSynth::setSubAmplitude(float amp) noexcept
+{
+    subAmp = juce::jlimit(0.0f, 2.0f, amp);
 }
 
 void WaveletSynth::setBoostThreshold(float thr) noexcept
@@ -106,14 +114,17 @@ void WaveletSynth::setBoostAmount(float amt) noexcept
 
 void WaveletSynth::setSkipCount(int n) noexcept
 {
-    const int newSkip = juce::jlimit(1, 8, n);
+    const int newSkip = juce::jlimit(0, 8, n);  // 0 = muted
     if (newSkip != skipCount)
     {
         // Scale accumulated samples proportionally so the EMA has a warm start.
         // e.g. going from skip=1 to skip=2: double the accumulation so the
         // first new measurement lands near the current estimate.
-        if (accumulatedSamples > 0.0f)
+        // Guard: don't scale when either side is 0 (would div-by-zero or produce nothing).
+        if (newSkip > 0 && skipCount > 0 && accumulatedSamples > 0.0f)
             accumulatedSamples *= (float)newSkip / (float)skipCount;
+        else
+            accumulatedSamples = 0.0f;
         skipCount            = newSkip;
         crossingsAccum       = 0;
         currentWaveletPeak   = 0.0f;   // discard partial-interval peak so Punch doesn't spike
@@ -189,6 +200,9 @@ float WaveletSynth::process(float x) noexcept
     // Decay lastWaveletPeak alongside inputPeak so Punch doesn't hold a stale
     // amplitude during silence and cause self-oscillation.
     lastWaveletPeak *= 0.9998f;
+    // RMS accumulation for gate (energy per waveset interval).
+    currentWaveletSumSq += x * x;
+    currentWaveletSampleCount++;
 
     // Advance gate smoother every sample (must not skip for correct ramp behaviour).
     const float rawGateVal = smoothGate.getNextValue();
@@ -221,14 +235,14 @@ float WaveletSynth::process(float x) noexcept
         {
             crossingsAccum++;
 
-            if (crossingsAccum >= skipCount)
+            if (crossingsAccum > skipCount)
             {
                 // ── Period estimation ────────────────────────────────────────
                 static constexpr float kAlphaRef = 0.25f;
                 if (inputPeak >= kAmplitudeFloor)
                 {
                     const float alphaScale = juce::jlimit(0.0f, 1.0f, inputPeak / kAlphaRef);
-                    const float maxDelta   = estimatedPeriod * 0.20f;
+                    const float maxDelta   = estimatedPeriod * 0.50f;
                     const float delta      = accumulatedSamples - estimatedPeriod;
                     estimatedPeriod += trackingAlpha * alphaScale * juce::jlimit(-maxDelta, maxDelta, delta);
                 }
@@ -247,38 +261,45 @@ float WaveletSynth::process(float x) noexcept
                 lastWaveletPeak    = currentWaveletPeak;
                 currentWaveletPeak = 0.0f;
 
-                // ── Miya-style amplitude gate ────────────────────────────────
-                // Gate operates on the completed wavelet's peak amplitude, not on
-                // the raw signal's negative excursion.  Soft knee (k=0.75) gives
-                // smooth transitions instead of binary pass/fail.
-                //   0% knob → gate off (gain=1)
-                //   at threshold: wavelets whose peak < threshold×inputPeak are attenuated
-                //   below threshold×0.75: fully silenced
+                // ── Latch waveset RMS energy ─────────────────────────────────
+                lastWaveletRMS = (currentWaveletSampleCount > 0)
+                    ? std::sqrt(currentWaveletSumSq / (float)currentWaveletSampleCount)
+                    : 0.0f;
+                currentWaveletSumSq      = 0.0f;
+                currentWaveletSampleCount = 0;
+
+                // ── Waveset gate (Miya Architecture A) ──────────────────────
+                // Hysteresis (~3 dB ≈ factor 0.71) prevents rapid flapping.
+                // Gate state drives gateGainSmooth; actual silence is a 5 ms
+                // fade rather than a hard cut to eliminate click artefacts.
+                //   0% knob → gate off (always open)
+                //   RMS > threshold → OPEN
+                //   RMS < threshold * 0.71 → CLOSED
+                //   in between → maintain previous state
                 if (rawGateVal <= 0.0f)
                 {
-                    lastGateGain = 1.0f;
+                    gateOpen = true;
                 }
                 else
                 {
-                    const float threshold  = rawGateVal * inputPeak;
-                    static constexpr float kKnee = 0.75f;
-                    const float lowerBound = threshold * kKnee;
-                    if (lastWaveletPeak >= threshold)
-                        lastGateGain = 1.0f;
-                    else if (lastWaveletPeak < lowerBound)
-                        lastGateGain = 0.0f;
-                    else
-                        lastGateGain = (lastWaveletPeak - lowerBound)
-                                     / (threshold - lowerBound);
+                    static constexpr float kHysteresis = 0.71f;  // ~3 dB below threshold
+                    const float openThr  = rawGateVal;
+                    const float closeThr = rawGateVal * kHysteresis;
+                    if (lastWaveletRMS >= openThr)
+                        gateOpen = true;
+                    else if (lastWaveletRMS < closeThr)
+                        gateOpen = false;
+                    // else: maintain previous state (hysteresis band)
                 }
+                gateGainSmooth.setTargetValue(gateOpen ? 1.0f : 0.0f);
 
                 // ── Upward expansion (Miya-style Threshold & Boost) ─────────
-                // If the wavelet peak exceeds the threshold, boost the output.
-                // This emphasises transients and strong harmonics.
+                // Sets targetBoostGain at each wavelet boundary; smoothedBoostGain
+                // tracks it per-sample to avoid step discontinuities.
                 if (rawBoostThr <= 0.0f || lastWaveletPeak < rawBoostThr * inputPeak)
-                    lastBoostGain = 1.0f;
+                    targetBoostGain = 1.0f;
                 else
-                    lastBoostGain = 1.0f + rawBoostAmt;
+                    targetBoostGain = 1.0f + rawBoostAmt;
             }
             samplesSinceLastCrossing = 0.0f;
         }
@@ -293,17 +314,18 @@ float WaveletSynth::process(float x) noexcept
     lastSample = x;
 
     // ── Phase advance ────────────────────────────────────────────────────
-    // Clamp period to valid range before dividing — prevents NaN/inf if the
-    // EMA somehow drifts out of bounds (e.g., first block before any crossings).
+    // Phase is NOT wrapped. Once it passes kTwoPi the wavelet window below
+    // silences output until the next valid crossing resets it to ~0. This
+    // makes synthesis naturally burst-like (discrete wavesets), matching
+    // Miya Architecture A behaviour.
     const float safePeriod = juce::jlimit(minPeriodSamples, maxPeriodSamples, estimatedPeriod);
     currentPhase += kTwoPi / safePeriod;
-    if (currentPhase >= kTwoPi)
-        currentPhase -= kTwoPi;
 
     // ── Advance shape smoothers (one step per audio sample) ──────────────
     const float step = smoothStep.getNextValue();
     const float duty = smoothDuty.getNextValue();
     const float len  = smoothLength.getNextValue();
+
 
     // ── Synthesise H2-H8 ─────────────────────────────────────────────────
     // H2-H8 additive content from recipe wheel, soft-clipped as a group.
@@ -331,27 +353,50 @@ float WaveletSynth::process(float x) noexcept
     }
 
     // ── Add H1 (fundamental) after harmonic soft-clip ─────────────────
-    // H1 is kept outside the harmonic soft-clip so its effect on the output
-    // is independent of how many harmonics are active. At h1Amp=0 you get
-    // pure harmonic content; at h1Amp=1 the fundamental always contributes
-    // a full unit-amplitude cycle regardless of recipe density.
-    y += h1Amp * shapedWave(warpPhase(currentPhase, duty), step);
+    // H1 is a pure sine at the fundamental — not shaped by Step or Push.
+    // This matches Miya's additive model: each partial is sin(n×φ), so the
+    // fundamental is always a clean sine regardless of shape settings.
+    // It also acts as a "glue" layer under heavy Step values since it stays
+    // smooth while H2-H8 are pushed toward square/harsh shapes.
+    y += h1Amp * std::sin(currentPhase);
 
-    // ── Amplitude gate: scale wavelet by gate gain (Miya-style) ────────
-    y *= lastGateGain;
-    y *= lastBoostGain;
+    // ── Sub-harmonic (H-1): one octave below the fundamental ──────────
+    // Phase at half the fundamental frequency = currentPhase / 2.
+    // Needs to wrap within [0, 2pi] independently.
+    if (subAmp > 0.0f)
+    {
+        const float subPhase = std::fmod(currentPhase * 0.5f, kTwoPi);
+        y += subAmp * shapedWave(warpPhase(subPhase, duty), step);
+    }
 
-    // ── Length gate: silence output after len×2π of each wavelet ────────
-    if (len < 1.0f)
+    // ── Smoothed gate gain + boost gain ─────────────────────────────────
+    // Gate ramps 0↔1 over 5 ms (set in prepare) — no hard clicks on open/close.
+    // Boost gain one-pole smooths between wavesets (~1 ms) instead of stepping.
+    const float gateGain = gateGainSmooth.getNextValue();
+    smoothedBoostGain += 0.05f * (targetBoostGain - smoothedBoostGain);
+    y *= gateGain * smoothedBoostGain;
+
+    // ── Wavelet window: silence once phase exceeds the active zone ───────
+    // Phase runs past 2π (no wrap) and stays there until the next valid crossing
+    // resets it.  len=1.0 means the full cycle plays (gateEnd = 2π). len<1.0
+    // truncates earlier with a cosine fade over the last 20% of the active zone.
+    // A matching cosine fade-in over the first 10% eliminates the leading click
+    // that occurred when each new wavelet started at full amplitude.
     {
         const float gateEnd   = len * kTwoPi;
-        const float fadeStart = gateEnd * 0.8f;   // cosine fade = last 20% of active zone
+        const float fadeStart = gateEnd * 0.80f;
+        const float fadeInEnd = gateEnd * 0.10f;
         if (currentPhase >= gateEnd)
-            y = 0.0f;
+            return 0.0f;
         else if (currentPhase >= fadeStart)
         {
             const float t = (currentPhase - fadeStart) / (gateEnd - fadeStart); // 0→1
-            y *= 0.5f * (1.0f + std::cos(kPi * t));  // cosine window 1→0
+            y *= 0.5f * (1.0f + std::cos(kPi * t));  // cosine 1→0
+        }
+        else if (currentPhase < fadeInEnd && fadeInEnd > 0.0f)
+        {
+            const float t = currentPhase / fadeInEnd;              // 0→1
+            y *= 0.5f * (1.0f - std::cos(kPi * t));               // cosine 0→1
         }
     }
     return y;

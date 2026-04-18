@@ -156,27 +156,32 @@ void PhantomEngine::setTrackingSpeed(float speed)
     resynR.setTrackingSpeed(speed);
 }
 
-void PhantomEngine::setMaxTrackHz(float hz)
+void PhantomEngine::setMinPeriodSamples(float samples)
 {
-    synthL.setMaxTrackHz(hz);
-    synthR.setMaxTrackHz(hz);
-    resynL.setMaxTrackHz(hz);
-    resynR.setMaxTrackHz(hz);
+    synthL.setMinPeriodSamples(samples);
+    synthR.setMinPeriodSamples(samples);
+    resynL.setMinPeriodSamples(samples);
+    resynR.setMinPeriodSamples(samples);
 }
 
-void PhantomEngine::setMinFreqHz(float hz)
+void PhantomEngine::setMaxPeriodSamples(float samples)
 {
-    synthL.setMinFreqHz(hz);
-    synthR.setMinFreqHz(hz);
-    resynL.setMinFreqHz(hz);
-    resynR.setMinFreqHz(hz);
+    synthL.setMaxPeriodSamples(samples);
+    synthR.setMaxPeriodSamples(samples);
+    resynL.setMaxPeriodSamples(samples);
+    resynR.setMaxPeriodSamples(samples);
 }
 
 void PhantomEngine::setH1Amplitude(float amp)
 {
-    // H1 only exists in WaveletSynth (RESYN mode) — ZCS never synthesises the fundamental
     resynL.setH1Amplitude(amp);
     resynR.setH1Amplitude(amp);
+}
+
+void PhantomEngine::setSubAmplitude(float amp)
+{
+    resynL.setSubAmplitude(amp);
+    resynR.setSubAmplitude(amp);
 }
 
 void PhantomEngine::setUsePunch(bool on)          { usePunch    = on; }
@@ -261,10 +266,12 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
 
         for (int i = 0; i < n; ++i)
         {
-            // Envelope source: main input bass band (default) or sidechain ch0
+            // Envelope source: full input signal (default) or sidechain ch0.
+            // Uses low+high (full input) rather than just the bass band so the
+            // envelope tracks input dynamics regardless of crossover setting.
             const float envIn = (envSource == 1 && sidechain != nullptr && sidechain->getNumChannels() > 0)
                 ? sidechain->getReadPointer(juce::jmin(ch, sidechain->getNumChannels() - 1))[i]
-                : low[i];
+                : (low[i] + high[i]);
             const float inLvl = env.process(envIn);
 
             // Both engines receive the raw bass-band signal for period detection.

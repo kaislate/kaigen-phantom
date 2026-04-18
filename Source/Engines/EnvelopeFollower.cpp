@@ -27,15 +27,20 @@ void EnvelopeFollower::setReleaseMs(float ms) noexcept
 
 void EnvelopeFollower::recomputeCoefs() noexcept
 {
-    // One-pole: coef = 1 - exp(-ln(1000) / (t * sr))
-    // Defines t as the time to decay from peak to −60 dBFS (factor 0.001),
-    // matching the standard audio engineering definition used by compressors.
-    // Using -1 instead of -ln(1000) would give the RC time constant (1/e in t),
-    // making the audible release ~7× longer than the labelled value.
-    const double srd    = juce::jmax(1.0, sampleRate);
-    const double ln1000 = 6.907755278982137; // ln(1000) = 3 * ln(10)
-    attackCoef  = 1.0f - static_cast<float>(std::exp(-ln1000 / (attackMs  * 0.001 * srd)));
-    releaseCoef = 1.0f - static_cast<float>(std::exp(-ln1000 / (releaseMs * 0.001 * srd)));
+    const double srd = juce::jmax(1.0, sampleRate);
+
+    // Attack: ln(1000) → time to charge from 0 to 99.9% of target (−60 dB gap).
+    // Fast and snappy — the envelope fully engages within the labelled attack time.
+    static constexpr double kAttackLn = 6.907755278982137;  // ln(1000)
+    attackCoef = 1.0f - static_cast<float>(std::exp(-kAttackLn / (attackMs * 0.001 * srd)));
+
+    // Release: ln(10) → time to decay to 10% of peak (−20 dB).
+    // Matches perceived release: the sound is still faintly audible at the labelled
+    // time, then tails off naturally.  With ln(1000) the displayed time mapped to
+    // −60 dB, making the last 2/3 of the release inaudibly quiet — a 5s release
+    // sounded like ~1.7s.  ln(10) fixes this perceptual mismatch.
+    static constexpr double kReleaseLn = 2.302585092994046;  // ln(10)
+    releaseCoef = 1.0f - static_cast<float>(std::exp(-kReleaseLn / (releaseMs * 0.001 * srd)));
 }
 
 float EnvelopeFollower::process(float input) noexcept

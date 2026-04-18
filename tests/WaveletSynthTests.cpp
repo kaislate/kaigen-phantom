@@ -194,62 +194,56 @@ TEST_CASE("WaveletSynth: slow tracking speed lags significantly on a pitch jump"
 
 // ─── Gate threshold ──────────────────────────────────────────────────────────
 
-TEST_CASE("WaveletSynth: Miya-style amplitude gate with soft knee")
+TEST_CASE("WaveletSynth: waveset gate — hard gating with RMS and hysteresis")
 {
-    // Gate operates on wavelet peak amplitude (not raw signal excursion).
-    // Threshold is normalised to inputPeak; soft knee (k=0.75) provides smooth transitions.
-    // Phase resets always fire — gate only attenuates the synthesised output.
-
-    // ── Full-amplitude sine: wavelet peak ≈ inputPeak → gate gain = 1 at any threshold <1
-    WaveletSynth fullSig;
-    fullSig.prepare(kSR);
-    fullSig.setGateThreshold(0.9f);
-    fullSig.setTrackingSpeed(0.25f);
+    // Miya-style: hard gating on waveset RMS energy with 3dB hysteresis.
+    // Entire wavesets are admitted (OPEN) or rejected (CLOSED).
 
     const float freq = 200.0f;
-    const float amp  = 0.5f;
     const float w    = 2.0f * juce::MathConstants<float>::pi * freq / (float)kSR;
-    float lastOut = 0.0f;
-    for (int i = 0; i < (int)(kSR); ++i)
+
+    // ── Loud signal (amp=0.5, RMS≈0.35) with gate at 0.3 → OPEN (0.35 > 0.3)
+    WaveletSynth loud;
+    loud.prepare(kSR);
+    loud.setGateThreshold(0.3f);
+    loud.setTrackingSpeed(0.25f);
+
+    float loudRms = 0.0f;
+    const int warmup = (int)(0.5 * kSR);
+    feedSine(loud, freq, warmup);  // warm up
+    const int N1 = (int)(0.5 * kSR);
+    for (int i = 0; i < N1; ++i)
     {
-        lastOut = fullSig.process(amp * std::sin(w * (float)i));
+        const float y = loud.process(0.5f * std::sin(w * (float)(i + warmup)));
+        loudRms += y * y;
     }
-    // Pitch always tracked regardless of gate.
-    REQUIRE(fullSig.getEstimatedHz() == Catch::Approx(200.0f).margin(15.0f));
-    // Wavelet peak ≈ amp, threshold = 0.9 * amp → peak > threshold → gain = 1
-    REQUIRE(fullSig.getWaveletPeak() > 0.0f);
+    loudRms = std::sqrt(loudRms / (float)N1);
+    // Gate should be open — RMS of 0.5 sine ≈ 0.35 > threshold 0.3
+    REQUIRE(loudRms > 0.3f);
 
-    // ── Quiet signal (10% of previous amplitude): should be gated at threshold 0.9
-    WaveletSynth quietSig;
-    quietSig.prepare(kSR);
-    quietSig.setGateThreshold(0.9f);
-    quietSig.setTrackingSpeed(0.25f);
+    // ── Quiet signal (amp=0.05, RMS≈0.035) with gate at 0.3 → CLOSED
+    WaveletSynth quiet;
+    quiet.prepare(kSR);
+    quiet.setGateThreshold(0.3f);
+    quiet.setTrackingSpeed(0.25f);
 
-    // First establish a loud signal to set inputPeak high
-    for (int i = 0; i < (int)(0.5 * kSR); ++i)
-        quietSig.process(amp * std::sin(w * (float)i));
-
-    // Immediately switch to 10% amplitude. inputPeak is still ~0.5 (decays slowly).
-    // threshold = 0.9 * ~0.5 = ~0.45, lowerBound = ~0.34
-    // wavelet peak ~0.05 < lowerBound → gate gain = 0
-    // Skip the first 20ms (one wavelet period) where lastGateGain is still 1.0
-    // from the loud section — the gate only updates at crossing points.
-    const int skip = (int)(0.02 * kSR);
+    // Skip first few wavesets for gate state to settle
+    const int skip = (int)(0.05 * kSR);
     for (int i = 0; i < skip; ++i)
-        quietSig.process(0.05f * std::sin(w * (float)i));
+        quiet.process(0.05f * std::sin(w * (float)i));
 
-    float rms = 0.0f;
-    const int N = (int)(0.08 * kSR);
-    for (int i = 0; i < N; ++i)
+    float quietRms = 0.0f;
+    const int N2 = (int)(0.5 * kSR);
+    for (int i = 0; i < N2; ++i)
     {
-        const float y = quietSig.process(0.05f * std::sin(w * (float)(i + skip)));
-        rms += y * y;
+        const float y = quiet.process(0.05f * std::sin(w * (float)(i + skip)));
+        quietRms += y * y;
     }
-    rms = std::sqrt(rms / (float)N);
-    // Gate should have heavily attenuated the output after the first wavelet.
-    REQUIRE(rms < 0.02f);
-    // But pitch tracking still works — gate doesn't block phase resets or period estimation.
-    REQUIRE(quietSig.getEstimatedHz() == Catch::Approx(200.0f).margin(15.0f));
+    quietRms = std::sqrt(quietRms / (float)N2);
+    // Gate should be CLOSED — RMS 0.035 < closeThr 0.3*0.71 = 0.213
+    REQUIRE(quietRms < 0.02f);
+    // Pitch tracking still works regardless of gate state
+    REQUIRE(quiet.getEstimatedHz() == Catch::Approx(200.0f).margin(15.0f));
 }
 
 // ─── Wavelet length ───────────────────────────────────────────────────────────
@@ -282,18 +276,19 @@ TEST_CASE("WaveletSynth: reduced length reduces output RMS")
 
 // ─── Skip count ──────────────────────────────────────────────────────────────
 
-TEST_CASE("WaveletSynth: skip=2 estimates period at twice the fundamental period")
+TEST_CASE("WaveletSynth: skip=1 estimates period at twice the fundamental period")
 {
-    // With skip=2 at 200 Hz (period=220.5 samples), accumulatedSamples spans
+    // With skip=1, crossingsAccum fires when crossingsAccum > 1 (i.e. after every
+    // 2nd crossing).  At 200 Hz (period=220.5 samples), accumulatedSamples spans
     // 2 crossings ≈ 441 samples.  estimatedPeriod converges to ~441, so
     // getEstimatedHz() = sr/estimatedPeriod ≈ 100 Hz (sub-octave of input).
     WaveletSynth syn;
     syn.prepare(kSR);
-    syn.setSkipCount(2);
+    syn.setSkipCount(1);
     syn.setTrackingSpeed(0.3f);
     feedSine(syn, 200.0f, (int)kSR);
 
-    // getEstimatedHz() with skip=2 should report ~100 Hz (= 200/2)
+    // getEstimatedHz() with skip=1 should report ~100 Hz (= 200/2)
     REQUIRE(syn.getEstimatedHz() == Catch::Approx(100.0f).margin(8.0f));
 }
 
@@ -321,7 +316,9 @@ TEST_CASE("WaveletSynth: minFreq rejects crossings below the floor")
 {
     WaveletSynth syn;
     syn.prepare(kSR);
-    syn.setMinFreqHz(100.0f);  // reject anything below 100 Hz
+    // 100 Hz at 44100 = 441 samples/period.  Set max period to 441 so crossings
+    // slower than 100 Hz (longer period) are rejected.
+    syn.setMaxPeriodSamples(441.0f);
     syn.setTrackingSpeed(0.25f);
 
     // Feed 50 Hz sine (below the 100 Hz floor) for 1 second
