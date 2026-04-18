@@ -186,6 +186,18 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 obj->setProperty("synthPeak",    (double) self.processor.engine.getSynthInputPeak());
                 complete(juce::var(obj));
             })
+        .withNativeFunction("setEditorHeight",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                const int height = args.size() > 0 ? (int) args[0] : 820;
+                const int clamped = juce::jlimit(400, 2000, height);
+                juce::MessageManager::callAsync([weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), clamped]
+                {
+                    if (auto* p = weakSelf.getComponent())
+                        p->setSize(1600, clamped);
+                });
+                complete(juce::var(true));
+            })
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });
 
     return options;
