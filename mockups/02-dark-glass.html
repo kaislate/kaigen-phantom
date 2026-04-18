@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Concept 2: Dark Glass</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#070710;width:1400px;height:820px;font-family:'Space Grotesk',sans-serif;color:#fff;overflow:hidden;
+  background-image:radial-gradient(ellipse at 20% 50%,#0d0d2a 0%,transparent 50%),radial-gradient(ellipse at 80% 30%,#1a0a20 0%,transparent 50%)}
+.wrap{width:100%;height:100%;display:grid;grid-template-rows:52px 1fr}
+.hdr{display:flex;align-items:center;padding:0 28px;gap:16px;
+  background:rgba(255,255,255,0.03);backdrop-filter:blur(40px);
+  border-bottom:1px solid rgba(255,255,255,0.06)}
+.logo{font-size:24px;font-weight:300;letter-spacing:14px;
+  background:linear-gradient(135deg,#a0a0ff,#ff80c0);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.brand{font-size:12px;letter-spacing:6px;color:#404060;margin-left:auto}
+.mode-sw{display:flex;gap:1px;background:rgba(0,0,0,0.4);border-radius:8px;padding:3px;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.05)}
+.mode-btn{padding:6px 18px;border:none;background:none;color:#505070;font:500 10px/1 'Space Grotesk';letter-spacing:2px;text-transform:uppercase;cursor:pointer;border-radius:6px;transition:all .2s}
+.mode-btn.active{background:rgba(255,255,255,0.06);color:#d0d0ff;box-shadow:0 0 20px rgba(100,100,255,0.1)}
+.body{display:grid;grid-template-columns:340px 1fr;gap:8px;padding:8px;overflow:hidden}
+/* Glass panels */
+.glass{background:rgba(255,255,255,0.02);backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;position:relative}
+.glass::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.04) 0%,transparent 50%);pointer-events:none}
+/* Wheel */
+.wheel-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:20px}
+.wheel{width:260px;height:260px;border-radius:50%;position:relative;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle,rgba(100,100,255,0.05) 0%,transparent 70%);
+  border:1px solid rgba(255,255,255,0.08);box-shadow:0 0 60px rgba(100,100,255,0.05)}
+.wheel-inner{width:240px;height:240px;border-radius:50%;border:1px solid rgba(255,255,255,0.04);position:absolute;display:flex;align-items:center;justify-content:center}
+.wheel-center{width:110px;height:110px;border-radius:50%;background:rgba(0,0,0,0.7);backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,0.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  box-shadow:0 0 30px rgba(0,0,0,0.5),inset 0 0 20px rgba(0,0,0,0.3)}
+.hz{font-size:22px;font-weight:300;color:#fff;text-shadow:0 0 10px rgba(150,150,255,0.5)}
+.note{font-size:9px;color:#7070a0;letter-spacing:3px}
+.spoke{position:absolute;width:2px;height:35px;background:linear-gradient(to top,rgba(100,120,255,0.6),transparent);transform-origin:bottom center;border-radius:1px}
+.spoke:nth-child(1){top:15px;left:50%;transform:translateX(-50%) rotate(0deg)}
+.spoke:nth-child(2){transform:rotate(51deg);top:30px;right:35px}
+.spoke:nth-child(3){transform:rotate(103deg);bottom:55px;right:18px}
+.spoke:nth-child(4){transform:rotate(154deg);bottom:22px;right:50px}
+.spoke:nth-child(5){transform:rotate(206deg);bottom:22px;left:50px}
+.spoke:nth-child(6){transform:rotate(257deg);bottom:55px;left:18px}
+.spoke:nth-child(7){transform:rotate(308deg);top:30px;left:35px}
+.presets{display:flex;gap:14px}
+.preset{font-size:9px;letter-spacing:2px;color:#303050;cursor:pointer;transition:all .2s}
+.preset.active{color:#a0a0ff;text-shadow:0 0 8px rgba(100,100,255,0.4)}
+/* Right */
+.right{display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.ctrl-row{display:flex;gap:8px;flex-shrink:0}
+.panel{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.panel-label{font-size:9px;font-weight:500;letter-spacing:3px;text-transform:uppercase;color:#505070}
+.knobs{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.knob{display:flex;flex-direction:column;align-items:center;gap:4px}
+.knob-ring{width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);
+  position:relative;backdrop-filter:blur(5px)}
+.knob-ring::after{content:'';position:absolute;top:5px;left:50%;width:2px;height:12px;
+  background:linear-gradient(to bottom,#8080ff,#8080ff80);transform:translateX(-50%) rotate(-45deg);transform-origin:bottom center;border-radius:1px}
+.knob-ring.lg{width:68px;height:68px}
+.knob-ring.lg::after{top:7px;height:16px}
+.knob-name{font-size:7px;color:#505070;letter-spacing:1.5px;text-transform:uppercase}
+.p-harmonic{flex:1}
+.p-ghost{flex:0.7}
+.p-small{flex:0.4}
+.p-punch{flex:0.5}
+.p-out{flex:0.3}
+.viz{display:flex;gap:8px;flex:1;min-height:0}
+.meter{width:12px;border-radius:6px}
+.viz-mid{flex:1;display:flex;flex-direction:column;gap:8px;min-height:0}
+.osc,.spec{border-radius:8px;position:relative;overflow:hidden}
+.osc{height:120px}
+.osc::after{content:'';position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(100,100,255,0.1)}
+.spec{flex:1;min-height:0}
+.glow-dot{position:absolute;width:4px;height:4px;border-radius:50%;background:#8080ff;box-shadow:0 0 6px #8080ff}
+</style></head><body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="logo">PHANTOM</div>
+    <div class="mode-sw"><div class="mode-btn active">Effect</div><div class="mode-btn">Resyn</div></div>
+    <div class="brand">KAIGEN</div>
+  </div>
+  <div class="body">
+    <div class="wheel-panel glass">
+      <div class="wheel">
+        <div class="spoke"></div><div class="spoke"></div><div class="spoke"></div><div class="spoke"></div><div class="spoke"></div><div class="spoke"></div><div class="spoke"></div>
+        <div class="wheel-center">
+          <div class="hz">82</div>
+          <div class="note">E2</div>
+        </div>
+      </div>
+      <div class="presets">
+        <span class="preset">Warm</span><span class="preset">Aggr</span><span class="preset">Hollow</span>
+        <span class="preset active">Stable</span><span class="preset">Dense</span><span class="preset">Weird</span>
+      </div>
+    </div>
+    <div class="right">
+      <div class="ctrl-row">
+        <div class="glass panel p-harmonic">
+          <div class="panel-label">Harmonic Engine</div>
+          <div class="knobs">
+            <div class="knob"><div class="knob-ring lg"></div><div class="knob-name">Saturation</div></div>
+            <div class="knob"><div class="knob-ring"></div><div class="knob-name">Strength</div></div>
+            <div class="knob"><div class="knob-ring lg"></div><div class="knob-name">Shape</div></div>
+            <div class="knob"><div class="knob-ring"></div><div class="knob-name">Push</div></div>
+            <div class="knob"><div class="knob-ring"></div><div class="knob-name">H1</div></div>
+            <div class="knob"><div class="knob-ring"></div><div class="knob-name">Length</div></div>
+            <div class="knob"><div class="knob-ring"></div><div class="knob-name">Gate</div></div>
+            <div class="knob"><div class="knob-ring"></div><div class="knob-name">Skip</div></div>
+            <div class="knob"><div class="knob-ring"></div><div class="knob-name">Lo</div></div>
+            <div class="knob"><div class="knob-ring"></div><div class="knob-name">Hi</div></div>
+            <div class="knob"><div class="knob-ring"></div><div class="knob-name">Track</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="ctrl-row">
+        <div class="glass panel p-ghost"><div class="panel-label">Ghost</div><div class="knobs"><div class="knob"><div class="knob-ring lg"></div><div class="knob-name">Amount</div></div><div class="knob"><div class="knob-ring"></div><div class="knob-name">Crossover</div></div></div></div>
+        <div class="glass panel p-small"><div class="panel-label">Stereo</div><div class="knobs"><div class="knob"><div class="knob-ring lg"></div><div class="knob-name">Width</div></div></div></div>
+        <div class="glass panel p-small"><div class="panel-label">Envelope</div><div class="knobs"><div class="knob"><div class="knob-ring"></div><div class="knob-name">Atk</div></div><div class="knob"><div class="knob-ring"></div><div class="knob-name">Rel</div></div></div></div>
+        <div class="glass panel p-small"><div class="panel-label">Filter</div><div class="knobs"><div class="knob"><div class="knob-ring"></div><div class="knob-name">LPF</div></div><div class="knob"><div class="knob-ring"></div><div class="knob-name">HPF</div></div></div></div>
+        <div class="glass panel p-punch"><div class="panel-label">Punch</div><div class="knobs"><div class="knob"><div class="knob-ring"></div><div class="knob-name">Amt</div></div><div class="knob"><div class="knob-ring"></div><div class="knob-name">Thr</div></div><div class="knob"><div class="knob-ring"></div><div class="knob-name">Boost</div></div></div></div>
+        <div class="glass panel p-out"><div class="panel-label">Output</div><div class="knobs"><div class="knob"><div class="knob-ring lg"></div><div class="knob-name">Gain</div></div></div></div>
+      </div>
+      <div class="viz">
+        <div class="glass meter"></div>
+        <div class="viz-mid">
+          <div class="glass osc"></div>
+          <div class="glass spec"></div>
+        </div>
+        <div class="glass meter"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

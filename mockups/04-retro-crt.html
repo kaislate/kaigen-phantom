@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Concept 4: Retro CRT Terminal</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#001200;width:1400px;height:820px;font-family:'VT323',monospace;color:#00ff41;overflow:hidden;position:relative}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.15) 2px,rgba(0,0,0,0.15) 4px);pointer-events:none;z-index:100}
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,0.5) 100%);pointer-events:none;z-index:99}
+@keyframes flicker{0%,100%{opacity:1}50%{opacity:0.98}}
+.wrap{width:100%;height:100%;display:grid;grid-template-rows:44px 1fr;animation:flicker 0.1s infinite;border:2px solid #003300}
+.hdr{display:flex;align-items:center;padding:0 16px;gap:16px;border-bottom:1px solid #003300;background:#001800}
+.logo{font-size:28px;color:#00ff41;letter-spacing:4px;text-shadow:0 0 10px #00ff41,0 0 30px #00ff4140}
+.brand{font-size:16px;color:#006620;margin-left:auto;letter-spacing:6px}
+.status{font-size:14px;color:#00ff41;text-shadow:0 0 5px #00ff41}
+.mode-sw{display:flex;gap:8px}
+.mode-btn{padding:4px 16px;border:1px solid #003300;background:none;color:#006620;font:16px 'VT323';cursor:pointer}
+.mode-btn.active{border-color:#00ff41;color:#00ff41;text-shadow:0 0 8px #00ff41;background:rgba(0,255,65,0.05)}
+.body{display:grid;grid-template-columns:340px 1fr;overflow:hidden}
+.wheel-panel{border-right:1px solid #003300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:16px;background:#001200}
+.wheel{width:260px;height:260px;border-radius:50%;border:1px solid #00ff41;position:relative;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 20px rgba(0,255,65,0.1),inset 0 0 30px rgba(0,255,65,0.03)}
+.wheel-center{width:100px;height:100px;border-radius:50%;background:#001200;border:1px solid #00aa30;
+  display:flex;flex-direction:column;align-items:center;justify-content:center}
+.hz{font-size:28px;color:#00ff41;text-shadow:0 0 10px #00ff41,0 0 20px #00ff4160}
+.note{font-size:14px;color:#006620}
+.h-lbl{position:absolute;font-size:14px;color:#00aa30}
+.h-lbl:nth-child(1){top:2px;left:50%;transform:translateX(-50%)}
+.h-lbl:nth-child(2){top:16%;right:8%}
+.h-lbl:nth-child(3){top:50%;right:0;transform:translateY(-50%)}
+.h-lbl:nth-child(4){bottom:16%;right:8%}
+.h-lbl:nth-child(5){bottom:16%;left:8%}
+.h-lbl:nth-child(6){top:50%;left:0;transform:translateY(-50%)}
+.h-lbl:nth-child(7){top:16%;left:8%}
+.presets{display:flex;gap:8px}
+.preset{font-size:14px;color:#003300;cursor:pointer;padding:2px 8px}
+.preset.active{color:#00ff41;text-shadow:0 0 8px #00ff41;border-bottom:1px solid #00ff41}
+.right{display:flex;flex-direction:column;overflow:hidden}
+.ctrl-row{display:flex;flex-shrink:0}
+.panel{padding:8px 10px;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid #003300;border-right:1px solid #003300}
+.panel:last-child{border-right:none}
+.panel-label{font-size:14px;color:#00aa30;letter-spacing:2px;border-bottom:1px dashed #003300;padding-bottom:2px}
+.knobs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.knob{display:flex;flex-direction:column;align-items:center;gap:2px}
+.knob-crt{width:44px;height:44px;border-radius:50%;border:1px solid #006620;position:relative;background:radial-gradient(circle,#002200 0%,#001200 100%)}
+.knob-crt::after{content:'';position:absolute;top:4px;left:50%;width:1px;height:12px;background:#00ff41;transform:translateX(-50%) rotate(-30deg);transform-origin:bottom center;
+  box-shadow:0 0 4px #00ff41}
+.knob-crt.lg{width:60px;height:60px}
+.knob-crt.lg::after{height:16px;top:5px}
+.knob-name{font-size:12px;color:#006620}
+.knob-val{font-size:11px;color:#00aa30}
+.p-he{flex:1}
+.p-gh{flex:0.7}
+.p-s{flex:0.4}
+.p-pu{flex:0.5}
+.p-o{flex:0.3}
+.viz{display:flex;flex:1;min-height:0}
+.meter{width:14px;background:#001200;border-right:1px solid #003300}
+.meter:last-child{border-left:1px solid #003300;border-right:none}
+.viz-mid{flex:1;display:flex;flex-direction:column;min-height:0}
+.osc{height:120px;background:#001200;border-bottom:1px solid #003300;position:relative}
+.osc::after{content:'';position:absolute;top:50%;left:0;right:0;height:1px;background:#003300}
+.osc-label{position:absolute;top:4px;left:8px;font-size:12px;color:#006620}
+.spec{flex:1;background:#001200;min-height:0;position:relative}
+.spec-label{position:absolute;top:4px;left:8px;font-size:12px;color:#006620}
+/* Fake waveform */
+.wave{position:absolute;top:50%;left:5%;right:5%;height:2px;background:linear-gradient(90deg,
+  transparent 0%,#00ff41 5%,transparent 10%,#00ff41 15%,transparent 20%,
+  #00ff41 25%,transparent 30%,#00ff41 50%,transparent 55%,
+  #00ff41 60%,transparent 65%,#00ff41 70%,transparent 75%,
+  #00ff41 80%,transparent 85%,#00ff41 90%,transparent 95%);
+  box-shadow:0 -8px 0 -7px #00ff41,0 8px 0 -7px #00ff41,0 -20px 0 -19px #00ff4180,0 20px 0 -19px #00ff4180;
+  filter:blur(0.5px)}
+</style></head><body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="logo">&gt;PHANTOM_</div>
+    <div class="mode-sw"><div class="mode-btn active">[EFFECT]</div><div class="mode-btn">[RESYN]</div></div>
+    <div class="status">SYS OK</div>
+    <div class="brand">KAIGEN//</div>
+  </div>
+  <div class="body">
+    <div class="wheel-panel">
+      <div class="wheel">
+        <div class="h-lbl">H2</div><div class="h-lbl">H3</div><div class="h-lbl">H4</div><div class="h-lbl">H5</div><div class="h-lbl">H6</div><div class="h-lbl">H7</div><div class="h-lbl">H8</div>
+        <div class="wheel-center"><div class="hz">82_</div><div class="note">E2</div></div>
+      </div>
+      <div class="presets">
+        <span class="preset">WARM</span><span class="preset">AGGR</span><span class="preset">HLLW</span>
+        <span class="preset active">STBL</span><span class="preset">DENS</span><span class="preset">WERD</span>
+      </div>
+    </div>
+    <div class="right">
+      <div class="ctrl-row">
+        <div class="panel p-he"><div class="panel-label">&gt;HARMONIC_ENGINE</div><div class="knobs">
+          <div class="knob"><div class="knob-crt lg"></div><div class="knob-name">SAT</div></div>
+          <div class="knob"><div class="knob-crt"></div><div class="knob-name">STR</div></div>
+          <div class="knob"><div class="knob-crt lg"></div><div class="knob-name">SHP</div></div>
+          <div class="knob"><div class="knob-crt"></div><div class="knob-name">PSH</div></div>
+          <div class="knob"><div class="knob-crt"></div><div class="knob-name">H1</div></div>
+          <div class="knob"><div class="knob-crt"></div><div class="knob-name">LEN</div></div>
+          <div class="knob"><div class="knob-crt"></div><div class="knob-name">GTE</div></div>
+          <div class="knob"><div class="knob-crt"></div><div class="knob-name">SKP</div></div>
+          <div class="knob"><div class="knob-crt"></div><div class="knob-name">LO</div></div>
+          <div class="knob"><div class="knob-crt"></div><div class="knob-name">HI</div></div>
+          <div class="knob"><div class="knob-crt"></div><div class="knob-name">TRK</div></div>
+        </div></div>
+      </div>
+      <div class="ctrl-row">
+        <div class="panel p-gh"><div class="panel-label">&gt;GHOST</div><div class="knobs"><div class="knob"><div class="knob-crt lg"></div><div class="knob-name">AMT</div></div><div class="knob"><div class="knob-crt"></div><div class="knob-name">XVR</div></div></div></div>
+        <div class="panel p-s"><div class="panel-label">&gt;STEREO</div><div class="knobs"><div class="knob"><div class="knob-crt lg"></div><div class="knob-name">WDT</div></div></div></div>
+        <div class="panel p-s"><div class="panel-label">&gt;ENV</div><div class="knobs"><div class="knob"><div class="knob-crt"></div><div class="knob-name">ATK</div></div><div class="knob"><div class="knob-crt"></div><div class="knob-name">REL</div></div></div></div>
+        <div class="panel p-s"><div class="panel-label">&gt;FLT</div><div class="knobs"><div class="knob"><div class="knob-crt"></div><div class="knob-name">LP</div></div><div class="knob"><div class="knob-crt"></div><div class="knob-name">HP</div></div></div></div>
+        <div class="panel p-pu"><div class="panel-label">&gt;PUNCH</div><div class="knobs"><div class="knob"><div class="knob-crt"></div><div class="knob-name">AMT</div></div><div class="knob"><div class="knob-crt"></div><div class="knob-name">THR</div></div><div class="knob"><div class="knob-crt"></div><div class="knob-name">BST</div></div></div></div>
+        <div class="panel p-o"><div class="panel-label">&gt;OUT</div><div class="knobs"><div class="knob"><div class="knob-crt lg"></div><div class="knob-name">GN</div></div></div></div>
+      </div>
+      <div class="viz">
+        <div class="meter"></div>
+        <div class="viz-mid">
+          <div class="osc"><span class="osc-label">SCOPE://CH1</span><div class="wave"></div></div>
+          <div class="spec"><span class="spec-label">FFT://8192</span></div>
+        </div>
+        <div class="meter"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

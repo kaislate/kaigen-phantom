@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Concept 3: Brutalist Industrial</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a1a;width:1400px;height:820px;font-family:'Space Mono',monospace;color:#e0e0e0;overflow:hidden}
+.wrap{width:100%;height:100%;display:grid;grid-template-rows:56px 1fr;border:3px solid #333}
+.hdr{display:flex;align-items:center;padding:0 20px;gap:20px;border-bottom:3px solid #333;background:#111}
+.logo{font-size:28px;font-weight:700;letter-spacing:8px;color:#ff4400;text-transform:uppercase}
+.brand{font-size:14px;font-weight:400;letter-spacing:8px;color:#555;margin-left:auto;text-transform:uppercase}
+.mode-sw{display:flex;border:2px solid #444}
+.mode-btn{padding:8px 20px;border:none;background:#111;color:#555;font:700 11px/1 'Space Mono';letter-spacing:3px;text-transform:uppercase;cursor:pointer}
+.mode-btn.active{background:#ff4400;color:#000}
+.mode-btn+.mode-btn{border-left:2px solid #444}
+.body{display:grid;grid-template-columns:340px 1fr;border-top:0;overflow:hidden}
+/* Wheel */
+.wheel-panel{border-right:3px solid #333;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;background:#111;padding:20px}
+.wheel{width:260px;height:260px;border-radius:50%;border:3px solid #ff4400;position:relative;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 0 1px #111,0 0 0 5px #222}
+.wheel-center{width:100px;height:100px;border-radius:50%;background:#000;border:2px solid #444;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.hz{font-size:24px;font-weight:700;color:#ff4400}
+.note{font-size:10px;color:#666;letter-spacing:3px}
+.bar{position:absolute;width:3px;background:#ff4400;transform-origin:bottom center}
+.bar:nth-child(1){height:30px;top:10px;left:50%;transform:translateX(-50%)}
+.bar:nth-child(2){height:22px;top:28px;right:38px;transform:rotate(51deg)}
+.bar:nth-child(3){height:18px;top:100px;right:12px;transform:rotate(90deg)}
+.bar:nth-child(4){height:25px;bottom:35px;right:42px;transform:rotate(140deg)}
+.bar:nth-child(5){height:15px;bottom:35px;left:42px;transform:rotate(220deg)}
+.bar:nth-child(6){height:20px;top:100px;left:12px;transform:rotate(270deg)}
+.bar:nth-child(7){height:28px;top:28px;left:38px;transform:rotate(310deg)}
+.presets{display:flex;gap:4px}
+.preset{font-size:10px;padding:4px 10px;background:#1a1a1a;border:1px solid #333;color:#555;cursor:pointer;letter-spacing:1px}
+.preset.active{background:#ff4400;color:#000;border-color:#ff4400;font-weight:700}
+/* Right */
+.right{display:flex;flex-direction:column;overflow:hidden}
+.ctrl-row{display:flex;flex-shrink:0}
+.panel{padding:10px 12px;display:flex;flex-direction:column;gap:6px;border-bottom:2px solid #333;border-right:2px solid #333}
+.panel:last-child{border-right:none}
+.panel-label{font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#ff4400;border-bottom:1px solid #333;padding-bottom:4px}
+.knobs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.knob{display:flex;flex-direction:column;align-items:center;gap:3px}
+.knob-sq{width:48px;height:48px;background:#0a0a0a;border:2px solid #444;position:relative}
+.knob-sq::after{content:'';position:absolute;top:4px;left:50%;width:2px;height:16px;background:#ff4400;transform:translateX(-50%) rotate(-30deg);transform-origin:bottom center}
+.knob-sq.lg{width:64px;height:64px}
+.knob-sq.lg::after{height:20px;top:6px}
+.knob-name{font-size:7px;color:#666;letter-spacing:1.5px;text-transform:uppercase}
+.p-harmonic{flex:1}
+.p-ghost{flex:0.7}
+.p-sm{flex:0.4}
+.p-punch{flex:0.5}
+.p-out{flex:0.3}
+.viz{display:flex;flex:1;min-height:0}
+.meter{width:16px;background:#0a0a0a;border-right:2px solid #333}
+.meter:last-child{border-right:none;border-left:2px solid #333}
+.viz-mid{flex:1;display:flex;flex-direction:column;min-height:0}
+.osc{height:120px;background:#0a0a0a;border-bottom:2px solid #333;position:relative}
+.osc::after{content:'';position:absolute;top:50%;left:0;right:0;height:1px;background:#333}
+.spec{flex:1;background:#0a0a0a;min-height:0}
+.warning{position:absolute;top:4px;right:8px;font-size:8px;color:#ff4400;letter-spacing:2px}
+</style></head><body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="logo">PHANTOM</div>
+    <div class="mode-sw"><div class="mode-btn active">EFFECT</div><div class="mode-btn">RESYN</div></div>
+    <div class="brand">KAIGEN</div>
+  </div>
+  <div class="body">
+    <div class="wheel-panel">
+      <div class="wheel">
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        <div class="wheel-center"><div class="hz">82</div><div class="note">E2</div></div>
+      </div>
+      <div class="presets">
+        <span class="preset">WARM</span><span class="preset">AGGR</span><span class="preset">HLLW</span>
+        <span class="preset active">STBL</span><span class="preset">DENS</span><span class="preset">WERD</span>
+      </div>
+    </div>
+    <div class="right">
+      <div class="ctrl-row">
+        <div class="panel p-harmonic"><div class="panel-label">HARMONIC ENGINE</div><div class="knobs">
+          <div class="knob"><div class="knob-sq lg"></div><div class="knob-name">SAT</div></div>
+          <div class="knob"><div class="knob-sq"></div><div class="knob-name">STR</div></div>
+          <div class="knob"><div class="knob-sq lg"></div><div class="knob-name">SHAPE</div></div>
+          <div class="knob"><div class="knob-sq"></div><div class="knob-name">PUSH</div></div>
+          <div class="knob"><div class="knob-sq"></div><div class="knob-name">H1</div></div>
+          <div class="knob"><div class="knob-sq"></div><div class="knob-name">LEN</div></div>
+          <div class="knob"><div class="knob-sq"></div><div class="knob-name">GATE</div></div>
+          <div class="knob"><div class="knob-sq"></div><div class="knob-name">SKIP</div></div>
+          <div class="knob"><div class="knob-sq"></div><div class="knob-name">LO</div></div>
+          <div class="knob"><div class="knob-sq"></div><div class="knob-name">HI</div></div>
+          <div class="knob"><div class="knob-sq"></div><div class="knob-name">TRK</div></div>
+        </div></div>
+      </div>
+      <div class="ctrl-row">
+        <div class="panel p-ghost"><div class="panel-label">GHOST</div><div class="knobs"><div class="knob"><div class="knob-sq lg"></div><div class="knob-name">AMT</div></div><div class="knob"><div class="knob-sq"></div><div class="knob-name">XOVR</div></div></div></div>
+        <div class="panel p-sm"><div class="panel-label">STEREO</div><div class="knobs"><div class="knob"><div class="knob-sq lg"></div><div class="knob-name">WDT</div></div></div></div>
+        <div class="panel p-sm"><div class="panel-label">ENV</div><div class="knobs"><div class="knob"><div class="knob-sq"></div><div class="knob-name">ATK</div></div><div class="knob"><div class="knob-sq"></div><div class="knob-name">REL</div></div></div></div>
+        <div class="panel p-sm"><div class="panel-label">FILTER</div><div class="knobs"><div class="knob"><div class="knob-sq"></div><div class="knob-name">LPF</div></div><div class="knob"><div class="knob-sq"></div><div class="knob-name">HPF</div></div></div></div>
+        <div class="panel p-punch"><div class="panel-label">PUNCH</div><div class="knobs"><div class="knob"><div class="knob-sq"></div><div class="knob-name">AMT</div></div><div class="knob"><div class="knob-sq"></div><div class="knob-name">THR</div></div><div class="knob"><div class="knob-sq"></div><div class="knob-name">BST</div></div></div></div>
+        <div class="panel p-out"><div class="panel-label">OUT</div><div class="knobs"><div class="knob"><div class="knob-sq lg"></div><div class="knob-name">GAIN</div></div></div></div>
+      </div>
+      <div class="viz">
+        <div class="meter"></div>
+        <div class="viz-mid"><div class="osc"><span class="warning">SCOPE</span></div><div class="spec"><span class="warning" style="position:absolute;top:4px;right:8px">FFT</span></div></div>
+        <div class="meter"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Concept 8: Crystalline Prism</title>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#08080c;width:1400px;height:820px;font-family:'Exo 2',sans-serif;color:#fff;overflow:hidden;
+  background-image:linear-gradient(135deg,#0a0810 0%,#080810 50%,#0a0a14 100%)}
+@keyframes rainbow{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}
+@keyframes shimmer{0%,100%{opacity:0.5}50%{opacity:1}}
+.wrap{width:100%;height:100%;display:grid;grid-template-rows:50px 1fr}
+.hdr{display:flex;align-items:center;padding:0 24px;gap:16px;
+  background:linear-gradient(90deg,rgba(255,100,100,0.02),rgba(100,255,100,0.02),rgba(100,100,255,0.02));
+  border-bottom:1px solid rgba(255,255,255,0.04)}
+.logo{font-size:22px;font-weight:200;letter-spacing:14px;
+  background:linear-gradient(90deg,#ff6080,#ffb060,#60ff80,#6080ff,#c060ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:rainbow 8s linear infinite;
+  filter:drop-shadow(0 0 8px rgba(255,255,255,0.1))}
+.brand{font-size:11px;font-weight:400;letter-spacing:6px;color:#333;margin-left:auto}
+.mode-sw{display:flex;gap:2px}
+.mode-btn{padding:6px 18px;border:none;background:rgba(255,255,255,0.01);color:#334;
+  font:400 10px/1 'Exo 2';letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+  clip-path:polygon(6px 0,100% 0,calc(100% - 6px) 100%,0 100%);border:1px solid rgba(255,255,255,0.04)}
+.mode-btn.active{background:rgba(255,255,255,0.03);color:#aab;
+  border-color:rgba(255,255,255,0.08);box-shadow:0 0 10px rgba(255,255,255,0.03)}
+.body{display:grid;grid-template-columns:340px 1fr;gap:6px;padding:6px;overflow:hidden}
+/* Faceted panels */
+.facet{background:linear-gradient(135deg,rgba(255,255,255,0.02) 0%,rgba(255,255,255,0.005) 50%,rgba(255,255,255,0.015) 100%);
+  border:1px solid rgba(255,255,255,0.05);position:relative;overflow:hidden;
+  clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px))}
+.facet::before{content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,100,100,0.015),transparent 25%,rgba(100,255,100,0.01) 50%,transparent 75%,rgba(100,100,255,0.015));
+  pointer-events:none}
+.facet::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent);animation:shimmer 3s ease-in-out infinite}
+/* Corner facet marks */
+.facet-mark{position:absolute;width:10px;height:10px}
+.facet-mark.tl{top:0;left:0;border-top:1px solid rgba(255,100,100,0.15);border-left:1px solid rgba(255,100,100,0.15)}
+.facet-mark.br{bottom:0;right:0;border-bottom:1px solid rgba(100,100,255,0.15);border-right:1px solid rgba(100,100,255,0.15)}
+/* Wheel */
+.wheel-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:20px}
+.wheel{width:260px;height:260px;position:relative;display:flex;align-items:center;justify-content:center}
+/* Diamond-cut ring */
+.diamond-ring{position:absolute;inset:0;border-radius:50%;
+  border:1px solid rgba(255,255,255,0.06);
+  background:conic-gradient(from 0deg,rgba(255,100,100,0.04),rgba(255,200,100,0.02),rgba(100,255,100,0.04),rgba(100,200,255,0.02),rgba(200,100,255,0.04),rgba(255,100,100,0.04));
+  animation:rainbow 12s linear infinite}
+.diamond-ring2{position:absolute;inset:20px;border-radius:50%;border:1px solid rgba(255,255,255,0.03)}
+.wheel-center{width:100px;height:100px;border-radius:0;background:#060608;
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  border:1px solid rgba(255,255,255,0.08);position:relative;z-index:1}
+.hz{font-size:22px;font-weight:200;
+  background:linear-gradient(135deg,#ff8090,#80b0ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.note{font-size:9px;color:#445;letter-spacing:3px;font-weight:300}
+.gem-label{position:absolute;font-size:8px;font-weight:500;letter-spacing:1px;
+  background:linear-gradient(135deg,#ff8090,#80b0ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.gem-label:nth-child(1){top:0;left:50%;transform:translateX(-50%)}
+.gem-label:nth-child(2){top:14%;right:6%}
+.gem-label:nth-child(3){top:48%;right:-2%}
+.gem-label:nth-child(4){bottom:14%;right:6%}
+.gem-label:nth-child(5){bottom:14%;left:6%}
+.gem-label:nth-child(6){top:48%;left:-2%}
+.gem-label:nth-child(7){top:14%;left:6%}
+.presets{display:flex;gap:12px}
+.preset{font-size:8px;letter-spacing:2px;color:#223;cursor:pointer;font-weight:400}
+.preset.active{background:linear-gradient(135deg,#ff8090,#80b0ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.right{display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.ctrl-row{display:flex;gap:6px;flex-shrink:0}
+.panel{padding:10px 14px;display:flex;flex-direction:column;gap:6px}
+.panel-label{font-size:8px;font-weight:500;letter-spacing:4px;text-transform:uppercase;color:#334}
+.knobs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.knob{display:flex;flex-direction:column;align-items:center;gap:3px}
+.knob-gem{width:46px;height:46px;position:relative;
+  background:linear-gradient(135deg,rgba(255,255,255,0.03),rgba(255,255,255,0.005));
+  clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);/* diamond shape */
+  border:1px solid rgba(255,255,255,0.06)}
+.knob-gem::after{content:'';position:absolute;top:15%;left:50%;width:1px;height:25%;
+  background:linear-gradient(to bottom,rgba(255,150,150,0.6),rgba(150,150,255,0.3),transparent);
+  transform:translateX(-50%) rotate(-30deg);transform-origin:bottom center}
+.knob-gem.lg{width:60px;height:60px}
+.knob-name{font-size:6px;color:#334;letter-spacing:2px;text-transform:uppercase;font-weight:400}
+.p-he{flex:1}
+.p-gh{flex:0.7}
+.p-s{flex:0.4}
+.p-pu{flex:0.5}
+.p-o{flex:0.3}
+.viz{display:flex;gap:6px;flex:1;min-height:0}
+.meter{width:10px}
+.viz-mid{flex:1;display:flex;flex-direction:column;gap:6px;min-height:0}
+.osc{height:120px;position:relative}
+.osc::after{content:'';position:absolute;top:50%;left:5%;right:5%;height:1px;
+  background:linear-gradient(90deg,rgba(255,100,100,0.06),rgba(100,100,255,0.06))}
+.spec{flex:1;min-height:0}
+</style></head><body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="logo">PHANTOM</div>
+    <div class="mode-sw"><div class="mode-btn active">EFFECT</div><div class="mode-btn">RESYN</div></div>
+    <div class="brand">KAIGEN</div>
+  </div>
+  <div class="body">
+    <div class="facet wheel-panel">
+      <div class="wheel">
+        <div class="diamond-ring"></div><div class="diamond-ring2"></div>
+        <div class="gem-label">H2</div><div class="gem-label">H3</div><div class="gem-label">H4</div><div class="gem-label">H5</div><div class="gem-label">H6</div><div class="gem-label">H7</div><div class="gem-label">H8</div>
+        <div class="wheel-center"><div class="hz">82</div><div class="note">E2</div></div>
+      </div>
+      <div class="presets">
+        <span class="preset">Warm</span><span class="preset">Aggr</span><span class="preset">Hollow</span>
+        <span class="preset active">Stable</span><span class="preset">Dense</span><span class="preset">Weird</span>
+      </div>
+    </div>
+    <div class="right">
+      <div class="ctrl-row">
+        <div class="facet panel p-he"><div class="panel-label">Harmonic Engine</div><div class="knobs">
+          <div class="knob"><div class="knob-gem lg"></div><div class="knob-name">Sat</div></div>
+          <div class="knob"><div class="knob-gem"></div><div class="knob-name">Str</div></div>
+          <div class="knob"><div class="knob-gem lg"></div><div class="knob-name">Shape</div></div>
+          <div class="knob"><div class="knob-gem"></div><div class="knob-name">Push</div></div>
+          <div class="knob"><div class="knob-gem"></div><div class="knob-name">H1</div></div>
+          <div class="knob"><div class="knob-gem"></div><div class="knob-name">Len</div></div>
+          <div class="knob"><div class="knob-gem"></div><div class="knob-name">Gate</div></div>
+          <div class="knob"><div class="knob-gem"></div><div class="knob-name">Skip</div></div>
+          <div class="knob"><div class="knob-gem"></div><div class="knob-name">Lo</div></div>
+          <div class="knob"><div class="knob-gem"></div><div class="knob-name">Hi</div></div>
+          <div class="knob"><div class="knob-gem"></div><div class="knob-name">Trk</div></div>
+        </div></div>
+      </div>
+      <div class="ctrl-row">
+        <div class="facet panel p-gh"><div class="panel-label">Ghost</div><div class="knobs"><div class="knob"><div class="knob-gem lg"></div><div class="knob-name">Amt</div></div><div class="knob"><div class="knob-gem"></div><div class="knob-name">Xovr</div></div></div></div>
+        <div class="facet panel p-s"><div class="panel-label">Stereo</div><div class="knobs"><div class="knob"><div class="knob-gem lg"></div><div class="knob-name">Wdt</div></div></div></div>
+        <div class="facet panel p-s"><div class="panel-label">Env</div><div class="knobs"><div class="knob"><div class="knob-gem"></div><div class="knob-name">Atk</div></div><div class="knob"><div class="knob-gem"></div><div class="knob-name">Rel</div></div></div></div>
+        <div class="facet panel p-s"><div class="panel-label">Filter</div><div class="knobs"><div class="knob"><div class="knob-gem"></div><div class="knob-name">LPF</div></div><div class="knob"><div class="knob-gem"></div><div class="knob-name">HPF</div></div></div></div>
+        <div class="facet panel p-pu"><div class="panel-label">Punch</div><div class="knobs"><div class="knob"><div class="knob-gem"></div><div class="knob-name">Amt</div></div><div class="knob"><div class="knob-gem"></div><div class="knob-name">Thr</div></div><div class="knob"><div class="knob-gem"></div><div class="knob-name">Bst</div></div></div></div>
+        <div class="facet panel p-o"><div class="panel-label">Out</div><div class="knobs"><div class="knob"><div class="knob-gem lg"></div><div class="knob-name">Gain</div></div></div></div>
+      </div>
+      <div class="viz">
+        <div class="facet meter"></div>
+        <div class="viz-mid"><div class="facet osc"></div><div class="facet spec"></div></div>
+        <div class="facet meter"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

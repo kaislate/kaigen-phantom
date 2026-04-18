@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Concept 7: Japanese Wabi-Sabi</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@200;300;400&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f0e0c;width:1400px;height:820px;font-family:'Noto Serif JP',serif;color:#c8b8a0;overflow:hidden}
+.wrap{width:100%;height:100%;display:grid;grid-template-rows:52px 1fr;
+  background:linear-gradient(180deg,#0f0e0c,#121110)}
+.hdr{display:flex;align-items:center;padding:0 28px;gap:20px;
+  border-bottom:1px solid rgba(200,180,140,0.06)}
+.logo{font-size:26px;font-weight:200;letter-spacing:16px;color:rgba(200,180,140,0.5);
+  text-shadow:0 1px 2px rgba(0,0,0,0.8)}
+.brand{font-size:12px;font-weight:300;letter-spacing:8px;color:rgba(200,180,140,0.2);margin-left:auto}
+.mode-sw{display:flex;gap:12px}
+.mode-btn{padding:4px 0;border:none;background:none;color:rgba(200,180,140,0.15);
+  font:300 12px/1 'Noto Serif JP';letter-spacing:3px;cursor:pointer;position:relative}
+.mode-btn.active{color:rgba(200,180,140,0.7)}
+.mode-btn.active::after{content:'';position:absolute;bottom:-2px;left:20%;right:20%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(200,160,80,0.5),transparent)}
+.body{display:grid;grid-template-columns:340px 1fr;gap:0;overflow:hidden;padding:12px;
+  background-image:url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.8' numOctaves='4' seed='2'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)' opacity='0.015'/%3E%3C/svg%3E")}
+/* Panels */
+.ink{background:rgba(20,18,16,0.7);border:1px solid rgba(200,180,140,0.04);border-radius:2px;
+  position:relative;overflow:hidden}
+.ink::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent 10%,rgba(200,160,80,0.15) 50%,transparent 90%)}
+/* Gold kintsugi accent line */
+.kintsugi{position:relative}
+.kintsugi::after{content:'';position:absolute;bottom:0;left:15%;right:60%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(212,175,55,0.4),rgba(212,175,55,0.1),transparent);filter:blur(0.3px)}
+/* Wheel */
+.wheel-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:20px;margin-right:12px}
+.wheel{width:260px;height:260px;border-radius:50%;position:relative;display:flex;align-items:center;justify-content:center;
+  border:1px solid rgba(200,180,140,0.06);
+  background:radial-gradient(circle,rgba(200,180,140,0.02) 0%,transparent 60%)}
+/* Brush stroke ring */
+.wheel::before{content:'';position:absolute;inset:8px;border-radius:50%;
+  border:2px solid transparent;border-top-color:rgba(200,180,140,0.08);border-right-color:rgba(200,180,140,0.04);
+  transform:rotate(20deg)}
+.wheel-center{width:100px;height:100px;border-radius:50%;background:#0a0908;
+  border:1px solid rgba(200,180,140,0.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.hz{font-size:28px;font-weight:200;color:rgba(212,175,55,0.8);text-shadow:0 0 12px rgba(212,175,55,0.2)}
+.note{font-size:10px;color:rgba(200,180,140,0.3);letter-spacing:4px;font-weight:300}
+.h-kanji{position:absolute;font-size:10px;font-weight:300;color:rgba(200,180,140,0.15)}
+.h-kanji:nth-child(1){top:2%;left:50%;transform:translateX(-50%)}
+.h-kanji:nth-child(2){top:16%;right:8%}
+.h-kanji:nth-child(3){top:50%;right:0;transform:translateY(-50%)}
+.h-kanji:nth-child(4){bottom:16%;right:8%}
+.h-kanji:nth-child(5){bottom:16%;left:8%}
+.h-kanji:nth-child(6){top:50%;left:0;transform:translateY(-50%)}
+.h-kanji:nth-child(7){top:16%;left:8%}
+.presets{display:flex;gap:16px}
+.preset{font-size:10px;font-weight:300;color:rgba(200,180,140,0.1);cursor:pointer;letter-spacing:2px;transition:all .3s}
+.preset.active{color:rgba(212,175,55,0.7)}
+.right{display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.ctrl-row{display:flex;gap:8px;flex-shrink:0}
+.panel{padding:10px 14px;display:flex;flex-direction:column;gap:6px;border-radius:2px}
+.panel-label{font-size:9px;font-weight:300;letter-spacing:4px;color:rgba(200,180,140,0.2)}
+.knobs{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.knob{display:flex;flex-direction:column;align-items:center;gap:4px}
+.knob-stone{width:48px;height:48px;border-radius:50%;position:relative;
+  background:radial-gradient(ellipse at 40% 35%,rgba(60,55,45,0.8),rgba(30,28,24,0.9));
+  border:1px solid rgba(200,180,140,0.06);box-shadow:2px 3px 8px rgba(0,0,0,0.4),-1px -1px 4px rgba(200,180,140,0.01)}
+.knob-stone::after{content:'';position:absolute;top:5px;left:50%;width:1px;height:12px;
+  background:rgba(212,175,55,0.5);transform:translateX(-50%) rotate(-30deg);transform-origin:bottom center}
+.knob-stone.lg{width:64px;height:64px}
+.knob-stone.lg::after{height:16px;top:6px}
+.knob-name{font-size:7px;color:rgba(200,180,140,0.15);letter-spacing:2px;font-weight:300}
+.p-he{flex:1}
+.p-gh{flex:0.7}
+.p-s{flex:0.4}
+.p-pu{flex:0.5}
+.p-o{flex:0.3}
+.viz{display:flex;gap:8px;flex:1;min-height:0}
+.meter{width:10px;border-radius:1px}
+.viz-mid{flex:1;display:flex;flex-direction:column;gap:8px;min-height:0}
+.osc{height:120px;border-radius:2px;position:relative}
+.osc::after{content:'';position:absolute;top:50%;left:8%;right:8%;height:1px;background:rgba(200,180,140,0.03)}
+.spec{flex:1;min-height:0;border-radius:2px}
+</style></head><body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="logo">PHANTOM</div>
+    <div class="mode-sw"><div class="mode-btn active">Effect</div><div class="mode-btn">Resyn</div></div>
+    <div class="brand">KAIGEN</div>
+  </div>
+  <div class="body">
+    <div class="ink kintsugi wheel-panel">
+      <div class="wheel">
+        <div class="h-kanji">H2</div><div class="h-kanji">H3</div><div class="h-kanji">H4</div><div class="h-kanji">H5</div><div class="h-kanji">H6</div><div class="h-kanji">H7</div><div class="h-kanji">H8</div>
+        <div class="wheel-center"><div class="hz">82</div><div class="note">E2</div></div>
+      </div>
+      <div class="presets">
+        <span class="preset">Warm</span><span class="preset">Aggr</span><span class="preset">Hollow</span>
+        <span class="preset active">Stable</span><span class="preset">Dense</span><span class="preset">Weird</span>
+      </div>
+    </div>
+    <div class="right">
+      <div class="ctrl-row">
+        <div class="ink kintsugi panel p-he"><div class="panel-label">Harmonic Engine</div><div class="knobs">
+          <div class="knob"><div class="knob-stone lg"></div><div class="knob-name">Saturation</div></div>
+          <div class="knob"><div class="knob-stone"></div><div class="knob-name">Strength</div></div>
+          <div class="knob"><div class="knob-stone lg"></div><div class="knob-name">Shape</div></div>
+          <div class="knob"><div class="knob-stone"></div><div class="knob-name">Push</div></div>
+          <div class="knob"><div class="knob-stone"></div><div class="knob-name">H1</div></div>
+          <div class="knob"><div class="knob-stone"></div><div class="knob-name">Length</div></div>
+          <div class="knob"><div class="knob-stone"></div><div class="knob-name">Gate</div></div>
+          <div class="knob"><div class="knob-stone"></div><div class="knob-name">Skip</div></div>
+          <div class="knob"><div class="knob-stone"></div><div class="knob-name">Lo</div></div>
+          <div class="knob"><div class="knob-stone"></div><div class="knob-name">Hi</div></div>
+          <div class="knob"><div class="knob-stone"></div><div class="knob-name">Track</div></div>
+        </div></div>
+      </div>
+      <div class="ctrl-row">
+        <div class="ink panel p-gh"><div class="panel-label">Ghost</div><div class="knobs"><div class="knob"><div class="knob-stone lg"></div><div class="knob-name">Amount</div></div><div class="knob"><div class="knob-stone"></div><div class="knob-name">Crossover</div></div></div></div>
+        <div class="ink panel p-s"><div class="panel-label">Stereo</div><div class="knobs"><div class="knob"><div class="knob-stone lg"></div><div class="knob-name">Width</div></div></div></div>
+        <div class="ink panel p-s"><div class="panel-label">Envelope</div><div class="knobs"><div class="knob"><div class="knob-stone"></div><div class="knob-name">Atk</div></div><div class="knob"><div class="knob-stone"></div><div class="knob-name">Rel</div></div></div></div>
+        <div class="ink panel p-s"><div class="panel-label">Filter</div><div class="knobs"><div class="knob"><div class="knob-stone"></div><div class="knob-name">LPF</div></div><div class="knob"><div class="knob-stone"></div><div class="knob-name">HPF</div></div></div></div>
+        <div class="ink panel p-pu"><div class="panel-label">Punch</div><div class="knobs"><div class="knob"><div class="knob-stone"></div><div class="knob-name">Amt</div></div><div class="knob"><div class="knob-stone"></div><div class="knob-name">Thr</div></div><div class="knob"><div class="knob-stone"></div><div class="knob-name">Boost</div></div></div></div>
+        <div class="ink panel p-o"><div class="panel-label">Output</div><div class="knobs"><div class="knob"><div class="knob-stone lg"></div><div class="knob-name">Gain</div></div></div></div>
+      </div>
+      <div class="viz">
+        <div class="ink meter"></div>
+        <div class="viz-mid"><div class="ink osc"></div><div class="ink spec"></div></div>
+        <div class="ink meter"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>
