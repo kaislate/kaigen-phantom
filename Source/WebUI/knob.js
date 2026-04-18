@@ -39,10 +39,12 @@ function shapedWave(wp, step) {
 
 function buildWaveformPoints(step, cx, cy, oledR) {
   const nPts = 64;
-  const xL = cx - (oledR - 5);
-  const xR = cx + (oledR - 5);
-  const yMid = cy - oledR * 0.15;
-  const yAmp = oledR * 0.45;
+  // Compact waveform — spans ~55% of OLED width at ~22% amplitude so the
+  // numeric value below has clear breathing room.
+  const xL = cx - oledR * 0.55;
+  const xR = cx + oledR * 0.55;
+  const yMid = cy - oledR * 0.20;
+  const yAmp = oledR * 0.22;
   const pts = [];
   for (let i = 0; i <= nPts; i++) {
     const t = (i / nPts) * TAU;
