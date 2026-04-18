@@ -1,180 +1,373 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "Parameters.h"
-#include <cmath>
 
 PhantomProcessor::PhantomProcessor()
     : AudioProcessor(BusesProperties()
         .withInput ("Input",     juce::AudioChannelSet::stereo(), true)
         .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)
         .withOutput("Output",    juce::AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "PHANTOM_STATE", createParameterLayout())
+      apvts(*this, nullptr, "PHANTOM_STATE", makeLayout())
 {
+    apvts.addParameterListener(ParamID::RECIPE_PRESET, this);
 }
 
-void PhantomProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
+PhantomProcessor::~PhantomProcessor()
 {
-    pitchTracker.prepare(sampleRate, samplesPerBlock);
-    harmonicGen .prepare(sampleRate, samplesPerBlock);
-    binauralStage.prepare(sampleRate, samplesPerBlock);
-    perceptualOpt.prepare(sampleRate, samplesPerBlock);
-    crossoverBlend.prepare(sampleRate, samplesPerBlock);
-
-    this->sampleRate = sampleRate;
-    stratStagger.setDelayMs(8.0f, sampleRate);
-
-    phantomBuf.setSize(2, samplesPerBlock, false, false, false);
-    dryBuf    .setSize(2, samplesPerBlock, false, false, false);
-    lastDeconflictionMode = -1;
+    apvts.removeParameterListener(ParamID::RECIPE_PRESET, this);
 }
 
-void PhantomProcessor::releaseResources()
+juce::AudioProcessorValueTreeState::ParameterLayout PhantomProcessor::makeLayout()
 {
-    pitchTracker.reset();
-    harmonicGen.reset();
-    binauralStage.reset();
-    crossoverBlend.reset();
+    return createParameterLayout();
 }
 
-void PhantomProcessor::syncEnginesFromApvts(bool isInstrumentMode)
+void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
 {
-    using namespace ParamID;
+    sampleRate = sr;
+    engine.prepare(sr, samplesPerBlock, 2);
 
-    const float ghost    = apvts.getRawParameterValue(GHOST)->load() / 100.0f;
-    const int   ghostModeIdx = (int)apvts.getRawParameterValue(GHOST_MODE)->load();
-    crossoverBlend.setGhost(ghost);
-    crossoverBlend.setGhostMode(ghostModeIdx == 0 ? GhostMode::Replace : GhostMode::Add);
+    // Auto input gain coefficients.
+    // Per-sample rates converted to per-block by raising (1-alpha) to the power of blockSize,
+    // which is the exact equivalent of running the IIR on every sample in the block.
+    const float perSampleAttack  = 1.0f - std::exp(-1.0f / (0.005f  * (float) sr)); // 5ms
+    const float perSampleRelease = 1.0f - std::exp(-1.0f / (0.400f  * (float) sr)); // 400ms
+    const float perSampleSmooth  = 1.0f - std::exp(-1.0f / (0.050f  * (float) sr)); // 50ms
+    const float n = (float) samplesPerBlock;
+    autoAttackCoef  = 1.0f - std::pow(1.0f - perSampleAttack,  n);
+    autoReleaseCoef = 1.0f - std::pow(1.0f - perSampleRelease, n);
+    autoSmoothCoef  = 1.0f - std::pow(1.0f - perSampleSmooth,  n);
+    autoEnvelope = 0.0f;
+    autoGain     = 1.0f;
 
-    const float threshold = apvts.getRawParameterValue(PHANTOM_THRESHOLD)->load();
-    crossoverBlend.setThresholdHz(threshold);
+    // Pre-allocate sidechain buffer to avoid heap allocation on the audio thread
+    const int scChannels = getChannelCountOfBus(true, 1);
+    if (scChannels > 0)
+        sidechainBuf.setSize(scChannels, samplesPerBlock, false, true, false);
 
-    const float gainDb = apvts.getRawParameterValue(OUTPUT_GAIN)->load();
-    crossoverBlend.setOutputGain(std::pow(10.0f, gainDb / 20.0f));
+    fftWritePos = 0;
+    fftBuffer.fill(0.0f);
+    spectrumData.fill(0.0f);
+    spectrumReady.store(false);
+}
 
-    crossoverBlend.setStereoWidth(apvts.getRawParameterValue(STEREO_WIDTH)->load() / 100.0f);
+void PhantomProcessor::releaseResources() {}
 
-    crossoverBlend.setSidechainDuckAmount(
-        apvts.getRawParameterValue(SIDECHAIN_DUCK_AMOUNT)->load() / 100.0f);
-    crossoverBlend.setDuckAttackMs(apvts.getRawParameterValue(SIDECHAIN_DUCK_ATTACK)->load());
-    crossoverBlend.setDuckReleaseMs(apvts.getRawParameterValue(SIDECHAIN_DUCK_RELEASE)->load());
+bool PhantomProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+{
+    // Accept stereo or mono main output. Input must match output channel count.
+    const auto& mainOut = layouts.getMainOutputChannelSet();
+    const auto& mainIn  = layouts.getMainInputChannelSet();
 
-    harmonicGen.setPhantomStrength(
-        apvts.getRawParameterValue(PHANTOM_STRENGTH)->load() / 100.0f);
+    if (mainOut != juce::AudioChannelSet::stereo() &&
+        mainOut != juce::AudioChannelSet::mono())
+        return false;
 
-    static const char* ampIDs[7] = {
-        RECIPE_H2, RECIPE_H3, RECIPE_H4, RECIPE_H5, RECIPE_H6, RECIPE_H7, RECIPE_H8
+    // Input must match output (stereo→stereo or mono→mono)
+    return mainIn == mainOut;
+}
+
+void PhantomProcessor::syncParamsToEngine()
+{
+    engine.setCrossoverHz    (apvts.getRawParameterValue(ParamID::PHANTOM_THRESHOLD)->load());
+    engine.setPhantomStrength(apvts.getRawParameterValue(ParamID::PHANTOM_STRENGTH)->load() / 100.0f);
+    engine.setSaturation     (apvts.getRawParameterValue(ParamID::HARMONIC_SATURATION)->load() / 100.0f);
+    engine.setSynthStep      (apvts.getRawParameterValue(ParamID::SYNTH_STEP)->load() / 100.0f);
+    engine.setSynthDuty      (apvts.getRawParameterValue(ParamID::SYNTH_DUTY)->load() / 100.0f);
+    engine.setSynthSkip      ((int) apvts.getRawParameterValue(ParamID::SYNTH_SKIP)->load());
+    engine.setGhostAmount  (apvts.getRawParameterValue(ParamID::GHOST)->load() / 100.0f);
+    engine.setGhostReplace (((int) apvts.getRawParameterValue(ParamID::GHOST_MODE)->load()) == 0);
+    engine.setOutputGainDb (apvts.getRawParameterValue(ParamID::OUTPUT_GAIN)->load());
+    engine.setEnvelopeAttackMs (apvts.getRawParameterValue(ParamID::ENV_ATTACK_MS)->load());
+    engine.setEnvelopeReleaseMs(apvts.getRawParameterValue(ParamID::ENV_RELEASE_MS)->load());
+    engine.setEnvSource((int) apvts.getRawParameterValue(ParamID::ENV_SOURCE)->load());
+    engine.setBinauralMode ((int) apvts.getRawParameterValue(ParamID::BINAURAL_MODE)->load());
+    engine.setBinauralWidth(apvts.getRawParameterValue(ParamID::BINAURAL_WIDTH)->load() / 100.0f);
+    engine.setStereoWidth  (apvts.getRawParameterValue(ParamID::STEREO_WIDTH)->load() / 100.0f);
+    engine.setSynthLPF(apvts.getRawParameterValue(ParamID::SYNTH_LPF_HZ)->load());
+    engine.setSynthHPF(apvts.getRawParameterValue(ParamID::SYNTH_HPF_HZ)->load());
+
+    static const char* hIds[7] = {
+        ParamID::RECIPE_H2, ParamID::RECIPE_H3, ParamID::RECIPE_H4,
+        ParamID::RECIPE_H5, ParamID::RECIPE_H6, ParamID::RECIPE_H7, ParamID::RECIPE_H8
     };
+    std::array<float, 7> amps;
     for (int i = 0; i < 7; ++i)
-        harmonicGen.setHarmonicAmp(i + 2, apvts.getRawParameterValue(ampIDs[i])->load() / 100.0f);
-
-    static const char* phaseIDs[7] = {
-        RECIPE_PHASE_H2, RECIPE_PHASE_H3, RECIPE_PHASE_H4, RECIPE_PHASE_H5,
-        RECIPE_PHASE_H6, RECIPE_PHASE_H7, RECIPE_PHASE_H8
-    };
-    for (int i = 0; i < 7; ++i)
-        harmonicGen.setHarmonicPhase(i + 2, apvts.getRawParameterValue(phaseIDs[i])->load());
-
-    harmonicGen.setRotation(apvts.getRawParameterValue(RECIPE_ROTATION)->load());
-    harmonicGen.setSaturation(apvts.getRawParameterValue(HARMONIC_SATURATION)->load() / 100.0f);
-
-    if (!isInstrumentMode)
-    {
-        const float sensitivity = apvts.getRawParameterValue(TRACKING_SENSITIVITY)->load() / 100.0f;
-        pitchTracker.setConfidenceThreshold(0.30f - sensitivity * 0.25f);
-        pitchTracker.setGlideMs(apvts.getRawParameterValue(TRACKING_GLIDE)->load());
-    }
-
-    if (isInstrumentMode)
-    {
-        const int deconMode = (int)apvts.getRawParameterValue(DECONFLICTION_MODE)->load();
-        if (deconMode != lastDeconflictionMode)
-        {
-            updateDeconflictionStrategy(deconMode);
-            lastDeconflictionMode = deconMode;
-        }
-        harmonicGen.setMaxVoices((int)apvts.getRawParameterValue(MAX_VOICES)->load());
-        stratStagger.setDelayMs(apvts.getRawParameterValue(STAGGER_DELAY)->load(),
-                                sampleRate);
-    }
-
-    const int binMode = (int)apvts.getRawParameterValue(BINAURAL_MODE)->load();
-    binauralStage.setMode(binMode == 0 ? BinauralMode::Off
-                        : binMode == 1 ? BinauralMode::Spread
-                                       : BinauralMode::VoiceSplit);
-    binauralStage.setWidth(apvts.getRawParameterValue(BINAURAL_WIDTH)->load() / 100.0f);
+        amps[(size_t) i] = apvts.getRawParameterValue(hIds[i])->load() / 100.0f;
+    engine.setHarmonicAmplitudes(amps);
+    engine.setSynthMode((int) apvts.getRawParameterValue(ParamID::MODE)->load());
+    engine.setWaveletLength(apvts.getRawParameterValue(ParamID::SYNTH_WAVELET_LENGTH)->load() / 100.0f);
+    engine.setGateThreshold(apvts.getRawParameterValue(ParamID::SYNTH_GATE_THRESHOLD)->load() / 100.0f);
+    engine.setH1Amplitude  (apvts.getRawParameterValue(ParamID::SYNTH_H1)->load() / 100.0f);
+    engine.setSubAmplitude (apvts.getRawParameterValue(ParamID::SYNTH_SUB)->load() / 100.0f);
+    engine.setMinPeriodSamples(apvts.getRawParameterValue(ParamID::SYNTH_MIN_SAMPLES)->load());
+    engine.setMaxPeriodSamples(apvts.getRawParameterValue(ParamID::SYNTH_MAX_SAMPLES)->load());
+    engine.setTrackingSpeed(apvts.getRawParameterValue(ParamID::TRACKING_SPEED)->load() / 100.0f);
+    engine.setUsePunch     (apvts.getRawParameterValue(ParamID::PUNCH_ENABLED)->load() > 0.5f);
+    engine.setPunchAmount  (apvts.getRawParameterValue(ParamID::PUNCH_AMOUNT)->load() / 100.0f);
+    engine.setBoostThreshold(apvts.getRawParameterValue(ParamID::SYNTH_BOOST_THRESHOLD)->load() / 100.0f);
+    engine.setBoostAmount   (apvts.getRawParameterValue(ParamID::SYNTH_BOOST_AMOUNT)->load() / 100.0f);
 }
 
-void PhantomProcessor::updateDeconflictionStrategy(int modeIndex)
-{
-    IDeconflictionStrategy* strategies[] = {
-        &stratPartition, &stratLane, &stratStagger,
-        &stratOddEven,   &stratResidue, &stratBinaural
-    };
-    harmonicGen.setDeconflictionStrategy(
-        (modeIndex >= 0 && modeIndex < 6) ? strategies[modeIndex] : nullptr);
-}
-
-void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer,
-                                     juce::MidiBuffer& midi)
+void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
 
-    const int numCh = juce::jmin(buffer.getNumChannels(), 2);
-    const int n     = buffer.getNumSamples();
-    if (numCh < 2 || n == 0) return;
+    const int n   = buffer.getNumSamples();
+    const int nCh = juce::jmin(buffer.getNumChannels(), 2);
+    if (n == 0 || nCh == 0) return;
 
-    const bool isInstrumentMode = ((int)apvts.getRawParameterValue(ParamID::MODE)->load() == 1);
-    syncEnginesFromApvts(isInstrumentMode);
-
-    if (isInstrumentMode)
+    // ── Bypass ────────────────────────────────────────────────────────
+    if (apvts.getRawParameterValue(ParamID::BYPASS)->load() > 0.5f)
     {
-        for (const auto msg : midi)
+        float pL = 0, pR = 0;
+        const float* inL = buffer.getReadPointer(0);
+        const float* inR = (nCh > 1) ? buffer.getReadPointer(1) : inL;
+        for (int i = 0; i < n; ++i)
         {
-            const auto m = msg.getMessage();
-            if (m.isNoteOn() && m.getVelocity() > 0)
+            pL = juce::jmax(pL, std::abs(inL[i]));
+            pR = juce::jmax(pR, std::abs(inR[i]));
+        }
+        peakInL .store(pL, std::memory_order_relaxed);
+        peakInR .store(pR, std::memory_order_relaxed);
+        peakOutL.store(pL, std::memory_order_relaxed);
+        peakOutR.store(pR, std::memory_order_relaxed);
+        return;
+    }
+
+    // ── Input gain ────────────────────────────────────────────────────
+    {
+        const bool autoMode = apvts.getRawParameterValue(ParamID::INPUT_GAIN_AUTO)->load() > 0.5f;
+
+        if (autoMode)
+        {
+            // Measure peak of this block across all channels.
+            float blockPeak = 0.0f;
+            for (int c = 0; c < nCh; ++c)
             {
-                harmonicGen.noteOn(m.getNoteNumber(), m.getVelocity());
-                // Update perceptual optimizer with note pitch
-                const float noteHz = 440.0f * std::pow(2.0f, (m.getNoteNumber() - 69) / 12.0f);
-                perceptualOpt.setFundamental(noteHz);
+                const float* ch = buffer.getReadPointer(c);
+                for (int i = 0; i < n; ++i)
+                    blockPeak = juce::jmax(blockPeak, std::abs(ch[i]));
             }
-            else if (m.isNoteOff() || (m.isNoteOn() && m.getVelocity() == 0))
-                harmonicGen.noteOff(m.getNoteNumber());
-        }
-    }
 
-    if (!isInstrumentMode)
-    {
-        float detectedHz = pitchTracker.detectPitch(buffer.getReadPointer(0), n);
-        if (detectedHz > 0.0f)
+            // Update peak envelope: fast attack so we don't over-drive,
+            // slow release so gain holds steady between notes.
+            const float coef = (blockPeak > autoEnvelope) ? autoAttackCoef : autoReleaseCoef;
+            autoEnvelope += coef * (blockPeak - autoEnvelope);
+
+            // Compute gain needed to reach -12 dBFS target.
+            // Below -60 dBFS freeze the envelope to avoid amplifying noise.
+            constexpr float kTarget  = 0.25f;   // -12 dBFS
+            constexpr float kFloor   = 0.001f;  // -60 dBFS — below this, hold current gain
+            constexpr float kMaxGain = 16.0f;   // +24 dB ceiling
+            const float desiredGain = (autoEnvelope > kFloor)
+                ? juce::jmin(kMaxGain, kTarget / autoEnvelope)
+                : autoGain;
+
+            // Smooth toward desired gain to prevent zipper noise.
+            autoGain += autoSmoothCoef * (desiredGain - autoGain);
+
+            for (int c = 0; c < nCh; ++c)
+                buffer.applyGain(c, 0, n, autoGain);
+        }
+        else
         {
-            harmonicGen.setEffectModePitch(detectedHz);
-            perceptualOpt.setFundamental(detectedHz);
+            autoEnvelope = 0.0f; // reset so auto is fresh next time it's enabled
+            autoGain     = 1.0f;
+
+            const float gainLin = juce::Decibels::decibelsToGain(
+                apvts.getRawParameterValue(ParamID::INPUT_GAIN)->load());
+            if (gainLin != 1.0f)
+                for (int c = 0; c < nCh; ++c)
+                    buffer.applyGain(c, 0, n, gainLin);
         }
     }
 
-    phantomBuf.clear();
-    harmonicGen.process(phantomBuf);
-
-    binauralStage.process(phantomBuf);
-    perceptualOpt.process(phantomBuf);
-
-    const juce::AudioBuffer<float>* sidechainBuf = nullptr;
-    if (getBusCount(true) > 1)
+    // ── Input peak levels + FFT/pitch capture (pre-engine) ──────────
+    // Reading input here ensures pitch detection sees the dry fundamental,
+    // not the phantom harmonics added by the engine. Spectrum also shows
+    // input so the threshold crossover is clearly visible.
     {
-        auto* scBus = getBus(true, 1);
-        if (scBus != nullptr && scBus->isEnabled())
-            sidechainBuf = &getBusBuffer(buffer, true, 1);
+        float pL = 0, pR = 0;
+        const float* inL = buffer.getReadPointer(0);
+        const float* inR = (nCh > 1) ? buffer.getReadPointer(1) : inL;
+        int oscInWp = oscInputWrPos.load(std::memory_order_relaxed);
+        for (int i = 0; i < n; ++i)
+        {
+            pL = juce::jmax(pL, std::abs(inL[i]));
+            pR = juce::jmax(pR, std::abs(inR[i]));
+
+            oscInputBuf[(size_t) oscInWp] = inL[i];
+            oscInWp = (oscInWp + 1) & (kOscBufSize - 1);
+
+            fftBuffer[(size_t) fftWritePos++] = inL[i];
+
+            if (fftWritePos >= kFftSize)
+            {
+                fftWritePos = 0;
+
+                // Hann window
+                for (int k = 0; k < kFftSize; ++k)
+                {
+                    const float w = 0.5f * (1.0f - std::cos(
+                        juce::MathConstants<float>::twoPi * k / (float)(kFftSize - 1)));
+                    fftBuffer[(size_t) k] *= w;
+                }
+                for (int k = kFftSize; k < kFftSize * 2; ++k)
+                    fftBuffer[(size_t) k] = 0.0f;
+
+                spectrumFFT.performFrequencyOnlyForwardTransform(fftBuffer.data());
+
+                const float sr       = (float) sampleRate;
+                const float fftSizeF = (float) kFftSize;
+                const int   maxBin   = kFftSize / 2 - 1;
+                const float logMin   = std::log10(30.0f);
+                const float logMax   = std::log10(16000.0f);
+                const float normalizer = 2.0f / (float) (kFftSize / 2);
+
+                for (int b = 0; b < kSpectrumBins; ++b)
+                {
+                    const float fLow  = std::pow(10.0f, logMin + (logMax - logMin) *  b      / kSpectrumBins);
+                    const float fHigh = std::pow(10.0f, logMin + (logMax - logMin) * (b + 1) / kSpectrumBins);
+
+                    const int binLow  = juce::jmax(1,      (int) std::floor(fLow  * fftSizeF / sr));
+                    const int binHigh = juce::jmin(maxBin, (int) std::ceil (fHigh * fftSizeF / sr));
+
+                    float mag = 0.0f;
+                    for (int k = binLow; k <= binHigh; ++k)
+                        mag = juce::jmax(mag, fftBuffer[(size_t) k]);
+
+                    const float normMag = mag * normalizer;
+                    const float dB      = juce::Decibels::gainToDecibels(normMag, -96.0f);
+                    spectrumData[(size_t) b] = juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f);
+                }
+
+                spectrumReady.store(true, std::memory_order_release);
+
+                // (pitch is now sourced from the synth's crossing tracker — see below)
+            }
+        }
+        oscInputWrPos.store(oscInWp, std::memory_order_relaxed);
+        peakInL.store(pL, std::memory_order_relaxed);
+        peakInR.store(pR, std::memory_order_relaxed);
     }
 
-    // Copy dry to pre-allocated member buffer (crossoverBlend modifies in-place)
-    for (int ch = 0; ch < numCh; ++ch)
-        dryBuf.copyFrom(ch, 0, buffer, ch, 0, n);
+    // ── Sync params → engine ──────────────────────────────────────────
+    syncParamsToEngine();
 
-    crossoverBlend.process(dryBuf, phantomBuf, sidechainBuf);
+    // ── Process through the waveshaper engine ────────────────────────
+    // Read sidechain bus (bus index 1) if enabled
+    const juce::AudioBuffer<float>* sidechainPtr = nullptr;
+    {
+        const int nSCBusChannels = getChannelCountOfBus(true, 1);
+        if (nSCBusChannels > 0)
+        {
+            // Find where sidechain channels start in the processBlock buffer.
+            // Main input (bus 0) is stereo (2 channels); sidechain starts at ch 2.
+            const int scStartCh = getTotalNumInputChannels() - nSCBusChannels;
+            if (scStartCh >= 0 && scStartCh + nSCBusChannels <= buffer.getNumChannels()
+                && buffer.getNumSamples() <= sidechainBuf.getNumSamples())
+            {
+                // Use pre-allocated member buffer — avoidReallocating is safe because
+                // we guard against oversized blocks above.
+                sidechainBuf.setSize(nSCBusChannels, buffer.getNumSamples(), false, false, true);
+                for (int c = 0; c < nSCBusChannels; ++c)
+                    sidechainBuf.copyFrom(c, 0, buffer, scStartCh + c, 0, buffer.getNumSamples());
+                sidechainPtr = &sidechainBuf;
+            }
+        }
+    }
+    engine.process(buffer, sidechainPtr);
 
-    for (int ch = 0; ch < numCh; ++ch)
-        buffer.copyFrom(ch, 0, dryBuf, ch, 0, n);
+    // Pitch display: use the synth's zero-crossing tracker directly — it reflects exactly
+    // what is being synthesised and covers the full frequency range (not FFT's 30-500 Hz).
+    // Returns 0 when input is quiet (so UI shows "---").
+    currentPitch.store(engine.getEstimatedHz(), std::memory_order_relaxed);
+
+    // ── Output peak levels + output spectrum FFT ─────────────────────
+    {
+        float pL = 0, pR = 0;
+        const float* outL = buffer.getReadPointer(0);
+        const float* outR = (nCh > 1) ? buffer.getReadPointer(1) : outL;
+        int oscOutWp = oscOutputWrPos.load(std::memory_order_relaxed);
+        for (int i = 0; i < n; ++i)
+        {
+            pL = juce::jmax(pL, std::abs(outL[i]));
+            pR = juce::jmax(pR, std::abs(outR[i]));
+
+            oscOutputBuf[(size_t) oscOutWp] = outL[i];
+            oscOutWp = (oscOutWp + 1) & (kOscBufSize - 1);
+
+            fftOutputBuffer[(size_t) fftOutputWritePos++] = outL[i];
+
+            if (fftOutputWritePos >= kFftSize)
+            {
+                fftOutputWritePos = 0;
+
+                // Hann window
+                for (int k = 0; k < kFftSize; ++k)
+                {
+                    const float w = 0.5f * (1.0f - std::cos(
+                        juce::MathConstants<float>::twoPi * k / (float)(kFftSize - 1)));
+                    fftOutputBuffer[(size_t) k] *= w;
+                }
+                for (int k = kFftSize; k < kFftSize * 2; ++k)
+                    fftOutputBuffer[(size_t) k] = 0.0f;
+
+                spectrumFFT.performFrequencyOnlyForwardTransform(fftOutputBuffer.data());
+
+                const float sr2       = (float) sampleRate;
+                const float fftSizeF2 = (float) kFftSize;
+                const int   maxBin2   = kFftSize / 2 - 1;
+                const float logMin2   = std::log10(30.0f);
+                const float logMax2   = std::log10(16000.0f);
+                const float norm2     = 2.0f / (float) (kFftSize / 2);
+
+                for (int b = 0; b < kSpectrumBins; ++b)
+                {
+                    const float fLow  = std::pow(10.0f, logMin2 + (logMax2 - logMin2) *  b      / kSpectrumBins);
+                    const float fHigh = std::pow(10.0f, logMin2 + (logMax2 - logMin2) * (b + 1) / kSpectrumBins);
+                    const int binLow  = juce::jmax(1,      (int) std::floor(fLow  * fftSizeF2 / sr2));
+                    const int binHigh = juce::jmin(maxBin2, (int) std::ceil (fHigh * fftSizeF2 / sr2));
+
+                    float mag = 0.0f;
+                    for (int k = binLow; k <= binHigh; ++k)
+                        mag = juce::jmax(mag, fftOutputBuffer[(size_t) k]);
+
+                    const float normMag = mag * norm2;
+                    const float dB      = juce::Decibels::gainToDecibels(normMag, -96.0f);
+                    spectrumOutputData[(size_t) b] = juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f);
+                }
+            }
+        }
+
+        oscOutputWrPos.store(oscOutWp, std::memory_order_relaxed);
+        peakOutL.store(pL, std::memory_order_relaxed);
+        peakOutR.store(pR, std::memory_order_relaxed);
+    }
+}
+
+void PhantomProcessor::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    if (parameterID == ParamID::RECIPE_PRESET)
+    {
+        const int idx = juce::roundToInt(newValue);
+        const float* tables[] = {
+            kWarmAmps, kAggressiveAmps, kHollowAmps, kDenseAmps,
+            kStableAmps, kWeirdAmps,
+            nullptr   // Custom (index 6)
+        };
+
+        if (idx >= 0 && idx < 6 && tables[idx] != nullptr)
+        {
+            const char* hIds[] = {
+                ParamID::RECIPE_H2, ParamID::RECIPE_H3, ParamID::RECIPE_H4,
+                ParamID::RECIPE_H5, ParamID::RECIPE_H6, ParamID::RECIPE_H7, ParamID::RECIPE_H8
+            };
+            for (int i = 0; i < 7; ++i)
+                if (auto* p = apvts.getParameter(hIds[i]))
+                    p->setValueNotifyingHost(p->convertTo0to1(tables[idx][i] * 100.0f));
+        }
+    }
 }
 
 juce::AudioProcessorEditor* PhantomProcessor::createEditor()
@@ -192,14 +385,8 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
 void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
-    if (xml && xml->hasTagName(apvts.state.getType()))
+    if (xml != nullptr && xml->hasTagName(apvts.state.getType()))
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
-}
-
-juce::AudioProcessorValueTreeState::ParameterLayout
-PhantomProcessor::createParameterLayout()
-{
-    return ::createParameterLayout();
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

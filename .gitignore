@@ -5,3 +5,7 @@ build/
 .vs/
 *.vcxproj.user
 .worktrees/
+Parameter value map.mhtml
+
+# Debug screenshots
+*.png

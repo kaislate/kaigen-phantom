@@ -1,0 +1,514 @@
+/* ═══ KAIGEN PHANTOM — Studio Gray Plastic WebView UI ═══ */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+body{
+  background:#AEAFB1;margin:0;overflow:hidden;
+  width:1300px;height:820px;
+  font-family:'Space Grotesk',sans-serif;
+  color:rgba(0,0,0,0.70);
+}
+
+.hidden,
+.candy-inner.hidden{display:none !important}
+
+/* ═══ WRAP — Studio Gray plastic surface ═══ */
+.wrap{
+  position:relative;width:1300px;height:820px;overflow:hidden;
+  display:grid;
+  grid-template-columns:1fr;
+  grid-template-rows:46px 1fr;
+  background:radial-gradient(ellipse at 28% 18%,#CACCCE 0%,#BBBDBF 48%,#AEAFB1 100%);
+  box-shadow:
+    inset 0 6px 16px rgba(255,255,255,0.62),
+    inset 6px 0 12px rgba(255,255,255,0.32),
+    inset 0 -5px 14px rgba(0,0,0,0.10),
+    inset -5px 0 12px rgba(0,0,0,0.07);
+}
+
+/* Top-shoulder gloss — gradual highlight on the upper rim */
+.wrap::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:8px;
+  background:linear-gradient(180deg,rgba(255,255,255,0.58) 0%,transparent 100%);
+  pointer-events:none;z-index:50;
+}
+
+/* ═══ SECTION LABELS ═══ */
+.el{
+  font-size:10px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;
+  position:relative;z-index:2;
+  color:rgba(0,0,0,0.22);
+  text-shadow:0 1px 0 rgba(255,255,255,0.50);
+  padding:0;border:none;margin-bottom:2px;display:inline-block;
+}
+
+/* ═══ HEADER ═══ */
+.hdr{
+  height:46px;display:flex;align-items:center;padding:0 20px;
+  background:linear-gradient(180deg,rgba(255,255,255,0.38) 0%,rgba(255,255,255,0.04) 100%);
+  box-shadow:0 1px 0 rgba(0,0,0,0.07),0 2px 12px rgba(0,0,0,0.06);
+  gap:8px;position:relative;flex-shrink:0;
+}
+/* Soft shadow-only separator below header */
+.hdr::after{
+  content:'';position:absolute;bottom:0;left:5%;right:5%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,0,0,0.08) 25%,rgba(0,0,0,0.08) 75%,transparent);
+  filter:blur(0.5px);z-index:1;
+}
+
+/* Etched metallic logos — dark charcoal on light plastic */
+.logo-phantom{
+  font-size:22px;font-weight:300;letter-spacing:10px;text-transform:uppercase;
+  position:relative;z-index:1;
+  color:#656769;
+  text-shadow:0 1px 0 rgba(255,255,255,0.72),0 -0.5px 0 rgba(0,0,0,0.10);
+}
+.logo-kaigen{
+  font-size:13px;font-weight:400;letter-spacing:6px;text-transform:uppercase;
+  position:relative;z-index:1;
+  color:#737577;
+  text-shadow:0 1px 0 rgba(255,255,255,0.60),0 -0.5px 0 rgba(0,0,0,0.08);
+}
+.hsp{flex:1}
+
+/* Mode toggle — neumorphic pill on light */
+.mt{
+  display:flex;border-radius:20px;padding:3px;position:relative;z-index:1;
+  background:rgba(0,0,0,0.08);border:none;
+  box-shadow:inset 1.5px 1.5px 5px rgba(0,0,0,0.14),inset -1.5px -1.5px 4px rgba(255,255,255,0.50),
+    0 1px 3px rgba(0,0,0,0.07);
+}
+.mb{
+  padding:5px 14px;border-radius:16px;font-size:10px;font-weight:400;
+  letter-spacing:2.5px;text-transform:uppercase;color:rgba(0,0,0,0.22);
+  cursor:pointer;white-space:nowrap;transition:all .2s;border:none;background:none;
+}
+.mb.active{
+  background:rgba(255,255,255,0.55);color:rgba(0,0,0,0.58);
+  box-shadow:1px 1px 4px rgba(0,0,0,0.12),0 0.5px 0 rgba(255,255,255,0.65);
+}
+
+/* Header buttons (bypass, settings) */
+.hdr-btn{
+  width:30px;height:30px;border-radius:50%;border:none;
+  background:rgba(0,0,0,0.09);color:rgba(0,0,0,0.28);
+  font-size:14px;cursor:pointer;position:relative;z-index:1;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:inset 1.5px 1.5px 4px rgba(0,0,0,0.14),inset -1.5px -1.5px 3px rgba(255,255,255,0.48),
+    1px 1px 3px rgba(0,0,0,0.07);
+  transition:all .2s;
+}
+.hdr-btn:hover{color:rgba(0,0,0,0.55)}
+.hdr-btn.active{
+  color:rgba(55,115,195,0.88);
+  box-shadow:inset 1.5px 1.5px 4px rgba(0,0,0,0.14),inset -1.5px -1.5px 3px rgba(255,255,255,0.48),
+    0 0 6px rgba(70,130,210,0.28);
+}
+
+/* Mode-inactive state for RESYN-only controls */
+phantom-knob.mode-inactive{
+  opacity:0.38;
+  pointer-events:none;
+  transition:opacity 0.15s ease;
+}
+
+/* ═══ BODY GRID ═══ */
+.body-grid{
+  display:grid;
+  grid-template-columns:340px 3px 1fr;
+  grid-template-rows:1fr;
+  flex:1;overflow:hidden;margin:3px;gap:0;
+}
+
+/* ═══ GAP SEAMS — dark hairlines on light plastic ═══ */
+.gap-v{width:3px;flex-shrink:0;position:relative}
+.gap-v::before{
+  content:'';position:absolute;top:4%;bottom:4%;left:50%;width:1px;transform:translateX(-50%);
+  background:linear-gradient(180deg,transparent 0%,rgba(0,0,0,0.08) 15%,rgba(0,0,0,0.12) 50%,rgba(0,0,0,0.08) 85%,transparent 100%);
+  filter:blur(0.3px);
+}
+.gap-v::after{
+  content:'';position:absolute;top:8%;bottom:8%;left:50%;width:8px;transform:translateX(-50%);
+  background:linear-gradient(180deg,transparent 0%,rgba(0,0,0,0.03) 25%,rgba(0,0,0,0.05) 50%,rgba(0,0,0,0.03) 75%,transparent 100%);
+  filter:blur(3px);
+}
+.gap-h{height:3px;flex-shrink:0;position:relative}
+.gap-h::before{
+  content:'';position:absolute;left:4%;right:4%;top:50%;height:1px;transform:translateY(-50%);
+  background:linear-gradient(90deg,transparent 0%,rgba(0,0,0,0.08) 15%,rgba(0,0,0,0.12) 50%,rgba(0,0,0,0.08) 85%,transparent 100%);
+  filter:blur(0.3px);
+}
+.gap-h::after{
+  content:'';position:absolute;left:8%;right:8%;top:50%;height:8px;transform:translateY(-50%);
+  background:linear-gradient(90deg,transparent 0%,rgba(0,0,0,0.03) 25%,rgba(0,0,0,0.05) 50%,rgba(0,0,0,0.03) 75%,transparent 100%);
+  filter:blur(3px);
+}
+
+/* ═══ LEFT COLUMN ═══ */
+.wheel-area{
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  padding:3px;gap:3px;position:relative;
+}
+
+/* Depressed panel containing the recipe wheel and harmonic mode presets.
+   Extra top padding so the radially-positioned H2 label (at 12 o'clock) isn't
+   clipped against the top edge. */
+.wheel-container{
+  width:100%;display:flex;flex-direction:column;align-items:center;
+  padding:24px 12px 8px;gap:0;border-radius:14px;
+  background:rgba(0,0,0,0.02);
+  box-shadow:inset 3px 3px 14px rgba(0,0,0,0.12),inset -3px -3px 12px rgba(220,222,226,0.72);
+}
+
+/* Neumorphic raised wheel mount — convex disc on light plastic */
+.wheel-mount{
+  width:280px;height:280px;border-radius:50%;position:relative;z-index:2;flex-shrink:0;
+  background:radial-gradient(ellipse at 35% 30%,rgba(255,255,255,0.24) 0%,rgba(255,255,255,0.12) 20%,
+    rgba(0,0,0,0.02) 55%,rgba(0,0,0,0.07) 100%);
+  border:none;
+  box-shadow:
+    -4px -4px 10px rgba(255,255,255,0.50),
+    4px 4px 14px rgba(0,0,0,0.22),
+    inset -1.5px -1.5px 5px rgba(255,255,255,0.22),
+    inset 2px 2px 8px rgba(0,0,0,0.09),
+    0 0 0 4px rgba(0,0,0,0.07);
+  display:flex;align-items:center;justify-content:center;overflow:visible;
+}
+.wheel-mount #wheelCanvas{
+  position:absolute;inset:0;width:100%;height:100%;z-index:3;border-radius:50%;
+}
+
+/* Center OLED readout — black screen embedded in plastic */
+.wheel-oled{
+  width:112px;height:112px;border-radius:50%;background:#000;z-index:4;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  box-shadow:0 0 0 2px rgba(0,0,0,0.55),0 0 0 3.5px rgba(180,182,186,0.7),0 0 0 5px rgba(0,0,0,0.18),
+    inset 3px 3px 14px #000,inset 0 0 24px rgba(0,0,0,.98);
+  overflow:hidden;position:relative;
+}
+.oled-label{
+  font-family:'Courier New',monospace;font-size:8px;letter-spacing:2.5px;
+  color:rgba(255,255,255,.3);text-transform:uppercase;z-index:1;
+}
+.oled-freq{
+  font-family:'Courier New',monospace;font-size:18px;color:#fff;line-height:1;z-index:1;font-weight:bold;
+  text-shadow:0 0 2px #fff,0 0 8px #fff,0 0 20px rgba(255,255,255,.6),0 0 40px rgba(255,255,255,.2);
+}
+.oled-preset{
+  font-family:'Courier New',monospace;font-size:8px;letter-spacing:1px;color:#fff;z-index:1;
+  text-shadow:0 0 2px #fff,0 0 6px rgba(255,255,255,.4);
+}
+
+/* Harmonic labels — positioned radially just outside the 280px wheel.
+   Each label sits on a circle of radius 152px (centered in wheel-mount), at
+   the exact angle of its corresponding spoke: angle = i * (360°/7). The
+   double-rotate trick keeps the text upright while positioning it radially. */
+.h-label{
+  position:absolute;top:50%;left:50%;
+  font-family:'Courier New',monospace;font-size:8px;font-weight:700;
+  letter-spacing:0.5px;color:rgba(0,0,0,0.38);
+  text-shadow:0 1px 0 rgba(255,255,255,0.65);
+  transform:translate(-50%,-50%)
+    rotate(calc(var(--i) * (360deg / 7)))
+    translateY(-152px)
+    rotate(calc(var(--i) * (-360deg / 7)));
+  z-index:5;pointer-events:none;white-space:nowrap;
+}
+
+/* Preset strip — 3×3 grid with etched separators */
+.preset-strip{
+  margin-top:auto;z-index:2;width:100%;padding:12px 8px 10px;
+}
+.preset-grid{
+  display:grid;
+  grid-template-columns:1fr 2px 1fr 2px 1fr;
+  grid-template-rows:auto auto auto;
+  gap:14px 8px;
+  align-items:center;
+  justify-items:center;
+  position:relative;z-index:2;
+}
+/* Etched vertical separator — dark line + bright highlight (same pair
+   as .el labels use: rgba(0,0,0,0.22) + white 0.50). */
+.preset-sep{
+  width:2px;height:14px;align-self:center;
+  background:linear-gradient(90deg,
+    rgba(0,0,0,0.22) 0%,
+    rgba(0,0,0,0.22) 50%,
+    rgba(255,255,255,0.55) 50%,
+    rgba(255,255,255,0.55) 100%);
+}
+.preset-blank{}
+/* Preset labels — matches .el section-label style (etched, Space Grotesk). */
+.lw{
+  font-size:10px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;
+  position:relative;z-index:2;
+  color:rgba(0,0,0,0.22);
+  text-shadow:0 1px 0 rgba(255,255,255,0.50);
+  cursor:pointer;
+  transition:color 0.2s;
+  padding-bottom:5px;
+}
+.lw::after{
+  content:'';position:absolute;
+  left:22%;right:22%;bottom:0;
+  height:1px;
+  background:rgba(0,0,0,0.22);
+  box-shadow:0 1px 0 rgba(255,255,255,0.50);
+}
+.lw.active{
+  color:rgba(0,0,0,0.65);
+  text-shadow:0 1px 0 rgba(255,255,255,0.70);
+}
+.lw.active::after{
+  background:rgba(0,0,0,0.45);
+}
+
+/* H2-H8 harmonic amplitude mini-knobs below preset strip */
+.harmonic-row{
+  display:flex;gap:1px;margin-top:8px;z-index:2;justify-content:center;
+}
+
+/* ═══ RIGHT PANEL ═══ */
+.right-panel{
+  display:flex;flex-direction:column;gap:0;min-width:0;overflow:hidden;
+}
+
+/* Control rows */
+.ctrl-row{display:flex;gap:0;align-items:stretch}
+
+/* ═══ NEUMORPHIC PANELS — recessed insets in the plastic surface ═══ */
+.candy-inner{
+  background:rgba(0,0,0,0.02);border:none;border-radius:14px;margin:2px;
+  box-shadow:inset 3px 3px 14px rgba(0,0,0,0.12),inset -3px -3px 12px rgba(220,222,226,0.72);
+  position:relative;overflow:hidden;
+  padding:5px 6px;display:flex;flex-direction:column;gap:3px;
+}
+
+/* Panel flex sizing — right column top row */
+.panel-harmonic{flex:2.3}
+.panel-stereo{flex:0.7;align-items:center}
+.panel-output{flex:1.4;align-items:center}
+
+/* Left column panel sizing — Ghost grows to absorb slack so the gap
+   between it and Filter matches the tight top-row→viz gap on the right. */
+.panel-ghost{flex:1 1 auto;min-height:140px}
+.panel-filter-left{flex:0 0 auto;min-height:168px}
+
+/* Centered labels for all .candy-inner panels */
+.candy-inner > .el{
+  display:block;text-align:center;width:100%;margin-bottom:6px;
+}
+
+/* Ghost panel — toggle sits above the Crossover knob */
+.ghost-row{align-items:flex-end;}
+.ghost-crossover-col{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+}
+.ghost-mode-toggle{margin-left:0;}
+
+/* Knob rows */
+.knob-row{
+  display:flex;gap:5px;justify-content:center;align-items:flex-start;
+  position:relative;z-index:1;flex-wrap:nowrap;
+}
+
+/* Toggle inline (Ghost Rpl/Add) */
+.toggle-group{display:inline-flex;border-radius:8px;overflow:hidden;position:relative;z-index:1;margin-left:4px;
+  background:rgba(0,0,0,0.08);border:none;
+  box-shadow:inset 1.5px 1.5px 5px rgba(0,0,0,0.14),inset -1.5px -1.5px 4px rgba(255,255,255,0.50);
+}
+.tog{
+  padding:3px 7px;font-size:8px;letter-spacing:1px;text-transform:uppercase;
+  color:rgba(0,0,0,0.22);cursor:pointer;border:none;background:none;
+}
+.tog.active{
+  color:rgba(0,0,0,0.62);
+  background:rgba(255,255,255,0.48);
+  box-shadow:1px 1px 3px rgba(0,0,0,0.10),0 0.5px 0 rgba(255,255,255,0.55);
+}
+
+/* Param select dropdown */
+.param-select{
+  background:rgba(0,0,0,0.07);border:none;
+  border-radius:4px;color:rgba(0,0,0,0.55);font-size:10px;letter-spacing:1px;
+  padding:3px 8px;font-family:'Space Grotesk',sans-serif;
+  box-shadow:inset 1.5px 1.5px 5px rgba(0,0,0,0.12),inset -1.5px -1.5px 4px rgba(255,255,255,0.45);
+  position:relative;z-index:1;
+}
+
+/* ═══ VISUALIZATION SECTION ═══ */
+.viz-section{
+  display:flex;flex-direction:column;flex:1;min-height:0;margin:2px;gap:2px;
+}
+
+/* Oscilloscope — full width, no side meters */
+.osc-row{
+  height:130px;flex-shrink:0;position:relative;overflow:hidden;
+  background:#000;border-radius:6px;border:none;
+  box-shadow:inset 3px 3px 12px rgba(0,0,0,1),
+    -2px -2px 6px rgba(255,255,255,0.30),3px 3px 8px rgba(0,0,0,0.22);
+}
+.osc-row canvas{
+  position:absolute;inset:0;width:100%;height:100%;
+}
+.osc-zoom-controls{
+  position:absolute;top:6px;right:8px;z-index:5;
+  display:flex;gap:4px;
+}
+.osc-zoom-btn{
+  width:20px;height:20px;border-radius:3px;border:none;
+  background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.70);
+  font-size:13px;line-height:1;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background 150ms,color 150ms;
+}
+.osc-zoom-btn:hover{background:rgba(255,255,255,0.16);color:#fff;}
+
+/* Spectrum analyzer row — meters sit on either side at the spectrum's height */
+.spectrum-row{
+  display:flex;flex:1;min-height:0;gap:2px;
+}
+.spectrum-wrap{
+  background:#000;border-radius:6px;border:none;flex:1;
+  box-shadow:inset 3px 3px 12px rgba(0,0,0,1),
+    -2px -2px 6px rgba(255,255,255,0.30),3px 3px 8px rgba(0,0,0,0.22);
+  position:relative;overflow:hidden;display:flex;align-items:flex-end;padding:3px 5px 2px;
+}
+.spectrum-wrap #spectrumCanvas{
+  width:100%;height:100%;position:relative;z-index:1;
+}
+
+/* I/O meters — now siblings of spectrum-wrap so they match its height */
+.io-meter{
+  width:16px;flex-shrink:0;background:#000;border-radius:4px;border:none;
+  box-shadow:inset 2px 2px 6px rgba(0,0,0,1),
+    -1.5px -1.5px 4px rgba(255,255,255,0.28),2px 2px 5px rgba(0,0,0,0.20);
+}
+
+/* ═══ FILTER PANEL — LPF ⟷ HPF link button ═══ */
+.filter-row{align-items:center;gap:4px;}
+.filter-link-btn{
+  width:22px;height:22px;border-radius:50%;border:none;padding:0;
+  background:rgba(0,0,0,0.08);color:rgba(0,0,0,0.42);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:inset 1px 1px 3px rgba(0,0,0,0.14),inset -1px -1px 2px rgba(255,255,255,0.48),
+    0 1px 2px rgba(0,0,0,0.06);
+  transition:color 150ms,background 150ms;
+}
+.filter-link-btn:hover{color:rgba(0,0,0,0.70);}
+.filter-link-btn[aria-pressed="true"]{
+  color:rgba(55,115,195,0.88);
+  box-shadow:inset 1px 1px 3px rgba(0,0,0,0.14),inset -1px -1px 2px rgba(255,255,255,0.48),
+    0 0 4px rgba(70,130,210,0.28);
+}
+
+/* ═══ SETTINGS OVERLAY ═══ */
+.settings-overlay{position:absolute;inset:0;z-index:100;display:flex;justify-content:flex-end;}
+.settings-overlay.hidden{display:none;}
+.settings-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.45);}
+.settings-panel{
+  position:relative;width:340px;height:100%;z-index:101;
+  background:radial-gradient(ellipse at 28% 18%,#CACCCE 0%,#BBBDBF 48%,#AEAFB1 100%);
+  box-shadow:-10px 0 40px rgba(0,0,0,0.35),
+    inset -4px 0 12px rgba(255,255,255,0.28),
+    inset 0 6px 14px rgba(255,255,255,0.40);
+  padding:16px;overflow-y:auto;
+}
+.settings-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.settings-close{
+  background:none;border:none;color:rgba(0,0,0,0.30);
+  font-size:22px;cursor:pointer;line-height:1;
+}
+.settings-close:hover{color:rgba(0,0,0,0.60);}
+.settings-section{margin-bottom:20px;}
+.settings-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:8px;}
+.phases-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.settings-panel .param-select{
+  background:rgba(0,0,0,0.07);color:rgba(0,0,0,0.60);
+  border:none;border-radius:4px;
+  padding:4px 8px;font-size:11px;font-family:'Courier New',monospace;
+  box-shadow:inset 1.5px 1.5px 5px rgba(0,0,0,0.12),inset -1.5px -1.5px 4px rgba(255,255,255,0.45);
+  outline:none;cursor:pointer;
+}
+.settings-panel .param-select option{background:#BBBDBF;color:#333;}
+
+/* ═══ ADVANCED PANEL ═══ */
+.advanced-panel{
+  max-height:0;opacity:0;
+  overflow:hidden;
+  position:relative;
+  background:#0A0B0C;
+  transform:scaleY(0);
+  transform-origin:center;
+  transition:max-height 400ms ease-out, opacity 400ms ease-out, transform 400ms ease-out;
+  margin:0;
+}
+.wrap.advanced-open .advanced-panel{
+  max-height:200px;
+  opacity:1;
+  transform:scaleY(1);
+}
+.circuit-canvas{
+  position:absolute;inset:0;width:100%;height:100%;
+  display:block;z-index:0;pointer-events:none;
+  opacity:0;transition:opacity 400ms ease;
+}
+.wrap.advanced-open .circuit-canvas{opacity:1;}
+
+.adv-content{
+  position:relative;z-index:2;
+  height:200px;
+  display:flex;flex-direction:row;align-items:stretch;
+  padding:0 20px;gap:0;
+}
+.adv-section{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:0 12px;gap:6px;
+}
+.adv-section-label{
+  font-size:9px;font-weight:600;letter-spacing:2px;text-transform:uppercase;
+  color:rgba(255,255,255,0.32);
+  text-shadow:0 1px 0 rgba(0,0,0,0.45);
+}
+.adv-knob-row{
+  display:flex;flex-direction:row;align-items:center;gap:6px;
+}
+.adv-sep{
+  width:2px;height:80%;align-self:center;margin:0 6px;
+  background:linear-gradient(90deg,
+    rgba(255,255,255,0.22) 0%,
+    rgba(255,255,255,0.22) 50%,
+    rgba(0,0,0,0.65) 50%,
+    rgba(0,0,0,0.65) 100%);
+}
+.adv-select{
+  background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.85);
+  border:none;border-radius:3px;padding:2px 6px;font-size:10px;
+  font-family:'Courier New',monospace;
+}
+
+/* ═══ HEADER ADVANCED BUTTON ═══ */
+#advanced-btn svg{transition:transform 250ms ease;}
+#advanced-btn.active svg{transform:rotate(180deg);}
+
+/* ═══ SEAM LATCH ═══ */
+.viz-section{position:relative;}
+.seam-latch{
+  position:absolute;top:-10px;left:50%;transform:translateX(-50%);
+  width:80px;height:16px;border-radius:8px;
+  background:rgba(0,0,0,0.08);
+  box-shadow:inset 1.5px 1.5px 4px rgba(0,0,0,0.14),
+    inset -1.5px -1.5px 3px rgba(255,255,255,0.48),
+    0 1px 3px rgba(0,0,0,0.07);
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  cursor:pointer;z-index:20;
+  transition:background 200ms ease;
+}
+.seam-dot{
+  width:3px;height:3px;border-radius:50%;
+  background:rgba(0,0,0,0.32);transition:background 200ms, box-shadow 200ms;
+}
+.seam-latch:hover .seam-dot{
+  background:rgba(255,255,255,0.88);
+  box-shadow:0 0 4px rgba(255,255,255,0.6);
+}

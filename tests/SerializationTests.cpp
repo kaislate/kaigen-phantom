@@ -70,6 +70,6 @@ TEST_CASE("Default parameter values match spec")
     REQUIRE(getFloat(ParamID::PHANTOM_THRESHOLD) == Catch::Approx(80.0f).margin(0.1f));
     REQUIRE(getFloat(ParamID::PHANTOM_STRENGTH)  == Catch::Approx(80.0f).margin(0.1f));
     REQUIRE(getFloat(ParamID::BINAURAL_WIDTH)    == Catch::Approx(50.0f).margin(0.1f));
-    REQUIRE(getFloat(ParamID::TRACKING_GLIDE)    == Catch::Approx(20.0f).margin(0.1f));
-    REQUIRE(getFloat(ParamID::STAGGER_DELAY)     == Catch::Approx(8.0f).margin(0.1f));
+    REQUIRE(getFloat(ParamID::ENV_ATTACK_MS)     == Catch::Approx(1.0f).margin(0.1f));
+    REQUIRE(getFloat(ParamID::ENV_RELEASE_MS)    == Catch::Approx(50.0f).margin(0.1f));
 }

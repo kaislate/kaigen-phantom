@@ -9,24 +9,20 @@ FetchContent_MakeAvailable(Catch2)
 
 add_executable(KaigenPhantomTests
     ParameterTests.cpp
-    PitchTrackerTests.cpp
-    HarmonicGeneratorTests.cpp
-    DeconflictionTests.cpp
+    WaveletSynthTests.cpp
     BinauralStageTests.cpp
-    PerceptualOptimizerTests.cpp
-    CrossoverBlendTests.cpp
     SerializationTests.cpp
-    ../Source/Engines/PitchTracker.cpp
-    ../Source/Engines/HarmonicGenerator.cpp
+    BassExtractorTests.cpp
+    WaveshaperTests.cpp
+    EnvelopeFollowerTests.cpp
+    PhantomEngineTests.cpp
     ../Source/Engines/BinauralStage.cpp
-    ../Source/Engines/PerceptualOptimizer.cpp
-    ../Source/Engines/CrossoverBlend.cpp
-    ../Source/Engines/Deconfliction/PartitionStrategy.cpp
-    ../Source/Engines/Deconfliction/SpectralLaneStrategy.cpp
-    ../Source/Engines/Deconfliction/StaggerStrategy.cpp
-    ../Source/Engines/Deconfliction/OddEvenStrategy.cpp
-    ../Source/Engines/Deconfliction/ResidueStrategy.cpp
-    ../Source/Engines/Deconfliction/BinauralStrategy.cpp
+    ../Source/Engines/BassExtractor.cpp
+    ../Source/Engines/Waveshaper.cpp
+    ../Source/Engines/EnvelopeFollower.cpp
+    ../Source/Engines/PhantomEngine.cpp
+    ../Source/Engines/ZeroCrossingSynth.cpp
+    ../Source/Engines/WaveletSynth.cpp
 )
 
 target_link_libraries(KaigenPhantomTests

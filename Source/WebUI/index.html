@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div style="position:fixed;top:2px;right:2px;z-index:99999;background:#0a0;color:#fff;font:bold 10px monospace;padding:2px 6px;border-radius:3px">DSP-11</div>
+  <div class="wrap">
+    <!-- Header -->
+    <div class="hdr">
+      <div class="logo-phantom">PHANTOM</div>
+      <div class="hsp"></div>
+      <div class="mt"><div class="mb active" data-mode="0">Effect</div><div class="mb" data-mode="1">Resyn</div></div>
+      <button class="hdr-btn" id="bypass-btn" title="Bypass">&#x23FB;</button>
+      <button class="hdr-btn" id="settings-btn" title="Settings">&#x2699;</button>
+      <button class="hdr-btn" id="advanced-btn" title="Advanced controls">
+        <svg viewBox="0 0 14 14" width="14" height="14">
+          <path d="M2 5 L7 10 L12 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="logo-kaigen">KAIGEN</div>
+    </div>
+
+    <div class="body-grid">
+      <!-- Left: Recipe wheel + harmonic modes — depressed panel -->
+      <div class="wheel-area">
+        <div class="wheel-container">
+          <div class="wheel-mount">
+            <canvas id="wheelCanvas"></canvas>
+            <div class="wheel-oled">
+              <div class="oled-label">FUND</div>
+              <div class="oled-freq" id="pitchDisplay">---</div>
+              <div class="oled-preset" id="presetDisplay">Warm</div>
+            </div>
+            <!-- H2-H8 labels positioned radially outside the wheel, each directly
+                 out from its corresponding bar (i=0..6 → 0°, 51.43°, 102.86°, ...) -->
+            <div class="h-label" style="--i:0">H2</div>
+            <div class="h-label" style="--i:1">H3</div>
+            <div class="h-label" style="--i:2">H4</div>
+            <div class="h-label" style="--i:3">H5</div>
+            <div class="h-label" style="--i:4">H6</div>
+            <div class="h-label" style="--i:5">H7</div>
+            <div class="h-label" style="--i:6">H8</div>
+          </div>
+          <div class="preset-strip">
+            <div class="preset-grid">
+            <span class="lw" data-preset="0">Warm</span>
+            <span class="preset-sep"></span>
+            <span class="lw" data-preset="1">Aggr</span>
+            <span class="preset-sep"></span>
+            <span class="lw" data-preset="2">Hollow</span>
+
+            <span class="lw" data-preset="3">Dense</span>
+            <span class="preset-sep"></span>
+            <span class="lw active" data-preset="4">Stable</span>
+            <span class="preset-sep"></span>
+            <span class="lw" data-preset="5">Weird</span>
+
+            <span class="preset-blank"></span>
+            <span class="preset-sep"></span>
+            <span class="lw" data-preset="6">Custom</span>
+            <span class="preset-sep"></span>
+            <span class="preset-blank"></span>
+          </div>
+        </div>
+        </div>
+        <!-- Ghost section — below recipe wheel -->
+        <div class="candy-inner panel-ghost" style="width:100%">
+          <div class="el">Ghost</div>
+          <div class="knob-row ghost-row">
+            <phantom-knob data-param="ghost" size="large" label="Amount" default-value="1.0"></phantom-knob>
+            <div class="ghost-crossover-col">
+              <span class="toggle-group ghost-mode-toggle"><button class="tog active" data-gmode="0">Rpl</button><button class="tog" data-gmode="1">Add</button></span>
+              <phantom-knob data-param="phantom_threshold" size="medium" label="Crossover" default-value="0.462"></phantom-knob>
+            </div>
+          </div>
+        </div>
+        <!-- Filter panel — under Ghost -->
+        <div class="candy-inner panel-filter-left" style="width:100%">
+          <div class="el">Filter</div>
+          <div class="knob-row filter-row">
+            <phantom-knob data-param="synth_lpf_hz" size="medium" label="LPF" default-value="1"></phantom-knob>
+            <button class="filter-link-btn" id="filterLinkBtn" title="Link LPF and HPF motion" aria-pressed="false">
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                <path d="M6.5 9.5 L9.5 6.5 M5 11 L3.5 11 A2.5 2.5 0 1 1 3.5 6 L5 6 M11 5 L12.5 5 A2.5 2.5 0 1 1 12.5 10 L11 10"
+                  fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <phantom-knob data-param="synth_hpf_hz" size="medium" label="HPF" default-value="0"></phantom-knob>
+          </div>
+        </div>
+        <!-- H2-H8 hidden parameter carriers — controlled by dragging wheel spokes -->
+        <phantom-knob data-param="recipe_h2" size="small" default-value="1.0" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h3" size="small" default-value="0.0" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h4" size="small" default-value="0.7" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h5" size="small" default-value="0.0" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h6" size="small" default-value="0.5" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h7" size="small" default-value="0.0" style="display:none"></phantom-knob>
+        <phantom-knob data-param="recipe_h8" size="small" default-value="0.3" style="display:none"></phantom-knob>
+      </div>
+
+      <div class="gap-v"></div>
+
+      <!-- Right panel -->
+      <div class="right-panel">
+        <!-- Single top row: Harmonic Engine + Stereo + Output -->
+        <div class="ctrl-row">
+          <div class="candy-inner panel-harmonic">
+            <div class="el">Harmonic Engine</div>
+            <div class="knob-row">
+              <phantom-knob data-param="harmonic_saturation" size="large" label="Saturation" default-value="0"></phantom-knob>
+              <phantom-knob data-param="phantom_strength" size="medium" label="Strength" default-value="0.8"></phantom-knob>
+              <phantom-knob data-param="synth_step" size="large" label="Shape" default-value="0" data-oled="waveform"></phantom-knob>
+              <phantom-knob data-param="synth_skip" size="medium" label="Skip" default-value="0"></phantom-knob>
+            </div>
+          </div>
+          <div class="candy-inner panel-stereo">
+            <div class="el">Stereo</div>
+            <div class="knob-row">
+              <phantom-knob data-param="stereo_width" size="large" label="Width" default-value="0.5"></phantom-knob>
+            </div>
+          </div>
+          <div class="candy-inner panel-output">
+            <div class="el">Output <span class="toggle-group"><button class="tog" id="auto-gain-btn" data-param="input_gain_auto">Auto</button></span></div>
+            <div class="knob-row">
+              <phantom-knob data-param="input_gain" size="medium" label="In" default-value="0.333" id="input-gain-knob"></phantom-knob>
+              <phantom-knob data-param="output_gain" size="large" label="Out" default-value="0.667"></phantom-knob>
+            </div>
+          </div>
+        </div>
+
+        <!-- Advanced panel — revealed by #advanced-btn / #seamLatch -->
+        <div class="advanced-panel" id="advancedPanel">
+          <canvas id="circuitCanvas" class="circuit-canvas"></canvas>
+          <div class="adv-content">
+            <div class="adv-section adv-wavelet">
+              <div class="adv-section-label">Wavelet</div>
+              <div class="adv-knob-row">
+                <phantom-mini-knob data-param="synth_duty" label="Push" default-value="0.5"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_h1" label="H1" default-value="0.5"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_sub" label="Sub" default-value="0"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_wavelet_length" label="Length" default-value="1"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_gate_threshold" label="Gate" default-value="0"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_min_samples" label="Min" default-value="0"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_max_samples" label="Max" default-value="0.9"></phantom-mini-knob>
+                <phantom-mini-knob data-param="tracking_speed" label="Track" default-value="0.5"></phantom-mini-knob>
+              </div>
+            </div>
+            <div class="preset-sep adv-sep"></div>
+            <div class="adv-section adv-punch-env">
+              <div class="adv-section-label">Punch &amp; Envelope</div>
+              <div class="adv-knob-row">
+                <phantom-mini-knob data-param="punch_amount" label="Amount" default-value="1"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_boost_threshold" label="Threshold" default-value="0"></phantom-mini-knob>
+                <phantom-mini-knob data-param="synth_boost_amount" label="Boost" default-value="0"></phantom-mini-knob>
+                <phantom-mini-knob data-param="env_attack_ms" label="Attack" default-value="0.05"></phantom-mini-knob>
+                <phantom-mini-knob data-param="env_release_ms" label="Release" default-value="0.1"></phantom-mini-knob>
+              </div>
+            </div>
+            <div class="preset-sep adv-sep"></div>
+            <div class="adv-section adv-binaural">
+              <div class="adv-section-label">Binaural</div>
+              <div class="adv-knob-row">
+                <select id="binaural-mode-select-adv" class="param-select adv-select" data-param="binaural_mode">
+                  <option value="0">Off</option>
+                  <option value="1">Spread</option>
+                  <option value="2">Voice-Split</option>
+                </select>
+                <phantom-mini-knob data-param="binaural_width" label="Width" default-value="0.5"></phantom-mini-knob>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="gap-h"></div>
+
+        <!-- Visualization: oscilloscope spans full width, meters flank only the spectrum -->
+        <div class="viz-section">
+          <div class="seam-latch" id="seamLatch" title="Advanced controls">
+            <span class="seam-dot"></span>
+            <span class="seam-dot"></span>
+          </div>
+          <div class="osc-row">
+            <canvas id="oscCanvas"></canvas>
+            <div class="osc-zoom-controls">
+              <button class="osc-zoom-btn" id="oscZoomOut" title="Zoom out">&minus;</button>
+              <button class="osc-zoom-btn" id="oscZoomIn" title="Zoom in">&plus;</button>
+            </div>
+          </div>
+          <div class="spectrum-row">
+            <canvas id="meterIn" class="io-meter"></canvas>
+            <div class="spectrum-wrap">
+              <canvas id="spectrumCanvas"></canvas>
+            </div>
+            <canvas id="meterOut" class="io-meter"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<div id="settings-overlay" class="settings-overlay hidden">
+  <div class="settings-backdrop"></div>
+  <div class="settings-panel">
+    <div class="settings-header">
+      <span class="el">SETTINGS</span>
+      <button id="settings-close" class="settings-close">&times;</button>
+    </div>
+    <div class="settings-content">
+      <div class="settings-section">
+        <div class="el">BINAURAL</div>
+        <div class="settings-row">
+          <select id="binaural-mode-select" class="param-select" data-param="binaural_mode">
+            <option value="0">Off</option>
+            <option value="1">Spread</option>
+          </select>
+          <phantom-knob data-param="binaural_width" size="medium" label="Width" default-value="0.5"></phantom-knob>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="el">ENVELOPE SOURCE</div>
+        <div class="settings-row">
+          <select id="env-source-select" class="param-select" data-param="env_source">
+            <option value="0">Input</option>
+            <option value="1">Sidechain</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="/knob.js"></script>
+<script src="/knob-mini.js"></script>
+<script src="/juce-frontend.js"></script>
+<script src="/phantom.js"></script>
+<script src="/spectrum.js"></script>
+<script src="/recipe-wheel.js"></script>
+<script src="/oscilloscope.js"></script>
+<script src="/circuit-board.js"></script>
+</body>
+</html>
