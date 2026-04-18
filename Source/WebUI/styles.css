@@ -190,21 +190,21 @@ phantom-knob.mode-inactive{
   text-shadow:0 0 2px #fff,0 0 6px rgba(255,255,255,.4);
 }
 
-/* Harmonic labels around wheel */
+/* Harmonic labels — positioned radially just outside the 280px wheel.
+   Each label sits on a circle of radius 152px (centered in wheel-mount), at
+   the exact angle of its corresponding spoke: angle = i * (360°/7). The
+   double-rotate trick keeps the text upright while positioning it radially. */
 .h-label{
-  position:absolute;font-family:'Courier New',monospace;font-size:8px;font-weight:700;
+  position:absolute;top:50%;left:50%;
+  font-family:'Courier New',monospace;font-size:8px;font-weight:700;
   letter-spacing:0.5px;color:rgba(0,0,0,0.38);
   text-shadow:0 1px 0 rgba(255,255,255,0.65);
-  transform:translate(-50%,-50%);z-index:5;pointer-events:none;
+  transform:translate(-50%,-50%)
+    rotate(calc(var(--i) * (360deg / 7)))
+    translateY(-152px)
+    rotate(calc(var(--i) * (-360deg / 7)));
+  z-index:5;pointer-events:none;white-space:nowrap;
 }
-/* Position H2-H8 around 280px circle */
-.h-label[style*="--angle:0"]{top:4%;left:50%}
-.h-label[style*="--angle:1"]{top:18%;right:4%;left:auto}
-.h-label[style*="--angle:2"]{top:55%;right:1%;left:auto}
-.h-label[style*="--angle:3"]{bottom:4%;right:17%;top:auto;left:auto}
-.h-label[style*="--angle:4"]{bottom:4%;left:17%;top:auto}
-.h-label[style*="--angle:5"]{top:55%;left:1%}
-.h-label[style*="--angle:6"]{top:18%;left:4%}
 
 /* Preset strip — 3×3 grid with etched separators */
 .preset-strip{
@@ -281,9 +281,10 @@ phantom-knob.mode-inactive{
 .panel-stereo{flex:0.7;align-items:center}
 .panel-output{flex:1.4;align-items:center}
 
-/* Left column panel sizing */
-.panel-ghost{min-height:140px}
-.panel-filter-left{min-height:168px;margin-top:auto}
+/* Left column panel sizing — Ghost grows to absorb slack so the gap
+   between it and Filter matches the tight top-row→viz gap on the right. */
+.panel-ghost{flex:1 1 auto;min-height:140px}
+.panel-filter-left{flex:0 0 auto;min-height:168px}
 
 /* Centered labels for all .candy-inner panels */
 .candy-inner > .el{

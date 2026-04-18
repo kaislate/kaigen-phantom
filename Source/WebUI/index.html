@@ -34,14 +34,15 @@
             <div class="oled-freq" id="pitchDisplay">---</div>
             <div class="oled-preset" id="presetDisplay">Warm</div>
           </div>
-          <!-- H2-H8 labels positioned absolutely around the wheel -->
-          <div class="h-label" style="--angle:0">H2</div>
-          <div class="h-label" style="--angle:1">H3</div>
-          <div class="h-label" style="--angle:2">H4</div>
-          <div class="h-label" style="--angle:3">H5</div>
-          <div class="h-label" style="--angle:4">H6</div>
-          <div class="h-label" style="--angle:5">H7</div>
-          <div class="h-label" style="--angle:6">H8</div>
+          <!-- H2-H8 labels positioned radially outside the wheel, each directly
+               out from its corresponding bar (i=0..6 → 0°, 51.43°, 102.86°, ...) -->
+          <div class="h-label" style="--i:0">H2</div>
+          <div class="h-label" style="--i:1">H3</div>
+          <div class="h-label" style="--i:2">H4</div>
+          <div class="h-label" style="--i:3">H5</div>
+          <div class="h-label" style="--i:4">H6</div>
+          <div class="h-label" style="--i:5">H7</div>
+          <div class="h-label" style="--i:6">H8</div>
         </div>
         <div class="preset-strip">
           <div class="preset-grid">
@@ -76,7 +77,7 @@
           </div>
         </div>
         <!-- Filter panel — under Ghost -->
-        <div class="candy-inner panel-filter-left" style="margin-top:auto;width:100%">
+        <div class="candy-inner panel-filter-left" style="width:100%">
           <div class="el">Filter</div>
           <div class="knob-row">
             <phantom-knob data-param="synth_lpf_hz" size="medium" label="LPF" default-value="1"></phantom-knob>
