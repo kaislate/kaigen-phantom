@@ -105,7 +105,7 @@ function formatDisplayValue(state) {
 // 2. Wire all phantom-knob elements to their slider relays
 // =============================================================================
 
-document.querySelectorAll("phantom-knob[data-param]").forEach((el) => {
+document.querySelectorAll("phantom-knob[data-param], phantom-mini-knob[data-param]").forEach((el) => {
   const paramName = el.dataset.param;
   const state = getSliderState(paramName);
 
@@ -335,5 +335,109 @@ if (envSourceSelect) {
     envSourceSelect.value = String(envSourceState.getChoiceIndex());
   }
 }
+
+
+// =============================================================================
+// Advanced mode toggle — coordinates class flip, circuit-board rAF, editor resize
+// =============================================================================
+
+const ADV_OPEN_PARAM = 'advanced_open';
+
+function readAdvancedOpen() {
+  const state = getSliderState ? getSliderState(ADV_OPEN_PARAM) : null;
+  if (!state) return false;
+  return state.getNormalisedValue() > 0.5;
+}
+
+function writeAdvancedOpen(isOpen) {
+  const state = getSliderState ? getSliderState(ADV_OPEN_PARAM) : null;
+  if (!state) return;
+  state.sliderDragStarted();
+  state.setNormalisedValue(isOpen ? 1.0 : 0.0);
+  state.sliderDragEnded();
+}
+
+function setEditorHeightViaNative(h) {
+  if (window.juce && typeof window.juce.getNativeFunction === 'function') {
+    try {
+      window.juce.getNativeFunction('setEditorHeight')(h);
+    } catch (e) {
+      console.warn('setEditorHeight native not available yet', e);
+    }
+  }
+}
+
+let circuitCanvasEl = null;
+function getCircuitCanvas() {
+  if (!circuitCanvasEl) circuitCanvasEl = document.getElementById('circuitCanvas');
+  return circuitCanvasEl;
+}
+
+function applyAdvancedMode(isOpen, { persist = true } = {}) {
+  const wrap = document.querySelector('.wrap');
+  const btn = document.getElementById('advanced-btn');
+  if (!wrap) return;
+
+  if (isOpen) {
+    wrap.classList.add('advanced-open');
+    if (btn) btn.classList.add('active');
+    setEditorHeightViaNative(1020);
+    const canvas = getCircuitCanvas();
+    if (canvas && window.PhantomCircuitBoard) {
+      window.PhantomCircuitBoard.start(canvas);
+    }
+  } else {
+    wrap.classList.remove('advanced-open');
+    if (btn) btn.classList.remove('active');
+    if (window.PhantomCircuitBoard) window.PhantomCircuitBoard.stop();
+    // Resize the editor AFTER the CSS transition completes so the window only
+    // shrinks once the panel is hidden.
+    setTimeout(() => setEditorHeightViaNative(820), 400);
+  }
+
+  if (persist) writeAdvancedOpen(isOpen);
+}
+
+function toggleAdvanced() {
+  const wrap = document.querySelector('.wrap');
+  if (!wrap) return;
+  const isOpen = wrap.classList.contains('advanced-open');
+  applyAdvancedMode(!isOpen);
+}
+
+// Wire click affordances.
+const advancedBtn = document.getElementById('advanced-btn');
+if (advancedBtn) advancedBtn.addEventListener('click', toggleAdvanced);
+
+const seamLatchEl = document.getElementById('seamLatch');
+if (seamLatchEl) seamLatchEl.addEventListener('click', toggleAdvanced);
+
+// Wire binaural-mode-select-adv to the same param as the settings-overlay select.
+const binauralModeSelectAdv = document.getElementById('binaural-mode-select-adv');
+if (binauralModeSelectAdv) {
+  const state = getSliderState('binaural_mode');
+  if (state) {
+    binauralModeSelectAdv.addEventListener('change', (e) => {
+      state.sliderDragStarted();
+      state.setNormalisedValue(parseInt(e.target.value, 10) / 2.0);
+      state.sliderDragEnded();
+    });
+    state.valueChangedEvent.addListener(() => {
+      binauralModeSelectAdv.value = String(Math.round(state.getNormalisedValue() * 2));
+    });
+    binauralModeSelectAdv.value = String(Math.round(state.getNormalisedValue() * 2));
+  }
+}
+
+// Initialise state from APVTS. If advanced_open was true when the plugin was
+// saved, restore that on load.
+(function initAdvancedFromState() {
+  const state = getSliderState ? getSliderState(ADV_OPEN_PARAM) : null;
+  if (!state) return;
+  const applyFromState = () => applyAdvancedMode(readAdvancedOpen(), { persist: false });
+  state.valueChangedEvent.addListener(applyFromState);
+  // Defer by a tick so the DOM + Canvas are ready.
+  setTimeout(applyFromState, 50);
+})();
 
 })();
