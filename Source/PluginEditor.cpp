@@ -194,7 +194,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 juce::MessageManager::callAsync([weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), clamped]
                 {
                     if (auto* p = weakSelf.getComponent())
-                        p->setSize(1600, clamped);
+                        p->setSize(1300, clamped);
                 });
                 complete(juce::var(true));
             })
@@ -209,7 +209,7 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
       webView(buildWebViewOptions(*this))
 {
     setWantsKeyboardFocus(false);
-    setSize(1600, 820);
+    setSize(1300, 820);
     addAndMakeVisible(webView);
 
     juce::MessageManager::callAsync([this]()

@@ -3,7 +3,7 @@
 
 body{
   background:#AEAFB1;margin:0;overflow:hidden;
-  width:1600px;height:820px;
+  width:1300px;height:820px;
   font-family:'Space Grotesk',sans-serif;
   color:rgba(0,0,0,0.70);
 }
@@ -13,7 +13,7 @@ body{
 
 /* ═══ WRAP — Studio Gray plastic surface ═══ */
 .wrap{
-  position:relative;width:1600px;height:820px;overflow:hidden;
+  position:relative;width:1300px;height:820px;overflow:hidden;
   display:grid;
   grid-template-columns:1fr;
   grid-template-rows:46px 1fr;

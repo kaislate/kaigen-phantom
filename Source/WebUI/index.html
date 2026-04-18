@@ -65,10 +65,19 @@
           </div>
         </div>
         <!-- Ghost section — below recipe wheel -->
-        <div class="candy-inner panel-ghost" style="margin-top:auto;width:100%">
+        <div class="candy-inner panel-ghost" style="width:100%">
           <div class="el">Ghost <span class="toggle-group"><button class="tog active" data-gmode="0">Rpl</button><button class="tog" data-gmode="1">Add</button></span></div>
           <div class="knob-row">
             <phantom-knob data-param="ghost" size="large" label="Amount" default-value="1.0"></phantom-knob>
+            <phantom-knob data-param="phantom_threshold" size="medium" label="Crossover" default-value="0.462"></phantom-knob>
+          </div>
+        </div>
+        <!-- Filter panel — under Ghost -->
+        <div class="candy-inner panel-filter-left" style="margin-top:auto;width:100%">
+          <div class="el">Filter</div>
+          <div class="knob-row">
+            <phantom-knob data-param="synth_lpf_hz" size="medium" label="LPF" default-value="1"></phantom-knob>
+            <phantom-knob data-param="synth_hpf_hz" size="medium" label="HPF" default-value="0"></phantom-knob>
           </div>
         </div>
         <!-- H2-H8 hidden parameter carriers — controlled by dragging wheel spokes -->
@@ -85,7 +94,7 @@
 
       <!-- Right panel -->
       <div class="right-panel">
-        <!-- Row 1 -->
+        <!-- Single top row: Harmonic Engine + Stereo + Output -->
         <div class="ctrl-row">
           <div class="candy-inner panel-harmonic">
             <div class="el">Harmonic Engine</div>
@@ -96,23 +105,10 @@
               <phantom-knob data-param="synth_skip" size="medium" label="Skip" default-value="0"></phantom-knob>
             </div>
           </div>
-        </div>
-
-        <div class="gap-h"></div>
-
-        <!-- Row 2: Stereo + Envelope + Filter + Punch + Output -->
-        <div class="ctrl-row">
           <div class="candy-inner panel-stereo">
             <div class="el">Stereo</div>
             <div class="knob-row">
               <phantom-knob data-param="stereo_width" size="large" label="Width" default-value="0.5"></phantom-knob>
-            </div>
-          </div>
-          <div class="candy-inner panel-filter">
-            <div class="el">Filter</div>
-            <div class="knob-row">
-              <phantom-knob data-param="synth_lpf_hz" size="medium" label="LPF" default-value="1"></phantom-knob>
-              <phantom-knob data-param="synth_hpf_hz" size="medium" label="HPF" default-value="0"></phantom-knob>
             </div>
           </div>
           <div class="candy-inner panel-output">
@@ -128,13 +124,6 @@
         <div class="advanced-panel" id="advancedPanel">
           <canvas id="circuitCanvas" class="circuit-canvas"></canvas>
           <div class="adv-content">
-            <div class="adv-section adv-phantom">
-              <div class="adv-section-label">Phantom</div>
-              <div class="adv-knob-row">
-                <phantom-mini-knob data-param="phantom_threshold" label="Crossover" default-value="0.462"></phantom-mini-knob>
-              </div>
-            </div>
-            <div class="preset-sep adv-sep"></div>
             <div class="adv-section adv-wavelet">
               <div class="adv-section-label">Wavelet</div>
               <div class="adv-knob-row">
