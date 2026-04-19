@@ -73,7 +73,7 @@
           <div class="knob-row ghost-row">
             <phantom-knob data-param="ghost" size="large" label="Amount" default-value="1.0"></phantom-knob>
             <div class="ghost-crossover-col">
-              <span class="toggle-group ghost-mode-toggle"><button class="tog active" data-gmode="0">Rpl</button><button class="tog" data-gmode="1">Add</button></span>
+              <span class="toggle-group ghost-mode-toggle"><button class="tog active" data-gmode="0">Replace</button><button class="tog" data-gmode="1">Combine</button><button class="tog" data-gmode="2">Phantom Only</button></span>
               <phantom-knob data-param="phantom_threshold" size="medium" label="Crossover" default-value="0.462"></phantom-knob>
             </div>
           </div>
@@ -90,6 +90,13 @@
               </svg>
             </button>
             <phantom-knob data-param="synth_hpf_hz" size="medium" label="HPF" default-value="0"></phantom-knob>
+          </div>
+          <div class="filter-slope-row">
+            <span class="toggle-group filter-slope-toggle">
+              <button class="tog" data-fslope="0">-6</button>
+              <button class="tog active" data-fslope="1">-12</button>
+              <button class="tog" data-fslope="2">-24</button>
+            </span>
           </div>
         </div>
         <!-- H2-H8 hidden parameter carriers — controlled by dragging wheel spokes -->
@@ -226,6 +233,15 @@
             <option value="0">Input</option>
             <option value="1">Sidechain</option>
           </select>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="el">MIDI TRIGGERING</div>
+        <div class="settings-row">
+          <span class="toggle-group">
+            <button class="tog" id="midi-trigger-btn" data-param="midi_trigger_enabled">Trigger</button>
+            <button class="tog" id="midi-gate-release-btn" data-param="midi_gate_release">Gate Release</button>
+          </span>
         </div>
       </div>
     </div>

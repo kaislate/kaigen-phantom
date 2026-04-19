@@ -44,6 +44,37 @@ if (autoGainBtn && inputGainAutoState) {
   updateAutoGainUI();
 }
 
+// ── MIDI triggering toggles ───────────────────────────────────────────────────
+const midiTriggerState = getToggleState?.("midi_trigger_enabled");
+const midiGateReleaseState = getToggleState?.("midi_gate_release");
+const midiTriggerBtn = document.getElementById("midi-trigger-btn");
+const midiGateReleaseBtn = document.getElementById("midi-gate-release-btn");
+if (midiTriggerBtn && midiTriggerState) {
+  midiTriggerBtn.addEventListener("click", () => {
+    midiTriggerState.setValue(!midiTriggerState.getValue());
+  });
+  function updateMidiTriggerUI() {
+    const on = midiTriggerState.getValue();
+    midiTriggerBtn.classList.toggle("active", on);
+    // Gate Release depends on Trigger being on — gray it out when Trigger is off.
+    if (midiGateReleaseBtn) midiGateReleaseBtn.classList.toggle("mode-inactive", !on);
+  }
+  midiTriggerState.valueChangedEvent.addListener(updateMidiTriggerUI);
+  updateMidiTriggerUI();
+}
+if (midiGateReleaseBtn && midiGateReleaseState) {
+  midiGateReleaseBtn.addEventListener("click", () => {
+    // Ignore clicks when parent toggle is off — mode-inactive class signals this.
+    if (midiGateReleaseBtn.classList.contains("mode-inactive")) return;
+    midiGateReleaseState.setValue(!midiGateReleaseState.getValue());
+  });
+  function updateMidiGateReleaseUI() {
+    midiGateReleaseBtn.classList.toggle("active", midiGateReleaseState.getValue());
+  }
+  midiGateReleaseState.valueChangedEvent.addListener(updateMidiGateReleaseUI);
+  updateMidiGateReleaseUI();
+}
+
 // ── Punch toggle ──────────────────────────────────────────────────────────────
 const punchEnabledState = getToggleState?.("punch_enabled");
 const punchBtn = document.getElementById("punch-btn");
@@ -247,6 +278,26 @@ function updateGhostModeUI() {
 
 ghostModeState.valueChangedEvent.addListener(updateGhostModeUI);
 updateGhostModeUI();
+
+// ── Filter slope toggle (-6 / -12 / -24 dB/oct) ──────────────────────────────
+const filterSlopeState = getComboBoxState("synth_filter_slope");
+if (filterSlopeState) {
+  document.querySelectorAll(".tog[data-fslope]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      filterSlopeState.setChoiceIndex(parseInt(btn.dataset.fslope));
+    });
+  });
+  function updateFilterSlopeUI() {
+    const idx = filterSlopeState.getChoiceIndex();
+    document
+      .querySelectorAll(".tog[data-fslope]")
+      .forEach((b) =>
+        b.classList.toggle("active", parseInt(b.dataset.fslope) === idx)
+      );
+  }
+  filterSlopeState.valueChangedEvent.addListener(updateFilterSlopeUI);
+  updateFilterSlopeUI();
+}
 
 // =============================================================================
 // 7. Real-time data polling loop

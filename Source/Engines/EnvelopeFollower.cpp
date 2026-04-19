@@ -6,6 +6,7 @@ void EnvelopeFollower::prepare(double sr) noexcept
     sampleRate = sr;
     env = 0.0f;
     peakHold = 0.0f;
+    peakHoldSamplesLeft = 0;
     recomputeCoefs();
 }
 
@@ -13,6 +14,7 @@ void EnvelopeFollower::reset() noexcept
 {
     env = 0.0f;
     peakHold = 0.0f;
+    peakHoldSamplesLeft = 0;
 }
 
 void EnvelopeFollower::setAttackMs(float ms) noexcept
@@ -44,21 +46,59 @@ void EnvelopeFollower::recomputeCoefs() noexcept
     static constexpr double kReleaseLn = 2.302585092994046;  // ln(10)
     releaseCoef = 1.0f - static_cast<float>(std::exp(-kReleaseLn / (releaseMs * 0.001 * srd)));
 
-    // Peak-hold decay: reaches -20 dB in kPeakHoldMs. 30 ms bridges the rectified
-    // troughs of pitched audio down to ~17 Hz fundamentals so the one-pole
-    // receives a stable "recent peak" target rather than an oscillating signal.
-    static constexpr double kPeakHoldMs = 30.0;
-    peakHoldCoef = static_cast<float>(std::exp(-kReleaseLn / (kPeakHoldMs * 0.001 * srd)));
+    // Peak-hold: hold flat for kPeakHoldMs (bridges troughs of pitched audio down
+    // to ~25 Hz fundamentals with margin), then decay fast at kPostHoldMs rate.
+    // Each new rectified peak restarts the hold timer, so during a sustained note
+    // the one-pole sees a truly stable target and env can reach peak at the
+    // user-set attack time regardless of release.
+    static constexpr double kPeakHoldMs = 20.0;
+    static constexpr double kPostHoldMs = 5.0;
+    peakHoldMaxSamples    = static_cast<int>(kPeakHoldMs * 0.001 * srd);
+    peakHoldPostDecayCoef = static_cast<float>(std::exp(-kReleaseLn / (kPostHoldMs * 0.001 * srd)));
 }
 
 float EnvelopeFollower::process(float input) noexcept
 {
     const float rectified = std::fabs(input);
-    if (rectified > peakHold) peakHold = rectified;   // instant attack on new peaks
-    else                      peakHold *= peakHoldCoef;
 
-    const float target = peakHold;
+    // Peak-hold with true hold duration: each new peak restarts the hold timer,
+    // so sustained pitched audio keeps the hold flat at peak. On silence the
+    // hold drops to zero immediately so release engages at the full user rate.
+    // Near-peak tolerance (kNearPeakRatio) keeps the timer alive when successive
+    // crests of a steady sine fall slightly below the first due to sample
+    // quantization — without this, env oscillates and creates AM sidebands that
+    // leak the fundamental into the phantom output.
+    constexpr float kSilenceFloor  = 1.0e-6f;
+    constexpr float kNearPeakRatio = 0.98f;
+    if (rectified < kSilenceFloor)
+    {
+        peakHold = 0.0f;
+        peakHoldSamplesLeft = 0;
+    }
+    else if (rectified > peakHold)
+    {
+        peakHold = rectified;
+        peakHoldSamplesLeft = peakHoldMaxSamples;
+    }
+    else if (rectified > peakHold * kNearPeakRatio)
+    {
+        peakHoldSamplesLeft = peakHoldMaxSamples;
+    }
+    else if (peakHoldSamplesLeft > 0)
+    {
+        --peakHoldSamplesLeft;
+    }
+    else
+    {
+        peakHold *= peakHoldPostDecayCoef;
+    }
+
+    const float target = forceReleaseActive ? 0.0f : peakHold;
     const float coef   = (target > env) ? attackCoef : releaseCoef;
     env += (target - env) * coef;
+
+    if (forceReleaseActive && env < 1.0e-4f)
+        forceReleaseActive = false;
+
     return env;
 }

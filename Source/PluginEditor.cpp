@@ -106,7 +106,8 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
     // ── Combo-box relays ──────────────────────────────────────────────
     juce::WebComboBoxRelay* comboRelays[] = {
         &self.modeRelay, &self.ghostModeRelay,
-        &self.recipePresetRelay, &self.binauralModeRelay
+        &self.recipePresetRelay, &self.binauralModeRelay,
+        &self.filterSlopeRelay
     };
     for (auto* r : comboRelays)
         options = options.withOptionsFrom(*r);
@@ -115,6 +116,8 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
     options = options.withOptionsFrom(self.bypassRelay);
     options = options.withOptionsFrom(self.punchEnabledRelay);
     options = options.withOptionsFrom(self.inputGainAutoRelay);
+    options = options.withOptionsFrom(self.midiTriggerRelay);
+    options = options.withOptionsFrom(self.midiGateReleaseRelay);
 
     // ── Native functions for real-time data ──────────────────────────
     options = options
@@ -263,7 +266,8 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         { ParamID::MODE,          modeRelay },
         { ParamID::GHOST_MODE,    ghostModeRelay },
         { ParamID::RECIPE_PRESET, recipePresetRelay },
-        { ParamID::BINAURAL_MODE, binauralModeRelay },
+        { ParamID::BINAURAL_MODE,       binauralModeRelay },
+        { ParamID::SYNTH_FILTER_SLOPE,  filterSlopeRelay  },
     };
     for (auto& b : comboBindings)
         comboAttachments.push_back(std::make_unique<juce::WebComboBoxParameterAttachment>(
@@ -276,6 +280,10 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         *processor.apvts.getParameter(ParamID::PUNCH_ENABLED), punchEnabledRelay, nullptr);
     inputGainAutoAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
         *processor.apvts.getParameter(ParamID::INPUT_GAIN_AUTO), inputGainAutoRelay, nullptr);
+    midiTriggerAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
+        *processor.apvts.getParameter(ParamID::MIDI_TRIGGER_ENABLED), midiTriggerRelay, nullptr);
+    midiGateReleaseAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
+        *processor.apvts.getParameter(ParamID::MIDI_GATE_RELEASE), midiGateReleaseRelay, nullptr);
 }
 
 PhantomEditor::~PhantomEditor() = default;

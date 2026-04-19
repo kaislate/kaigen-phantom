@@ -71,6 +71,11 @@ public:
     /** Maximum waveset length [100–8000 samples]. Crossings further apart than this are rejected. */
     void setMaxPeriodSamples(float samples) noexcept;
 
+    /** Free-run: no-op here — ZCS is a continuous crossing-locked oscillator and
+     *  doesn't have the wavelet-window-silence issue that WaveletSynth has. API
+     *  parity so PhantomEngine can call it uniformly. */
+    void setFreeRun(bool /*on*/) noexcept {}
+
     // ── Processing ───────────────────────────────────────────────────────────
     /** Process one sample of the raw bass-band signal.
      *  Returns synthesised harmonics sum only — no fundamental component.

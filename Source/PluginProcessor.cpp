@@ -75,7 +75,7 @@ void PhantomProcessor::syncParamsToEngine()
     engine.setSynthDuty      (apvts.getRawParameterValue(ParamID::SYNTH_DUTY)->load() / 100.0f);
     engine.setSynthSkip      ((int) apvts.getRawParameterValue(ParamID::SYNTH_SKIP)->load());
     engine.setGhostAmount  (apvts.getRawParameterValue(ParamID::GHOST)->load() / 100.0f);
-    engine.setGhostReplace (((int) apvts.getRawParameterValue(ParamID::GHOST_MODE)->load()) == 0);
+    engine.setGhostMode    ((int) apvts.getRawParameterValue(ParamID::GHOST_MODE)->load());
     engine.setOutputGainDb (apvts.getRawParameterValue(ParamID::OUTPUT_GAIN)->load());
     engine.setEnvelopeAttackMs (apvts.getRawParameterValue(ParamID::ENV_ATTACK_MS)->load());
     engine.setEnvelopeReleaseMs(apvts.getRawParameterValue(ParamID::ENV_RELEASE_MS)->load());
@@ -85,6 +85,11 @@ void PhantomProcessor::syncParamsToEngine()
     engine.setStereoWidth  (apvts.getRawParameterValue(ParamID::STEREO_WIDTH)->load() / 100.0f);
     engine.setSynthLPF(apvts.getRawParameterValue(ParamID::SYNTH_LPF_HZ)->load());
     engine.setSynthHPF(apvts.getRawParameterValue(ParamID::SYNTH_HPF_HZ)->load());
+    {
+        const int idx = (int) apvts.getRawParameterValue(ParamID::SYNTH_FILTER_SLOPE)->load();
+        const int dBPerOct = (idx == 0) ? 6 : (idx == 2) ? 24 : 12;
+        engine.setSynthFilterSlope(dBPerOct);
+    }
 
     static const char* hIds[7] = {
         ParamID::RECIPE_H2, ParamID::RECIPE_H3, ParamID::RECIPE_H4,
@@ -106,9 +111,11 @@ void PhantomProcessor::syncParamsToEngine()
     engine.setPunchAmount  (apvts.getRawParameterValue(ParamID::PUNCH_AMOUNT)->load() / 100.0f);
     engine.setBoostThreshold(apvts.getRawParameterValue(ParamID::SYNTH_BOOST_THRESHOLD)->load() / 100.0f);
     engine.setBoostAmount   (apvts.getRawParameterValue(ParamID::SYNTH_BOOST_AMOUNT)->load() / 100.0f);
+    engine.setMidiTriggerEnabled(apvts.getRawParameterValue(ParamID::MIDI_TRIGGER_ENABLED)->load() > 0.5f);
+    engine.setMidiGateRelease   (apvts.getRawParameterValue(ParamID::MIDI_GATE_RELEASE)   ->load() > 0.5f);
 }
 
-void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
 
@@ -132,6 +139,16 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         peakOutL.store(pL, std::memory_order_relaxed);
         peakOutR.store(pR, std::memory_order_relaxed);
         return;
+    }
+
+    // ── MIDI events → engine ──────────────────────────────────────────
+    // The engine's own gating (setMidiTriggerEnabled / setMidiGateRelease)
+    // decides whether to act on these — we just forward every event.
+    for (const auto meta : midiMessages)
+    {
+        const auto& m = meta.getMessage();
+        if      (m.isNoteOn())  engine.handleMidiNoteOn();
+        else if (m.isNoteOff()) engine.handleMidiNoteOff();
     }
 
     // ── Input Gain → engine detection only ────────────────────────────

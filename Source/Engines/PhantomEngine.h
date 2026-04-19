@@ -35,7 +35,7 @@ public:
     void setSynthDuty(float duty);           // 0.05-0.95 pulse width
     void setSynthSkip(int n);               // 1-8 zero-crossing accumulator
     void setGhostAmount(float amt);          // [0..1] wet/dry
-    void setGhostReplace(bool replace);      // true = replace, false = add
+    void setGhostMode(int mode);             // 0 = Replace, 1 = Combine, 2 = Phantom Only
     void setPhantomStrength(float s);        // [0..1]
     void setOutputGainDb(float db);
     void setEnvelopeAttackMs(float ms);
@@ -45,6 +45,7 @@ public:
     void setStereoWidth(float width);        // [0..2]
     void setSynthLPF(float hz);            // 200–20000 Hz, default 20000 (transparent)
     void setSynthHPF(float hz);            // 20–2000 Hz,   default 20   (transparent)
+    void setSynthFilterSlope(int dBPerOct); // 6, 12, or 24 dB/oct (applies to both LPF and HPF)
     void setSynthMode(int mode);           // 0 = Effect (ZCS), 1 = RESYN (WaveletSynth)
     void setWaveletLength(float len);      // RESYN only: 0.05–1.0 fraction of period
     void setGateThreshold(float thr);      // RESYN only: 0.0–1.0 min negative-peak threshold
@@ -59,6 +60,12 @@ public:
     void setBoostThreshold(float thr);     // RESYN only: upward expansion threshold [0–1]
     void setBoostAmount(float amt);        // RESYN only: upward expansion gain [0–2]
     void setInputDetectionGain(float lin); // scales what the synth's period/gate/boost detection sees; audio path stays at unity
+    void setMidiTriggerEnabled(bool on);   // when true, MIDI note-on retriggers the envelope; audio transient retrigger is suppressed
+    void setMidiGateRelease(bool on);      // when true (and MIDI trigger enabled), MIDI note-off forces envelope release + free-run
+
+    // ─── MIDI event handlers (called from PluginProcessor per MIDI event) ───
+    void handleMidiNoteOn() noexcept;
+    void handleMidiNoteOff() noexcept;
 
     /** Current tracked pitch in Hz (from the active engine's zero-crossing tracker).
      *  Returns 0 when the input is too quiet to give reliable pitch info. */
@@ -94,15 +101,25 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothSatL;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothSatR;
 
-    // IIR filters on the synthesised harmonics signal (applied after saturation, before envelope scale)
-    juce::IIRFilter lpfL, lpfR;
-    juce::IIRFilter hpfL, hpfR;
+    // IIR filters on the synthesised harmonics signal (applied after saturation, before envelope scale).
+    // Three slope options multiplex through different filter topologies:
+    //   -6 dB/oct  → FirstOrderTPTFilter  (1-pole)
+    //   -12 dB/oct → IIRFilter stage A only (Butterworth biquad, Q=1/sqrt(2))
+    //   -24 dB/oct → IIRFilter stage A + stage B cascaded (4th-order Butterworth)
+    juce::dsp::FirstOrderTPTFilter<float> lpf1pole;
+    juce::dsp::FirstOrderTPTFilter<float> hpf1pole;
+    juce::IIRFilter lpfL_sa, lpfR_sa, lpfL_sb, lpfR_sb;
+    juce::IIRFilter hpfL_sa, hpfR_sa, hpfL_sb, hpfR_sb;
     float lastLPFHz = 20000.0f;
     float lastHPFHz = 20.0f;
+    int   filterSlope = 12;  // 6, 12, or 24 dB/oct
+
+    void recomputeLPFCoefs();
+    void recomputeHPFCoefs();
 
     // Block-rate params
     float ghostAmount     = 1.0f;
-    bool  ghostReplace    = true;
+    int   ghostMode       = 0;  // 0=Replace, 1=Combine, 2=Phantom Only
     float phantomStrength = 0.8f;
     float outputGainLin   = 1.0f;
     float stereoWidth     = 1.0f;
@@ -117,4 +134,6 @@ private:
     float punchAmount = 1.0f;
 
     float inputDetectionGain = 1.0f;
+    bool  midiTriggerEnabled = false;
+    bool  midiGateRelease    = false;
 };

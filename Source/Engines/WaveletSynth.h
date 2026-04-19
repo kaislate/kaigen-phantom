@@ -44,6 +44,12 @@ public:
     /** Upward expansion amount [0–2]. Additional gain multiplier. Default 0. */
     void setBoostAmount(float amt) noexcept;
 
+    /** Free-run: when true, the wavelet keeps firing at the last latched period
+     *  even after inputPeak drops below the amplitude floor — phase wraps
+     *  automatically instead of silencing. Used during MIDI-gated release so
+     *  the tail rings out for the full envelope release time. */
+    void setFreeRun(bool on) noexcept { freeRun = on; }
+
     float process(float x) noexcept;
     float getEstimatedHz() const noexcept;
     /** Per-wavelet peak: amplitude of the last completed wavelet cycle. Updated at every
@@ -101,6 +107,8 @@ private:
     // Freezes period updates when input is too quiet to give reliable pitch info
     // (e.g. noise during a long envelope release tail).
     float inputPeak = 0.0f;
+
+    bool freeRun = false;
 
     static float warpPhase(float phase, float duty) noexcept;
     static float shapedWave(float wp, float step) noexcept;
