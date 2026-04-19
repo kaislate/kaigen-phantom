@@ -21,6 +21,39 @@ static float feedN(EnvelopeFollower& e, float val, int n)
     return out;
 }
 
+// ─── Stability on pitched audio ──────────────────────────────────────────────
+// Regression: without the near-peak timer-refresh, env oscillated on a steady
+// sine because sample quantization made successive crests fall slightly below
+// the first, causing the peak-hold timer to expire between cycles.
+
+TEST_CASE("EnvelopeFollower: env stays near peak on sustained pitched signal")
+{
+    const double sr = 44100.0;
+    EnvelopeFollower e;
+    e.prepare(sr);
+    e.setAttackMs(1.0f);
+    e.setReleaseMs(50.0f);
+
+    const float amp = 0.5f;
+    const float w   = 2.0f * juce::MathConstants<float>::pi * 60.0f / (float) sr;
+
+    // Warm up for 200ms, then measure stability over next 100ms.
+    for (int i = 0; i < (int)(0.200 * sr); ++i)
+        e.process(amp * std::sin(w * (float) i));
+
+    float minEnv = 1.0f, maxEnv = 0.0f;
+    const int startI = (int)(0.200 * sr);
+    for (int i = 0; i < (int)(0.100 * sr); ++i)
+    {
+        const float env = e.process(amp * std::sin(w * (float) (startI + i)));
+        minEnv = juce::jmin(minEnv, env);
+        maxEnv = juce::jmax(maxEnv, env);
+    }
+
+    REQUIRE(maxEnv == Catch::Approx(amp).margin(0.02f));
+    REQUIRE(minEnv == Catch::Approx(amp).margin(0.05f));
+}
+
 // ─── Basic sanity ────────────────────────────────────────────────────────────
 
 TEST_CASE("EnvelopeFollower: starts at zero after prepare")

@@ -61,7 +61,7 @@ TEST_CASE("createParameterLayout contains all required parameter IDs")
     REQUIRE(has(ParamID::SYNTH_BOOST_THRESHOLD));
     REQUIRE(has(ParamID::SYNTH_BOOST_AMOUNT));
 
-    REQUIRE(ids.size() == 41u);
+    REQUIRE(ids.size() == 44u);
 }
 
 TEST_CASE("ghost parameter default is 100 percent")

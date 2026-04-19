@@ -48,6 +48,7 @@ namespace ParamID
 
     // ── Synth Filter ──────────────────────────────────────────────────
     /** Low-pass filter on synthesised harmonics. 200–20000 Hz. Default 20000 (transparent). */
+    inline constexpr auto SYNTH_FILTER_SLOPE = "synth_filter_slope";
     inline constexpr auto SYNTH_LPF_HZ      = "synth_lpf_hz";
     /** High-pass filter on synthesised harmonics. 20–2000 Hz. Default 20 (transparent). */
     inline constexpr auto SYNTH_HPF_HZ      = "synth_hpf_hz";
@@ -86,6 +87,17 @@ namespace ParamID
     inline constexpr auto SYNTH_BOOST_THRESHOLD = "synth_boost_threshold";
     /** Upward expansion amount: additional gain for wavelets above threshold. 0–200%. Default 0. */
     inline constexpr auto SYNTH_BOOST_AMOUNT    = "synth_boost_amount";
+
+    // ── MIDI triggering ────────────────────────────────────────────────────
+    /** When true, MIDI note-on events retrigger the envelope follower (resetting
+     *  env to 0 so the Attack curve starts fresh per note). When false, the
+     *  envelope tracks audio amplitude only, with no per-note retrigger. */
+    inline constexpr auto MIDI_TRIGGER_ENABLED = "midi_trigger_enabled";
+    /** When true (and MIDI_TRIGGER_ENABLED is on), MIDI note-off forces the
+     *  envelope into release and the wavelet engine into free-run, so the tail
+     *  decays over the full Release time instead of being capped by the
+     *  engine's amplitude floor (~500 ms). */
+    inline constexpr auto MIDI_GATE_RELEASE    = "midi_gate_release";
 
     // ── Advanced mode toggle (UI state; not automated) ────────────────────
     /** True if the advanced controls panel is open. UI-only; DSP never reads. */
@@ -129,11 +141,14 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::ENV_ATTACK_MS,
         ParamID::ENV_RELEASE_MS,
         ParamID::ENV_SOURCE,
+        ParamID::MIDI_TRIGGER_ENABLED,
+        ParamID::MIDI_GATE_RELEASE,
         ParamID::BINAURAL_MODE,
         ParamID::BINAURAL_WIDTH,
         ParamID::STEREO_WIDTH,
         ParamID::SYNTH_LPF_HZ,
         ParamID::SYNTH_HPF_HZ,
+        ParamID::SYNTH_FILTER_SLOPE,
         ParamID::SYNTH_WAVELET_LENGTH,
         ParamID::SYNTH_GATE_THRESHOLD,
         ParamID::SYNTH_H1,
@@ -168,7 +183,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         AudioParameterFloatAttributes().withLabel("%")));
     params.push_back(std::make_unique<APC>(
         ParamID::GHOST_MODE, "Ghost Mode",
-        StringArray{ "Replace", "Add" }, 0));
+        StringArray{ "Replace", "Combine", "Phantom Only" }, 0));
     params.push_back(std::make_unique<APF>(
         ParamID::PHANTOM_THRESHOLD, "Phantom Threshold",
         NormalisableRange<float>(20.0f, 20000.0f, 0.0f, 0.25f), 120.0f,
@@ -234,6 +249,10 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     params.push_back(std::make_unique<APC>(
         ParamID::ENV_SOURCE, "Envelope Source",
         StringArray{ "Input", "Sidechain" }, 0));
+    params.push_back(std::make_unique<AudioParameterBool>(
+        ParamID::MIDI_TRIGGER_ENABLED, "MIDI Trigger", false));
+    params.push_back(std::make_unique<AudioParameterBool>(
+        ParamID::MIDI_GATE_RELEASE,    "MIDI Gate Release", false));
 
     // ── Synth Filter ──────────────────────────────────────────────────
     params.push_back(std::make_unique<APF>(
@@ -244,6 +263,9 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         ParamID::SYNTH_HPF_HZ, "Synth HPF",
         NormalisableRange<float>(20.0f, 2000.0f, 0.0f, 0.3f), 20.0f,
         AudioParameterFloatAttributes().withLabel("Hz")));
+    params.push_back(std::make_unique<APC>(
+        ParamID::SYNTH_FILTER_SLOPE, "Filter Slope",
+        StringArray{ "-6 dB/oct", "-12 dB/oct", "-24 dB/oct" }, 1));
 
     // ── RESYN controls ────────────────────────────────────────────────
     params.push_back(std::make_unique<APF>(

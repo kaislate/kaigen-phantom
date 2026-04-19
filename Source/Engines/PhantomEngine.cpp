@@ -31,14 +31,21 @@ void PhantomEngine::prepare(double sr, int blockSize, int nCh)
     lowBuf .setSize(numChannels, blockSize, false, true, true);
     highBuf.setSize(numChannels, blockSize, false, true, true);
 
-    const auto lpfCoeff = juce::IIRCoefficients::makeLowPass(sr, 20000.0);
-    const auto hpfCoeff = juce::IIRCoefficients::makeHighPass(sr, 20.0);
-    lpfL.setCoefficients(lpfCoeff); lpfR.setCoefficients(lpfCoeff);
-    hpfL.setCoefficients(hpfCoeff); hpfR.setCoefficients(hpfCoeff);
-    lpfL.reset(); lpfR.reset();
-    hpfL.reset(); hpfR.reset();
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate       = sr;
+    spec.maximumBlockSize = (juce::uint32) blockSize;
+    spec.numChannels      = (juce::uint32) numChannels;
+    lpf1pole.prepare(spec);
+    hpf1pole.prepare(spec);
+    lpf1pole.setType(juce::dsp::FirstOrderTPTFilterType::lowpass);
+    hpf1pole.setType(juce::dsp::FirstOrderTPTFilterType::highpass);
+
     lastLPFHz = 20000.0f;
     lastHPFHz = 20.0f;
+    recomputeLPFCoefs();
+    recomputeHPFCoefs();
+    lpfL_sa.reset(); lpfR_sa.reset(); lpfL_sb.reset(); lpfR_sb.reset();
+    hpfL_sa.reset(); hpfR_sa.reset(); hpfL_sb.reset(); hpfR_sb.reset();
 }
 
 void PhantomEngine::reset()
@@ -52,8 +59,9 @@ void PhantomEngine::reset()
     envelopeR.reset();
     lowBuf.clear();
     highBuf.clear();
-    lpfL.reset(); lpfR.reset();
-    hpfL.reset(); hpfR.reset();
+    lpf1pole.reset(); hpf1pole.reset();
+    lpfL_sa.reset(); lpfR_sa.reset(); lpfL_sb.reset(); lpfR_sb.reset();
+    hpfL_sa.reset(); hpfR_sa.reset(); hpfL_sb.reset(); hpfR_sb.reset();
 }
 
 // ── Parameter setters ──────────────────────────────────────────────────────
@@ -94,10 +102,26 @@ void PhantomEngine::setSynthSkip(int n)
     resynL.setSkipCount(n); resynR.setSkipCount(n);
 }
 void PhantomEngine::setGhostAmount(float a)       { ghostAmount    = juce::jlimit(0.0f, 1.0f, a); }
-void PhantomEngine::setGhostReplace(bool r)       { ghostReplace   = r; }
+void PhantomEngine::setGhostMode(int m)           { ghostMode      = juce::jlimit(0, 2, m); }
 void PhantomEngine::setPhantomStrength(float s)   { phantomStrength = juce::jlimit(0.0f, 1.0f, s); }
 void PhantomEngine::setOutputGainDb(float db)     { outputGainLin  = std::pow(10.0f, db * 0.05f); }
 void PhantomEngine::setInputDetectionGain(float lin) { inputDetectionGain = juce::jmax(1e-4f, lin); }
+void PhantomEngine::setMidiTriggerEnabled(bool on)   { midiTriggerEnabled = on; }
+void PhantomEngine::setMidiGateRelease(bool on)      { midiGateRelease    = on; }
+
+void PhantomEngine::handleMidiNoteOn() noexcept
+{
+    if (!midiTriggerEnabled) return;
+    envelopeL.retrigger();
+    envelopeR.retrigger();
+}
+
+void PhantomEngine::handleMidiNoteOff() noexcept
+{
+    if (!midiTriggerEnabled || !midiGateRelease) return;
+    envelopeL.forceRelease();
+    envelopeR.forceRelease();
+}
 void PhantomEngine::setEnvelopeAttackMs(float ms) { envelopeL.setAttackMs(ms);  envelopeR.setAttackMs(ms); }
 void PhantomEngine::setEnvelopeReleaseMs(float ms){ envelopeL.setReleaseMs(ms); envelopeR.setReleaseMs(ms); }
 void PhantomEngine::setBinauralMode(int m)
@@ -114,9 +138,7 @@ void PhantomEngine::setSynthLPF(float hz)
     hz = juce::jlimit(200.0f, 20000.0f, hz);
     if (hz == lastLPFHz) return;
     lastLPFHz = hz;
-    const auto coeff = juce::IIRCoefficients::makeLowPass(sampleRate, (double) hz);
-    lpfL.setCoefficients(coeff);
-    lpfR.setCoefficients(coeff);
+    recomputeLPFCoefs();
 }
 
 void PhantomEngine::setSynthHPF(float hz)
@@ -124,9 +146,46 @@ void PhantomEngine::setSynthHPF(float hz)
     hz = juce::jlimit(20.0f, 2000.0f, hz);
     if (hz == lastHPFHz) return;
     lastHPFHz = hz;
-    const auto coeff = juce::IIRCoefficients::makeHighPass(sampleRate, (double) hz);
-    hpfL.setCoefficients(coeff);
-    hpfR.setCoefficients(coeff);
+    recomputeHPFCoefs();
+}
+
+void PhantomEngine::setSynthFilterSlope(int dBPerOct)
+{
+    const int s = (dBPerOct <= 6)  ? 6
+                : (dBPerOct >= 24) ? 24
+                                   : 12;
+    if (s == filterSlope) return;
+    filterSlope = s;
+    // Stage-A Q differs between -12 (Butterworth, 0.7071) and -24 (cascade Q1=0.541).
+    // Recompute both filter sections so each stage's coefficients match the new slope.
+    recomputeLPFCoefs();
+    recomputeHPFCoefs();
+}
+
+void PhantomEngine::recomputeLPFCoefs()
+{
+    lpf1pole.setCutoffFrequency((double) lastLPFHz);
+
+    // -12 dB/oct: stage A alone, Butterworth Q = 1/sqrt(2).
+    // -24 dB/oct: stage A with Q₁ = 0.541, stage B with Q₂ = 1.307 → 4th-order Butterworth.
+    const double qA = (filterSlope == 24) ? 0.541196100 : 0.707106781;
+    const double qB =                       1.306562965;
+    const auto coefA = juce::IIRCoefficients::makeLowPass(sampleRate, (double) lastLPFHz, qA);
+    const auto coefB = juce::IIRCoefficients::makeLowPass(sampleRate, (double) lastLPFHz, qB);
+    lpfL_sa.setCoefficients(coefA); lpfR_sa.setCoefficients(coefA);
+    lpfL_sb.setCoefficients(coefB); lpfR_sb.setCoefficients(coefB);
+}
+
+void PhantomEngine::recomputeHPFCoefs()
+{
+    hpf1pole.setCutoffFrequency((double) lastHPFHz);
+
+    const double qA = (filterSlope == 24) ? 0.541196100 : 0.707106781;
+    const double qB =                       1.306562965;
+    const auto coefA = juce::IIRCoefficients::makeHighPass(sampleRate, (double) lastHPFHz, qA);
+    const auto coefB = juce::IIRCoefficients::makeHighPass(sampleRate, (double) lastHPFHz, qB);
+    hpfL_sa.setCoefficients(coefA); hpfR_sa.setCoefficients(coefA);
+    hpfL_sb.setCoefficients(coefB); hpfR_sb.setCoefficients(coefB);
 }
 
 void PhantomEngine::setWaveletLength(float len)
@@ -253,6 +312,16 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
     const float detGain    = inputDetectionGain;
     const float detGainInv = 1.0f / detGain;
 
+    // Ghost-mode mix coefficients. Hoisting these out of the sample loop makes
+    // the per-sample math branchless.
+    //   Replace (0):      out = [low*(1-ghost) + phantom*ghost] + high
+    //   Combine (1):      out = [low + phantom*ghost]           + high
+    //   Phantom Only (2): out =  phantom*ghost                   (dry + high muted)
+    const float dryLowCoef = (ghostMode == 0) ? (1.0f - ghostAmount)
+                           : (ghostMode == 1) ? 1.0f
+                                              : 0.0f;
+    const float highCoef   = (ghostMode == 2) ? 0.0f : 1.0f;
+
     int oscWp = oscSynthWrPos.load(std::memory_order_relaxed);
     for (int ch = 0; ch < nCh; ++ch)
     {
@@ -260,8 +329,10 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
         auto& syn   = (ch == 0) ? synthL     : synthR;
         auto& resyn = (ch == 0) ? resynL     : resynR;
         auto& sat   = (ch == 0) ? smoothSatL : smoothSatR;
-        auto& lpf  = (ch == 0) ? lpfL       : lpfR;
-        auto& hpf  = (ch == 0) ? hpfL       : hpfR;
+        auto& lpfSa = (ch == 0) ? lpfL_sa : lpfR_sa;
+        auto& lpfSb = (ch == 0) ? lpfL_sb : lpfR_sb;
+        auto& hpfSa = (ch == 0) ? hpfL_sa : hpfR_sa;
+        auto& hpfSb = (ch == 0) ? hpfL_sb : hpfR_sb;
 
         const float* low  = lowBuf .getReadPointer(ch);
         const float* high = highBuf.getReadPointer(ch);
@@ -275,6 +346,12 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
                 ? sidechain->getReadPointer(juce::jmin(ch, sidechain->getNumChannels() - 1))[i]
                 : (low[i] + high[i]);
             const float inLvl = env.process(envIn);
+
+            // While the envelope is in a MIDI-gated release, keep the synth in
+            // free-run so it rings out past the normal amplitude floor.
+            const bool freeRunNow = env.isForceReleasing();
+            syn  .setFreeRun(freeRunNow);
+            resyn.setFreeRun(freeRunNow);
 
             // Synth receives detection-scaled input (period, gate RMS, upward-expander
             // benefit from a hotter signal). Output is amplitude-normalised internally.
@@ -293,9 +370,25 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
                               + satCurve * saturation;
             }
 
-            // Synth filter: LPF then HPF on harmonics before envelope scaling
-            phantomSample = lpf.processSingleSampleRaw(phantomSample);
-            phantomSample = hpf.processSingleSampleRaw(phantomSample);
+            // Synth filter: LPF then HPF on harmonics before envelope scaling.
+            // Topology depends on filterSlope (6/12/24 dB/oct).
+            if (filterSlope == 6)
+            {
+                phantomSample = lpf1pole.processSample(ch, phantomSample);
+                phantomSample = hpf1pole.processSample(ch, phantomSample);
+            }
+            else if (filterSlope == 12)
+            {
+                phantomSample = lpfSa.processSingleSampleRaw(phantomSample);
+                phantomSample = hpfSa.processSingleSampleRaw(phantomSample);
+            }
+            else // 24
+            {
+                phantomSample = lpfSa.processSingleSampleRaw(phantomSample);
+                phantomSample = lpfSb.processSingleSampleRaw(phantomSample);
+                phantomSample = hpfSa.processSingleSampleRaw(phantomSample);
+                phantomSample = hpfSb.processSingleSampleRaw(phantomSample);
+            }
 
             // Punch: blend envelope with per-wavelet peak. getWaveletPeak() is on the
             // detection-scaled signal, so de-scale before blending with natural inLvl.
@@ -318,14 +411,9 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
                 oscWp = (oscWp + 1) & (kOscBufSize - 1);
             }
 
-            // Ghost mix
-            float mixedLow;
-            if (ghostReplace)
-                mixedLow = low[i] * (1.0f - ghostAmount) + phantomOut * ghostAmount;
-            else
-                mixedLow = low[i] + phantomOut * ghostAmount;
-
-            out[i] = (mixedLow + high[i]) * outputGainLin;
+            // Ghost mix (coefficients hoisted above).
+            const float mixedLow = low[i] * dryLowCoef + phantomOut * ghostAmount;
+            out[i] = (mixedLow + high[i] * highCoef) * outputGainLin;
         }
     }
 

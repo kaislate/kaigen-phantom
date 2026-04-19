@@ -326,6 +326,16 @@ float WaveletSynth::process(float x) noexcept
     const float duty = smoothDuty.getNextValue();
     const float len  = smoothLength.getNextValue();
 
+    // Free-run: wrap phase when it exceeds the wavelet window so synthesis
+    // continues at the last known period. Normal mode lets phase run past
+    // gateEnd so the wavelet silences until a new zero crossing.
+    if (freeRun)
+    {
+        const float gateEnd = len * kTwoPi;
+        if (currentPhase >= gateEnd && gateEnd > 0.0f)
+            currentPhase = std::fmod(currentPhase, gateEnd);
+    }
+
 
     // ── Synthesise H2-H8 ─────────────────────────────────────────────────
     // H2-H8 additive content from recipe wheel, soft-clipped as a group.
@@ -382,6 +392,9 @@ float WaveletSynth::process(float x) noexcept
     // truncates earlier with a cosine fade over the last 20% of the active zone.
     // A matching cosine fade-in over the first 10% eliminates the leading click
     // that occurred when each new wavelet started at full amplitude.
+    // In free-run mode, phase has already been wrapped above, so this branch
+    // only silences when the wavelet has naturally ended and no crossing
+    // has reset phase.
     {
         const float gateEnd   = len * kTwoPi;
         const float fadeStart = gateEnd * 0.80f;

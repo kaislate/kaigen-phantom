@@ -72,11 +72,14 @@ private:
     juce::WebComboBoxRelay ghostModeRelay        { "ghost_mode" };
     juce::WebComboBoxRelay recipePresetRelay     { "recipe_preset" };
     juce::WebComboBoxRelay binauralModeRelay     { "binaural_mode" };
+    juce::WebComboBoxRelay filterSlopeRelay      { "synth_filter_slope" };
 
     // ── Toggle relay for bypass ───────────────────────────────────────
     juce::WebToggleButtonRelay bypassRelay          { "bypass" };
     juce::WebToggleButtonRelay punchEnabledRelay    { "punch_enabled" };
     juce::WebToggleButtonRelay inputGainAutoRelay   { "input_gain_auto" };
+    juce::WebToggleButtonRelay midiTriggerRelay     { "midi_trigger_enabled" };
+    juce::WebToggleButtonRelay midiGateReleaseRelay { "midi_gate_release" };
 
     // WebView — constructed in .cpp via buildWebViewOptions()
     SinglePageBrowser webView;
@@ -87,6 +90,8 @@ private:
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          bypassAttachment;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          punchEnabledAttachment;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          inputGainAutoAttachment;
+    std::unique_ptr<juce::WebToggleButtonParameterAttachment>          midiTriggerAttachment;
+    std::unique_ptr<juce::WebToggleButtonParameterAttachment>          midiGateReleaseAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomEditor)
 };
