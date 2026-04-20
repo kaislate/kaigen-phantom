@@ -201,6 +201,74 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 });
                 complete(juce::var(true));
             })
+        // ── Native functions for preset system ─────────────────────────
+        .withNativeFunction("loadPreset",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 2)
+                {
+                    complete(juce::var(false));
+                    return;
+                }
+
+                auto presetName = args[0].toString();
+                auto packName = args[1].toString();
+
+                auto presetFile = self.presetManager->getPresetFile(presetName, packName);
+                if (presetFile.exists())
+                {
+                    self.processor.loadPresetFromFile(presetFile);
+                    complete(juce::var(true));
+                }
+                else
+                {
+                    complete(juce::var(false));
+                }
+            })
+        .withNativeFunction("savePreset",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 2)
+                {
+                    complete(juce::var(juce::String{}));
+                    return;
+                }
+
+                auto presetName = args[0].toString();
+                auto shouldOverwrite = args[1].isBool() && args[1];
+
+                auto memBlock = self.processor.getStateAsMemoryBlock();
+                auto savedPath = self.presetManager->savePreset(presetName, "Experimental", memBlock);
+
+                complete(juce::var(savedPath));
+            })
+        .withNativeFunction("getAllPresets",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                auto allPresets = self.presetManager->getAllPresets();
+                juce::String json = "{";
+
+                int packIdx = 0;
+                for (const auto& [packName, presets] : allPresets)
+                {
+                    if (packIdx++ > 0) json += ",";
+                    json += "\"" + packName + "\":[";
+
+                    int presetIdx = 0;
+                    for (const auto& preset : presets)
+                    {
+                        if (presetIdx++ > 0) json += ",";
+                        json += "{\"metadata\":{\"name\":\"" + preset.metadata.name +
+                               "\",\"type\":\"" + preset.metadata.type +
+                               "\",\"designer\":\"" + preset.metadata.designer +
+                               "\",\"isFavorite\":" + (preset.metadata.isFavorite ? "true" : "false") + "}}";
+                    }
+                    json += "]";
+                }
+                json += "}";
+
+                complete(juce::var(json));
+            })
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });
 
     return options;
