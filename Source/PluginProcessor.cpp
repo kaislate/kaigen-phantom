@@ -9,6 +9,7 @@ PhantomProcessor::PhantomProcessor()
       apvts(*this, nullptr, "PHANTOM_STATE", makeLayout())
 {
     apvts.addParameterListener(ParamID::RECIPE_PRESET, this);
+    presetManager.initialize();
 }
 
 PhantomProcessor::~PhantomProcessor()
@@ -399,69 +400,6 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
     std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
     if (xml != nullptr && xml->hasTagName(apvts.state.getType()))
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
-}
-
-void PhantomProcessor::loadPresetFromFile(const juce::File& presetFile)
-{
-    if (!presetFile.exists())
-    {
-        return;
-    }
-
-    auto xmlStr = presetFile.loadFileAsString();
-    if (xmlStr.isEmpty())
-    {
-        return;
-    }
-
-    // Parse XML state from file
-    auto xml = juce::parseXML(xmlStr);
-
-    if (!xml)
-    {
-        return;
-    }
-
-    // Replace APVTS state with loaded values
-    auto tree = juce::ValueTree::fromXml(*xml);
-    if (tree.isValid())
-    {
-        apvts.replaceState(tree);
-
-        // Trigger parameter callbacks for DSP update
-        for (auto param : getParameters())
-        {
-            param->sendValueChangedMessageToListeners(param->getValue());
-        }
-    }
-}
-
-void PhantomProcessor::savePresetToFile(const juce::File& presetFile)
-{
-    auto state = apvts.copyState();
-    auto xml = state.createXml();
-
-    if (!xml)
-    {
-        return;
-    }
-
-    presetFile.replaceWithText(xml->toString());
-}
-
-juce::MemoryBlock PhantomProcessor::getStateAsMemoryBlock() const
-{
-    auto state = const_cast<PhantomProcessor*>(this)->apvts.copyState();
-    auto xml = state.createXml();
-
-    if (!xml)
-    {
-        return juce::MemoryBlock();
-    }
-
-    auto xmlStr = xml->toString();
-    juce::MemoryBlock block(xmlStr.toUTF8(), xmlStr.length());
-    return block;
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

@@ -1,67 +1,131 @@
 #pragma once
 
-#include "PresetTypes.h"
 #include <juce_core/juce_core.h>
+#include <juce_audio_processors/juce_audio_processors.h>
 #include <vector>
 #include <map>
+#include <set>
 
-namespace kaigen::phantom {
+namespace kaigen::phantom
+{
 
-class PresetManager {
+struct PresetMetadata
+{
+    juce::String name;         // "Warm Bass Boost"
+    juce::String type;         // "Piano" | "Drone" | "Synth" | "Bass" | "Experimental"
+    juce::String designer;     // "Kai Slate" | user name
+    juce::String description;  // Optional free-form notes from the designer
+    juce::String packName;     // "Factory" | "User" | pack folder name
+    bool isFactory = false;
+    bool isFavorite = false;
+};
+
+struct PresetInfo
+{
+    PresetMetadata metadata;
+    juce::File file;
+};
+
+// A preset pack = any directory under Presets/. Factory and User are the
+// built-in packs; third-party packs live in their own sibling folders.
+// Optional `pack.json` in the folder provides display metadata; optional
+// `cover.png` provides album art. Both are optional.
+struct PackInfo
+{
+    juce::String name;          // Folder name (also the pack's key)
+    juce::String displayName;   // From pack.json, or name if absent
+    juce::String description;
+    juce::String designer;
+    bool         hasCoverArt = false;  // Whether cover.png exists in the pack folder
+    int          presetCount = 0;
+};
+
+// Preset library manager. Owned by the AudioProcessor (not the Editor) so
+// its lifetime matches the plugin's, not the UI's.
+//
+// On-disk format: each preset is a single .fxp file containing XML from a
+// juce::ValueTree. The tree's root is the APVTS state; a <Metadata> child
+// node holds name/type/designer. Favorites live in a separate
+// `favorites.index` JSON file at the presets root so favorites work even
+// when the preset lives in a read-only pack directory.
+class PresetManager
+{
 public:
     PresetManager();
     ~PresetManager() = default;
 
-    // Initialize preset directories and load factory presets
+    // Create directories, scan the disk, load favorites index.
     void initialize();
 
-    // Get all presets organized by pack/category
-    // Returns map: packName -> vector of PresetInfo
+    // All presets, grouped by pack. Cheap copy (cached in memory).
     std::map<juce::String, std::vector<PresetInfo>> getAllPresets() const;
 
-    // Get presets for a specific pack
-    std::vector<PresetInfo> getPresetsForPack(const juce::String& packName) const;
-
-    // Get all unique types across all presets
-    std::vector<juce::String> getAllTypes() const;
-
-    // Search presets by name (case-insensitive)
-    std::vector<PresetInfo> searchByName(const juce::String& query) const;
-
-    // Toggle favorite status of a preset
-    void setFavorite(const juce::String& presetPath, bool isFavorite);
-
-    // Save current parameters as a new preset
-    // Returns full path to saved file
-    juce::String savePreset(const juce::String& presetName,
-                           const juce::String& type,
-                           const juce::MemoryBlock& fxpData);
-
-    // Get full path for a preset file
+    // Returns the File for a preset, or a non-existent File if not found.
     juce::File getPresetFile(const juce::String& presetName,
-                            const juce::String& packName) const;
+                             const juce::String& packName) const;
 
-    // Get user presets directory
+    // Load a preset into the given APVTS. Must be called on the message thread.
+    // Returns true on success, false if file missing / parse error.
+    bool loadPreset(juce::AudioProcessorValueTreeState& apvts,
+                    const juce::String& presetName,
+                    const juce::String& packName);
+
+    // Save APVTS state as a new preset in User/. If overwrite=false and a
+    // preset with this name exists, a numeric suffix is appended.
+    // Returns the saved preset's name (possibly disambiguated), or empty on failure.
+    juce::String savePreset(juce::AudioProcessorValueTreeState& apvts,
+                            const juce::String& presetName,
+                            const juce::String& type,
+                            const juce::String& designer,
+                            const juce::String& description,
+                            bool overwrite);
+
+    // Delete a user preset (factory/pack presets cannot be deleted).
+    bool deletePreset(const juce::String& presetName,
+                      const juce::String& packName);
+
+    // Favorites (persisted in favorites.index).
+    void setFavorite(const juce::String& presetName,
+                     const juce::String& packName,
+                     bool isFavorite);
+    bool isFavorite(const juce::String& presetName,
+                    const juce::String& packName) const;
+
+    // Rescan disk (call after external file changes).
+    void rescan();
+
+    // Packs (including Factory and User, plus any third-party pack dirs).
+    std::vector<PackInfo> getAllPacks() const;
+
+    // Cover art file for a pack (returns non-existent File if none present).
+    juce::File getPackCoverFile(const juce::String& packName) const;
+
+    // Path accessors.
+    juce::File getPresetsRootDirectory() const;
     juce::File getUserPresetsDirectory() const;
-
-    // Get factory presets directory
     juce::File getFactoryPresetsDirectory() const;
 
 private:
-    juce::File getPresetsRootDirectory() const;
     void ensureDirectoryStructure();
-    void loadPresetsFromDisk();
-    void loadMetadataJson(PresetInfo& presetInfo);
-    void saveMetadataJson(const juce::File& presetFile,
-                         const juce::String& type,
-                         const juce::String& designer,
-                         bool isFavorite);
+    void scanPresetsFromDisk();
 
-    // Helper to extract string value from JSON
-    juce::String extractJsonString(const juce::String& jsonStr, const juce::String& key);
+    void loadFavoritesIndex();
+    void saveFavoritesIndex();
+    juce::String favoriteKey(const juce::String& presetName,
+                             const juce::String& packName) const;
+
+    // Build the Metadata child ValueTree.
+    static juce::ValueTree buildMetadataTree(const juce::String& name,
+                                             const juce::String& type,
+                                             const juce::String& designer,
+                                             const juce::String& description);
+
+    // Extract metadata from a preset file, if present.
+    static PresetMetadata readMetadataFromFile(const juce::File& file);
 
     std::map<juce::String, std::vector<PresetInfo>> allPresets;
-    std::map<juce::String, bool> favoriteMap;  // path -> isFavorite
+    std::map<juce::String, PackInfo> packs;  // keyed by folder name
+    std::set<juce::String> favorites;        // keys: "packName/presetName"
 };
 
 } // namespace kaigen::phantom

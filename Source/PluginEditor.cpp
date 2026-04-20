@@ -27,9 +27,31 @@ namespace {
 
 constexpr UINT_PTR kFocusRedirectId = 0x4B4750; // 'KGP'
 
+// Set to true by JS whenever a text input / textarea / contenteditable has
+// focus inside the WebView. While true, the keyboard subclass lets the
+// WebView handle keys itself so the user can type. While false, keys are
+// forwarded up to the top-level window (the DAW host) so spacebar plays,
+// A–L triggers MIDI keyboard mode, etc.
+std::atomic<bool> sWebViewInputFocused { false };
+
+bool shouldForwardKey(UINT msg)
+{
+    return msg == WM_KEYDOWN  || msg == WM_KEYUP
+        || msg == WM_SYSKEYDOWN || msg == WM_SYSKEYUP
+        || msg == WM_CHAR       || msg == WM_SYSCHAR;
+}
+
 LRESULT CALLBACK webViewFocusSubclass(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
                                        UINT_PTR id, DWORD_PTR)
 {
+    const bool inputFocused = sWebViewInputFocused.load(std::memory_order_relaxed);
+
+    // When nothing text-y is focused, don't let a mouse click shift keyboard
+    // focus onto the WebView. The click itself still goes through to JS so
+    // knob drags work — we just refuse to become the active window.
+    if (msg == WM_MOUSEACTIVATE && !inputFocused)
+        return MA_NOACTIVATE;
+
     if (msg == WM_SETFOCUS)
     {
         // Redirect focus to the parent HWND so the DAW keeps keyboard MIDI
@@ -37,6 +59,21 @@ LRESULT CALLBACK webViewFocusSubclass(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
             SetFocus(parent);
         return 0;
     }
+
+    // Forward keyboard input to the DAW's top-level window unless a text
+    // field inside the WebView currently has focus.
+    if (shouldForwardKey(msg) && !inputFocused)
+    {
+        if (HWND top = GetAncestor(hwnd, GA_ROOT))
+        {
+            if (top != hwnd)
+            {
+                PostMessage(top, msg, wParam, lParam);
+                return 0;
+            }
+        }
+    }
+
     if (msg == WM_NCDESTROY)
         RemoveWindowSubclass(hwnd, webViewFocusSubclass, id);
     return DefSubclassProc(hwnd, msg, wParam, lParam);
@@ -46,7 +83,15 @@ BOOL CALLBACK installOnChromeWindows(HWND hwnd, LPARAM)
 {
     wchar_t cls[256] = {};
     GetClassNameW(hwnd, cls, 255);
-    if (wcsncmp(cls, L"Chrome_WidgetWin", 16) == 0)
+    // Match any Chromium-owned child window that can hold keyboard focus.
+    // "Chrome_WidgetWin"        — outer WebView HWND
+    // "Chrome_RenderWidgetHostHWND" — inner renderer (where keys actually land)
+    // "Intermediate D3D Window"      — compositing layer (seen in some versions)
+    const bool isChromeWindow =
+            wcsncmp(cls, L"Chrome_",            7)  == 0 ||
+            wcsncmp(cls, L"Intermediate D3D",  16) == 0;
+
+    if (isChromeWindow)
         SetWindowSubclass(hwnd, webViewFocusSubclass, kFocusRedirectId, 0);
     EnumChildWindows(hwnd, installOnChromeWindows, 0);
     return TRUE;
@@ -54,17 +99,31 @@ BOOL CALLBACK installOnChromeWindows(HWND hwnd, LPARAM)
 
 } // namespace
 
+void PhantomEditor::FocusRescanTimer::timerCallback()
+{
+    if (owner == nullptr) return;
+    if (auto* peer = owner->getPeer())
+        installOnChromeWindows((HWND) peer->getNativeHandle(), 0);
+}
+
 void PhantomEditor::parentHierarchyChanged()
 {
-    // WebView2 creates its Chrome_WidgetWin HWNDs asynchronously, so we retry
-    // at increasing intervals until they exist.
+    // WebView2 creates its HWNDs asynchronously, and some Chromium helper
+    // windows appear only after the user interacts with the UI (e.g., after
+    // first mouse-down on a canvas). We rescan on a long-running timer so
+    // those windows also get the focus subclass installed.
+    focusRescanTimer.owner = this;
+    if (!focusRescanTimer.isTimerRunning())
+        focusRescanTimer.startTimer(1000);
+
+    // Also do a few quick passes during startup to catch windows before
+    // the first real scan tick.
     auto tryInstall = [this]()
     {
         if (auto* peer = getPeer())
             installOnChromeWindows((HWND) peer->getNativeHandle(), 0);
     };
-
-    for (int delayMs : { 50, 200, 500, 1000, 2000 })
+    for (int delayMs : { 50, 200, 500 })
         juce::Timer::callAfterDelay(delayMs, tryInstall);
 }
 #endif
@@ -201,7 +260,106 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 });
                 complete(juce::var(true));
             })
-        // ── Native functions for preset system ─────────────────────────
+        .withNativeFunction("setInputFocused",
+            // Tells the Win32 subclass whether a text field inside the WebView
+            // has focus — determines whether keyboard events are forwarded to
+            // the DAW (false) or handled by the WebView (true).
+            []([[maybe_unused]] const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+               #if JUCE_WINDOWS
+                const bool focused = args.size() > 0 && args[0].isBool() && (bool) args[0];
+                sWebViewInputFocused.store(focused, std::memory_order_relaxed);
+               #endif
+                complete(juce::var(true));
+            })
+        .withNativeFunction("returnFocusToHost",
+            // Called from JS after any mouseup on a non-text element. WebView2
+            // grabs keyboard focus internally during interaction (through its
+            // own focus routing that bypasses Windows focus APIs), so we have
+            // to explicitly hand focus back to the DAW's top-level window.
+            [&self]([[maybe_unused]] const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+               #if JUCE_WINDOWS
+                juce::MessageManager::callAsync([weakSelf = juce::Component::SafePointer<PhantomEditor>(&self)]
+                {
+                    if (auto* ed = weakSelf.getComponent())
+                    {
+                        if (auto* peer = ed->getPeer())
+                        {
+                            HWND pluginHwnd = (HWND) peer->getNativeHandle();
+                            HWND top = GetAncestor(pluginHwnd, GA_ROOT);
+                            if (top != nullptr) SetFocus(top);
+                        }
+                    }
+                });
+               #endif
+                complete(juce::var(true));
+            })
+        .withNativeFunction("forwardKeyToHost",
+            // JS calls this for every keydown/keyup that lands on a non-input
+            // DOM element. We PostMessage the key to the DAW's top-level window
+            // so transport controls (spacebar) and MIDI keyboard (A-L) work
+            // regardless of whether the WebView stole keyboard focus.
+            //
+            // Args: [virtualKeyCode: int, isDown: bool]
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+               #if JUCE_WINDOWS
+                if (args.size() >= 2)
+                {
+                    const WPARAM vk = (WPARAM) (int) args[0];
+                    const bool isDown = args[1].isBool() && (bool) args[1];
+
+                    if (auto* peer = self.getPeer())
+                    {
+                        HWND pluginHwnd = (HWND) peer->getNativeHandle();
+                        HWND top = GetAncestor(pluginHwnd, GA_ROOT);
+                        if (top != nullptr && top != pluginHwnd)
+                        {
+                            // Minimal, well-formed lParam:
+                            //   bits 0-15  = repeat count (1)
+                            //   bit  30    = previous key state (1 on release)
+                            //   bit  31    = transition state  (1 on release)
+                            const LPARAM lp = isDown ? LPARAM(1)
+                                                     : LPARAM(0xC0000001u);
+                            const UINT msg = isDown ? WM_KEYDOWN : WM_KEYUP;
+                            PostMessage(top, msg, vk, lp);
+                        }
+                    }
+                }
+               #endif
+                complete(juce::var(true));
+            })
+        // ── Preset system ──────────────────────────────────────────────
+        .withNativeFunction("getAllPresets",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                auto& pm = self.processor.getPresetManager();
+                auto all = pm.getAllPresets();
+
+                auto* root = new juce::DynamicObject();
+                for (const auto& [packName, presets] : all)
+                {
+                    juce::Array<juce::var> arr;
+                    for (const auto& p : presets)
+                    {
+                        auto* meta = new juce::DynamicObject();
+                        meta->setProperty("name",        p.metadata.name);
+                        meta->setProperty("type",        p.metadata.type);
+                        meta->setProperty("designer",    p.metadata.designer);
+                        meta->setProperty("description", p.metadata.description);
+                        meta->setProperty("isFavorite",  p.metadata.isFavorite);
+                        meta->setProperty("isFactory",   p.metadata.isFactory);
+
+                        auto* item = new juce::DynamicObject();
+                        item->setProperty("metadata", juce::var(meta));
+                        arr.add(juce::var(item));
+                    }
+                    root->setProperty(packName, juce::var(arr));
+                }
+
+                complete(juce::JSON::toString(juce::var(root)));
+            })
         .withNativeFunction("loadPreset",
             [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
@@ -211,63 +369,87 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                     return;
                 }
 
-                auto presetName = args[0].toString();
-                auto packName = args[1].toString();
+                const auto presetName = args[0].toString();
+                const auto packName   = args[1].toString();
 
-                auto presetFile = self.presetManager->getPresetFile(presetName, packName);
-                if (presetFile.exists())
-                {
-                    self.processor.loadPresetFromFile(presetFile);
-                    complete(juce::var(true));
-                }
-                else
-                {
-                    complete(juce::var(false));
-                }
+                // APVTS mutation must run on the message thread.
+                juce::MessageManager::callAsync(
+                    [weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), presetName, packName]
+                    {
+                        if (auto* ed = weakSelf.getComponent())
+                            ed->processor.getPresetManager().loadPreset(
+                                ed->processor.apvts, presetName, packName);
+                    });
+
+                complete(juce::var(true));
             })
         .withNativeFunction("savePreset",
             [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
-                if (args.size() < 2)
+                if (args.size() < 1)
                 {
                     complete(juce::var(juce::String{}));
                     return;
                 }
 
-                auto presetName = args[0].toString();
-                auto shouldOverwrite = args[1].isBool() && args[1];
+                const auto name        = args[0].toString();
+                const auto type        = args.size() > 1 ? args[1].toString() : juce::String("Experimental");
+                const auto designer    = args.size() > 2 ? args[2].toString() : juce::String("User");
+                const auto description = args.size() > 3 ? args[3].toString() : juce::String();
+                const bool overwrite   = args.size() > 4 && args[4].isBool() && (bool) args[4];
 
-                auto memBlock = self.processor.getStateAsMemoryBlock();
-                auto savedPath = self.presetManager->savePreset(presetName, "Experimental", memBlock);
-
-                complete(juce::var(savedPath));
+                auto savedName = self.processor.getPresetManager().savePreset(
+                    self.processor.apvts, name, type, designer, description, overwrite);
+                complete(juce::var(savedName));
             })
-        .withNativeFunction("getAllPresets",
+        .withNativeFunction("setFavorite",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 3)
+                {
+                    complete(juce::var(false));
+                    return;
+                }
+
+                const auto name    = args[0].toString();
+                const auto pack    = args[1].toString();
+                const bool isFav   = args[2].isBool() && (bool) args[2];
+
+                self.processor.getPresetManager().setFavorite(name, pack, isFav);
+                complete(juce::var(true));
+            })
+        .withNativeFunction("deletePreset",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 2)
+                {
+                    complete(juce::var(false));
+                    return;
+                }
+
+                const auto name = args[0].toString();
+                const auto pack = args[1].toString();
+
+                const bool ok = self.processor.getPresetManager().deletePreset(name, pack);
+                complete(juce::var(ok));
+            })
+        .withNativeFunction("getAllPacks",
             [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
-                auto allPresets = self.presetManager->getAllPresets();
-                juce::String json = "{";
-
-                int packIdx = 0;
-                for (const auto& [packName, presets] : allPresets)
+                auto packs = self.processor.getPresetManager().getAllPacks();
+                juce::Array<juce::var> arr;
+                for (const auto& p : packs)
                 {
-                    if (packIdx++ > 0) json += ",";
-                    json += "\"" + packName + "\":[";
-
-                    int presetIdx = 0;
-                    for (const auto& preset : presets)
-                    {
-                        if (presetIdx++ > 0) json += ",";
-                        json += "{\"metadata\":{\"name\":\"" + preset.metadata.name +
-                               "\",\"type\":\"" + preset.metadata.type +
-                               "\",\"designer\":\"" + preset.metadata.designer +
-                               "\",\"isFavorite\":" + (preset.metadata.isFavorite ? "true" : "false") + "}}";
-                    }
-                    json += "]";
+                    auto* obj = new juce::DynamicObject();
+                    obj->setProperty("name",         p.name);
+                    obj->setProperty("displayName",  p.displayName);
+                    obj->setProperty("description",  p.description);
+                    obj->setProperty("designer",     p.designer);
+                    obj->setProperty("hasCoverArt",  p.hasCoverArt);
+                    obj->setProperty("presetCount",  p.presetCount);
+                    arr.add(juce::var(obj));
                 }
-                json += "}";
-
-                complete(juce::var(json));
+                complete(juce::JSON::toString(juce::var(arr)));
             })
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });
 
@@ -279,11 +461,15 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
       processor(p),
       webView(buildWebViewOptions(*this))
 {
-    // Initialize preset system
-    presetManager = std::make_unique<kaigen::phantom::PresetManager>();
-    presetManager->initialize();
-
+    // Plugin never wants keyboard focus by default; clicks on JUCE components
+    // (the editor, the WebBrowserComponent wrapper) must not steal keyboard
+    // focus from the DAW. The WebView's internal focus model is handled
+    // separately in preset-system.js (mousedown preventDefault on non-inputs)
+    // and the Win32 subclass in webViewFocusSubclass.
     setWantsKeyboardFocus(false);
+    setMouseClickGrabsKeyboardFocus(false);
+    webView.setWantsKeyboardFocus(false);
+    webView.setMouseClickGrabsKeyboardFocus(false);
     setSize(1300, 820);
     addAndMakeVisible(webView);
 
@@ -372,6 +558,30 @@ void PhantomEditor::resized()
 
 std::optional<juce::WebBrowserComponent::Resource> PhantomEditor::getResource(const juce::String& url)
 {
+    // Pack cover art served from disk: /pack-cover/<urlencoded packName>
+    if (url.startsWith("/pack-cover/"))
+    {
+        auto packNameEnc = url.fromFirstOccurrenceOf("/pack-cover/", false, false);
+        auto packName    = juce::URL::removeEscapeChars(packNameEnc);
+        auto coverFile   = processor.getPresetManager().getPackCoverFile(packName);
+        if (coverFile.existsAsFile())
+        {
+            juce::MemoryBlock mb;
+            if (coverFile.loadFileAsData(mb))
+            {
+                std::vector<std::byte> bytes(
+                    reinterpret_cast<const std::byte*>(mb.getData()),
+                    reinterpret_cast<const std::byte*>(mb.getData()) + mb.getSize());
+                const auto ext = coverFile.getFileExtension().substring(1).toLowerCase();
+                return juce::WebBrowserComponent::Resource{
+                    std::move(bytes),
+                    juce::String(getMimeForExtension(ext))
+                };
+            }
+        }
+        return std::nullopt;
+    }
+
     const auto urlToRetrieve = url == "/" ? juce::String{ "index.html" }
                                           : url.fromFirstOccurrenceOf("/", false, false);
 

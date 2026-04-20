@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include "Parameters.h"
 #include "Engines/PhantomEngine.h"
+#include "PresetManager.h"
 
 class PhantomProcessor : public juce::AudioProcessor,
                          private juce::AudioProcessorValueTreeState::Listener
@@ -41,17 +42,12 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    // Load a preset (.fxp file) and apply all parameters
-    void loadPresetFromFile(const juce::File& presetFile);
-
-    // Save current parameter state to .fxp file
-    void savePresetToFile(const juce::File& presetFile);
-
-    // Get current state as MemoryBlock (for PresetManager::savePreset)
-    juce::MemoryBlock getStateAsMemoryBlock() const;
+    kaigen::phantom::PresetManager& getPresetManager() { return presetManager; }
 
     // Public state for the editor
     juce::AudioProcessorValueTreeState apvts;
+
+    kaigen::phantom::PresetManager presetManager;
 
     // Real-time data exposed to the UI
     std::atomic<float> currentPitch { -1.0f };

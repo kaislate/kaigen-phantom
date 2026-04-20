@@ -1,6 +1,24 @@
 /* ═══ KAIGEN PHANTOM — Studio Gray Plastic WebView UI ═══ */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 
+/* Nothing in the plugin UI is user-selectable by default. Dragging knobs
+   shouldn't accidentally select text. Inputs re-enable selection below. */
+html, body, * {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+/* Kill the default focus outline globally; inputs keep their own look. */
+*:focus { outline: none; }
+
 body{
   background:#AEAFB1;margin:0;overflow:hidden;
   width:1300px;height:820px;
