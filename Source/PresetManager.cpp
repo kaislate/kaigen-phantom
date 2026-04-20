@@ -22,7 +22,7 @@ juce::String PresetManager::extractJsonString(const juce::String& jsonStr, const
     if (start < 0) return "";
 
     start += searchKey.length();
-    auto end = jsonStr.indexOf("\"", start);
+    auto end = jsonStr.indexOf(start, juce::StringRef("\""));
 
     if (end > start) {
         return jsonStr.substring(start, end);
