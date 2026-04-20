@@ -9,72 +9,24 @@
 <body>
   <div style="position:fixed;top:2px;right:2px;z-index:99999;background:#0a0;color:#fff;font:bold 10px monospace;padding:2px 6px;border-radius:3px">DSP-11</div>
   <div class="wrap">
-    <!-- Preset Header Bar -->
-    <div id="preset-header" style="
-        background: linear-gradient(to right, #0f3460, #16384d);
-        padding: 12px 16px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        border-bottom: 1px solid #16384d;
-        font-family: system-ui, -apple-system, sans-serif;
-        font-size: 12px;
-    ">
-        <!-- Left: Books icon + Heart -->
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <button id="preset-browser-btn"
-                    style="background: none; border: none; color: #16c784; cursor: pointer; font-size: 16px; padding: 0;">
-                |||
-            </button>
-            <button id="preset-favorite-btn"
-                    style="background: none; border: none; color: #999; cursor: pointer; font-size: 16px; padding: 0;">
-                ♡
-            </button>
-        </div>
-
-        <!-- Center: Preset Name -->
-        <div style="flex: 1; text-align: center;">
-            <span id="preset-name" style="color: #fff; font-size: 16px; font-weight: 600; letter-spacing: 0.5px;">
-                Default
-            </span>
-            <span id="preset-modified-indicator" style="color: #e94560; font-weight: 600; display: none;">*</span>
-        </div>
-
-        <!-- Right: Browse arrows + Save button -->
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <button id="preset-prev-btn"
-                    style="background: none; border: none; color: #999; cursor: pointer; padding: 0; font-size: 14px;">
-                ▲
-            </button>
-            <button id="preset-next-btn"
-                    style="background: none; border: none; color: #999; cursor: pointer; padding: 0; font-size: 14px;">
-                ▼
-            </button>
-            <button id="preset-save-btn"
-                    style="background: #e94560; color: #fff; border: none; cursor: pointer; padding: 4px 10px; border-radius: 3px; font-size: 10px; font-weight: 600; display: none;">
-                Save
-            </button>
-        </div>
-    </div>
-
     <!-- Preset Dropdown (hidden by default) -->
     <div id="preset-dropdown" style="
         display: none;
         position: absolute;
-        top: 50px;
-        left: 0;
-        background: #0f3460;
-        border: 1px solid #16384d;
+        top: 46px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #BBBDBF 0%, #AEAFB1 100%);
+        border: 1px solid rgba(0,0,0,0.15);
         border-radius: 4px;
-        width: 220px;
-        font-family: system-ui;
+        width: 420px;
+        height: 320px;
+        font-family: 'Space Grotesk', system-ui;
         font-size: 11px;
         z-index: 1000;
-        max-height: 400px;
-        overflow-y: auto;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     ">
-        <!-- Populated by preset-dropdown.js -->
     </div>
 
     <!-- Preset Browser Modal (hidden by default) -->
@@ -85,21 +37,22 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.7);
+        background: rgba(0, 0, 0, 0.4);
         z-index: 2000;
         align-items: center;
         justify-content: center;
     ">
         <div style="
-            background: #1a1a2e;
-            border: 1px solid #16384d;
+            background: linear-gradient(135deg, #BBBDBF 0%, #AEAFB1 100%);
+            border: 1px solid rgba(0,0,0,0.15);
             border-radius: 8px;
             width: 90%;
             height: 90%;
             display: flex;
             flex-direction: column;
-            font-family: system-ui;
+            font-family: 'Space Grotesk', system-ui;
             font-size: 11px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.6);
         ">
             <!-- Populated by preset-browser.js -->
         </div>
@@ -124,7 +77,41 @@
     <!-- Header -->
     <div class="hdr">
       <div class="logo-phantom">PHANTOM</div>
-      <div class="hsp"></div>
+      <div style="flex: 1;"></div>
+      <div id="preset-controls" style="display: flex; align-items: center; gap: 8px; margin: 0 16px;">
+        <!-- Library button (books icon) -->
+        <button id="preset-browser-btn" style="background: none; border: none; color: #656769; cursor: pointer; padding: 4px 6px; transition: color 0.2s; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-shadow: 0 1px 0 rgba(255,255,255,0.5);" title="Preset browser">|||</button>
+
+        <!-- Preset name in glass pill (with heart on left) -->
+        <div id="preset-name-container" style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: linear-gradient(180deg, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.02) 100%);
+          border-radius: 20px;
+          padding: 4px 14px;
+          flex: 0 1 auto;
+          min-width: 260px;
+          box-shadow:
+            inset 0 2px 4px rgba(0,0,0,0.10),
+            inset 0 -1px 2px rgba(255,255,255,0.3),
+            0 1px 2px rgba(255,255,255,0.6);
+          margin: 0 4px;
+          cursor: pointer;
+        ">
+          <button id="preset-favorite-btn" style="background: none; border: none; color: rgba(0,0,0,0.5); cursor: pointer; font-size: 13px; padding: 0; line-height: 1; transition: color 0.2s; flex-shrink: 0;" title="Favorite">♡</button>
+          <span id="preset-name" style="color: rgba(0,0,0,0.75); font-size: 12px; font-weight: 500; text-align: center; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Default</span>
+          <span id="preset-modified-indicator" style="color: #c74a4a; font-weight: 700; font-size: 13px; display: none; flex-shrink: 0;">*</span>
+        </div>
+
+        <!-- Previous/Next buttons (right of glass) -->
+        <button id="preset-prev-btn" style="background: none; border: none; color: #656769; cursor: pointer; padding: 2px 3px; font-size: 11px; transition: color 0.2s; text-shadow: 0 1px 0 rgba(255,255,255,0.5);">▲</button>
+        <button id="preset-next-btn" style="background: none; border: none; color: #656769; cursor: pointer; padding: 2px 3px; font-size: 11px; transition: color 0.2s; text-shadow: 0 1px 0 rgba(255,255,255,0.5);">▼</button>
+
+        <!-- Save button (etched) -->
+        <button id="preset-save-btn" style="background: none; border: none; color: #656769; cursor: pointer; padding: 3px 5px; font-size: 12px; transition: color 0.2s; text-shadow: 0 1px 0 rgba(255,255,255,0.5); display: none;" title="Save preset">💾</button>
+      </div>
+      <div style="flex: 1;"></div>
       <div class="mt"><div class="mb active" data-mode="0">Effect</div><div class="mb" data-mode="1">Resyn</div></div>
       <button class="hdr-btn" id="bypass-btn" title="Bypass">&#x23FB;</button>
       <button class="hdr-btn" id="settings-btn" title="Settings">&#x2699;</button>
@@ -363,9 +350,7 @@
 <script src="/knob-mini.js"></script>
 <script src="/juce-frontend.js"></script>
 <script src="/phantom.js"></script>
-<script src="/preset-header.js"></script>
-<script src="/preset-dropdown.js"></script>
-<script src="/preset-browser.js"></script>
+<script src="/preset-system.js"></script>
 <script src="/spectrum.js"></script>
 <script src="/recipe-wheel.js"></script>
 <script src="/oscilloscope.js"></script>

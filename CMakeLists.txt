@@ -62,6 +62,7 @@ juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/oscilloscope.js
     Source/WebUI/circuit-board.js
     Source/WebUI/juce-frontend.js
+    Source/WebUI/preset-system.js
 )
 
 # Factory presets (optional, for Phase 2 implementation)

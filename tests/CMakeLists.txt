@@ -46,33 +46,6 @@ target_compile_definitions(KaigenPhantomTests PRIVATE
     JUCE_DONT_DECLARE_PROJECTINFO=1
 )
 
-# Preset Manager Tests
-add_executable(PresetManagerTest
-    PresetManagerTest.cpp
-    ../Source/PresetManager.cpp
-)
-
-target_link_libraries(PresetManagerTest
-    PRIVATE
-        Catch2::Catch2WithMain
-        juce::juce_core
-)
-
-target_include_directories(PresetManagerTest PRIVATE
-    ../Source
-    ${CMAKE_BINARY_DIR}/KaigenPhantom_artefacts/JuceLibraryCode
-)
-
-target_compile_definitions(PresetManagerTest PRIVATE
-    JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1
-    JUCE_WEB_BROWSER=0
-    JUCE_USE_CURL=0
-    JUCE_DISPLAY_SPLASH_SCREEN=0
-    DONT_SET_USING_JUCE_NAMESPACE=1
-    JUCE_DONT_DECLARE_PROJECTINFO=1
-)
-
 include(CTest)
 include(Catch)
 catch_discover_tests(KaigenPhantomTests)
-catch_discover_tests(PresetManagerTest)

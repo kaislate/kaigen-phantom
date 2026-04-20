@@ -2,7 +2,6 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "Parameters.h"
-#include "PresetManager.h"
 
 struct SinglePageBrowser : juce::WebBrowserComponent
 {
@@ -25,9 +24,17 @@ public:
     bool keyPressed(const juce::KeyPress&) override { return false; }
     bool keyStateChanged(bool) override { return false; }
 
-    kaigen::phantom::PresetManager* getPresetManager() { return presetManager.get(); }
 #if JUCE_WINDOWS
     void parentHierarchyChanged() override;
+
+    // Re-scans the WebView HWND tree on a timer so newly-created Chromium
+    // child windows get the focus subclass installed.
+    struct FocusRescanTimer : juce::Timer
+    {
+        PhantomEditor* owner = nullptr;
+        void timerCallback() override;
+    };
+    FocusRescanTimer focusRescanTimer;
 #endif
 
 private:
@@ -95,9 +102,6 @@ private:
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          inputGainAutoAttachment;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          midiTriggerAttachment;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          midiGateReleaseAttachment;
-
-    // Preset system
-    std::unique_ptr<kaigen::phantom::PresetManager> presetManager;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomEditor)
 };
