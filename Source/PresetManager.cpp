@@ -204,8 +204,8 @@ void PresetManager::saveMetadataJson(const juce::File& presetFile,
     auto jsonFile = presetFile.withFileExtension(".json");
 
     // Escape special characters
-    auto escapedType = type.replace("\"", "\\\"").replace("\\", "\\\\");
-    auto escapedDesigner = designer.replace("\"", "\\\"").replace("\\", "\\\\");
+    auto escapedType = type.replace("\\", "\\\\").replace("\"", "\\\"");
+    auto escapedDesigner = designer.replace("\\", "\\\\").replace("\"", "\\\"");
 
     auto jsonStr = juce::String("{\"type\":\"") + escapedType +
                    "\",\"designer\":\"" + escapedDesigner +
