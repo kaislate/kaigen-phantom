@@ -1,5 +1,6 @@
 #include "PresetManager.h"
 #include <juce_core/juce_core.h>
+#include <set>
 
 namespace kaigen::phantom {
 
@@ -9,6 +10,24 @@ PresetManager::PresetManager() {
 void PresetManager::initialize() {
     ensureDirectoryStructure();
     loadPresetsFromDisk();
+}
+
+juce::String PresetManager::extractJsonString(const juce::String& jsonStr, const juce::String& key) {
+    auto searchKey = "\"" + key + "\":\"";
+    if (!jsonStr.contains(searchKey)) {
+        return "";
+    }
+
+    auto start = jsonStr.indexOf(searchKey);
+    if (start < 0) return "";
+
+    start += searchKey.length();
+    auto end = jsonStr.indexOf("\"", start);
+
+    if (end > start) {
+        return jsonStr.substring(start, end);
+    }
+    return "";
 }
 
 juce::File PresetManager::getPresetsRootDirectory() const {
@@ -65,31 +84,16 @@ void PresetManager::loadMetadataJson(PresetInfo& presetInfo) {
 
     auto jsonStr = jsonFile.loadFileAsString();
 
-    // Extract type with bounds checking
-    if (jsonStr.contains("\"type\":\"")) {
-        auto typeStart = jsonStr.indexOf("\"type\":\"");
-        if (typeStart >= 0) {
-            typeStart += 8;  // length of "\"type\":"
-            auto typeEnd = jsonStr.indexOf("\"", typeStart);
-            if (typeEnd > typeStart) {
-                presetInfo.metadata.type = jsonStr.substring(typeStart, typeEnd);
-            }
-        }
+    auto type = extractJsonString(jsonStr, "type");
+    if (!type.isEmpty()) {
+        presetInfo.metadata.type = type;
     }
 
-    // Extract designer with bounds checking
-    if (jsonStr.contains("\"designer\":\"")) {
-        auto designerStart = jsonStr.indexOf("\"designer\":\"");
-        if (designerStart >= 0) {
-            designerStart += 12;  // length of "\"designer\":"
-            auto designerEnd = jsonStr.indexOf("\"", designerStart);
-            if (designerEnd > designerStart) {
-                presetInfo.metadata.designer = jsonStr.substring(designerStart, designerEnd);
-            }
-        }
+    auto designer = extractJsonString(jsonStr, "designer");
+    if (!designer.isEmpty()) {
+        presetInfo.metadata.designer = designer;
     }
 
-    // Extract isFavorite
     presetInfo.metadata.isFavorite = jsonStr.contains("\"isFavorite\":true");
 }
 
@@ -136,15 +140,15 @@ std::vector<PresetInfo> PresetManager::getPresetsForPack(
 }
 
 std::vector<juce::String> PresetManager::getAllTypes() const {
-    std::vector<juce::String> types;
+    std::set<juce::String> typeSet;
+
     for (const auto& [packName, presets] : allPresets) {
         for (const auto& preset : presets) {
-            if (std::find(types.begin(), types.end(), preset.metadata.type) == types.end()) {
-                types.push_back(preset.metadata.type);
-            }
+            typeSet.insert(preset.metadata.type);
         }
     }
-    return types;
+
+    return std::vector<juce::String>(typeSet.begin(), typeSet.end());
 }
 
 std::vector<PresetInfo> PresetManager::searchByName(
@@ -165,43 +169,32 @@ std::vector<PresetInfo> PresetManager::searchByName(
 void PresetManager::setFavorite(const juce::String& presetPath, bool isFavorite) {
     favoriteMap[presetPath] = isFavorite;
 
-    // Persist to disk
     auto presetFile = juce::File(presetPath);
-    if (presetFile.exists() && presetFile.getFileExtension() == ".fxp") {
-        // Load existing metadata
-        auto jsonFile = presetFile.withFileExtension(".json");
-        juce::String type = "Experimental";
-        juce::String designer = "Kai Slate";
-
-        if (jsonFile.exists()) {
-            auto jsonStr = jsonFile.loadFileAsString();
-            // Extract type with bounds checking
-            if (jsonStr.contains("\"type\":\"")) {
-                auto typeStart = jsonStr.indexOf("\"type\":\"");
-                if (typeStart >= 0) {
-                    typeStart += 8;
-                    auto typeEnd = jsonStr.indexOf("\"", typeStart);
-                    if (typeEnd > typeStart) {
-                        type = jsonStr.substring(typeStart, typeEnd);
-                    }
-                }
-            }
-            // Extract designer with bounds checking
-            if (jsonStr.contains("\"designer\":\"")) {
-                auto designerStart = jsonStr.indexOf("\"designer\":\"");
-                if (designerStart >= 0) {
-                    designerStart += 12;
-                    auto designerEnd = jsonStr.indexOf("\"", designerStart);
-                    if (designerEnd > designerStart) {
-                        designer = jsonStr.substring(designerStart, designerEnd);
-                    }
-                }
-            }
-        }
-
-        // Write updated metadata
-        saveMetadataJson(presetFile, type, designer, isFavorite);
+    if (!presetFile.exists() || presetFile.getFileExtension() != ".fxp") {
+        return;
     }
+
+    // Validate path is within presets directory
+    auto presetsRoot = getPresetsRootDirectory();
+    if (!presetFile.getFullPathName().startsWith(presetsRoot.getFullPathName())) {
+        jassertfalse;  // Path outside preset directory
+        return;
+    }
+
+    auto jsonFile = presetFile.withFileExtension(".json");
+    juce::String type = "Experimental";
+    juce::String designer = "Kai Slate";
+
+    if (jsonFile.exists()) {
+        auto jsonStr = jsonFile.loadFileAsString();
+        auto jsonType = extractJsonString(jsonStr, "type");
+        if (!jsonType.isEmpty()) type = jsonType;
+
+        auto jsonDesigner = extractJsonString(jsonStr, "designer");
+        if (!jsonDesigner.isEmpty()) designer = jsonDesigner;
+    }
+
+    saveMetadataJson(presetFile, type, designer, isFavorite);
 }
 
 void PresetManager::saveMetadataJson(const juce::File& presetFile,
@@ -210,9 +203,12 @@ void PresetManager::saveMetadataJson(const juce::File& presetFile,
                                      bool isFavorite) {
     auto jsonFile = presetFile.withFileExtension(".json");
 
-    // Create simple JSON: { "type": "...", "designer": "...", "isFavorite": ... }
-    auto jsonStr = juce::String("{\"type\":\"") + type +
-                   "\",\"designer\":\"" + designer +
+    // Escape special characters
+    auto escapedType = type.replace("\"", "\\\"").replace("\\", "\\\\");
+    auto escapedDesigner = designer.replace("\"", "\\\"").replace("\\", "\\\\");
+
+    auto jsonStr = juce::String("{\"type\":\"") + escapedType +
+                   "\",\"designer\":\"" + escapedDesigner +
                    "\",\"isFavorite\":" + (isFavorite ? "true" : "false") + "}";
 
     jsonFile.replaceWithText(jsonStr);

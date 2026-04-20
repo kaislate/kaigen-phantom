@@ -57,6 +57,9 @@ private:
                          const juce::String& designer,
                          bool isFavorite);
 
+    // Helper to extract string value from JSON
+    juce::String extractJsonString(const juce::String& jsonStr, const juce::String& key);
+
     std::map<juce::String, std::vector<PresetInfo>> allPresets;
     std::map<juce::String, bool> favoriteMap;  // path -> isFavorite
 };
