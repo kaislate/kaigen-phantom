@@ -4,6 +4,15 @@ project(KaigenPhantom VERSION 0.1.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Preset system developer mode
+option(DEVELOPER_MODE "Enable developer preset management panel" OFF)
+
+if(DEVELOPER_MODE)
+    add_definitions(-DDEVELOPER_MODE=1)
+else()
+    add_definitions(-DDEVELOPER_MODE=0)
+endif()
+
 include(FetchContent)
 FetchContent_Declare(
     JUCE
@@ -54,6 +63,11 @@ juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/circuit-board.js
     Source/WebUI/juce-frontend.js
 )
+
+# Factory presets (optional, for Phase 2 implementation)
+# set(FACTORY_PRESETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Source/FactoryPresets")
+# file(GLOB FACTORY_PRESET_FILES "${FACTORY_PRESETS_DIR}/*.fxp")
+# juce_add_binary_data(KaigenPhantomData SOURCES ${FACTORY_PRESET_FILES})
 
 target_include_directories(KaigenPhantom PRIVATE Source)
 
