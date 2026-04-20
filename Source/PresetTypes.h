@@ -1,8 +1,6 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
-#include <string>
-#include <vector>
 
 namespace kaigen::phantom {
 
