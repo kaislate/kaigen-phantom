@@ -65,25 +65,31 @@ void PresetManager::loadMetadataJson(PresetInfo& presetInfo) {
 
     auto jsonStr = jsonFile.loadFileAsString();
 
-    // Simple parsing for type
-    if (jsonStr.contains("\"type\":")) {
-        auto typeStart = jsonStr.indexOf("\"type\":\"") + 9;
-        auto typeEnd = jsonStr.indexOf("\"", typeStart);
-        if (typeEnd > typeStart) {
-            presetInfo.metadata.type = jsonStr.substring(typeStart, typeEnd);
+    // Extract type with bounds checking
+    if (jsonStr.contains("\"type\":\"")) {
+        auto typeStart = jsonStr.indexOf("\"type\":\"");
+        if (typeStart >= 0) {
+            typeStart += 8;  // length of "\"type\":"
+            auto typeEnd = jsonStr.indexOf("\"", typeStart);
+            if (typeEnd > typeStart) {
+                presetInfo.metadata.type = jsonStr.substring(typeStart, typeEnd);
+            }
         }
     }
 
-    // Simple parsing for designer
-    if (jsonStr.contains("\"designer\":")) {
-        auto designerStart = jsonStr.indexOf("\"designer\":\"") + 12;
-        auto designerEnd = jsonStr.indexOf("\"", designerStart);
-        if (designerEnd > designerStart) {
-            presetInfo.metadata.designer = jsonStr.substring(designerStart, designerEnd);
+    // Extract designer with bounds checking
+    if (jsonStr.contains("\"designer\":\"")) {
+        auto designerStart = jsonStr.indexOf("\"designer\":\"");
+        if (designerStart >= 0) {
+            designerStart += 12;  // length of "\"designer\":"
+            auto designerEnd = jsonStr.indexOf("\"", designerStart);
+            if (designerEnd > designerStart) {
+                presetInfo.metadata.designer = jsonStr.substring(designerStart, designerEnd);
+            }
         }
     }
 
-    // Simple parsing for isFavorite
+    // Extract isFavorite
     presetInfo.metadata.isFavorite = jsonStr.contains("\"isFavorite\":true");
 }
 
@@ -158,7 +164,44 @@ std::vector<PresetInfo> PresetManager::searchByName(
 
 void PresetManager::setFavorite(const juce::String& presetPath, bool isFavorite) {
     favoriteMap[presetPath] = isFavorite;
-    // TODO: persist favorite flag to disk (Phase 2)
+
+    // Persist to disk
+    auto presetFile = juce::File(presetPath);
+    if (presetFile.exists() && presetFile.getFileExtension() == ".fxp") {
+        // Load existing metadata
+        auto jsonFile = presetFile.withFileExtension(".json");
+        juce::String type = "Experimental";
+        juce::String designer = "Kai Slate";
+
+        if (jsonFile.exists()) {
+            auto jsonStr = jsonFile.loadFileAsString();
+            // Extract type with bounds checking
+            if (jsonStr.contains("\"type\":\"")) {
+                auto typeStart = jsonStr.indexOf("\"type\":\"");
+                if (typeStart >= 0) {
+                    typeStart += 8;
+                    auto typeEnd = jsonStr.indexOf("\"", typeStart);
+                    if (typeEnd > typeStart) {
+                        type = jsonStr.substring(typeStart, typeEnd);
+                    }
+                }
+            }
+            // Extract designer with bounds checking
+            if (jsonStr.contains("\"designer\":\"")) {
+                auto designerStart = jsonStr.indexOf("\"designer\":\"");
+                if (designerStart >= 0) {
+                    designerStart += 12;
+                    auto designerEnd = jsonStr.indexOf("\"", designerStart);
+                    if (designerEnd > designerStart) {
+                        designer = jsonStr.substring(designerStart, designerEnd);
+                    }
+                }
+            }
+        }
+
+        // Write updated metadata
+        saveMetadataJson(presetFile, type, designer, isFavorite);
+    }
 }
 
 void PresetManager::saveMetadataJson(const juce::File& presetFile,
@@ -178,6 +221,10 @@ void PresetManager::saveMetadataJson(const juce::File& presetFile,
 juce::String PresetManager::savePreset(const juce::String& presetName,
                                        const juce::String& type,
                                        const juce::MemoryBlock& fxpData) {
+    // Validate type
+    const auto validTypes = std::vector<juce::String>{"Piano", "Drone", "Synth", "Bass", "Experimental"};
+    auto validType = std::find(validTypes.begin(), validTypes.end(), type) != validTypes.end() ? type : "Experimental";
+
     auto userDir = getUserPresetsDirectory();
     auto presetFile = userDir.getChildFile(presetName + ".fxp");
 
@@ -187,14 +234,14 @@ juce::String PresetManager::savePreset(const juce::String& presetName,
         return "";
     }
 
-    // Save metadata to .json file
-    saveMetadataJson(presetFile, type, "User", false);
+    // Save metadata to .json file using validated type
+    saveMetadataJson(presetFile, validType, "User", false);
 
     // Update in-memory cache
     PresetInfo newPreset;
     newPreset.file = presetFile;
     newPreset.metadata.name = presetName;
-    newPreset.metadata.type = type;
+    newPreset.metadata.type = validType;
     newPreset.metadata.designer = "User";
     newPreset.metadata.packName = "User";
     newPreset.metadata.isFactory = false;
