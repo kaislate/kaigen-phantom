@@ -51,6 +51,11 @@ private:
     juce::File getPresetsRootDirectory() const;
     void ensureDirectoryStructure();
     void loadPresetsFromDisk();
+    void loadMetadataJson(PresetInfo& presetInfo);
+    void saveMetadataJson(const juce::File& presetFile,
+                         const juce::String& type,
+                         const juce::String& designer,
+                         bool isFavorite);
 
     std::map<juce::String, std::vector<PresetInfo>> allPresets;
     std::map<juce::String, bool> favoriteMap;  // path -> isFavorite

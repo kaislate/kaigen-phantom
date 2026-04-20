@@ -52,6 +52,41 @@ void PresetManager::ensureDirectoryStructure() {
     getFactoryPresetsDirectory().createDirectory();
 }
 
+void PresetManager::loadMetadataJson(PresetInfo& presetInfo) {
+    auto jsonFile = presetInfo.file.withFileExtension(".json");
+
+    if (!jsonFile.exists()) {
+        // Fallback to defaults if no JSON file
+        presetInfo.metadata.type = "Experimental";
+        presetInfo.metadata.designer = "Kai Slate";
+        presetInfo.metadata.isFavorite = false;
+        return;
+    }
+
+    auto jsonStr = jsonFile.loadFileAsString();
+
+    // Simple parsing for type
+    if (jsonStr.contains("\"type\":")) {
+        auto typeStart = jsonStr.indexOf("\"type\":\"") + 9;
+        auto typeEnd = jsonStr.indexOf("\"", typeStart);
+        if (typeEnd > typeStart) {
+            presetInfo.metadata.type = jsonStr.substring(typeStart, typeEnd);
+        }
+    }
+
+    // Simple parsing for designer
+    if (jsonStr.contains("\"designer\":")) {
+        auto designerStart = jsonStr.indexOf("\"designer\":\"") + 12;
+        auto designerEnd = jsonStr.indexOf("\"", designerStart);
+        if (designerEnd > designerStart) {
+            presetInfo.metadata.designer = jsonStr.substring(designerStart, designerEnd);
+        }
+    }
+
+    // Simple parsing for isFavorite
+    presetInfo.metadata.isFavorite = jsonStr.contains("\"isFavorite\":true");
+}
+
 void PresetManager::loadPresetsFromDisk() {
     allPresets.clear();
     auto root = getPresetsRootDirectory();
@@ -69,9 +104,8 @@ void PresetManager::loadPresetsFromDisk() {
             info.metadata.packName = packName;
             info.metadata.isFactory = (packName == "Factory");
 
-            // Default values (type and designer could be read from .fxp metadata later)
-            info.metadata.type = "Experimental";
-            info.metadata.designer = "Kai Slate";
+            // Load metadata from .json if it exists, otherwise use defaults
+            loadMetadataJson(info);
 
             presetList.push_back(info);
         }
@@ -127,16 +161,46 @@ void PresetManager::setFavorite(const juce::String& presetPath, bool isFavorite)
     // TODO: persist favorite flag to disk (Phase 2)
 }
 
+void PresetManager::saveMetadataJson(const juce::File& presetFile,
+                                     const juce::String& type,
+                                     const juce::String& designer,
+                                     bool isFavorite) {
+    auto jsonFile = presetFile.withFileExtension(".json");
+
+    // Create simple JSON: { "type": "...", "designer": "...", "isFavorite": ... }
+    auto jsonStr = juce::String("{\"type\":\"") + type +
+                   "\",\"designer\":\"" + designer +
+                   "\",\"isFavorite\":" + (isFavorite ? "true" : "false") + "}";
+
+    jsonFile.replaceWithText(jsonStr);
+}
+
 juce::String PresetManager::savePreset(const juce::String& presetName,
                                        const juce::String& type,
                                        const juce::MemoryBlock& fxpData) {
     auto userDir = getUserPresetsDirectory();
     auto presetFile = userDir.getChildFile(presetName + ".fxp");
 
+    // Save .fxp file
     if (!presetFile.replaceWithData(fxpData.getData(), fxpData.getSize())) {
         jassertfalse;  // File write failed
         return "";
     }
+
+    // Save metadata to .json file
+    saveMetadataJson(presetFile, type, "User", false);
+
+    // Update in-memory cache
+    PresetInfo newPreset;
+    newPreset.file = presetFile;
+    newPreset.metadata.name = presetName;
+    newPreset.metadata.type = type;
+    newPreset.metadata.designer = "User";
+    newPreset.metadata.packName = "User";
+    newPreset.metadata.isFactory = false;
+    newPreset.metadata.isFavorite = false;
+
+    allPresets["User"].push_back(newPreset);
 
     return presetFile.getFullPathName();
 }
