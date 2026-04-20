@@ -41,6 +41,15 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    // Load a preset (.fxp file) and apply all parameters
+    void loadPresetFromFile(const juce::File& presetFile);
+
+    // Save current parameter state to .fxp file
+    void savePresetToFile(const juce::File& presetFile);
+
+    // Get current state as MemoryBlock (for PresetManager::savePreset)
+    juce::MemoryBlock getStateAsMemoryBlock() const;
+
     // Public state for the editor
     juce::AudioProcessorValueTreeState apvts;
 

@@ -401,6 +401,70 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
 }
 
+void PhantomProcessor::loadPresetFromFile(const juce::File& presetFile)
+{
+    if (!presetFile.exists())
+    {
+        return;
+    }
+
+    auto presetData = presetFile.loadFileAsData();
+    if (presetData.isEmpty())
+    {
+        return;
+    }
+
+    // Parse XML state from file
+    auto xmlStr = juce::String::fromUTF8((const char*)presetData.getData(), (int)presetData.getSize());
+    auto xml = juce::XmlElement::createTextElement(xmlStr);
+
+    if (!xml)
+    {
+        return;
+    }
+
+    // Replace APVTS state with loaded values
+    auto tree = juce::ValueTree::fromXml(*xml);
+    if (tree.isValid())
+    {
+        apvts.replaceState(tree);
+
+        // Trigger parameter callbacks for DSP update
+        for (auto param : getParameters())
+        {
+            param->sendValueChangedMessageToListeners(param->getValue());
+        }
+    }
+}
+
+void PhantomProcessor::savePresetToFile(const juce::File& presetFile)
+{
+    auto state = apvts.copyState();
+    auto xml = state.createXml();
+
+    if (!xml)
+    {
+        return;
+    }
+
+    presetFile.replaceWithText(xml->toString());
+}
+
+juce::MemoryBlock PhantomProcessor::getStateAsMemoryBlock() const
+{
+    auto state = apvts.copyState();
+    auto xml = state.createXml();
+
+    if (!xml)
+    {
+        return juce::MemoryBlock();
+    }
+
+    auto xmlStr = xml->toString();
+    juce::MemoryBlock block(xmlStr.toUTF8(), xmlStr.length());
+    return block;
+}
+
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new PhantomProcessor();
