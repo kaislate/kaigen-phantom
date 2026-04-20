@@ -9,6 +9,118 @@
 <body>
   <div style="position:fixed;top:2px;right:2px;z-index:99999;background:#0a0;color:#fff;font:bold 10px monospace;padding:2px 6px;border-radius:3px">DSP-11</div>
   <div class="wrap">
+    <!-- Preset Header Bar -->
+    <div id="preset-header" style="
+        background: linear-gradient(to right, #0f3460, #16384d);
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid #16384d;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 12px;
+    ">
+        <!-- Left: Books icon + Heart -->
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <button id="preset-browser-btn"
+                    style="background: none; border: none; color: #16c784; cursor: pointer; font-size: 16px; padding: 0;">
+                |||
+            </button>
+            <button id="preset-favorite-btn"
+                    style="background: none; border: none; color: #999; cursor: pointer; font-size: 16px; padding: 0;">
+                ♡
+            </button>
+        </div>
+
+        <!-- Center: Preset Name -->
+        <div style="flex: 1; text-align: center;">
+            <span id="preset-name" style="color: #fff; font-size: 16px; font-weight: 600; letter-spacing: 0.5px;">
+                Default
+            </span>
+            <span id="preset-modified-indicator" style="color: #e94560; font-weight: 600; display: none;">*</span>
+        </div>
+
+        <!-- Right: Browse arrows + Save button -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <button id="preset-prev-btn"
+                    style="background: none; border: none; color: #999; cursor: pointer; padding: 0; font-size: 14px;">
+                ▲
+            </button>
+            <button id="preset-next-btn"
+                    style="background: none; border: none; color: #999; cursor: pointer; padding: 0; font-size: 14px;">
+                ▼
+            </button>
+            <button id="preset-save-btn"
+                    style="background: #e94560; color: #fff; border: none; cursor: pointer; padding: 4px 10px; border-radius: 3px; font-size: 10px; font-weight: 600; display: none;">
+                Save
+            </button>
+        </div>
+    </div>
+
+    <!-- Preset Dropdown (hidden by default) -->
+    <div id="preset-dropdown" style="
+        display: none;
+        position: absolute;
+        top: 50px;
+        left: 0;
+        background: #0f3460;
+        border: 1px solid #16384d;
+        border-radius: 4px;
+        width: 220px;
+        font-family: system-ui;
+        font-size: 11px;
+        z-index: 1000;
+        max-height: 400px;
+        overflow-y: auto;
+    ">
+        <!-- Populated by preset-dropdown.js -->
+    </div>
+
+    <!-- Preset Browser Modal (hidden by default) -->
+    <div id="preset-browser-modal" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+    ">
+        <div style="
+            background: #1a1a2e;
+            border: 1px solid #16384d;
+            border-radius: 8px;
+            width: 90%;
+            height: 90%;
+            display: flex;
+            flex-direction: column;
+            font-family: system-ui;
+            font-size: 11px;
+        ">
+            <!-- Populated by preset-browser.js -->
+        </div>
+    </div>
+
+    <!-- Preset Save Modal (hidden by default) -->
+    <div id="preset-save-modal" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 2500;
+        align-items: center;
+        justify-content: center;
+    ">
+        <!-- Populated by preset-header.js -->
+    </div>
+
     <!-- Header -->
     <div class="hdr">
       <div class="logo-phantom">PHANTOM</div>
@@ -251,6 +363,9 @@
 <script src="/knob-mini.js"></script>
 <script src="/juce-frontend.js"></script>
 <script src="/phantom.js"></script>
+<script src="/preset-header.js"></script>
+<script src="/preset-dropdown.js"></script>
+<script src="/preset-browser.js"></script>
 <script src="/spectrum.js"></script>
 <script src="/recipe-wheel.js"></script>
 <script src="/oscilloscope.js"></script>
