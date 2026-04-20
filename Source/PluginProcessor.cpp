@@ -408,15 +408,14 @@ void PhantomProcessor::loadPresetFromFile(const juce::File& presetFile)
         return;
     }
 
-    auto presetData = presetFile.loadFileAsData();
-    if (presetData.isEmpty())
+    auto xmlStr = presetFile.loadFileAsString();
+    if (xmlStr.isEmpty())
     {
         return;
     }
 
     // Parse XML state from file
-    auto xmlStr = juce::String::fromUTF8((const char*)presetData.getData(), (int)presetData.getSize());
-    auto xml = juce::XmlElement::createTextElement(xmlStr);
+    auto xml = juce::parseXML(xmlStr);
 
     if (!xml)
     {
@@ -452,7 +451,7 @@ void PhantomProcessor::savePresetToFile(const juce::File& presetFile)
 
 juce::MemoryBlock PhantomProcessor::getStateAsMemoryBlock() const
 {
-    auto state = apvts.copyState();
+    auto state = const_cast<PhantomProcessor*>(this)->apvts.copyState();
     auto xml = state.createXml();
 
     if (!xml)
