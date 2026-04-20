@@ -39,6 +39,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/Engines/WaveletSynth.cpp
     Source/Engines/EnvelopeFollower.cpp
     Source/Engines/PhantomEngine.cpp
+    Source/PresetManager.cpp
 )
 
 juce_add_binary_data(PhantomWebUI SOURCES
