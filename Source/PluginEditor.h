@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "Parameters.h"
+#include "PresetManager.h"
 
 struct SinglePageBrowser : juce::WebBrowserComponent
 {
@@ -23,6 +24,8 @@ public:
 
     bool keyPressed(const juce::KeyPress&) override { return false; }
     bool keyStateChanged(bool) override { return false; }
+
+    kaigen::phantom::PresetManager* getPresetManager() { return presetManager.get(); }
 #if JUCE_WINDOWS
     void parentHierarchyChanged() override;
 #endif
@@ -92,6 +95,9 @@ private:
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          inputGainAutoAttachment;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          midiTriggerAttachment;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          midiGateReleaseAttachment;
+
+    // Preset system
+    std::unique_ptr<kaigen::phantom::PresetManager> presetManager;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomEditor)
 };

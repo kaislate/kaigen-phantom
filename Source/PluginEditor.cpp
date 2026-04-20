@@ -211,6 +211,10 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
       processor(p),
       webView(buildWebViewOptions(*this))
 {
+    // Initialize preset system
+    presetManager = std::make_unique<kaigen::phantom::PresetManager>();
+    presetManager->initialize();
+
     setWantsKeyboardFocus(false);
     setSize(1300, 820);
     addAndMakeVisible(webView);
