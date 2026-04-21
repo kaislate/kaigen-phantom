@@ -12,7 +12,7 @@ Turn the preset browser's in-list view into a real sortable table:
 
 - **Spectrum thumbnail column** — a compact monochrome curve per row, stripped of axis labels
 - **Skip column** — shows the preset's `SYNTH_SKIP` integer (0–8); renders as "—" when 0
-- **Sortable headers** — click-to-sort on Name / Type / Designer / Skip; Shape and ♥ remain static
+- **Sortable headers** — click-to-sort on every column: Name, Type, Designer, Shape (by spectral centroid), Skip, ♥ (favorites first)
 - **Skip-driven shift** — the rendered curve's fundamental is `crossover ÷ 2^skip`, so higher skip pushes the whole shape one octave left per step
 - **SUB BASS tag** — when the effective fundamental drops below 6 Hz, both the thumbnail and the preview card replace the curve with a big muted "SUB BASS" label
 
@@ -174,13 +174,15 @@ A new `<div class="browser-header">` rendered once above the list, inside `rende
     <span data-sort="name" class="sortable active">Name <span class="arrow">↑</span></span>
     <span data-sort="type" class="sortable">Type</span>
     <span data-sort="designer" class="sortable">Designer</span>
-    <span class="static">Shape</span>
+    <span data-sort="shape" class="sortable">Shape</span>
     <span data-sort="skip" class="sortable">Skip</span>
-    <span class="static"></span>
+    <span data-sort="heart" class="sortable" title="Sort by favorites">♥</span>
 </div>
 ```
 
 Styles for `.sortable` add `cursor: pointer; user-select: none;`. Hover state: `color: rgba(0,0,0,0.75)`. `.active` highlights the currently-sorted column in full black. The arrow (`↑` or `↓`) appears only inside the active header span.
+
+For the ♥ header, since the glyph itself is the label, the sort arrow renders to the *right* of the heart when that column is active (e.g., `♥ ↑`). The `title="Sort by favorites"` attribute provides a tooltip so the interaction is discoverable despite the glyph-only header.
 
 ### 5.2 Row structure
 
@@ -252,18 +254,44 @@ Two-state toggle per column (asc ↔ desc). No unsorted state — first click on
 Secondary tie-break by name ascending keeps ordering stable when the primary column ties (e.g., many presets with Type = Synth). The chained `||` returns the first non-zero comparison; if both names also tie, final fallback is 0.
 
 ```js
+function spectralCentroid(preview) {
+    // Weighted-mean peak frequency in Hz. Uses the same effective
+    // fundamental the renderer uses, so skip and crossover both feed in.
+    // Returns 0 for presets with no harmonic content.
+    if (!preview || !Array.isArray(preview.h)) return 0;
+    const fund = Math.max(0.01, (preview.crossover || 80) / Math.pow(2, preview.skip || 0));
+    let num = 0, den = 0;
+    for (let i = 0; i < 7; ++i) {
+        const w = preview.h[i] || 0;
+        num += w * (i + 2) * fund;
+        den += w;
+    }
+    return den > 0 ? num / den : 0;
+}
+
 function compareRows(a, b) {
     const dir = browserSort.dir === 'asc' ? 1 : -1;
     const col = browserSort.column;
-    const byName = a.meta.name.localeCompare(b.meta.name); // ascending by name, stable tiebreaker
+    const byName = a.meta.name.localeCompare(b.meta.name); // ascending tiebreaker
 
     if (col === 'name')     return dir * byName;
     if (col === 'type')     return (dir * (a.meta.type || '').localeCompare(b.meta.type || '')) || byName;
     if (col === 'designer') return (dir * (a.meta.designer || '').localeCompare(b.meta.designer || '')) || byName;
     if (col === 'skip')     return (dir * ((a.preview?.skip ?? 0) - (b.preview?.skip ?? 0))) || byName;
+    if (col === 'shape')    return (dir * (spectralCentroid(a.preview) - spectralCentroid(b.preview))) || byName;
+    if (col === 'heart') {
+        // Ascending = favorites on top. (true should compare as "less than" false in asc order.)
+        const av = a.meta.isFavorite ? 0 : 1;
+        const bv = b.meta.isFavorite ? 0 : 1;
+        return (dir * (av - bv)) || byName;
+    }
     return byName;
 }
 ```
+
+**Shape sort semantics.** Spectral centroid gives each preset a single representative Hz value — the weighted mean of its peak frequencies. Ascending orders left-heavy shapes (deep / sub-bass / narrow) first; descending puts right-heavy shapes (bright / top-loaded) first. High-skip presets naturally sort toward the low end because their effective fundamental is reduced. A preset with all harmonics at zero weight gets centroid 0 and sorts to the very bottom (ascending) — an acceptable degenerate case.
+
+**Heart sort semantics.** Ascending = favorites first (the common expectation for a "favorites" column). Descending = non-favorites first, favorites at the bottom. Within each group, alphabetical.
 
 ### 6.4 Filter interaction
 
@@ -345,8 +373,10 @@ TEST_CASE("readPreviewFromState clamps skip to valid range")
 3. Save a preset with skip=2 and crossover=120 → thumbnail peaks sit at roughly half the frequency they would at skip=0.
 4. Save a preset with skip=5 and crossover=60 → thumbnail shows "SUB BASS"; preview card on hover also shows big SUB BASS.
 5. Sort by Skip ascending → zero-skip presets first, high-skip last. Click again → reversed.
-6. Window resize → thumbnails rescale cleanly with the row width.
-7. No DevTools console errors during any of the above.
+6. Sort by Shape → presets with low-frequency-heavy curves come first (ascending). Reverse → bright/top-heavy curves first.
+7. Sort by ♥ → favorites appear at the top of the list. Reverse → favorites at the bottom.
+8. Window resize → thumbnails rescale cleanly with the row width.
+9. No DevTools console errors during any of the above.
 
 ## 11. Out of Scope
 
@@ -354,8 +384,7 @@ Deferred to future work:
 
 - Multi-column sort (shift-click to add secondary)
 - Persistent sort across plugin restarts
-- Heart column as a sortable ("favorites first") header
-- Shape column sorting (by dominant harmonic or total energy)
+- Alternate shape-sort metrics (dominant-harmonic mode, total-energy mode) — the spectral centroid covers the common case
 - Animated thumbnail transitions when sort reorders
 - Adaptive per-preset zoom for high-skip presets (superseded by SUB BASS tag)
 - Skip shift in the main in-plugin spectrum analyzer (separate future work)
