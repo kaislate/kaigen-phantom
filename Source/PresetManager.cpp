@@ -1,4 +1,5 @@
 #include "PresetManager.h"
+#include "Parameters.h"
 #include <juce_core/juce_core.h>
 
 namespace kaigen::phantom
@@ -105,6 +106,47 @@ PresetMetadata PresetManager::readMetadataFromFile(const juce::File& file)
     return result;
 }
 
+PreviewData PresetManager::readPreviewFromState(const juce::ValueTree& state)
+{
+    PreviewData data;
+
+    static const juce::String paramIds[7] = {
+        ParamID::RECIPE_H2, ParamID::RECIPE_H3, ParamID::RECIPE_H4,
+        ParamID::RECIPE_H5, ParamID::RECIPE_H6, ParamID::RECIPE_H7,
+        ParamID::RECIPE_H8,
+    };
+
+    // APVTS serializes each parameter as a <PARAM id="..." value="..."/> child.
+    // Walk the tree and pick out the ones we care about.
+    for (int i = 0; i < state.getNumChildren(); ++i)
+    {
+        auto child = state.getChild(i);
+        if (! child.hasProperty("id")) continue;
+
+        const auto id = child.getProperty("id").toString();
+        const auto value = (float) (double) child.getProperty("value", 0.0);
+
+        if (id == ParamID::PHANTOM_THRESHOLD)
+        {
+            data.crossover = value;
+            continue;
+        }
+
+        for (int h = 0; h < 7; ++h)
+        {
+            if (id == paramIds[h])
+            {
+                // APVTS stores recipe_h* as 0..100 (percent); normalize to 0..1
+                // so consumers treat PreviewData.h[] uniformly on a 0..1 scale.
+                data.h[h] = value * 0.01f;
+                break;
+            }
+        }
+    }
+
+    return data;
+}
+
 // ── Scanning ───────────────────────────────────────────────────────────
 
 void PresetManager::scanPresetsFromDisk()
@@ -159,6 +201,17 @@ void PresetManager::scanPresetsFromDisk()
             info.metadata.packName = packName;
             info.metadata.isFactory = (packName == kFactoryPackName);
             info.metadata.isFavorite = isFavorite(info.metadata.name, packName);
+
+            // Parse the state tree once more to extract preview parameter values.
+            // readMetadataFromFile already parses the file; we repeat here to avoid
+            // a signature change. The cost is negligible (few dozen presets at load).
+            if (auto xml = juce::parseXML(presetFile))
+            {
+                auto state = juce::ValueTree::fromXml(*xml);
+                if (state.isValid())
+                    info.preview = readPreviewFromState(state);
+            }
+
             presets.push_back(info);
         }
 
@@ -319,6 +372,7 @@ juce::String PresetManager::savePreset(juce::AudioProcessorValueTreeState& apvts
     info.metadata.packName = kUserPackName;
     info.metadata.isFactory = false;
     info.metadata.isFavorite = isFavorite(sanitized, kUserPackName);
+    info.preview = readPreviewFromState(state);  // NEW: match scan path
 
     auto& userList = allPresets[kUserPackName];
     auto it = std::find_if(userList.begin(), userList.end(),
