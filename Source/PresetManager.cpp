@@ -199,6 +199,17 @@ void PresetManager::scanPresetsFromDisk()
             info.metadata.packName = packName;
             info.metadata.isFactory = (packName == kFactoryPackName);
             info.metadata.isFavorite = isFavorite(info.metadata.name, packName);
+
+            // Parse the state tree once more to extract preview parameter values.
+            // readMetadataFromFile already parses the file; we repeat here to avoid
+            // a signature change. The cost is negligible (few dozen presets at load).
+            if (auto xml = juce::parseXML(presetFile))
+            {
+                auto state = juce::ValueTree::fromXml(*xml);
+                if (state.isValid())
+                    info.preview = readPreviewFromState(state);
+            }
+
             presets.push_back(info);
         }
 
@@ -359,6 +370,7 @@ juce::String PresetManager::savePreset(juce::AudioProcessorValueTreeState& apvts
     info.metadata.packName = kUserPackName;
     info.metadata.isFactory = false;
     info.metadata.isFavorite = isFavorite(sanitized, kUserPackName);
+    info.preview = readPreviewFromState(state);  // NEW: match scan path
 
     auto& userList = allPresets[kUserPackName];
     auto it = std::find_if(userList.begin(), userList.end(),
