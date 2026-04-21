@@ -351,8 +351,17 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                         meta->setProperty("isFavorite",  p.metadata.isFavorite);
                         meta->setProperty("isFactory",   p.metadata.isFactory);
 
+                        // Preview: 7 harmonic weights + crossover Hz
+                        auto* preview = new juce::DynamicObject();
+                        juce::Array<juce::var> hArr;
+                        for (int i = 0; i < 7; ++i)
+                            hArr.add(juce::var(p.preview.h[i]));
+                        preview->setProperty("h",         juce::var(hArr));
+                        preview->setProperty("crossover", juce::var(p.preview.crossover));
+
                         auto* item = new juce::DynamicObject();
                         item->setProperty("metadata", juce::var(meta));
+                        item->setProperty("preview",  juce::var(preview));
                         arr.add(juce::var(item));
                     }
                     root->setProperty(packName, juce::var(arr));
