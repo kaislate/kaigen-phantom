@@ -24,8 +24,8 @@ struct PresetMetadata
 // Populated once at scan time so hovering a preset triggers no disk I/O.
 struct PreviewData
 {
-    float h[7]      {};     // recipe_h2 .. recipe_h8, normalized 0..1
-    float crossover = 80.0f; // phantom_threshold in Hz
+    float h[7]      {};       // recipe_h2 .. recipe_h8, normalized 0..1
+    float crossover = 120.0f; // phantom_threshold in Hz (matches APVTS default in Parameters.h)
 };
 
 struct PresetInfo
