@@ -253,10 +253,12 @@ git commit -m "feat(preset): extract harmonic weights + crossover for preview"
 
 ---
 
-### Task 3: Populate `PresetInfo::preview` during the disk scan
+### Task 3: Populate `PresetInfo::preview` during disk scan AND save
+
+There are two code paths that build a `PresetInfo` for the in-memory cache: `scanPresetsFromDisk` (at plugin load) and `savePreset` (when the user saves a new preset). Both need to populate `info.preview`, otherwise a freshly-saved preset will render a flat spectrum until the next rescan.
 
 **Files:**
-- Modify: `Source/PresetManager.cpp`
+- Modify: `Source/PresetManager.cpp` (two locations)
 
 - [ ] **Step 1: Extend the scan loop to populate `preview`**
 
@@ -301,17 +303,37 @@ for (const auto& presetFile : packDir.findChildFiles(juce::File::findFiles, fals
 }
 ```
 
-- [ ] **Step 2: Build**
+- [ ] **Step 2: Extend `savePreset` to populate `preview` on the cache entry**
+
+In the same file, find `savePreset` (around line 302). After the on-disk write succeeds (around line 349) and before the `PresetInfo info;` construction that updates the in-memory cache (around line 353), the state tree is already in hand from `apvts.copyState()` — reuse it. Update the cache-entry construction block to populate `info.preview`:
+
+```cpp
+// Update in-memory cache.
+PresetInfo info;
+info.file = target;
+info.metadata.name = sanitized;
+info.metadata.type = validType;
+info.metadata.designer = effectiveDesigner;
+info.metadata.description = description;
+info.metadata.packName = kUserPackName;
+info.metadata.isFactory = false;
+info.metadata.isFavorite = isFavorite(sanitized, kUserPackName);
+info.preview = readPreviewFromState(state);  // NEW: match scan path
+```
+
+The local `state` variable built earlier in `savePreset` is the same shape `readPreviewFromState` expects. No extra file I/O needed.
+
+- [ ] **Step 3: Build**
 
 Run: `cmake --build build --config RelWithDebInfo --target Phantom_VST3 --parallel`
 
 Expected: clean build.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add Source/PresetManager.cpp
-git commit -m "feat(preset): populate PreviewData during preset scan"
+git commit -m "feat(preset): populate PreviewData on scan + save paths"
 ```
 
 ---
