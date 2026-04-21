@@ -46,8 +46,8 @@ In `Source/PresetManager.h`, immediately after the `PresetMetadata` struct defin
 // Populated once at scan time so hovering a preset triggers no disk I/O.
 struct PreviewData
 {
-    float h[7]      {};     // recipe_h2 .. recipe_h8, normalized 0..1
-    float crossover = 80.0f; // phantom_threshold in Hz
+    float h[7]      {};       // recipe_h2 .. recipe_h8, normalized 0..1
+    float crossover = 120.0f; // phantom_threshold in Hz (matches APVTS default in Parameters.h)
 };
 ```
 
@@ -158,7 +158,7 @@ TEST_CASE("readPreviewFromState returns defaults when params are missing")
 
     for (int i = 0; i < 7; ++i)
         REQUIRE(preview.h[i] == Catch::Approx(0.0f));
-    REQUIRE(preview.crossover == Catch::Approx(80.0f));
+    REQUIRE(preview.crossover == Catch::Approx(120.0f));  // matches APVTS default
 }
 
 TEST_CASE("readPreviewFromState handles partial params (legacy preset)")

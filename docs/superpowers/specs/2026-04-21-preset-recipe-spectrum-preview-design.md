@@ -160,7 +160,7 @@ All colors are expressed in the same black-ink vocabulary as the preview card so
 | Case | Behavior |
 |------|----------|
 | Preset missing `recipe_h2..h8` in state (legacy) | Read as 0. Curve renders as a flat baseline. Still visually valid. |
-| Preset missing `phantom_threshold` | Fall back to 80 Hz default. Crossover marker draws at 80 Hz. |
+| Preset missing `phantom_threshold` | Fall back to 120 Hz — matches the APVTS live default in `Parameters.h`. Crossover marker draws at 120 Hz. |
 | All harmonic weights are 0 | Flat baseline. Marker still shows. Communicates "no harmonics" accurately. |
 | Very low crossover (20 Hz) | Fundamental is off-screen left; harmonics push left; axis still renders. No clipping issues. |
 | Very high crossover (250 Hz) | Upper harmonics (8× = 2kHz) push past 1kHz label. Axis max scales to `max(1000, 10×crossover)` to keep all peaks visible. |
