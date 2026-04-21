@@ -20,10 +20,19 @@ struct PresetMetadata
     bool isFavorite = false;
 };
 
+// Parameter values extracted from a preset for the browser preview spectrum.
+// Populated once at scan time so hovering a preset triggers no disk I/O.
+struct PreviewData
+{
+    float h[7]      {};     // recipe_h2 .. recipe_h8, normalized 0..1
+    float crossover = 80.0f; // phantom_threshold in Hz
+};
+
 struct PresetInfo
 {
     PresetMetadata metadata;
-    juce::File file;
+    PreviewData    preview;
+    juce::File     file;
 };
 
 // A preset pack = any directory under Presets/. Factory and User are the
@@ -122,6 +131,10 @@ private:
 
     // Extract metadata from a preset file, if present.
     static PresetMetadata readMetadataFromFile(const juce::File& file);
+
+    // Extract the preview parameter values from a preset's APVTS state tree.
+    // Missing recipe params default to 0; missing crossover defaults to 80 Hz.
+    static PreviewData readPreviewFromState(const juce::ValueTree& state);
 
     std::map<juce::String, std::vector<PresetInfo>> allPresets;
     std::map<juce::String, PackInfo> packs;  // keyed by folder name
