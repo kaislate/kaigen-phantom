@@ -605,39 +605,65 @@ function renderBrowserList(searchTerm) {
     const cache = state.presetsCache || {};
     const q = (searchTerm || '').toLowerCase().trim();
 
+    // Flatten + filter
     const rows = [];
     for (const [packName, list] of Object.entries(cache)) {
         for (const p of list) {
             if (browserFilter === 'favorites' && !p.metadata.isFavorite) continue;
             if (browserFilter !== 'all' && browserFilter !== 'favorites' && packName !== browserFilter) continue;
             if (q && !p.metadata.name.toLowerCase().includes(q)) continue;
-            rows.push({ pack: packName, meta: p.metadata });
+            rows.push({ pack: packName, meta: p.metadata, preview: p.preview });
         }
     }
 
     updateBrowserCount(rows.length);
 
+    // Header row (always rendered, even when list is empty — keeps the chrome consistent)
+    const headerHtml = `
+        <div class="browser-header">
+            <span data-sort="name" class="sortable active">Name <span class="arrow">↑</span></span>
+            <span data-sort="type" class="sortable">Type</span>
+            <span data-sort="designer" class="sortable">Designer</span>
+            <span data-sort="shape" class="sortable">Shape</span>
+            <span data-sort="skip" class="sortable">Skip</span>
+            <span data-sort="heart" class="sortable" title="Sort by favorites">♥</span>
+        </div>
+    `;
+
     if (rows.length === 0) {
-        listDiv.innerHTML = '<div style="padding: 16px; color: rgba(0,0,0,0.50); text-align: center; font-size: 11px;">No presets found</div>';
+        listDiv.innerHTML = headerHtml +
+            '<div style="padding: 16px; color: rgba(0,0,0,0.50); text-align: center; font-size: 11px;">No presets found</div>';
         return;
     }
 
-    listDiv.innerHTML = rows.map(r => {
+    const rowsHtml = rows.map(r => {
         const isCurrent = r.meta.name === state.currentName && r.pack === state.currentPack;
         const bg = isCurrent ? 'rgba(0,0,0,0.10)' : 'transparent';
         const heart = r.meta.isFavorite ? '♥' : '♡';
         const heartCol = r.meta.isFavorite ? '#c74a4a' : 'rgba(0,0,0,0.40)';
+        const skipVal = (r.preview && r.preview.skip) ? String(r.preview.skip) : '—';
         return `
-            <div class="browser-row" data-name="${escapeAttr(r.meta.name)}" data-pack="${escapeAttr(r.pack)}" style="display: grid; grid-template-columns: 1fr 80px 100px 40px; gap: 8px; padding: 6px 12px; background: ${bg}; border-radius: 3px; align-items: center; cursor: pointer; font-size: 11px; margin-bottom: 2px;">
+            <div class="browser-row" data-name="${escapeAttr(r.meta.name)}" data-pack="${escapeAttr(r.pack)}"
+                 style="display: grid; grid-template-columns: 1fr 72px 72px 140px 40px 30px; gap: 8px; padding: 6px 12px; background: ${bg}; border-radius: 3px; align-items: center; cursor: pointer; font-size: 11px; margin-bottom: 2px;">
                 <div style="color: rgba(0,0,0,0.85); font-weight: 500;">${escapeHtml(r.meta.name)}</div>
                 <div style="color: rgba(0,0,0,0.60);">${escapeHtml(r.meta.type || '')}</div>
                 <div style="color: rgba(0,0,0,0.60);">${escapeHtml(r.meta.designer || '')}</div>
+                <svg class="browser-shape" viewBox="0 0 170 26" preserveAspectRatio="none"></svg>
+                <div style="color: rgba(0,0,0,0.60); font-variant-numeric: tabular-nums;">${skipVal}</div>
                 <div class="browser-heart" style="color: ${heartCol}; text-align: center; cursor: pointer;">${heart}</div>
             </div>
         `;
     }).join('');
 
-    listDiv.querySelectorAll('.browser-row').forEach(row => {
+    listDiv.innerHTML = headerHtml + rowsHtml;
+
+    // Populate each thumbnail SVG now that the DOM exists.
+    listDiv.querySelectorAll('.browser-row').forEach((row, i) => {
+        const svg = row.querySelector('.browser-shape');
+        if (svg && rows[i].preview && window.PresetSpectrum) {
+            window.PresetSpectrum.render(svg, rows[i].preview, { variant: 'thumbnail' });
+        }
+
         const name = row.getAttribute('data-name');
         const pack = row.getAttribute('data-pack');
         row.addEventListener('click', () => loadPreset(name, pack));
