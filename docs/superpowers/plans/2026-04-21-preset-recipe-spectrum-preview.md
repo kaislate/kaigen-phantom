@@ -179,9 +179,11 @@ TEST_CASE("readPreviewFromState handles partial params (legacy preset)")
 
 - [ ] **Step 2: Register the test file in CMake**
 
-In `CMakeLists.txt`, find the `PhantomTests` target's source list (near the other `tests/*.cpp` entries) and add `tests/PresetPreviewTests.cpp`. If the `PresetManager` sources aren't already linked into `PhantomTests`, add `Source/PresetManager.cpp` as well.
+In `tests/CMakeLists.txt` (not the top-level CMakeLists), find the `add_executable(KaigenPhantomTests ...)` block and:
+- Add `PresetPreviewTests.cpp` to the list (note: paths in `tests/CMakeLists.txt` are relative to `tests/`, so use bare filenames for test files)
+- Add `../Source/PresetManager.cpp` to the list (the existing tests don't link PresetManager — this test is the first one that needs it)
 
-Run: `cmake --build build --config RelWithDebInfo --target PhantomTests` and confirm the new file is being compiled (it should fail linking because `readPreviewFromState` isn't defined yet).
+Run: `cmake --build build --config RelWithDebInfo --target KaigenPhantomTests` and confirm the new file is being compiled (it should fail linking because `readPreviewFromState` isn't defined yet).
 
 Expected: link error referencing `readPreviewFromState`.
 
@@ -234,11 +236,11 @@ Also add `#include "Parameters.h"` at the top of `PresetManager.cpp` if it isn't
 
 - [ ] **Step 4: Run the tests**
 
-Run: `cmake --build build --config RelWithDebInfo --target PhantomTests && ./build/RelWithDebInfo/PhantomTests.exe "[readPreviewFromState]*"`
+Build and then run the whole suite — tests have no tags so filter-by-tag isn't available.
 
-If the tag filter doesn't match (tests above use `TEST_CASE` without tags), just run the whole suite and look for the three new test cases:
+Build: `cmake --build build --config RelWithDebInfo --target KaigenPhantomTests`
 
-Run: `./build/RelWithDebInfo/PhantomTests.exe`
+Run: `./build/tests/RelWithDebInfo/KaigenPhantomTests.exe` (the actual binary path under `build/` — adjust if your build layout differs; CTest target `KaigenPhantomTests` is also usable via `ctest --test-dir build -C RelWithDebInfo --output-on-failure`)
 
 Expected: all three new test cases pass; the existing 25+ test cases still pass.
 
