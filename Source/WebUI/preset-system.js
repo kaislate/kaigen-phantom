@@ -190,7 +190,7 @@ function flatPresetList() {
     const flat = [];
     if (!state.presetsCache) return flat;
     for (const [packName, list] of Object.entries(state.presetsCache)) {
-        for (const p of list) flat.push({ name: p.metadata.name, pack: packName, meta: p.metadata });
+        for (const p of list) flat.push({ name: p.metadata.name, pack: packName, meta: p.metadata, preview: p.preview });
     }
     return flat;
 }
@@ -672,6 +672,8 @@ function updatePreview(name, pack) {
     const entry = flatPresetList().find(p => p.name === name && p.pack === pack);
     if (!entry) { preview.textContent = 'Select a preset'; return; }
     preview.innerHTML = `
+        <svg class="preview-spectrum" viewBox="0 0 280 56" preserveAspectRatio="none"
+             style="width:100%;height:56px;display:block;margin-bottom:10px;"></svg>
         <div style="font-size: 12px; font-weight: 600; color: rgba(0,0,0,0.85); margin-bottom: 8px;">${escapeHtml(entry.meta.name)}</div>
         <div><span style="color: rgba(0,0,0,0.50);">Type:</span> ${escapeHtml(entry.meta.type || '—')}</div>
         <div><span style="color: rgba(0,0,0,0.50);">Designer:</span> ${escapeHtml(entry.meta.designer || '—')}</div>
@@ -679,6 +681,12 @@ function updatePreview(name, pack) {
         ${entry.meta.description ? `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.10); color: rgba(0,0,0,0.65); white-space: pre-wrap;">${escapeHtml(entry.meta.description)}</div>` : ''}
         ${entry.pack === 'User' ? `<div style="margin-top: 10px;"><button class="preview-delete" style="background: linear-gradient(135deg, #BBBDBF 0%, #AEAFB1 100%); color: rgba(0,0,0,0.70); border: 1px solid rgba(0,0,0,0.12); padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 10px; font-family: 'Space Grotesk', system-ui;">Delete</button></div>` : ''}
     `;
+
+    const svg = preview.querySelector('.preview-spectrum');
+    if (svg && entry.preview && window.PresetSpectrum) {
+        window.PresetSpectrum.render(svg, entry.preview);
+    }
+
     const btn = preview.querySelector('.preview-delete');
     if (btn) {
         btn.addEventListener('click', async () => {
