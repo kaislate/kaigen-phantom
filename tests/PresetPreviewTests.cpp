@@ -27,14 +27,16 @@ static juce::ValueTree makeState(const std::map<juce::String, float>& params)
 
 TEST_CASE("readPreviewFromState extracts all seven harmonic weights")
 {
+    // Recipe params are stored in APVTS as 0..100 percentages;
+    // readPreviewFromState normalizes them to 0..1.
     auto state = makeState({
-        { ParamID::RECIPE_H2, 0.10f },
-        { ParamID::RECIPE_H3, 0.20f },
-        { ParamID::RECIPE_H4, 0.30f },
-        { ParamID::RECIPE_H5, 0.40f },
-        { ParamID::RECIPE_H6, 0.50f },
-        { ParamID::RECIPE_H7, 0.60f },
-        { ParamID::RECIPE_H8, 0.70f },
+        { ParamID::RECIPE_H2, 10.0f },
+        { ParamID::RECIPE_H3, 20.0f },
+        { ParamID::RECIPE_H4, 30.0f },
+        { ParamID::RECIPE_H5, 40.0f },
+        { ParamID::RECIPE_H6, 50.0f },
+        { ParamID::RECIPE_H7, 60.0f },
+        { ParamID::RECIPE_H8, 70.0f },
         { ParamID::PHANTOM_THRESHOLD, 120.0f },
     });
 
@@ -63,7 +65,7 @@ TEST_CASE("readPreviewFromState returns defaults when params are missing")
 TEST_CASE("readPreviewFromState handles partial params (legacy preset)")
 {
     auto state = makeState({
-        { ParamID::RECIPE_H3, 0.75f },
+        { ParamID::RECIPE_H3, 75.0f },   // 75% → 0.75 normalized
         { ParamID::PHANTOM_THRESHOLD, 45.0f },
     });
 
@@ -71,7 +73,7 @@ TEST_CASE("readPreviewFromState handles partial params (legacy preset)")
 
     // Only H3 was set; all other harmonics should remain at their 0.0 default.
     REQUIRE(preview.h[0] == Catch::Approx(0.0f));   // H2
-    REQUIRE(preview.h[1] == Catch::Approx(0.75f));  // H3
+    REQUIRE(preview.h[1] == Catch::Approx(0.75f));  // H3 (75% normalized)
     REQUIRE(preview.h[2] == Catch::Approx(0.0f));   // H4
     REQUIRE(preview.h[3] == Catch::Approx(0.0f));   // H5
     REQUIRE(preview.h[4] == Catch::Approx(0.0f));   // H6

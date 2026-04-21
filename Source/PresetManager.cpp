@@ -136,7 +136,9 @@ PreviewData PresetManager::readPreviewFromState(const juce::ValueTree& state)
         {
             if (id == paramIds[h])
             {
-                data.h[h] = value;
+                // APVTS stores recipe_h* as 0..100 (percent); normalize to 0..1
+                // so consumers treat PreviewData.h[] uniformly on a 0..1 scale.
+                data.h[h] = value * 0.01f;
                 break;
             }
         }
