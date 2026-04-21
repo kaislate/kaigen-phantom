@@ -114,6 +114,10 @@ public:
     juce::File getUserPresetsDirectory() const;
     juce::File getFactoryPresetsDirectory() const;
 
+    // Extract the preview parameter values from a preset's APVTS state tree.
+    // Missing recipe params default to 0; missing crossover defaults to 120 Hz.
+    static PreviewData readPreviewFromState(const juce::ValueTree& state);
+
 private:
     void ensureDirectoryStructure();
     void scanPresetsFromDisk();
@@ -131,10 +135,6 @@ private:
 
     // Extract metadata from a preset file, if present.
     static PresetMetadata readMetadataFromFile(const juce::File& file);
-
-    // Extract the preview parameter values from a preset's APVTS state tree.
-    // Missing recipe params default to 0; missing crossover defaults to 80 Hz.
-    static PreviewData readPreviewFromState(const juce::ValueTree& state);
 
     std::map<juce::String, std::vector<PresetInfo>> allPresets;
     std::map<juce::String, PackInfo> packs;  // keyed by folder name

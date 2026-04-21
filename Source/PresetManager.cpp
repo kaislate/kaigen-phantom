@@ -1,4 +1,5 @@
 #include "PresetManager.h"
+#include "Parameters.h"
 #include <juce_core/juce_core.h>
 
 namespace kaigen::phantom
@@ -103,6 +104,45 @@ PresetMetadata PresetManager::readMetadataFromFile(const juce::File& file)
     }
 
     return result;
+}
+
+PreviewData PresetManager::readPreviewFromState(const juce::ValueTree& state)
+{
+    PreviewData data;
+
+    const juce::String paramIds[7] = {
+        ParamID::RECIPE_H2, ParamID::RECIPE_H3, ParamID::RECIPE_H4,
+        ParamID::RECIPE_H5, ParamID::RECIPE_H6, ParamID::RECIPE_H7,
+        ParamID::RECIPE_H8,
+    };
+
+    // APVTS serializes each parameter as a <PARAM id="..." value="..."/> child.
+    // Walk the tree and pick out the ones we care about.
+    for (int i = 0; i < state.getNumChildren(); ++i)
+    {
+        auto child = state.getChild(i);
+        if (! child.hasProperty("id")) continue;
+
+        const auto id = child.getProperty("id").toString();
+        const auto value = (float) (double) child.getProperty("value", 0.0);
+
+        if (id == ParamID::PHANTOM_THRESHOLD)
+        {
+            data.crossover = value;
+            continue;
+        }
+
+        for (int h = 0; h < 7; ++h)
+        {
+            if (id == paramIds[h])
+            {
+                data.h[h] = value;
+                break;
+            }
+        }
+    }
+
+    return data;
 }
 
 // ── Scanning ───────────────────────────────────────────────────────────
