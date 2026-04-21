@@ -110,7 +110,7 @@ PreviewData PresetManager::readPreviewFromState(const juce::ValueTree& state)
 {
     PreviewData data;
 
-    const juce::String paramIds[7] = {
+    static const juce::String paramIds[7] = {
         ParamID::RECIPE_H2, ParamID::RECIPE_H3, ParamID::RECIPE_H4,
         ParamID::RECIPE_H5, ParamID::RECIPE_H6, ParamID::RECIPE_H7,
         ParamID::RECIPE_H8,

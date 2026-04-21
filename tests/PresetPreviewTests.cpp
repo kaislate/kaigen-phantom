@@ -9,7 +9,7 @@ using kaigen::phantom::PreviewData;
 // Helpers ────────────────────────────────────────────────────────────────
 
 // Build a minimal APVTS-style state tree with an inner <PARAM id="..." value="..."/>
-// per parameter. replaceState reads from exactly this shape.
+// per parameter. readPreviewFromState walks this shape directly.
 static juce::ValueTree makeState(const std::map<juce::String, float>& params)
 {
     juce::ValueTree state("STATE");
@@ -69,8 +69,13 @@ TEST_CASE("readPreviewFromState handles partial params (legacy preset)")
 
     auto preview = PresetManager::readPreviewFromState(state);
 
-    REQUIRE(preview.h[0] == Catch::Approx(0.0f));   // H2 missing
-    REQUIRE(preview.h[1] == Catch::Approx(0.75f));  // H3 present
-    REQUIRE(preview.h[6] == Catch::Approx(0.0f));   // H8 missing
+    // Only H3 was set; all other harmonics should remain at their 0.0 default.
+    REQUIRE(preview.h[0] == Catch::Approx(0.0f));   // H2
+    REQUIRE(preview.h[1] == Catch::Approx(0.75f));  // H3
+    REQUIRE(preview.h[2] == Catch::Approx(0.0f));   // H4
+    REQUIRE(preview.h[3] == Catch::Approx(0.0f));   // H5
+    REQUIRE(preview.h[4] == Catch::Approx(0.0f));   // H6
+    REQUIRE(preview.h[5] == Catch::Approx(0.0f));   // H7
+    REQUIRE(preview.h[6] == Catch::Approx(0.0f));   // H8
     REQUIRE(preview.crossover == Catch::Approx(45.0f));
 }
