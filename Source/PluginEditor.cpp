@@ -627,6 +627,37 @@ std::optional<juce::WebBrowserComponent::Resource> PhantomEditor::getResource(co
             if (data != nullptr && size > 0)
             {
                 auto extension = urlToRetrieve.fromLastOccurrenceOf(".", false, false);
+
+                // Diagnostic-build hook: when serving index.html, inject a tiny
+                // <script> tag that sets window.PHANTOM_DIAG from env vars so
+                // pollData and the canvas animation loops can be toggled off
+                // for freeze-cause isolation. Zero cost when env vars are unset.
+                if (resourceName == "indexhtml")
+                {
+                    const bool nopoll   = juce::SystemStats::getEnvironmentVariable("KAIGEN_PHANTOM_DIAG_NOPOLL",   {}).isNotEmpty();
+                    const bool nocanvas = juce::SystemStats::getEnvironmentVariable("KAIGEN_PHANTOM_DIAG_NOCANVAS", {}).isNotEmpty();
+
+                    juce::String html(reinterpret_cast<const char*>(data), (size_t) size);
+                    const juce::String inject =
+                        juce::String("<script>window.PHANTOM_DIAG={nopoll:")
+                        + (nopoll   ? "true" : "false")
+                        + ",nocanvas:"
+                        + (nocanvas ? "true" : "false")
+                        + "};</script>";
+
+                    if (html.contains("<head>"))
+                        html = html.replace("<head>", "<head>" + inject);
+                    else
+                        html = inject + html;
+
+                    const auto utf8Size = (size_t) html.getNumBytesAsUTF8();
+                    std::vector<std::byte> bytes(utf8Size);
+                    std::memcpy(bytes.data(), html.toRawUTF8(), utf8Size);
+                    return juce::WebBrowserComponent::Resource{
+                        std::move(bytes), juce::String("text/html")
+                    };
+                }
+
                 std::vector<std::byte> bytes(
                     reinterpret_cast<const std::byte*>(data),
                     reinterpret_cast<const std::byte*>(data) + size);

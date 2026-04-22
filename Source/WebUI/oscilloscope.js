@@ -253,6 +253,7 @@ const getOscData = window.Juce.getNativeFunction('getOscilloscopeData');
 let frameCount = 0;
 
 function tick() {
+    if (window.PHANTOM_DIAG && window.PHANTOM_DIAG.nocanvas) return;
     requestAnimationFrame(tick);
     frameCount++;
 

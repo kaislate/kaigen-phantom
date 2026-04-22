@@ -147,6 +147,7 @@ for (let s = 0; s < 7; s++)
 
 // ─── Draw ─────────────────────────────────────────────────────────────────
 function draw() {
+    if (window.PHANTOM_DIAG && window.PHANTOM_DIAG.nocanvas) return;
     requestAnimationFrame(draw);
 
     const { w, h, cx, cy, R, innerR, outerR } = getDimensions();

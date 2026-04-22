@@ -314,6 +314,11 @@ const getPitch = getNativeFunction("getPitchInfo");
 // unresolved-promise queue grows without bound, V8 GC thrashes, and the
 // host message pump eventually stalls.
 async function pollData() {
+  // Diagnostic toggle: when KAIGEN_PHANTOM_DIAG_NOPOLL=1, skip the bridge
+  // round-trips entirely so we can isolate polling as a freeze cause.
+  if (window.PHANTOM_DIAG && window.PHANTOM_DIAG.nopoll) {
+    return;
+  }
   try {
     const [bins, peaks, p] = await Promise.all([
       getSpectrum(),

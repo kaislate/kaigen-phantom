@@ -296,6 +296,7 @@ document.addEventListener('peak-data', (e) => {
 
 // ─── Animation loop ──────────────────────────────────────────────────────────
 function tick() {
+    if (window.PHANTOM_DIAG && window.PHANTOM_DIAG.nocanvas) return;
     requestAnimationFrame(tick);
 
     const tgtIn  = Math.max(inL, inR);

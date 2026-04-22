@@ -161,6 +161,7 @@
 
   function tick(nowMs) {
     if (!running) return;
+    if (window.PHANTOM_DIAG && window.PHANTOM_DIAG.nocanvas) return;
     const dt = lastFrameMs ? (nowMs - lastFrameMs) : 16;
     lastFrameMs = nowMs;
 
