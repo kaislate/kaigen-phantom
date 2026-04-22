@@ -131,17 +131,21 @@ void PhantomEditor::parentHierarchyChanged()
 juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEditor& self)
 {
    #if JUCE_WINDOWS
-    // DevTools on port 9222 was always-on during development, but binding a fixed
-    // TCP port from every plugin instance means subsequent instances stall during
-    // WebView2 init waiting for the bind to fail/retry — and that retry happens on
-    // the message thread, freezing the host. Gate it behind an opt-in env var so
-    // production users never pay that cost. Set KAIGEN_PHANTOM_DEVTOOLS=1 before
-    // launching the host to re-enable remote debugging.
+    // Force WebView2 to render at devicePixelRatio = 1 regardless of monitor
+    // DPR. On HiDPI displays this quarters the GPU texture memory per surface
+    // (a 2× DPR → 1× drop cuts texture area by 4), dramatically reducing DWM
+    // compositor work when multiple plugin UIs are visible at once. Visual
+    // tradeoff: canvas content renders slightly softer on HiDPI, but the
+    // perf ceiling with 2+ visible instances rises substantially.
+    std::wstring webViewArgs = L"--force-device-scale-factor=1";
+
+    // Debug port is opt-in (see prior note on TCP-bind stalls). Set
+    // KAIGEN_PHANTOM_DEVTOOLS=1 before launching the host to re-enable
+    // DevTools on port 9222.
     if (juce::SystemStats::getEnvironmentVariable("KAIGEN_PHANTOM_DEVTOOLS", {}).isNotEmpty())
-    {
-        SetEnvironmentVariableW(L"WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-                                 L"--remote-debugging-port=9222 --remote-allow-origins=*");
-    }
+        webViewArgs += L" --remote-debugging-port=9222 --remote-allow-origins=*";
+
+    SetEnvironmentVariableW(L"WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", webViewArgs.c_str());
    #endif
 
     // Shared WebView2 User Data Folder across all Phantom instances in the same
