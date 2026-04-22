@@ -295,8 +295,15 @@ document.addEventListener('peak-data', (e) => {
 });
 
 // ─── Animation loop ──────────────────────────────────────────────────────────
+// Throttled to ~30 fps — a spectrum analyzer at 30 fps is visually
+// indistinguishable from 60 fps for monitoring purposes, and halving
+// canvas work significantly eases the DWM compositor when multiple
+// plugin UIs are on screen at once.
+let _specFrame = 0;
 function tick() {
     requestAnimationFrame(tick);
+    if (document.hidden) return;
+    if ((_specFrame++ & 1) === 1) return;
 
     const tgtIn  = Math.max(inL, inR);
     const tgtOut = Math.max(outL, outR);

@@ -254,6 +254,7 @@ let frameCount = 0;
 
 function tick() {
     requestAnimationFrame(tick);
+    if (document.hidden) return;
     frameCount++;
 
     // Poll native function at ~20 fps (every 3rd frame)

@@ -146,8 +146,14 @@ for (let s = 0; s < 7; s++)
         particles.push({ spoke: s, progress: Math.random() });
 
 // ─── Draw ─────────────────────────────────────────────────────────────────
+// Throttled to ~30 fps: the holographic ring rotation and particle motion
+// look identical at 30 and 60 fps, and halving canvas work matters when
+// multiple plugin UIs are visible in the host.
+let _drawFrame = 0;
 function draw() {
     requestAnimationFrame(draw);
+    if (document.hidden) return;
+    if ((_drawFrame++ & 1) === 1) return;
 
     const { w, h, cx, cy, R, innerR, outerR } = getDimensions();
 
