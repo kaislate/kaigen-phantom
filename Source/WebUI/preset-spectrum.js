@@ -18,7 +18,7 @@
 (function(){
 
 const DISPLAY_FREQ_LOW  = 30;
-const DISPLAY_FREQ_HIGH = 1000;
+const DISPLAY_FREQ_HIGH = 10000;
 const SIGMA             = 0.04; // Gaussian peak width in log10(Hz)
 const SAMPLES           = 48;
 const SUB_BASS_CUTOFF   = 6.0;  // Hz — below this, show SUB BASS instead of curve
@@ -52,9 +52,9 @@ function evaluate(freq, preview, fundamental) {
 function pickAxisLabels() {
     // Fixed display range means fixed label choices.
     return [
-        { hz: 30,   label: '30' },
-        { hz: 300,  label: '300' },
-        { hz: 1000, label: '1k' },
+        { hz: 30,    label: '30' },
+        { hz: 300,   label: '300' },
+        { hz: 3000,  label: '3k' },
     ];
 }
 
