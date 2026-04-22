@@ -43,10 +43,6 @@ private:
 
     PhantomProcessor& processor;
 
-    // Per-instance WebView2 User Data Folder, populated in buildWebViewOptions.
-    // Cleaned up on editor destruction to avoid accumulating stale folders in temp.
-    juce::File webViewUserDataFolder;
-
     // ── Slider relays (one per APVTS slider parameter) ────────────────
     juce::WebSliderRelay inputGainRelay          { "input_gain" };
     juce::WebSliderRelay ghostRelay              { "ghost" };

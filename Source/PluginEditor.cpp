@@ -144,15 +144,16 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
     }
    #endif
 
-    // Every editor instance gets its own WebView2 User Data Folder. Sharing one
-    // across multiple CoreWebView2Environments triggers lock contention inside
-    // WebView2's browser process and can cascade into a host freeze — especially
-    // when another WebView2-using plugin (e.g. Arturia Analog Lab) is present in
-    // the same Ableton session.
-    auto udf = juce::File::getSpecialLocation(juce::File::tempDirectory)
+    // Shared WebView2 User Data Folder across all Phantom instances in the same
+    // process. WebView2 reuses a single browser process for WebViews that share
+    // a UDF, which is cheaper at open-time than spawning a fresh Chromium per
+    // instance. The UDF lives under our app's roaming-data dir rather than the
+    // OS temp dir so it doesn't collide with other apps' temp files.
+    auto udf = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                   .getChildFile("Kaigen")
                    .getChildFile("KaigenPhantom")
-                   .getChildFile("WebView2_" + juce::Uuid().toString());
-    self.webViewUserDataFolder = udf;
+                   .getChildFile("WebView2UserData");
+    udf.createDirectory();
 
     auto options = juce::WebBrowserComponent::Options{}
         .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
@@ -573,14 +574,7 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         *processor.apvts.getParameter(ParamID::MIDI_GATE_RELEASE), midiGateReleaseRelay, nullptr);
 }
 
-PhantomEditor::~PhantomEditor()
-{
-    // Best-effort cleanup of this instance's WebView2 User Data Folder.
-    // WebView2 may still hold file handles briefly after teardown; deletion
-    // is allowed to fail silently.
-    if (webViewUserDataFolder != juce::File{} && webViewUserDataFolder.isDirectory())
-        webViewUserDataFolder.deleteRecursively();
-}
+PhantomEditor::~PhantomEditor() = default;
 
 void PhantomEditor::paint(juce::Graphics& g)
 {
