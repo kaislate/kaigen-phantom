@@ -788,7 +788,7 @@ function updatePreview(name, pack) {
 
     const svg = preview.querySelector('.preview-spectrum');
     if (svg && entry.preview && window.PresetSpectrum) {
-        window.PresetSpectrum.render(svg, entry.preview);
+        window.PresetSpectrum.render(svg, entry.preview, { variant: 'preview' });
     }
 
     const btn = preview.querySelector('.preview-delete');
