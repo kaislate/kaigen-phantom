@@ -249,7 +249,13 @@ document.addEventListener('osc-data', (e) => {
 });
 
 // ── Polling + animation loop ─────────────────────────────────────────────────
+// Backpressured: the previous version fired getOscData() without awaiting,
+// so every frame another ~24 KB payload was requested regardless of whether
+// the prior one had arrived. Under two-instance contention or during audio
+// playback (when payloads are nonzero and the bridge is busier), pending
+// promises accumulated and caused the renderer heap to grow ~500 KB/sec.
 const getOscData = window.Juce.getNativeFunction('getOscilloscopeData');
+let oscRequestInFlight = false;
 let frameCount = 0;
 
 function tick() {
@@ -257,11 +263,20 @@ function tick() {
     if (document.hidden) return;
     frameCount++;
 
-    // Poll native function at ~20 fps (every 3rd frame)
-    if (getOscData && frameCount % 3 === 0) {
-        getOscData().then((d) => {
-            document.dispatchEvent(new CustomEvent('osc-data', { detail: d }));
-        });
+    // Poll native function at ~20 fps (every 3rd frame). Skip if a previous
+    // request hasn't returned yet — bounds the outstanding-promise queue.
+    if (getOscData && frameCount % 3 === 0 && !oscRequestInFlight) {
+        oscRequestInFlight = true;
+        getOscData()
+            .then((d) => {
+                document.dispatchEvent(new CustomEvent('osc-data', { detail: d }));
+            })
+            .catch((err) => {
+                console.error('getOscilloscopeData failed:', err);
+            })
+            .finally(() => {
+                oscRequestInFlight = false;
+            });
     }
 
     draw();
