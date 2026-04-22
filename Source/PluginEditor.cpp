@@ -131,15 +131,34 @@ void PhantomEditor::parentHierarchyChanged()
 juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEditor& self)
 {
    #if JUCE_WINDOWS
-    SetEnvironmentVariableW(L"WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-                             L"--remote-debugging-port=9222 --remote-allow-origins=*");
+    // DevTools on port 9222 was always-on during development, but binding a fixed
+    // TCP port from every plugin instance means subsequent instances stall during
+    // WebView2 init waiting for the bind to fail/retry — and that retry happens on
+    // the message thread, freezing the host. Gate it behind an opt-in env var so
+    // production users never pay that cost. Set KAIGEN_PHANTOM_DEVTOOLS=1 before
+    // launching the host to re-enable remote debugging.
+    if (juce::SystemStats::getEnvironmentVariable("KAIGEN_PHANTOM_DEVTOOLS", {}).isNotEmpty())
+    {
+        SetEnvironmentVariableW(L"WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+                                 L"--remote-debugging-port=9222 --remote-allow-origins=*");
+    }
    #endif
+
+    // Every editor instance gets its own WebView2 User Data Folder. Sharing one
+    // across multiple CoreWebView2Environments triggers lock contention inside
+    // WebView2's browser process and can cascade into a host freeze — especially
+    // when another WebView2-using plugin (e.g. Arturia Analog Lab) is present in
+    // the same Ableton session.
+    auto udf = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                   .getChildFile("KaigenPhantom")
+                   .getChildFile("WebView2_" + juce::Uuid().toString());
+    self.webViewUserDataFolder = udf;
 
     auto options = juce::WebBrowserComponent::Options{}
         .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
         .withWinWebView2Options(
             juce::WebBrowserComponent::Options::WinWebView2{}
-                .withUserDataFolder(juce::File::getSpecialLocation(juce::File::tempDirectory)))
+                .withUserDataFolder(udf))
         .withNativeIntegrationEnabled();
 
     // ── Slider relays ─────────────────────────────────────────────────
@@ -554,7 +573,14 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         *processor.apvts.getParameter(ParamID::MIDI_GATE_RELEASE), midiGateReleaseRelay, nullptr);
 }
 
-PhantomEditor::~PhantomEditor() = default;
+PhantomEditor::~PhantomEditor()
+{
+    // Best-effort cleanup of this instance's WebView2 User Data Folder.
+    // WebView2 may still hold file handles briefly after teardown; deletion
+    // is allowed to fail silently.
+    if (webViewUserDataFolder != juce::File{} && webViewUserDataFolder.isDirectory())
+        webViewUserDataFolder.deleteRecursively();
+}
 
 void PhantomEditor::paint(juce::Graphics& g)
 {
