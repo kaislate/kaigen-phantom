@@ -119,6 +119,45 @@ const state = {
     packsCache:      null,  // [ { name, displayName, description, designer, hasCoverArt, presetCount } ]
 };
 
+// Sort state for the preset browser list. Persists for the lifetime of the
+// editor window; resets to defaults when the plugin is re-opened.
+const browserSort = { column: 'name', dir: 'asc' };
+
+// Weighted-mean peak frequency in Hz — used by the Shape column sort.
+// Uses the same effective fundamental the renderer uses, so skip and
+// crossover both feed in. Returns 0 for presets with no harmonic content
+// (they sort to the bottom in ascending order).
+function spectralCentroid(preview) {
+    if (!preview || !Array.isArray(preview.h)) return 0;
+    const fund = Math.max(0.01, (preview.crossover || 120) / Math.pow(2, preview.skip || 0));
+    let num = 0, den = 0;
+    for (let i = 0; i < 7; ++i) {
+        const w = preview.h[i] || 0;
+        num += w * (i + 2) * fund;
+        den += w;
+    }
+    return den > 0 ? num / den : 0;
+}
+
+function compareRows(a, b) {
+    const dir = browserSort.dir === 'asc' ? 1 : -1;
+    const col = browserSort.column;
+    const byName = a.meta.name.localeCompare(b.meta.name); // ascending tiebreaker
+
+    if (col === 'name')     return dir * byName;
+    if (col === 'type')     return (dir * (a.meta.type || '').localeCompare(b.meta.type || '')) || byName;
+    if (col === 'designer') return (dir * (a.meta.designer || '').localeCompare(b.meta.designer || '')) || byName;
+    if (col === 'skip')     return (dir * ((a.preview?.skip ?? 0) - (b.preview?.skip ?? 0))) || byName;
+    if (col === 'shape')    return (dir * (spectralCentroid(a.preview) - spectralCentroid(b.preview))) || byName;
+    if (col === 'heart') {
+        // Ascending = favorites on top. (true should compare as "less than" false in asc order.)
+        const av = a.meta.isFavorite ? 0 : 1;
+        const bv = b.meta.isFavorite ? 0 : 1;
+        return (dir * (av - bv)) || byName;
+    }
+    return byName;
+}
+
 // ── Element refs (filled in initUI) ──────────────────────────────────────
 
 const el = {};
@@ -618,21 +657,46 @@ function renderBrowserList(searchTerm) {
 
     updateBrowserCount(rows.length);
 
+    rows.sort(compareRows);
+
     // Header row (always rendered, even when list is empty — keeps the chrome consistent)
+    const headerCols = [
+        { id: 'name',     label: 'Name' },
+        { id: 'type',     label: 'Type' },
+        { id: 'designer', label: 'Designer' },
+        { id: 'shape',    label: 'Shape' },
+        { id: 'skip',     label: 'Skip' },
+        { id: 'heart',    label: '♥', title: 'Sort by favorites' },
+    ];
+    const arrow = browserSort.dir === 'asc' ? '↑' : '↓';
     const headerHtml = `
         <div class="browser-header">
-            <span data-sort="name" class="sortable active">Name <span class="arrow">↑</span></span>
-            <span data-sort="type" class="sortable">Type</span>
-            <span data-sort="designer" class="sortable">Designer</span>
-            <span data-sort="shape" class="sortable">Shape</span>
-            <span data-sort="skip" class="sortable">Skip</span>
-            <span data-sort="heart" class="sortable" title="Sort by favorites">♥</span>
+            ${headerCols.map(c => {
+                const active = (browserSort.column === c.id);
+                const cls = 'sortable' + (active ? ' active' : '');
+                const titleAttr = c.title ? ` title="${escapeAttr(c.title)}"` : '';
+                const arrowSpan = active ? ` <span class="arrow">${arrow}</span>` : '';
+                return `<span data-sort="${c.id}" class="${cls}"${titleAttr}>${c.label}${arrowSpan}</span>`;
+            }).join('')}
         </div>
     `;
 
     if (rows.length === 0) {
         listDiv.innerHTML = headerHtml +
             '<div style="padding: 16px; color: rgba(0,0,0,0.50); text-align: center; font-size: 11px;">No presets found</div>';
+        listDiv.querySelectorAll('.browser-header .sortable').forEach(span => {
+            span.addEventListener('click', () => {
+                const col = span.getAttribute('data-sort');
+                if (!col) return;
+                if (browserSort.column === col) {
+                    browserSort.dir = browserSort.dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    browserSort.column = col;
+                    browserSort.dir = 'asc';
+                }
+                renderBrowserList(document.getElementById('browser-search').value);
+            });
+        });
         return;
     }
 
@@ -687,6 +751,20 @@ function renderBrowserList(searchTerm) {
             const entry = flatPresetList().find(p => p.name === name && p.pack === pack);
             const newFav = entry ? !entry.meta.isFavorite : true;
             await setFavorite(name, pack, newFav);
+            renderBrowserList(document.getElementById('browser-search').value);
+        });
+    });
+
+    listDiv.querySelectorAll('.browser-header .sortable').forEach(span => {
+        span.addEventListener('click', () => {
+            const col = span.getAttribute('data-sort');
+            if (!col) return;
+            if (browserSort.column === col) {
+                browserSort.dir = browserSort.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                browserSort.column = col;
+                browserSort.dir = 'asc';
+            }
             renderBrowserList(document.getElementById('browser-search').value);
         });
     });
