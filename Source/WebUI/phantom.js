@@ -307,20 +307,23 @@ const getSpectrum = getNativeFunction("getSpectrumData");
 const getPeaks = getNativeFunction("getPeakLevels");
 const getPitch = getNativeFunction("getPitchInfo");
 
-function pollData() {
-  requestAnimationFrame(pollData);
+// Backpressured polling: wait for all three bridge calls to resolve
+// before scheduling the next frame. This bounds the outstanding-promise
+// queue to one batch per WebView regardless of bridge latency. Without
+// this, two visible editor instances exceed the bridge's throughput, the
+// unresolved-promise queue grows without bound, V8 GC thrashes, and the
+// host message pump eventually stalls.
+async function pollData() {
+  try {
+    const [bins, peaks, p] = await Promise.all([
+      getSpectrum(),
+      getPeaks(),
+      getPitch(),
+    ]);
 
-  getSpectrum().then((bins) => {
-    document.dispatchEvent(
-      new CustomEvent("spectrum-data", { detail: bins })
-    );
-  });
+    document.dispatchEvent(new CustomEvent("spectrum-data", { detail: bins }));
+    document.dispatchEvent(new CustomEvent("peak-data", { detail: peaks }));
 
-  getPeaks().then((p) => {
-    document.dispatchEvent(new CustomEvent("peak-data", { detail: p }));
-  });
-
-  getPitch().then((p) => {
     const pitchDisplay = document.getElementById("pitchDisplay");
     const presetDisplay = document.getElementById("presetDisplay");
 
@@ -333,7 +336,10 @@ function pollData() {
     }
 
     document.dispatchEvent(new CustomEvent("pitch-data", { detail: p }));
-  });
+  } catch (err) {
+    console.error("pollData failed:", err);
+  }
+  requestAnimationFrame(pollData);
 }
 
 pollData();

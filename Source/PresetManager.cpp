@@ -132,6 +132,14 @@ PreviewData PresetManager::readPreviewFromState(const juce::ValueTree& state)
             continue;
         }
 
+        if (id == ParamID::SYNTH_SKIP)
+        {
+            // APVTS stores this as a stepped float; round and clamp to the valid 0..8 range
+            // so corrupted or out-of-range presets still render safely.
+            data.skip = juce::jlimit(0, 8, juce::roundToInt(value));
+            continue;
+        }
+
         for (int h = 0; h < 7; ++h)
         {
             if (id == paramIds[h])

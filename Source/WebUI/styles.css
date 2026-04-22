@@ -530,3 +530,51 @@ phantom-knob.mode-inactive{
   background:rgba(255,255,255,0.88);
   box-shadow:0 0 4px rgba(255,255,255,0.6);
 }
+
+/* ── Preset browser header row ──────────────────────────────────────────── */
+
+.browser-header {
+    display: grid;
+    grid-template-columns: 1fr 72px 72px 140px 40px 30px;
+    gap: 8px;
+    padding: 4px 12px;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.55);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.10);
+    user-select: none;
+}
+
+.browser-header .sortable {
+    cursor: pointer;
+    transition: color 0.1s ease;
+}
+
+.browser-header .sortable:hover {
+    color: rgba(0, 0, 0, 0.75);
+}
+
+.browser-header .sortable.active {
+    color: rgba(0, 0, 0, 0.85);
+}
+
+.browser-header .static {
+    cursor: default;
+    color: rgba(0, 0, 0, 0.40);
+}
+
+.browser-header .arrow {
+    opacity: 0.75;
+    margin-left: 2px;
+    font-size: 8px;
+}
+
+/* Thumbnail sits inside a grid cell — let mouse events pass through to the row. */
+.browser-row svg.browser-shape {
+    display: block;
+    width: 100%;
+    height: 26px;
+    pointer-events: none;
+}
