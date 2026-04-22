@@ -307,12 +307,10 @@ const getSpectrum = getNativeFunction("getSpectrumData");
 const getPeaks = getNativeFunction("getPeakLevels");
 const getPitch = getNativeFunction("getPitchInfo");
 
-// Backpressured polling: wait for all three bridge calls to resolve
-// before scheduling the next frame. This bounds the outstanding-promise
-// queue to one batch per WebView regardless of bridge latency. Without
-// this, two visible editor instances exceed the bridge's throughput, the
-// unresolved-promise queue grows without bound, V8 GC thrashes, and the
-// host message pump eventually stalls.
+// Backpressured polling: wait for all three bridge calls to resolve before
+// scheduling the next frame. Additionally throttled to ~30 fps — meters and
+// spectrum smoothing look identical at 30 vs 60, and halving bridge traffic
+// significantly reduces WebView2 IPC allocation pressure during playback.
 async function pollData() {
   try {
     const [bins, peaks, p] = await Promise.all([
@@ -339,7 +337,8 @@ async function pollData() {
   } catch (err) {
     console.error("pollData failed:", err);
   }
-  requestAnimationFrame(pollData);
+  // Throttle to ~30 fps: skip every other rAF tick before the next poll.
+  requestAnimationFrame(() => requestAnimationFrame(pollData));
 }
 
 pollData();
