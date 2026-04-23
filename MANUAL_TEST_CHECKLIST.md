@@ -159,3 +159,19 @@ git commit -m "test: verify end-to-end preset system functionality"
 - [ ] Focus on preset UI/workflow tests for this task
 - [ ] Log issue for later investigation
 
+---
+
+## A/B Compare
+
+Build with Debug config, copy VST3 to `C:\Users\kaislate\Downloads\KAIGEN\`, fully restart Ableton Live 12, load the plugin on a fresh track.
+
+- [ ] **Snap with include-discrete OFF (default).** Set slot A Ghost Mode = Replace. Snap to B. Set slot B Ghost Mode = Phantom Only. Snap A↔B a few times — Ghost Mode stays fixed (no audible click at crossover). Only continuous params flip.
+- [ ] **Standard build ignores `<MorphConfig>`.** Hand-craft a `.fxp` file containing `<SlotB>` *and* `<MorphConfig defaultPosition="0.5" curve="linear" />`, drop it into `%APPDATA%/Kaigen/KaigenPhantom/Presets/User/`. Load it — the plugin should treat it as a plain A/B preset (both slots restored; morph metadata silently ignored since `KAIGEN_PRO_BUILD` is not defined in this build).
+- [ ] **Snap with include-discrete ON.** Open settings, enable "Include discrete parameters when snapping A/B". Repeat the previous test — now Ghost Mode flips on snap and a click is audible if the two engines are in materially different states.
+- [ ] **Designer-authored preset override.** Turn include-discrete OFF. Load a factory A/B preset that has different Ghost Modes between slots (may need to create one for testing). Snap A↔B — discrete params flip regardless of the setting (designer intent).
+- [ ] **Designer-authored clears on edit.** From the previous state, tweak any knob. Snap A↔B — discrete params no longer flip (designerAuthored cleared).
+- [ ] **Per-slot modified indicator.** Snap to B, tweak a param, snap back to A. The "B" pill should show a small red dot under the letter. Top-level preset asterisk reflects only the active slot.
+- [ ] **DAW project save/reload.** Configure distinct slot A and B content, set active = B, enable include-discrete, save the Ableton project. Close and reopen. Plugin state: slots restore with correct content, active = B, include-discrete still ON.
+- [ ] **Browser A/B column.** Open preset browser. Existing presets render "—". Save a preset as A/B → row shows "A|B" badge. Sort by column works (Single → A/B → Morph). Filter dropdown narrows list correctly.
+- [ ] **Save modal Preset Kind.** With slots identical: A/B radio dimmed + helper text. With slots different: A/B radio enabled. Save as A/B — reload the preset — both slots match what was saved.
+
