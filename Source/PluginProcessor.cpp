@@ -299,6 +299,10 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     }
     engine.process(buffer, sidechainPtr);
 
+  #ifdef KAIGEN_PRO_BUILD
+    morph.postProcessBlock(buffer, sidechainPtr);
+  #endif
+
     // Pitch display: use the synth's zero-crossing tracker directly — it reflects exactly
     // what is being synthesised and covers the full frequency range (not FFT's 30-500 Hz).
     // Returns 0 when input is quiet (so UI shows "---").

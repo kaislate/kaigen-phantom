@@ -427,4 +427,24 @@ TEST_CASE("setSceneCrossfadeEnabled(true) lazily constructs secondary engine")
     CHECK(true);
 }
 
+TEST_CASE("postProcessBlock with scene disabled is a no-op")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    PhantomEngine engine;
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    morph.prepareToPlay(44100.0, 512);
+
+    juce::AudioBuffer<float> buf(2, 512);
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < 512; ++i)
+            buf.setSample(ch, i, 0.5f);
+
+    morph.setSceneCrossfadeEnabled(false);
+    morph.postProcessBlock(buf, nullptr);
+
+    CHECK(buf.getSample(0, 0) == Catch::Approx(0.5f));
+    CHECK(buf.getSample(0, 511) == Catch::Approx(0.5f));
+}
+
 #endif // KAIGEN_PRO_BUILD

@@ -64,7 +64,38 @@ void MorphEngine::preProcessBlock()
     }
 }
 
-void MorphEngine::postProcessBlock(juce::AudioBuffer<float>&, const juce::AudioBuffer<float>*) {}
+void MorphEngine::postProcessBlock(juce::AudioBuffer<float>& mainBuffer,
+                                   const juce::AudioBuffer<float>* sidechain)
+{
+    if (!sceneEnabled || secondaryEngine == nullptr) return;
+
+    const int n = mainBuffer.getNumSamples();
+    const int nCh = juce::jmin(2, mainBuffer.getNumChannels());
+
+    // Prepare a scratch buffer for the secondary engine.
+    // Approximation for v1: copy the current main buffer (which is the primary's
+    // output) as the secondary's input. True shared-input requires threading the
+    // original pre-engine input into MorphEngine — deferred to v2.
+    // NOTE (v2): thread the original input through MorphEngine if this proves audibly wrong.
+
+    juce::AudioBuffer<float> secondaryBuf(nCh, n);
+    for (int ch = 0; ch < nCh; ++ch)
+        secondaryBuf.copyFrom(ch, 0, mainBuffer, ch, 0, n);
+
+    secondaryEngine->process(secondaryBuf, sidechain);
+
+    const float pos = juce::jlimit(0.0f, 1.0f, smoothedScenePos);
+    const float primaryGain = 1.0f - pos;
+    const float secondaryGain = pos;
+
+    for (int ch = 0; ch < nCh; ++ch)
+    {
+        auto* main = mainBuffer.getWritePointer(ch);
+        const auto* sec = secondaryBuf.getReadPointer(ch);
+        for (int i = 0; i < n; ++i)
+            main[i] = main[i] * primaryGain + sec[i] * secondaryGain;
+    }
+}
 
 void MorphEngine::parameterChanged(const juce::String& paramID, float newValue)
 {
