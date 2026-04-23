@@ -10,12 +10,26 @@ ABSlotManager::ABSlotManager(juce::AudioProcessorValueTreeState& apvtsRef)
 {
     slots[0] = apvts.copyState();
     slots[1] = apvts.copyState();
-    // Registration of APVTS listeners happens in a later task.
+
+    // Subscribe to every parameter so we can flip the active slot's
+    // modified flag on any user-initiated change.
+    for (const auto& id : getAllParameterIDs())
+        apvts.addParameterListener(id, this);
 }
 
-ABSlotManager::~ABSlotManager() = default;
+ABSlotManager::~ABSlotManager()
+{
+    for (const auto& id : getAllParameterIDs())
+        apvts.removeParameterListener(id, this);
+}
 
-void ABSlotManager::parameterChanged(const juce::String&, float) {}
+void ABSlotManager::parameterChanged(const juce::String& /*parameterID*/, float /*newValue*/)
+{
+    if (suppressModifiedUpdates) return;
+    modified[(int) active] = true;
+    // Any user edit leaves designer-authored territory.
+    designerAuthored = false;
+}
 
 void ABSlotManager::snapTo(Slot target)
 {

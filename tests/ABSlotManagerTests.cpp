@@ -161,3 +161,31 @@ TEST_CASE("copy A to B overwrites slot B with slot A contents")
     // Active did not change.
     CHECK(abSlots.getActive() == kaigen::phantom::ABSlotManager::Slot::A);
 }
+
+TEST_CASE("modified flag set on APVTS change for active slot only")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+
+    REQUIRE(abSlots.isModified(kaigen::phantom::ABSlotManager::Slot::A) == false);
+    REQUIRE(abSlots.isModified(kaigen::phantom::ABSlotManager::Slot::B) == false);
+
+    // Change a param while on slot A → modified[A] should flip to true.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.4f);
+
+    CHECK(abSlots.isModified(kaigen::phantom::ABSlotManager::Slot::A) == true);
+    CHECK(abSlots.isModified(kaigen::phantom::ABSlotManager::Slot::B) == false);
+}
+
+TEST_CASE("modified flag NOT set during internal snap/copy/load")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+
+    // First make slots differ so snapTo actually does something.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.4f);
+    abSlots.snapTo(kaigen::phantom::ABSlotManager::Slot::B);
+    // snapTo fires replaceState which, in the absence of suppression, would
+    // flip modified flags. Verify it did not.
+    CHECK(abSlots.isModified(kaigen::phantom::ABSlotManager::Slot::B) == false);
+}
