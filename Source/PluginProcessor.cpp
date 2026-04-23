@@ -390,16 +390,19 @@ juce::AudioProcessorEditor* PhantomProcessor::createEditor()
 
 void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    // Ensure any in-flight edits on the active slot are captured before serializing.
     abSlots.syncActiveSlotFromLive();
 
     auto state = apvts.copyState();
 
-    // Drop any prior <ABSlots> child (shouldn't exist on state from copyState,
-    // but guard against re-entrant save paths writing twice).
     if (auto existing = state.getChildWithName("ABSlots"); existing.isValid())
         state.removeChild(existing, nullptr);
     state.appendChild(abSlots.toStateTree(), nullptr);
+
+  #ifdef KAIGEN_PRO_BUILD
+    if (auto existing = state.getChildWithName("MorphState"); existing.isValid())
+        state.removeChild(existing, nullptr);
+    state.appendChild(morph.toStateTree(), nullptr);
+  #endif
 
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     copyXmlToBinary(*xml, destData);
@@ -412,15 +415,22 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
 
     auto tree = juce::ValueTree::fromXml(*xml);
 
-    // Peel off the <ABSlots> child (if any) before the parameter replace; APVTS
-    // doesn't know about it and would keep it in the live tree where it would
-    // shadow future apvts.copyState() calls.
     auto abSlotsTree = tree.getChildWithName("ABSlots");
     if (abSlotsTree.isValid())
         tree.removeChild(abSlotsTree, nullptr);
 
+  #ifdef KAIGEN_PRO_BUILD
+    auto morphStateTree = tree.getChildWithName("MorphState");
+    if (morphStateTree.isValid())
+        tree.removeChild(morphStateTree, nullptr);
+  #endif
+
     apvts.replaceState(tree);
     abSlots.fromStateTree(abSlotsTree);
+
+  #ifdef KAIGEN_PRO_BUILD
+    morph.fromStateTree(morphStateTree);
+  #endif
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

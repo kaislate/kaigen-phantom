@@ -377,4 +377,32 @@ TEST_CASE("toMorphConfigTree / fromMorphConfigTree round-trips arc data")
     CHECK(dst.armedKnobCount() == 2);
 }
 
+TEST_CASE("toStateTree / fromStateTree round-trips full live state")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots1 { proc.apvts };
+    PhantomEngine engine1;
+    kaigen::phantom::MorphEngine src { proc.apvts, abSlots1, engine1 };
+    src.prepareToPlay(44100.0, 512);
+
+    src.setEnabled(true);
+    src.setArcDepth(ParamID::GHOST, 0.35f);
+    proc.apvts.getParameter(ParamID::MORPH_AMOUNT)->setValueNotifyingHost(0.60f);
+    for (int i = 0; i < 100; ++i) src.preProcessBlock();  // let smoothing settle
+
+    const auto tree = src.toStateTree();
+    CHECK(tree.getType().toString() == "MorphState");
+
+    TestProcessor proc2;
+    kaigen::phantom::ABSlotManager abSlots2 { proc2.apvts };
+    PhantomEngine engine2;
+    kaigen::phantom::MorphEngine dst { proc2.apvts, abSlots2, engine2 };
+    dst.prepareToPlay(44100.0, 512);
+    dst.fromStateTree(tree);
+
+    CHECK(dst.isEnabled() == true);
+    CHECK(dst.getArcDepth(ParamID::GHOST) == Catch::Approx(0.35f));
+    CHECK(dst.getMorphAmount() == Catch::Approx(0.60f).epsilon(0.02));
+}
+
 #endif // KAIGEN_PRO_BUILD

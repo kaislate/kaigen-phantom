@@ -303,8 +303,75 @@ void MorphEngine::fromMorphConfigTree(const juce::ValueTree& morphConfig)
         setEnabled(true);
 }
 
-juce::ValueTree MorphEngine::toStateTree() const { return juce::ValueTree("MorphState"); }
-void MorphEngine::fromStateTree(const juce::ValueTree&) {}
+juce::ValueTree MorphEngine::toStateTree() const
+{
+    // <MorphState> wraps <MorphConfig> plus live runtime state.
+    juce::ValueTree root { "MorphState" };
+    root.setProperty("enabled",       enabled ? 1 : 0, nullptr);
+    root.setProperty("morphAmount",   smoothedMorph, nullptr);
+    root.setProperty("sceneEnabled",  sceneEnabled ? 1 : 0, nullptr);
+    root.setProperty("scenePosition", smoothedScenePos, nullptr);
+
+    // Arc lane inline (same structure as preset's MorphConfig).
+    juce::ValueTree lane { "ArcLane" };
+    lane.setProperty("id", 1, nullptr);
+    for (const auto& [id, entry] : lane1Arcs)
+    {
+        juce::ValueTree arc { "Arc" };
+        arc.setProperty("paramID", id, nullptr);
+        arc.setProperty("depth", entry.depth, nullptr);
+        arc.setProperty("capturedBase", entry.capturedBase, nullptr);
+        lane.appendChild(arc, nullptr);
+    }
+    root.appendChild(lane, nullptr);
+    return root;
+}
+
+void MorphEngine::fromStateTree(const juce::ValueTree& morphStateNode)
+{
+    if (!morphStateNode.isValid() || morphStateNode.getType().toString() != "MorphState")
+    {
+        // Reset to defaults.
+        enabled = false;
+        rawMorph = smoothedMorph = 0.0f;
+        sceneEnabled = false;
+        rawScenePos = smoothedScenePos = 0.0f;
+        lane1Arcs.clear();
+        return;
+    }
+
+    enabled = ((int) morphStateNode.getProperty("enabled", 0)) != 0;
+    rawMorph = smoothedMorph = juce::jlimit(0.0f, 1.0f,
+        (float) morphStateNode.getProperty("morphAmount", juce::var(0.0f)));
+    sceneEnabled = ((int) morphStateNode.getProperty("sceneEnabled", 0)) != 0;
+    rawScenePos = smoothedScenePos = juce::jlimit(0.0f, 1.0f,
+        (float) morphStateNode.getProperty("scenePosition", juce::var(0.0f)));
+
+    lane1Arcs.clear();
+    const auto lane = morphStateNode.getChildWithName("ArcLane");
+    if (lane.isValid())
+    {
+        for (int i = 0; i < lane.getNumChildren(); ++i)
+        {
+            const auto arc = lane.getChild(i);
+            if (arc.getType().toString() != "Arc") continue;
+
+            const auto id = arc.getProperty("paramID", juce::var("")).toString();
+            const float depth = (float) arc.getProperty("depth", juce::var(0.0f));
+            const float base  = (float) arc.getProperty("capturedBase", juce::var(0.0f));
+
+            if (id.isNotEmpty() && std::abs(depth) >= 1e-6f)
+                lane1Arcs[id] = { depth, base };
+        }
+    }
+
+    // Sync APVTS to reflect the restored state.
+    const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
+    if (auto* p = apvts.getParameter(ParamID::MORPH_ENABLED))  p->setValueNotifyingHost(enabled ? 1.0f : 0.0f);
+    if (auto* p = apvts.getParameter(ParamID::MORPH_AMOUNT))   p->setValueNotifyingHost(rawMorph);
+    if (auto* p = apvts.getParameter(ParamID::SCENE_ENABLED))  p->setValueNotifyingHost(sceneEnabled ? 1.0f : 0.0f);
+    if (auto* p = apvts.getParameter(ParamID::SCENE_POSITION)) p->setValueNotifyingHost(rawScenePos);
+}
 
 std::vector<juce::String> MorphEngine::getContinuousParamIDs(juce::AudioProcessorValueTreeState& apvts)
 {
