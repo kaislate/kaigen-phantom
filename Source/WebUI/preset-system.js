@@ -11,15 +11,19 @@
 // ── Native function bridge ───────────────────────────────────────────────
 
 const native = {
-    getAllPresets:     null,
-    loadPreset:        null,
-    savePreset:        null,
-    setFavorite:       null,
-    deletePreset:      null,
-    getAllPacks:       null,
-    setInputFocused:   null,
-    returnFocusToHost: null,
-    forwardKeyToHost:  null,
+    getAllPresets:        null,
+    loadPreset:          null,
+    savePreset:          null,
+    setFavorite:         null,
+    deletePreset:        null,
+    getAllPacks:          null,
+    setInputFocused:     null,
+    returnFocusToHost:   null,
+    forwardKeyToHost:    null,
+    abGetState:          null,
+    abSnapTo:            null,
+    abCopy:              null,
+    abSetIncludeDiscrete:null,
 };
 
 function initNativeBridge() {
@@ -36,6 +40,10 @@ function initNativeBridge() {
     native.setInputFocused   = window.Juce.getNativeFunction('setInputFocused');
     native.returnFocusToHost = window.Juce.getNativeFunction('returnFocusToHost');
     native.forwardKeyToHost  = window.Juce.getNativeFunction('forwardKeyToHost');
+    native.abGetState            = window.Juce.getNativeFunction('abGetState');
+    native.abSnapTo              = window.Juce.getNativeFunction('abSnapTo');
+    native.abCopy                = window.Juce.getNativeFunction('abCopy');
+    native.abSetIncludeDiscrete  = window.Juce.getNativeFunction('abSetIncludeDiscrete');
     return true;
 }
 
@@ -119,6 +127,15 @@ const state = {
     packsCache:      null,  // [ { name, displayName, description, designer, hasCoverArt, presetCount } ]
 };
 
+state.ab = {
+    active:         'A',
+    modifiedA:      false,
+    modifiedB:      false,
+    slotsIdentical: true,
+    includeDiscrete:false,
+};
+state.browserKindFilter = 'all';
+
 // Sort state for the preset browser list. Persists for the lifetime of the
 // editor window; resets to defaults when the plugin is re-opened.
 const browserSort = { column: 'name', dir: 'asc' };
@@ -149,6 +166,12 @@ function compareRows(a, b) {
     if (col === 'designer') return (dir * (a.meta.designer || '').localeCompare(b.meta.designer || '')) || byName;
     if (col === 'skip')     return (dir * ((a.preview?.skip ?? 0) - (b.preview?.skip ?? 0))) || byName;
     if (col === 'shape')    return (dir * (spectralCentroid(a.preview) - spectralCentroid(b.preview))) || byName;
+    if (col === 'kind') {
+        const order = { 'single': 0, 'ab': 1, 'ab_morph': 2 };
+        const va = order[a.meta.presetKind || 'single'] ?? 0;
+        const vb = order[b.meta.presetKind || 'single'] ?? 0;
+        return (va - vb) * dir;
+    }
     if (col === 'heart') {
         // Ascending = favorites on top. (true should compare as "less than" false in asc order.)
         const av = a.meta.isFavorite ? 0 : 1;
@@ -174,6 +197,11 @@ function cacheElements() {
     el.dropdown         = document.getElementById('preset-dropdown');
     el.browserModal     = document.getElementById('preset-browser-modal');
     el.saveModal        = document.getElementById('preset-save-modal');
+    el.abSlotA   = document.getElementById('ab-slot-a');
+    el.abSlotB   = document.getElementById('ab-slot-b');
+    el.abCopy    = document.getElementById('ab-copy');
+    el.abModDotA = document.getElementById('ab-mod-a');
+    el.abModDotB = document.getElementById('ab-mod-b');
 }
 
 // ── Header UI updates ────────────────────────────────────────────────────
@@ -199,6 +227,45 @@ function setCurrentPreset(name, pack, isFav) {
     state.isFavorite = !!isFav;
     state.isModified = false;
     refreshHeader();
+}
+
+// ── A/B Compare state + render ───────────────────────────────────────────
+
+function renderABState() {
+    if (!el.abSlotA || !el.abSlotB || !el.abCopy) return;
+    const s = state.ab;
+
+    // Active pill highlight
+    el.abSlotA.classList.toggle('active', s.active === 'A');
+    el.abSlotB.classList.toggle('active', s.active === 'B');
+
+    // Copy label dynamic
+    el.abCopy.textContent = s.active === 'A' ? 'A→B' : 'B→A';
+
+    // Disabled state
+    if (s.slotsIdentical) el.abCopy.classList.add('is-disabled');
+    else                  el.abCopy.classList.remove('is-disabled');
+
+    // Inactive-slot modified dot
+    if (el.abModDotA) {
+        el.abModDotA.classList.toggle('show',
+            s.modifiedA && s.active !== 'A');
+    }
+    if (el.abModDotB) {
+        el.abModDotB.classList.toggle('show',
+            s.modifiedB && s.active !== 'B');
+    }
+}
+
+async function refreshABState() {
+    if (!native.abGetState) return;
+    try {
+        const r = await native.abGetState();
+        if (r && typeof r === 'object') {
+            state.ab = Object.assign(state.ab, r);
+            renderABState();
+        }
+    } catch (e) { /* native not ready yet */ }
 }
 
 // ── Presets cache ────────────────────────────────────────────────────────
@@ -255,10 +322,10 @@ async function loadPreset(name, pack) {
     return true;
 }
 
-async function savePreset(name, type, designer, description, overwrite) {
+async function savePreset(name, type, designer, description, overwrite, kind = 'single') {
     if (!native.savePreset) return '';
     try {
-        const savedName = await native.savePreset(name, type, designer, description, !!overwrite);
+        const savedName = await native.savePreset(name, type, designer, description, !!overwrite, kind);
         if (savedName) {
             await refreshCache();
             setCurrentPreset(savedName, 'User', false);
@@ -505,6 +572,12 @@ function renderBrowser() {
             </div>
             <div style="padding: 4px 12px 8px 12px; border-bottom: 1px solid rgba(0,0,0,0.12); display: flex; gap: 6px; align-items: center;">
               <input id="browser-search" type="text" placeholder="${isExplore ? 'Search packs…' : 'Search presets…'}" style="flex: 1; background: rgba(255,255,255,0.6); color: rgba(0,0,0,0.70); border: 1px solid rgba(0,0,0,0.12); padding: 4px 8px; border-radius: 3px; font-size: 11px; font-family: 'Space Grotesk', system-ui;">
+              <select id="browser-kind-filter" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; background: rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.10); border-radius: 3px; color: rgba(0,0,0,0.75);">
+                  <option value="all">All</option>
+                  <option value="single">Single</option>
+                  <option value="ab">A/B</option>
+                  <option value="morph">Morph</option>
+              </select>
               <button id="browser-close" style="background: none; border: none; color: rgba(0,0,0,0.70); cursor: pointer; font-size: 14px; padding: 2px 8px; font-weight: 600;">✕</button>
             </div>
             ${mainPane}
@@ -528,6 +601,15 @@ function renderBrowser() {
         if (isExplore) renderExplore(e.target.value);
         else renderBrowserList(e.target.value);
     });
+
+    const kindFilter = document.getElementById('browser-kind-filter');
+    if (kindFilter) {
+        kindFilter.value = state.browserKindFilter;
+        kindFilter.addEventListener('change', (e) => {
+            state.browserKindFilter = e.target.value;
+            renderBrowserList(document.getElementById('browser-search').value);
+        });
+    }
 
     if (isExplore) renderExplore('');
     else renderBrowserList('');
@@ -645,7 +727,7 @@ function renderBrowserList(searchTerm) {
     const q = (searchTerm || '').toLowerCase().trim();
 
     // Flatten + filter
-    const rows = [];
+    let rows = [];
     for (const [packName, list] of Object.entries(cache)) {
         for (const p of list) {
             if (browserFilter === 'favorites' && !p.metadata.isFavorite) continue;
@@ -653,6 +735,15 @@ function renderBrowserList(searchTerm) {
             if (q && !p.metadata.name.toLowerCase().includes(q)) continue;
             rows.push({ pack: packName, meta: p.metadata, preview: p.preview });
         }
+    }
+
+    // Kind filter
+    if (state.browserKindFilter === 'single') {
+        rows = rows.filter(r => !r.meta.presetKind || r.meta.presetKind === 'single');
+    } else if (state.browserKindFilter === 'ab') {
+        rows = rows.filter(r => r.meta.presetKind === 'ab');
+    } else if (state.browserKindFilter === 'morph') {
+        rows = rows.filter(r => r.meta.presetKind === 'ab_morph');
     }
 
     updateBrowserCount(rows.length);
@@ -664,6 +755,7 @@ function renderBrowserList(searchTerm) {
         { id: 'name',     label: 'Name' },
         { id: 'type',     label: 'Type' },
         { id: 'designer', label: 'Designer' },
+        { id: 'kind',     label: 'A/B' },
         { id: 'shape',    label: 'Shape' },
         { id: 'skip',     label: 'Skip' },
         { id: 'heart',    label: '♥', title: 'Sort by favorites' },
@@ -708,10 +800,11 @@ function renderBrowserList(searchTerm) {
         const skipVal = (r.preview && r.preview.skip) ? String(r.preview.skip) : '—';
         return `
             <div class="browser-row" data-name="${escapeAttr(r.meta.name)}" data-pack="${escapeAttr(r.pack)}"
-                 style="display: grid; grid-template-columns: 1fr 72px 72px 140px 40px 30px; gap: 8px; padding: 6px 12px; background: ${bg}; border-radius: 3px; align-items: center; cursor: pointer; font-size: 11px; margin-bottom: 2px;">
+                 style="display: grid; grid-template-columns: 1fr 72px 72px 54px 140px 40px 30px; gap: 8px; padding: 6px 12px; background: ${bg}; border-radius: 3px; align-items: center; cursor: pointer; font-size: 11px; margin-bottom: 2px;">
                 <div style="color: rgba(0,0,0,0.85); font-weight: 500;">${escapeHtml(r.meta.name)}</div>
                 <div style="color: rgba(0,0,0,0.60);">${escapeHtml(r.meta.type || '')}</div>
                 <div style="color: rgba(0,0,0,0.60);">${escapeHtml(r.meta.designer || '')}</div>
+                <div>${renderKindBadge(r.meta.presetKind)}</div>
                 <svg class="browser-shape" viewBox="0 0 170 26" preserveAspectRatio="none"></svg>
                 <div style="color: rgba(0,0,0,0.60); font-variant-numeric: tabular-nums;">${skipVal}</div>
                 <div class="browser-heart" style="color: ${heartCol}; text-align: center; cursor: pointer;">${heart}</div>
@@ -804,7 +897,7 @@ function updatePreview(name, pack) {
 
 // ── Save modal ───────────────────────────────────────────────────────────
 
-function openSaveModal() {
+async function openSaveModal() {
     if (!el.saveModal) return;
     const isFactory = state.currentPack === 'Factory';
 
@@ -824,6 +917,20 @@ function openSaveModal() {
                     <option>Bass</option>
                     <option selected>Experimental</option>
                 </select>
+            </div>
+            <div style="margin-top: 12px;">
+                <label style="font-size: 10px; color: rgba(0,0,0,0.60); text-transform: uppercase; letter-spacing: 0.5px;">Preset Kind</label>
+                <div id="save-kind-row" style="display: flex; gap: 14px; align-items: center; margin-top: 6px; font-size: 12px;">
+                    <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="radio" name="save-kind" value="single" checked> Single
+                    </label>
+                    <label id="save-kind-ab-wrap" style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="radio" name="save-kind" value="ab" id="save-kind-ab"> A/B
+                    </label>
+                </div>
+                <div id="save-kind-helper" style="display: none; font-size: 10px; color: rgba(199,74,74,0.9); margin-top: 4px;">
+                    Slot B is unchanged from Slot A. Snap to B and make edits first, or save as Single.
+                </div>
             </div>
             <div style="margin-bottom: 12px;">
                 <label style="display: block; color: rgba(0,0,0,0.55); font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">Designer</label>
@@ -845,6 +952,23 @@ function openSaveModal() {
     `;
     el.saveModal.style.display = 'flex';
 
+    await refreshABState();  // ensure slotsIdentical is current
+    const abRadio    = document.getElementById('save-kind-ab');
+    const abWrap     = document.getElementById('save-kind-ab-wrap');
+    const kindHelper = document.getElementById('save-kind-helper');
+
+    const disabled = !!state.ab.slotsIdentical;
+
+    if (abRadio) abRadio.disabled = disabled;
+    if (abWrap)  abWrap.style.opacity = disabled ? '0.4' : '1';
+    if (abWrap)  abWrap.style.cursor = disabled ? 'not-allowed' : 'pointer';
+    if (kindHelper) kindHelper.style.display = disabled ? 'block' : 'none';
+
+    if (disabled) {
+        const singleRadio = document.querySelector('input[name="save-kind"][value="single"]');
+        if (singleRadio) singleRadio.checked = true;
+    }
+
     const nameInput = document.getElementById('save-name');
     nameInput.focus();
     nameInput.select();
@@ -856,8 +980,10 @@ function openSaveModal() {
         const designer    = document.getElementById('save-designer').value.trim() || 'User';
         const description = document.getElementById('save-description').value.trim();
         const overwrite   = document.getElementById('save-overwrite').checked;
+        const kindChecked = document.querySelector('input[name="save-kind"]:checked');
+        const kindStr     = kindChecked ? kindChecked.value : 'single';
 
-        await savePreset(name, type, designer, description, overwrite);
+        await savePreset(name, type, designer, description, overwrite, kindStr);
         el.saveModal.style.display = 'none';
     });
     document.getElementById('save-cancel').addEventListener('click', () => {
@@ -880,7 +1006,13 @@ function wireParameterListeners() {
     const data = window.__JUCE__.initialisationData;
 
     const onChange = () => {
-        if (!state.isLoadingPreset) setModified(true);
+        if (!state.isLoadingPreset) {
+            setModified(true);
+            // A/B: mark the active slot as locally modified
+            if (state.ab.active === 'A') state.ab.modifiedA = true;
+            else                         state.ab.modifiedB = true;
+            renderABState();
+        }
     };
 
     if (window.Juce.getSliderState) {
@@ -904,6 +1036,12 @@ function wireParameterListeners() {
 }
 
 // ── HTML escape helpers ──────────────────────────────────────────────────
+
+function renderKindBadge(kind) {
+    if (kind === 'ab')       return '<span class="kind-badge kind-badge--ab">A|B</span>';
+    if (kind === 'ab_morph') return '<span class="kind-badge kind-badge--abm">A|B·M</span>';
+    return '<span class="kind-badge kind-badge--single">—</span>';
+}
 
 function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({
@@ -929,6 +1067,40 @@ function initClickHandlers() {
     if (el.nextBtn)       el.nextBtn.addEventListener('click', () => navigatePreset(1));
     if (el.saveBtn)       el.saveBtn.addEventListener('click', openSaveModal);
 
+    // A/B Compare cluster
+    if (el.abSlotA) el.abSlotA.addEventListener('click', async () => {
+        if (!native.abSnapTo) return;
+        await native.abSnapTo('A');
+        await refreshABState();
+    });
+
+    if (el.abSlotB) el.abSlotB.addEventListener('click', async () => {
+        if (!native.abSnapTo) return;
+        await native.abSnapTo('B');
+        await refreshABState();
+    });
+
+    if (el.abCopy) el.abCopy.addEventListener('click', async () => {
+        if (state.ab.slotsIdentical) return;
+        if (!native.abCopy) return;
+        await native.abCopy();
+        await refreshABState();
+    });
+
+    // Settings: Compare toggle — include discrete params when snapping A/B
+    const discreteCheckbox = document.getElementById('setting-include-discrete');
+    if (discreteCheckbox) {
+        refreshABState().then(() => {
+            discreteCheckbox.checked = !!state.ab.includeDiscrete;
+        });
+
+        discreteCheckbox.addEventListener('change', async (e) => {
+            if (!native.abSetIncludeDiscrete) return;
+            await native.abSetIncludeDiscrete(e.target.checked);
+            await refreshABState();
+        });
+    }
+
     // Close dropdown when clicking elsewhere.
     document.addEventListener('click', (e) => {
         if (!el.dropdown) return;
@@ -939,7 +1111,7 @@ function initClickHandlers() {
     });
 }
 
-function init() {
+async function init() {
     cacheElements();
     if (!initNativeBridge()) return;
     initClickHandlers();
@@ -948,6 +1120,7 @@ function init() {
     refreshHeader();
     // Prime the cache in the background.
     refreshCache();
+    await refreshABState();
 }
 
 if (document.readyState === 'loading') {

@@ -390,7 +390,17 @@ juce::AudioProcessorEditor* PhantomProcessor::createEditor()
 
 void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
+    // Ensure any in-flight edits on the active slot are captured before serializing.
+    abSlots.syncActiveSlotFromLive();
+
     auto state = apvts.copyState();
+
+    // Drop any prior <ABSlots> child (shouldn't exist on state from copyState,
+    // but guard against re-entrant save paths writing twice).
+    if (auto existing = state.getChildWithName("ABSlots"); existing.isValid())
+        state.removeChild(existing, nullptr);
+    state.appendChild(abSlots.toStateTree(), nullptr);
+
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     copyXmlToBinary(*xml, destData);
 }
@@ -398,8 +408,19 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
 void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
-    if (xml != nullptr && xml->hasTagName(apvts.state.getType()))
-        apvts.replaceState(juce::ValueTree::fromXml(*xml));
+    if (xml == nullptr || !xml->hasTagName(apvts.state.getType())) return;
+
+    auto tree = juce::ValueTree::fromXml(*xml);
+
+    // Peel off the <ABSlots> child (if any) before the parameter replace; APVTS
+    // doesn't know about it and would keep it in the live tree where it would
+    // shadow future apvts.copyState() calls.
+    auto abSlotsTree = tree.getChildWithName("ABSlots");
+    if (abSlotsTree.isValid())
+        tree.removeChild(abSlotsTree, nullptr);
+
+    apvts.replaceState(tree);
+    abSlots.fromStateTree(abSlotsTree);
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

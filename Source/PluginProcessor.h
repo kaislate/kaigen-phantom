@@ -3,6 +3,7 @@
 #include "Parameters.h"
 #include "Engines/PhantomEngine.h"
 #include "PresetManager.h"
+#include "ABSlotManager.h"
 
 class PhantomProcessor : public juce::AudioProcessor,
                          private juce::AudioProcessorValueTreeState::Listener
@@ -48,6 +49,14 @@ public:
     juce::AudioProcessorValueTreeState apvts;
 
     kaigen::phantom::PresetManager presetManager;
+
+    // NOTE: MUST be declared AFTER `apvts`. Constructor subscribes to APVTS
+    // parameter listeners in order (see Parameters.h getAllParameterIDs()).
+    // If moved above `apvts`, the listener registration loop will find no
+    // registered parameters and the modified-flag tracking will silently break.
+    kaigen::phantom::ABSlotManager abSlots { apvts };
+
+    kaigen::phantom::ABSlotManager& getABSlotManager() { return abSlots; }
 
     // Real-time data exposed to the UI
     std::atomic<float> currentPitch { -1.0f };

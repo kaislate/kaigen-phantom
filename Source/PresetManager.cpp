@@ -1,4 +1,5 @@
 #include "PresetManager.h"
+#include "ABSlotManager.h"
 #include "Parameters.h"
 #include <juce_core/juce_core.h>
 
@@ -20,6 +21,24 @@ namespace
         return name.trim().retainCharacters(
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-()[]");
     }
+}
+
+juce::String presetKindToString(PresetKind k)
+{
+    switch (k)
+    {
+        case PresetKind::Single:  return "single";
+        case PresetKind::AB:      return "ab";
+        case PresetKind::ABMorph: return "ab_morph";
+    }
+    return "single";
+}
+
+PresetKind presetKindFromString(const juce::String& s)
+{
+    if (s == "ab")       return PresetKind::AB;
+    if (s == "ab_morph") return PresetKind::ABMorph;
+    return PresetKind::Single;
 }
 
 PresetManager::PresetManager() = default;
@@ -96,6 +115,9 @@ PresetMetadata PresetManager::readMetadataFromFile(const juce::File& file)
         result.type        = meta.getProperty("type", "Experimental").toString();
         result.designer    = meta.getProperty("designer", "").toString();
         result.description = meta.getProperty("description", "").toString();
+
+        const auto kindStr = meta.getProperty("presetKind", juce::var("single")).toString();
+        result.presetKind = presetKindFromString(kindStr);
     }
     else
     {
@@ -320,11 +342,71 @@ bool PresetManager::loadPreset(juce::AudioProcessorValueTreeState& apvts,
     return true;
 }
 
+bool PresetManager::loadPresetInto(ABSlotManager& abSlots,
+                                   const juce::String& presetName,
+                                   const juce::String& packName)
+{
+    auto file = getPresetFile(presetName, packName);
+    if (!file.existsAsFile()) return false;
+
+    auto xml = juce::parseXML(file);
+    if (xml == nullptr) return false;
+
+    auto tree = juce::ValueTree::fromXml(*xml);
+    if (!tree.isValid()) return false;
+
+    // Determine kind: prefer explicit metadata prop; else infer from SlotB presence.
+    PresetKind kind = PresetKind::Single;
+    if (auto meta = tree.getChildWithName(kMetadataNodeId); meta.isValid())
+    {
+        const auto s = meta.getProperty("presetKind", juce::var("")).toString();
+        if (!s.isEmpty())
+            kind = presetKindFromString(s);
+        else if (tree.getChildWithName("SlotB").isValid())
+            kind = PresetKind::AB;
+    }
+    else if (tree.getChildWithName("SlotB").isValid())
+    {
+        kind = PresetKind::AB;
+    }
+
+    const juce::String ref = packName + "/" + presetName;
+
+    if (kind == PresetKind::Single)
+    {
+        // Active-slot-only load. Strip metadata before handing to abSlots so the
+        // live APVTS doesn't get polluted by the Metadata child.
+        auto stateForLoad = tree.createCopy();
+        if (auto existingMeta = stateForLoad.getChildWithName(kMetadataNodeId); existingMeta.isValid())
+            stateForLoad.removeChild(existingMeta, nullptr);
+        if (auto existingSlotB = stateForLoad.getChildWithName("SlotB"); existingSlotB.isValid())
+            stateForLoad.removeChild(existingSlotB, nullptr);
+        if (auto existingMorph = stateForLoad.getChildWithName("MorphConfig"); existingMorph.isValid())
+            stateForLoad.removeChild(existingMorph, nullptr);
+        if (auto existingAB = stateForLoad.getChildWithName("ABSlots"); existingAB.isValid())
+            stateForLoad.removeChild(existingAB, nullptr);
+        abSlots.loadSinglePresetIntoActive(stateForLoad, ref);
+    }
+    else
+    {
+        // AB / ABMorph: hand the whole tree to abSlots.loadABPreset; it strips
+        // <SlotB> and <MorphConfig> internally for slot A and reads <SlotB> for slot B.
+        auto stateForLoad = tree.createCopy();
+        if (auto existingMeta = stateForLoad.getChildWithName(kMetadataNodeId); existingMeta.isValid())
+            stateForLoad.removeChild(existingMeta, nullptr);
+        abSlots.loadABPreset(stateForLoad, ref);
+    }
+
+    return true;
+}
+
 juce::String PresetManager::savePreset(juce::AudioProcessorValueTreeState& apvts,
+                                       ABSlotManager* abSlots,
                                        const juce::String& presetName,
                                        const juce::String& type,
                                        const juce::String& designer,
                                        const juce::String& description,
+                                       PresetKind kind,
                                        bool overwrite)
 {
     auto sanitized = sanitizeName(presetName);
@@ -333,10 +415,19 @@ juce::String PresetManager::savePreset(juce::AudioProcessorValueTreeState& apvts
     const auto validType = kValidTypes.contains(type) ? type : juce::String("Experimental");
     const auto effectiveDesigner = designer.isEmpty() ? juce::String("User") : designer;
 
+    // Reject AB / AB+Morph saves when slots are identical (safety net — UI
+    // should disable the radio in that state).
+    if ((kind == PresetKind::AB || kind == PresetKind::ABMorph) && abSlots != nullptr)
+    {
+        const auto slotA = abSlots->getSlot(ABSlotManager::Slot::A);
+        const auto slotB = abSlots->getSlot(ABSlotManager::Slot::B);
+        if (slotA.toXmlString() == slotB.toXmlString())
+            return {};
+    }
+
     auto userDir = getUserPresetsDirectory();
     auto target = userDir.getChildFile(sanitized + ".fxp");
 
-    // Disambiguate the name if needed.
     if (target.existsAsFile() && !overwrite)
     {
         int suffix = 2;
@@ -353,16 +444,38 @@ juce::String PresetManager::savePreset(juce::AudioProcessorValueTreeState& apvts
         }
     }
 
-    // Build a fresh state tree: params + metadata child.
-    auto state = apvts.copyState();
+    // Build the root state: for Single, use live APVTS (current behavior).
+    // For AB / AB+Morph, the root is user's SLOT A (regardless of active slot).
+    juce::ValueTree state;
+    if (kind == PresetKind::Single || abSlots == nullptr)
+    {
+        state = apvts.copyState();
+    }
+    else
+    {
+        state = abSlots->getSlot(ABSlotManager::Slot::A).createCopy();
+    }
 
-    // Remove any existing metadata node (from a previously-loaded preset)
-    // before adding our own.
-    auto existingMeta = state.getChildWithName(kMetadataNodeId);
-    if (existingMeta.isValid())
+    // Remove any pre-existing children that we're about to re-emit.
+    if (auto existingMeta = state.getChildWithName(kMetadataNodeId); existingMeta.isValid())
         state.removeChild(existingMeta, nullptr);
+    if (auto existingSlotB = state.getChildWithName("SlotB"); existingSlotB.isValid())
+        state.removeChild(existingSlotB, nullptr);
+    if (auto existingMorph = state.getChildWithName("MorphConfig"); existingMorph.isValid())
+        state.removeChild(existingMorph, nullptr);
 
-    state.appendChild(buildMetadataTree(sanitized, validType, effectiveDesigner, description), nullptr);
+    // Metadata child, with presetKind prop.
+    auto metadataTree = buildMetadataTree(sanitized, validType, effectiveDesigner, description);
+    metadataTree.setProperty("presetKind", presetKindToString(kind), nullptr);
+    state.appendChild(metadataTree, nullptr);
+
+    // Slot B for AB / AB+Morph saves.
+    if ((kind == PresetKind::AB || kind == PresetKind::ABMorph) && abSlots != nullptr)
+    {
+        state.appendChild(abSlots->buildPresetSlotBChild(), nullptr);
+    }
+
+    // <MorphConfig> is Pro-build only — not emitted in this plan.
 
     auto xml = state.createXml();
     if (xml == nullptr) return {};
@@ -370,7 +483,7 @@ juce::String PresetManager::savePreset(juce::AudioProcessorValueTreeState& apvts
     if (!target.replaceWithText(xml->toString()))
         return {};
 
-    // Update in-memory cache.
+    // Update in-memory cache (same as before, plus presetKind).
     PresetInfo info;
     info.file = target;
     info.metadata.name = sanitized;
@@ -380,7 +493,8 @@ juce::String PresetManager::savePreset(juce::AudioProcessorValueTreeState& apvts
     info.metadata.packName = kUserPackName;
     info.metadata.isFactory = false;
     info.metadata.isFavorite = isFavorite(sanitized, kUserPackName);
-    info.preview = readPreviewFromState(state);  // NEW: match scan path
+    info.metadata.presetKind = kind;
+    info.preview = readPreviewFromState(state);
 
     auto& userList = allPresets[kUserPackName];
     auto it = std::find_if(userList.begin(), userList.end(),

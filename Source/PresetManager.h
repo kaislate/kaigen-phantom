@@ -9,6 +9,18 @@
 namespace kaigen::phantom
 {
 
+class ABSlotManager;   // fwd decl
+
+enum class PresetKind
+{
+    Single,     // no <SlotB>; one state snapshot
+    AB,         // <SlotB> present; no <MorphConfig>
+    ABMorph     // <SlotB> + <MorphConfig> present (loaded as AB in Standard build)
+};
+
+juce::String presetKindToString(PresetKind);
+PresetKind   presetKindFromString(const juce::String&);
+
 struct PresetMetadata
 {
     juce::String name;         // "Warm Bass Boost"
@@ -18,6 +30,7 @@ struct PresetMetadata
     juce::String packName;     // "Factory" | "User" | pack folder name
     bool isFactory = false;
     bool isFavorite = false;
+    PresetKind   presetKind = PresetKind::Single;   // NEW
 };
 
 // Parameter values extracted from a preset for the browser preview spectrum.
@@ -80,14 +93,34 @@ public:
                     const juce::String& presetName,
                     const juce::String& packName);
 
+    // Load a preset via ABSlotManager. Dispatches on the preset's kind:
+    //   Single → abSlots.loadSinglePresetIntoActive
+    //   AB / ABMorph → abSlots.loadABPreset
+    // Returns true on success, false if missing/parse/unsupported.
+    bool loadPresetInto(ABSlotManager& abSlots,
+                        const juce::String& presetName,
+                        const juce::String& packName);
+
     // Save APVTS state as a new preset in User/. If overwrite=false and a
     // preset with this name exists, a numeric suffix is appended.
     // Returns the saved preset's name (possibly disambiguated), or empty on failure.
+    //
+    // `kind` controls whether a <SlotB> child is attached:
+    //   Single → no slot B (ignores abSlots)
+    //   AB     → emits <SlotB> from abSlots.buildPresetSlotBChild()
+    //   ABMorph→ same as AB in Standard builds; emits <MorphConfig> only under
+    //            KAIGEN_PRO_BUILD (not defined in this spec).
+    //
+    // When kind != Single and the caller's slot B equals slot A (or is empty),
+    // the method returns empty to signal "rejected". The UI is expected to
+    // prevent this case; the check here is a safety net.
     juce::String savePreset(juce::AudioProcessorValueTreeState& apvts,
+                            ABSlotManager* abSlots,        // may be nullptr for Single
                             const juce::String& presetName,
                             const juce::String& type,
                             const juce::String& designer,
                             const juce::String& description,
+                            PresetKind kind,
                             bool overwrite);
 
     // Delete a user preset (factory/pack presets cannot be deleted).
