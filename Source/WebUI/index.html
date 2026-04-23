@@ -111,6 +111,15 @@
         <!-- Save button (etched) -->
         <button id="preset-save-btn" style="background: none; border: none; color: #656769; cursor: pointer; padding: 3px 5px; font-size: 12px; transition: color 0.2s; text-shadow: 0 1px 0 rgba(255,255,255,0.5); display: none;" title="Save preset">💾</button>
       </div>
+      <div class="ab-group" id="ab-cluster" style="margin: 0 12px;">
+        <button class="ab-btn active" id="ab-slot-a" title="Snap to slot A">A
+          <span class="ab-mod-dot" id="ab-mod-a"></span>
+        </button>
+        <button class="cp-btn" id="ab-copy" title="Copy active slot to other slot">A→B</button>
+        <button class="ab-btn" id="ab-slot-b" title="Snap to slot B">B
+          <span class="ab-mod-dot" id="ab-mod-b"></span>
+        </button>
+      </div>
       <div style="flex: 1;"></div>
       <div class="mt"><div class="mb active" data-mode="0">Effect</div><div class="mb" data-mode="1">Resyn</div></div>
       <button class="hdr-btn" id="bypass-btn" title="Bypass">&#x23FB;</button>
