@@ -349,4 +349,32 @@ TEST_CASE("beginCapture + knob edits + endCapture(cancel) restores baselines")
     CHECK(live == Catch::Approx(50.0f).epsilon(0.01));
 }
 
+TEST_CASE("toMorphConfigTree / fromMorphConfigTree round-trips arc data")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots1 { proc.apvts };
+    PhantomEngine engine1;
+    kaigen::phantom::MorphEngine src { proc.apvts, abSlots1, engine1 };
+
+    // Arm a few arcs.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
+        proc.apvts.getParameter(ParamID::GHOST)->convertTo0to1(50.0f));
+    src.setArcDepth(ParamID::GHOST, 0.35f);
+    src.setArcDepth(ParamID::RECIPE_H2, -0.20f);
+
+    const auto tree = src.toMorphConfigTree();
+    CHECK(tree.getType().toString() == "MorphConfig");
+
+    // Restore in a fresh processor.
+    TestProcessor proc2;
+    kaigen::phantom::ABSlotManager abSlots2 { proc2.apvts };
+    PhantomEngine engine2;
+    kaigen::phantom::MorphEngine dst { proc2.apvts, abSlots2, engine2 };
+
+    dst.fromMorphConfigTree(tree);
+    CHECK(dst.getArcDepth(ParamID::GHOST)     == Catch::Approx(0.35f));
+    CHECK(dst.getArcDepth(ParamID::RECIPE_H2) == Catch::Approx(-0.20f));
+    CHECK(dst.armedKnobCount() == 2);
+}
+
 #endif // KAIGEN_PRO_BUILD

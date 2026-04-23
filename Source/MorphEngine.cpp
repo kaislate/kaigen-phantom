@@ -210,8 +210,98 @@ void MorphEngine::setSceneCrossfadeEnabled(bool on)
     // Note: Task 16 handles lazy secondaryEngine construction on first enable.
 }
 
-juce::ValueTree MorphEngine::toMorphConfigTree() const { return juce::ValueTree("MorphConfig"); }
-void MorphEngine::fromMorphConfigTree(const juce::ValueTree&) {}
+juce::ValueTree MorphEngine::toMorphConfigTree() const
+{
+    juce::ValueTree root { "MorphConfig" };
+    root.setProperty("defaultPosition", rawMorph, nullptr);
+    root.setProperty("curve", curveName, nullptr);
+
+    juce::ValueTree lane { "ArcLane" };
+    lane.setProperty("id", 1, nullptr);
+    for (const auto& [id, entry] : lane1Arcs)
+    {
+        juce::ValueTree arc { "Arc" };
+        arc.setProperty("paramID", id, nullptr);
+        arc.setProperty("depth", entry.depth, nullptr);
+        lane.appendChild(arc, nullptr);
+    }
+    root.appendChild(lane, nullptr);
+
+    if (sceneEnabled || rawScenePos != 0.0f)
+    {
+        juce::ValueTree scene { "SceneCrossfade" };
+        scene.setProperty("enabled", sceneEnabled ? 1 : 0, nullptr);
+        scene.setProperty("position", rawScenePos, nullptr);
+        root.appendChild(scene, nullptr);
+    }
+
+    return root;
+}
+
+void MorphEngine::fromMorphConfigTree(const juce::ValueTree& morphConfig)
+{
+    if (!morphConfig.isValid() || morphConfig.getType().toString() != "MorphConfig")
+        return;
+
+    // Reset current state before applying new.
+    lane1Arcs.clear();
+
+    // Apply top-level morph defaults.
+    rawMorph = juce::jlimit(0.0f, 1.0f,
+        (float) morphConfig.getProperty("defaultPosition", juce::var(0.0f)));
+    smoothedMorph = rawMorph;
+    curveName = morphConfig.getProperty("curve", juce::var("linear")).toString();
+
+    // Read arcs.
+    const auto lane = morphConfig.getChildWithName("ArcLane");
+    if (lane.isValid())
+    {
+        for (int i = 0; i < lane.getNumChildren(); ++i)
+        {
+            const auto arc = lane.getChild(i);
+            if (arc.getType().toString() != "Arc") continue;
+
+            const auto id = arc.getProperty("paramID", juce::var("")).toString();
+            const float depth = (float) arc.getProperty("depth", juce::var(0.0f));
+
+            if (id.isNotEmpty() && std::abs(depth) >= 1e-6f)
+            {
+                // Capture current live value as the base (the base is recomputed
+                // on load; the saved arc depth is relative delta).
+                float base = 0.0f;
+                if (auto* p = apvts.getParameter(id))
+                    base = p->convertFrom0to1(p->getValue());
+                lane1Arcs[id] = { depth, base };
+            }
+        }
+    }
+
+    // Read scene crossfade state.
+    const auto scene = morphConfig.getChildWithName("SceneCrossfade");
+    if (scene.isValid())
+    {
+        sceneEnabled = ((int) scene.getProperty("enabled", 0)) != 0;
+        rawScenePos = juce::jlimit(0.0f, 1.0f,
+            (float) scene.getProperty("position", juce::var(0.0f)));
+        smoothedScenePos = rawScenePos;
+
+        // Sync APVTS parameters.
+        if (auto* p = apvts.getParameter(ParamID::SCENE_ENABLED))
+        {
+            const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
+            p->setValueNotifyingHost(sceneEnabled ? 1.0f : 0.0f);
+        }
+        if (auto* p = apvts.getParameter(ParamID::SCENE_POSITION))
+        {
+            const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
+            p->setValueNotifyingHost(rawScenePos);
+        }
+    }
+
+    // Enable morph automatically if any arcs are loaded.
+    if (!lane1Arcs.empty())
+        setEnabled(true);
+}
 
 juce::ValueTree MorphEngine::toStateTree() const { return juce::ValueTree("MorphState"); }
 void MorphEngine::fromStateTree(const juce::ValueTree&) {}
