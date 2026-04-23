@@ -2,6 +2,15 @@
 #include "Parameters.h"
 #include <map>
 
+namespace
+{
+    constexpr const char* kABSlotsNodeId    = "ABSlots";
+    constexpr const char* kSlotNodeId       = "Slot";
+    constexpr const char* kActiveAttr       = "active";
+    constexpr const char* kIncludeDiscAttr  = "includeDiscrete";
+    constexpr const char* kSlotNameAttr     = "name";
+}
+
 namespace kaigen::phantom
 {
 
@@ -104,9 +113,64 @@ void ABSlotManager::copy(Slot from, Slot to)
 bool ABSlotManager::isModified(Slot s) const noexcept { return modified[(int) s]; }
 juce::String ABSlotManager::getPresetRef(Slot s) const { return presetRef[(int) s]; }
 
-void ABSlotManager::syncActiveSlotFromLive() {}
-juce::ValueTree ABSlotManager::toStateTree() const { return {}; }
-void ABSlotManager::fromStateTree(const juce::ValueTree&) {}
+void ABSlotManager::syncActiveSlotFromLive()
+{
+    slots[(int) active] = apvts.copyState();
+}
+
+juce::ValueTree ABSlotManager::toStateTree() const
+{
+    juce::ValueTree tree { kABSlotsNodeId };
+    tree.setProperty(kActiveAttr, active == Slot::A ? "A" : "B", nullptr);
+    tree.setProperty(kIncludeDiscAttr, includeDiscreteInSnap ? 1 : 0, nullptr);
+
+    for (int i = 0; i < 2; ++i)
+    {
+        juce::ValueTree slotNode { kSlotNodeId };
+        slotNode.setProperty(kSlotNameAttr, i == 0 ? "A" : "B", nullptr);
+        if (slots[i].isValid())
+            slotNode.appendChild(slots[i].createCopy(), nullptr);
+        tree.appendChild(slotNode, nullptr);
+    }
+    return tree;
+}
+
+void ABSlotManager::fromStateTree(const juce::ValueTree& abSlotsTree)
+{
+    if (!abSlotsTree.isValid() || abSlotsTree.getType().toString() != kABSlotsNodeId)
+    {
+        slots[0] = apvts.copyState();
+        slots[1] = apvts.copyState();
+        active = Slot::A;
+        includeDiscreteInSnap = false;
+        designerAuthored = false;
+        modified[0] = modified[1] = false;
+        presetRef[0] = presetRef[1] = {};
+        return;
+    }
+
+    const auto activeStr = abSlotsTree.getProperty(kActiveAttr, juce::var("A")).toString();
+    active = (activeStr == "B") ? Slot::B : Slot::A;
+    includeDiscreteInSnap = ((int) abSlotsTree.getProperty(kIncludeDiscAttr, 0)) != 0;
+
+    for (int i = 0; i < abSlotsTree.getNumChildren(); ++i)
+    {
+        auto slotNode = abSlotsTree.getChild(i);
+        if (slotNode.getType().toString() != kSlotNodeId) continue;
+        const auto nameStr = slotNode.getProperty(kSlotNameAttr).toString();
+        const int idx = (nameStr == "B") ? 1 : 0;
+        if (slotNode.getNumChildren() > 0)
+            slots[idx] = slotNode.getChild(0).createCopy();
+    }
+
+    // Default/empty-slot fallback: fill with live state so they're always valid.
+    if (!slots[0].isValid()) slots[0] = apvts.copyState();
+    if (!slots[1].isValid()) slots[1] = apvts.copyState();
+
+    designerAuthored = false;
+    modified[0] = modified[1] = false;
+    presetRef[0] = presetRef[1] = {};
+}
 
 void ABSlotManager::loadSinglePresetIntoActive(const juce::ValueTree&, const juce::String&) {}
 void ABSlotManager::loadABPreset(const juce::ValueTree&, const juce::String&) {}

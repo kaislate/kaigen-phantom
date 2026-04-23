@@ -189,3 +189,45 @@ TEST_CASE("modified flag NOT set during internal snap/copy/load")
     // flip modified flags. Verify it did not.
     CHECK(abSlots.isModified(kaigen::phantom::ABSlotManager::Slot::B) == false);
 }
+
+TEST_CASE("toStateTree / fromStateTree round-trips slots, active, and setting")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager src { proc.apvts };
+
+    // Populate slots with distinct data.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.25f);
+    src.snapTo(kaigen::phantom::ABSlotManager::Slot::B);
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.75f);
+    src.syncActiveSlotFromLive();   // make sure slot B is current
+    src.setIncludeDiscreteInSnap(true);
+
+    const auto tree = src.toStateTree();
+
+    // New manager in a separate processor, restore.
+    TestProcessor proc2;
+    kaigen::phantom::ABSlotManager dst { proc2.apvts };
+    dst.fromStateTree(tree);
+
+    CHECK(dst.getActive() == kaigen::phantom::ABSlotManager::Slot::B);
+    CHECK(dst.getIncludeDiscreteInSnap() == true);
+    CHECK(dst.getSlot(kaigen::phantom::ABSlotManager::Slot::A).toXmlString()
+          == src.getSlot(kaigen::phantom::ABSlotManager::Slot::A).toXmlString());
+    CHECK(dst.getSlot(kaigen::phantom::ABSlotManager::Slot::B).toXmlString()
+          == src.getSlot(kaigen::phantom::ABSlotManager::Slot::B).toXmlString());
+}
+
+TEST_CASE("fromStateTree with invalid/empty tree initializes slots from live APVTS")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+
+    abSlots.fromStateTree(juce::ValueTree{});
+
+    CHECK(abSlots.getActive() == kaigen::phantom::ABSlotManager::Slot::A);
+    CHECK(abSlots.getIncludeDiscreteInSnap() == false);
+    CHECK(abSlots.getSlot(kaigen::phantom::ABSlotManager::Slot::A).toXmlString()
+          == proc.apvts.copyState().toXmlString());
+    CHECK(abSlots.getSlot(kaigen::phantom::ABSlotManager::Slot::B).toXmlString()
+          == proc.apvts.copyState().toXmlString());
+}
