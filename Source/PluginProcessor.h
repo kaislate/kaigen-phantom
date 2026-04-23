@@ -4,6 +4,9 @@
 #include "Engines/PhantomEngine.h"
 #include "PresetManager.h"
 #include "ABSlotManager.h"
+#ifdef KAIGEN_PRO_BUILD
+#include "MorphEngine.h"
+#endif
 
 class PhantomProcessor : public juce::AudioProcessor,
                          private juce::AudioProcessorValueTreeState::Listener
@@ -79,6 +82,15 @@ public:
 
     // Engine — public so editor can read oscilloscope synth capture
     PhantomEngine engine;
+
+  #ifdef KAIGEN_PRO_BUILD
+    // NOTE: MUST be declared AFTER apvts, abSlots, and engine. MorphEngine
+    // subscribes to morph APVTS parameters, reads slot data, and drives
+    // the primary engine; all three must exist first.
+    kaigen::phantom::MorphEngine morph { apvts, abSlots, engine };
+
+    kaigen::phantom::MorphEngine& getMorphEngine() { return morph; }
+  #endif
 
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;

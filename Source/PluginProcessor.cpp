@@ -49,6 +49,10 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
     fftBuffer.fill(0.0f);
     spectrumData.fill(0.0f);
     spectrumReady.store(false);
+
+    #ifdef KAIGEN_PRO_BUILD
+    morph.prepareToPlay(sr, samplesPerBlock);
+    #endif
 }
 
 void PhantomProcessor::releaseResources() {}
@@ -263,6 +267,10 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         peakInL.store(pL, std::memory_order_relaxed);
         peakInR.store(pR, std::memory_order_relaxed);
     }
+
+    #ifdef KAIGEN_PRO_BUILD
+        morph.preProcessBlock();   // apply arc interpolations for this block
+    #endif
 
     // ── Sync params → engine ──────────────────────────────────────────
     syncParamsToEngine();
