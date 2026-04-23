@@ -322,10 +322,10 @@ async function loadPreset(name, pack) {
     return true;
 }
 
-async function savePreset(name, type, designer, description, overwrite) {
+async function savePreset(name, type, designer, description, overwrite, kind = 'single') {
     if (!native.savePreset) return '';
     try {
-        const savedName = await native.savePreset(name, type, designer, description, !!overwrite);
+        const savedName = await native.savePreset(name, type, designer, description, !!overwrite, kind);
         if (savedName) {
             await refreshCache();
             setCurrentPreset(savedName, 'User', false);
@@ -897,7 +897,7 @@ function updatePreview(name, pack) {
 
 // ── Save modal ───────────────────────────────────────────────────────────
 
-function openSaveModal() {
+async function openSaveModal() {
     if (!el.saveModal) return;
     const isFactory = state.currentPack === 'Factory';
 
@@ -917,6 +917,20 @@ function openSaveModal() {
                     <option>Bass</option>
                     <option selected>Experimental</option>
                 </select>
+            </div>
+            <div style="margin-top: 12px;">
+                <label style="font-size: 10px; color: rgba(0,0,0,0.60); text-transform: uppercase; letter-spacing: 0.5px;">Preset Kind</label>
+                <div id="save-kind-row" style="display: flex; gap: 14px; align-items: center; margin-top: 6px; font-size: 12px;">
+                    <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="radio" name="save-kind" value="single" checked> Single
+                    </label>
+                    <label id="save-kind-ab-wrap" style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="radio" name="save-kind" value="ab" id="save-kind-ab"> A/B
+                    </label>
+                </div>
+                <div id="save-kind-helper" style="display: none; font-size: 10px; color: rgba(199,74,74,0.9); margin-top: 4px;">
+                    Slot B is unchanged from Slot A. Snap to B and make edits first, or save as Single.
+                </div>
             </div>
             <div style="margin-bottom: 12px;">
                 <label style="display: block; color: rgba(0,0,0,0.55); font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">Designer</label>
@@ -938,6 +952,23 @@ function openSaveModal() {
     `;
     el.saveModal.style.display = 'flex';
 
+    await refreshABState();  // ensure slotsIdentical is current
+    const abRadio    = document.getElementById('save-kind-ab');
+    const abWrap     = document.getElementById('save-kind-ab-wrap');
+    const kindHelper = document.getElementById('save-kind-helper');
+
+    const disabled = !!state.ab.slotsIdentical;
+
+    if (abRadio) abRadio.disabled = disabled;
+    if (abWrap)  abWrap.style.opacity = disabled ? '0.4' : '1';
+    if (abWrap)  abWrap.style.cursor = disabled ? 'not-allowed' : 'pointer';
+    if (kindHelper) kindHelper.style.display = disabled ? 'block' : 'none';
+
+    if (disabled) {
+        const singleRadio = document.querySelector('input[name="save-kind"][value="single"]');
+        if (singleRadio) singleRadio.checked = true;
+    }
+
     const nameInput = document.getElementById('save-name');
     nameInput.focus();
     nameInput.select();
@@ -949,8 +980,10 @@ function openSaveModal() {
         const designer    = document.getElementById('save-designer').value.trim() || 'User';
         const description = document.getElementById('save-description').value.trim();
         const overwrite   = document.getElementById('save-overwrite').checked;
+        const kindChecked = document.querySelector('input[name="save-kind"]:checked');
+        const kindStr     = kindChecked ? kindChecked.value : 'single';
 
-        await savePreset(name, type, designer, description, overwrite);
+        await savePreset(name, type, designer, description, overwrite, kindStr);
         el.saveModal.style.display = 'none';
     });
     document.getElementById('save-cancel').addEventListener('click', () => {
