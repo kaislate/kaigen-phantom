@@ -535,7 +535,7 @@ phantom-knob.mode-inactive{
 
 .browser-header {
     display: grid;
-    grid-template-columns: 1fr 72px 72px 140px 40px 30px;
+    grid-template-columns: 1fr 72px 72px 54px 140px 40px 30px;
     gap: 8px;
     padding: 4px 12px;
     font-size: 9px;

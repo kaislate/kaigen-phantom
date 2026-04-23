@@ -724,6 +724,7 @@ function renderBrowserList(searchTerm) {
         { id: 'name',     label: 'Name' },
         { id: 'type',     label: 'Type' },
         { id: 'designer', label: 'Designer' },
+        { id: 'kind',     label: 'A/B' },
         { id: 'shape',    label: 'Shape' },
         { id: 'skip',     label: 'Skip' },
         { id: 'heart',    label: '♥', title: 'Sort by favorites' },
@@ -768,10 +769,11 @@ function renderBrowserList(searchTerm) {
         const skipVal = (r.preview && r.preview.skip) ? String(r.preview.skip) : '—';
         return `
             <div class="browser-row" data-name="${escapeAttr(r.meta.name)}" data-pack="${escapeAttr(r.pack)}"
-                 style="display: grid; grid-template-columns: 1fr 72px 72px 140px 40px 30px; gap: 8px; padding: 6px 12px; background: ${bg}; border-radius: 3px; align-items: center; cursor: pointer; font-size: 11px; margin-bottom: 2px;">
+                 style="display: grid; grid-template-columns: 1fr 72px 72px 54px 140px 40px 30px; gap: 8px; padding: 6px 12px; background: ${bg}; border-radius: 3px; align-items: center; cursor: pointer; font-size: 11px; margin-bottom: 2px;">
                 <div style="color: rgba(0,0,0,0.85); font-weight: 500;">${escapeHtml(r.meta.name)}</div>
                 <div style="color: rgba(0,0,0,0.60);">${escapeHtml(r.meta.type || '')}</div>
                 <div style="color: rgba(0,0,0,0.60);">${escapeHtml(r.meta.designer || '')}</div>
+                <div>${renderKindBadge(r.meta.presetKind)}</div>
                 <svg class="browser-shape" viewBox="0 0 170 26" preserveAspectRatio="none"></svg>
                 <div style="color: rgba(0,0,0,0.60); font-variant-numeric: tabular-nums;">${skipVal}</div>
                 <div class="browser-heart" style="color: ${heartCol}; text-align: center; cursor: pointer;">${heart}</div>
@@ -970,6 +972,12 @@ function wireParameterListeners() {
 }
 
 // ── HTML escape helpers ──────────────────────────────────────────────────
+
+function renderKindBadge(kind) {
+    if (kind === 'ab')       return '<span class="kind-badge kind-badge--ab">A|B</span>';
+    if (kind === 'ab_morph') return '<span class="kind-badge kind-badge--abm">A|B·M</span>';
+    return '<span class="kind-badge kind-badge--single">—</span>';
+}
 
 function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({
