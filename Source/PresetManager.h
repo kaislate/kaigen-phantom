@@ -9,6 +9,16 @@
 namespace kaigen::phantom
 {
 
+enum class PresetKind
+{
+    Single,     // no <SlotB>; one state snapshot
+    AB,         // <SlotB> present; no <MorphConfig>
+    ABMorph     // <SlotB> + <MorphConfig> present (loaded as AB in Standard build)
+};
+
+juce::String presetKindToString(PresetKind);
+PresetKind   presetKindFromString(const juce::String&);
+
 struct PresetMetadata
 {
     juce::String name;         // "Warm Bass Boost"
@@ -18,6 +28,7 @@ struct PresetMetadata
     juce::String packName;     // "Factory" | "User" | pack folder name
     bool isFactory = false;
     bool isFavorite = false;
+    PresetKind   presetKind = PresetKind::Single;   // NEW
 };
 
 // Parameter values extracted from a preset for the browser preview spectrum.

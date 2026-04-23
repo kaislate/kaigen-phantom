@@ -22,6 +22,24 @@ namespace
     }
 }
 
+juce::String presetKindToString(PresetKind k)
+{
+    switch (k)
+    {
+        case PresetKind::Single:  return "single";
+        case PresetKind::AB:      return "ab";
+        case PresetKind::ABMorph: return "ab_morph";
+    }
+    return "single";
+}
+
+PresetKind presetKindFromString(const juce::String& s)
+{
+    if (s == "ab")       return PresetKind::AB;
+    if (s == "ab_morph") return PresetKind::ABMorph;
+    return PresetKind::Single;
+}
+
 PresetManager::PresetManager() = default;
 
 void PresetManager::initialize()
@@ -96,6 +114,9 @@ PresetMetadata PresetManager::readMetadataFromFile(const juce::File& file)
         result.type        = meta.getProperty("type", "Experimental").toString();
         result.designer    = meta.getProperty("designer", "").toString();
         result.description = meta.getProperty("description", "").toString();
+
+        const auto kindStr = meta.getProperty("presetKind", juce::var("single")).toString();
+        result.presetKind = presetKindFromString(kindStr);
     }
     else
     {
