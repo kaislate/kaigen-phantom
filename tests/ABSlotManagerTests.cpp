@@ -137,3 +137,27 @@ TEST_CASE("snapTo with includeDiscreteInSnap=true flips discrete params")
     const int liveGhostMode = (int) proc.apvts.getRawParameterValue(ParamID::GHOST_MODE)->load();
     CHECK(liveGhostMode == 1);
 }
+
+TEST_CASE("copy A to B overwrites slot B with slot A contents")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+
+    // Make slot A and slot B differ.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.3f);
+    abSlots.snapTo(kaigen::phantom::ABSlotManager::Slot::B);
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.7f);
+    abSlots.snapTo(kaigen::phantom::ABSlotManager::Slot::A);
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.3f);  // live = slot A state
+    // Now slot A's stored ghost value is ≠ slot B's. Active = A.
+
+    abSlots.copy(kaigen::phantom::ABSlotManager::Slot::A,
+                 kaigen::phantom::ABSlotManager::Slot::B);
+
+    auto slotA = abSlots.getSlot(kaigen::phantom::ABSlotManager::Slot::A);
+    auto slotB = abSlots.getSlot(kaigen::phantom::ABSlotManager::Slot::B);
+    CHECK(slotA.toXmlString() == slotB.toXmlString());
+
+    // Active did not change.
+    CHECK(abSlots.getActive() == kaigen::phantom::ABSlotManager::Slot::A);
+}

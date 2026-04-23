@@ -75,7 +75,18 @@ void ABSlotManager::snapTo(Slot target)
 
     active = target;
 }
-void ABSlotManager::copy(Slot, Slot) {}
+void ABSlotManager::copy(Slot from, Slot to)
+{
+    if (from == to) return;
+
+    // If source is active, commit in-flight edits first so `from` is current.
+    if (from == active)
+        slots[(int) active] = apvts.copyState();
+
+    slots[(int) to] = slots[(int) from].createCopy();
+    modified[(int) to] = false;
+    presetRef[(int) to] = presetRef[(int) from];
+}
 bool ABSlotManager::isModified(Slot s) const noexcept { return modified[(int) s]; }
 juce::String ABSlotManager::getPresetRef(Slot s) const { return presetRef[(int) s]; }
 
