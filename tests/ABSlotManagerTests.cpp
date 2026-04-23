@@ -231,3 +231,33 @@ TEST_CASE("fromStateTree with invalid/empty tree initializes slots from live APV
     CHECK(abSlots.getSlot(kaigen::phantom::ABSlotManager::Slot::B).toXmlString()
           == proc.apvts.copyState().toXmlString());
 }
+
+TEST_CASE("loadSinglePresetIntoActive writes only the active slot")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+
+    // Snapshot slot B's initial content so we can verify it's untouched.
+    const auto slotBBefore = abSlots.getSlot(kaigen::phantom::ABSlotManager::Slot::B).toXmlString();
+
+    // Build a preset tree that differs from live state.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.9f);
+    auto presetTree = proc.apvts.copyState();
+    // Reset live to default so we can see the load took effect.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.0f);
+
+    abSlots.loadSinglePresetIntoActive(presetTree, "Factory/Warm Bass");
+
+    // Slot A should be the preset.
+    CHECK(abSlots.getSlot(kaigen::phantom::ABSlotManager::Slot::A).toXmlString()
+          == presetTree.toXmlString());
+    // Slot B untouched.
+    CHECK(abSlots.getSlot(kaigen::phantom::ABSlotManager::Slot::B).toXmlString()
+          == slotBBefore);
+    // Live state is now the preset.
+    const float liveGhost = proc.apvts.getRawParameterValue(ParamID::GHOST)->load();
+    CHECK(liveGhost == Catch::Approx(90.0f).epsilon(0.01));  // 0.9 normalized × 100 range
+    // Preset ref set for slot A only, modified cleared.
+    CHECK(abSlots.getPresetRef(kaigen::phantom::ABSlotManager::Slot::A) == "Factory/Warm Bass");
+    CHECK(abSlots.isModified(kaigen::phantom::ABSlotManager::Slot::A) == false);
+}

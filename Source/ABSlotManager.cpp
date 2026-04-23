@@ -172,7 +172,23 @@ void ABSlotManager::fromStateTree(const juce::ValueTree& abSlotsTree)
     presetRef[0] = presetRef[1] = {};
 }
 
-void ABSlotManager::loadSinglePresetIntoActive(const juce::ValueTree&, const juce::String&) {}
+void ABSlotManager::loadSinglePresetIntoActive(const juce::ValueTree& presetState,
+                                               const juce::String& ref)
+{
+    if (!presetState.isValid() || presetState.getType() != apvts.state.getType())
+        return;
+
+    slots[(int) active] = presetState.createCopy();
+
+    {
+        const juce::ScopedValueSetter<bool> guard { suppressModifiedUpdates, true };
+        apvts.replaceState(slots[(int) active]);
+    }
+
+    modified[(int) active] = false;
+    presetRef[(int) active] = ref;
+    designerAuthored = false;
+}
 void ABSlotManager::loadABPreset(const juce::ValueTree&, const juce::String&) {}
 juce::ValueTree ABSlotManager::buildPresetSlotBChild() const { return {}; }
 
