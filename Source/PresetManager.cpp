@@ -379,6 +379,12 @@ bool PresetManager::loadPresetInto(ABSlotManager& abSlots,
         auto stateForLoad = tree.createCopy();
         if (auto existingMeta = stateForLoad.getChildWithName(kMetadataNodeId); existingMeta.isValid())
             stateForLoad.removeChild(existingMeta, nullptr);
+        if (auto existingSlotB = stateForLoad.getChildWithName("SlotB"); existingSlotB.isValid())
+            stateForLoad.removeChild(existingSlotB, nullptr);
+        if (auto existingMorph = stateForLoad.getChildWithName("MorphConfig"); existingMorph.isValid())
+            stateForLoad.removeChild(existingMorph, nullptr);
+        if (auto existingAB = stateForLoad.getChildWithName("ABSlots"); existingAB.isValid())
+            stateForLoad.removeChild(existingAB, nullptr);
         abSlots.loadSinglePresetIntoActive(stateForLoad, ref);
     }
     else

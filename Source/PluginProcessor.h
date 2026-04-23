@@ -50,6 +50,10 @@ public:
 
     kaigen::phantom::PresetManager presetManager;
 
+    // NOTE: MUST be declared AFTER `apvts`. Constructor subscribes to APVTS
+    // parameter listeners in order (see Parameters.h getAllParameterIDs()).
+    // If moved above `apvts`, the listener registration loop will find no
+    // registered parameters and the modified-flag tracking will silently break.
     kaigen::phantom::ABSlotManager abSlots { apvts };
 
     kaigen::phantom::ABSlotManager& getABSlotManager() { return abSlots; }
