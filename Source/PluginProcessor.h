@@ -3,6 +3,7 @@
 #include "Parameters.h"
 #include "Engines/PhantomEngine.h"
 #include "PresetManager.h"
+#include "ABSlotManager.h"
 
 class PhantomProcessor : public juce::AudioProcessor,
                          private juce::AudioProcessorValueTreeState::Listener
@@ -48,6 +49,10 @@ public:
     juce::AudioProcessorValueTreeState apvts;
 
     kaigen::phantom::PresetManager presetManager;
+
+    kaigen::phantom::ABSlotManager abSlots { apvts };
+
+    kaigen::phantom::ABSlotManager& getABSlotManager() { return abSlots; }
 
     // Real-time data exposed to the UI
     std::atomic<float> currentPitch { -1.0f };
