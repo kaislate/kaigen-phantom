@@ -362,3 +362,38 @@ TEST_CASE("buildPresetSlotBChild wraps slot B in a <SlotB> node")
     CHECK(slotBState.toXmlString()
           == abSlots.getSlot(kaigen::phantom::ABSlotManager::Slot::B).toXmlString());
 }
+
+TEST_CASE("plugin-state round-trip preserves slots + active + setting")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager src { proc.apvts };
+
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.15f);
+    src.snapTo(kaigen::phantom::ABSlotManager::Slot::B);
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.85f);
+    src.syncActiveSlotFromLive();
+    src.setIncludeDiscreteInSnap(true);
+
+    // Build what get/setStateInformation would write: root state + <ABSlots> child.
+    auto rootForSave = proc.apvts.copyState();
+    rootForSave.appendChild(src.toStateTree(), nullptr);
+    const auto xml = rootForSave.toXmlString();
+
+    // Now parse that back (simulating setStateInformation).
+    auto parsed = juce::ValueTree::fromXml(xml);
+    auto abSlotsChild = parsed.getChildWithName("ABSlots");
+    REQUIRE(abSlotsChild.isValid());
+    parsed.removeChild(abSlotsChild, nullptr);
+
+    TestProcessor proc2;
+    proc2.apvts.replaceState(parsed);
+    kaigen::phantom::ABSlotManager dst { proc2.apvts };
+    dst.fromStateTree(abSlotsChild);
+
+    CHECK(dst.getActive() == kaigen::phantom::ABSlotManager::Slot::B);
+    CHECK(dst.getIncludeDiscreteInSnap() == true);
+    CHECK(dst.getSlot(kaigen::phantom::ABSlotManager::Slot::A).toXmlString()
+          == src.getSlot(kaigen::phantom::ABSlotManager::Slot::A).toXmlString());
+    CHECK(dst.getSlot(kaigen::phantom::ABSlotManager::Slot::B).toXmlString()
+          == src.getSlot(kaigen::phantom::ABSlotManager::Slot::B).toXmlString());
+}
