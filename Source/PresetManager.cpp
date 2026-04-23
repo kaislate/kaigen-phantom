@@ -342,6 +342,58 @@ bool PresetManager::loadPreset(juce::AudioProcessorValueTreeState& apvts,
     return true;
 }
 
+bool PresetManager::loadPresetInto(ABSlotManager& abSlots,
+                                   const juce::String& presetName,
+                                   const juce::String& packName)
+{
+    auto file = getPresetFile(presetName, packName);
+    if (!file.existsAsFile()) return false;
+
+    auto xml = juce::parseXML(file);
+    if (xml == nullptr) return false;
+
+    auto tree = juce::ValueTree::fromXml(*xml);
+    if (!tree.isValid()) return false;
+
+    // Determine kind: prefer explicit metadata prop; else infer from SlotB presence.
+    PresetKind kind = PresetKind::Single;
+    if (auto meta = tree.getChildWithName(kMetadataNodeId); meta.isValid())
+    {
+        const auto s = meta.getProperty("presetKind", juce::var("")).toString();
+        if (!s.isEmpty())
+            kind = presetKindFromString(s);
+        else if (tree.getChildWithName("SlotB").isValid())
+            kind = PresetKind::AB;
+    }
+    else if (tree.getChildWithName("SlotB").isValid())
+    {
+        kind = PresetKind::AB;
+    }
+
+    const juce::String ref = packName + "/" + presetName;
+
+    if (kind == PresetKind::Single)
+    {
+        // Active-slot-only load. Strip metadata before handing to abSlots so the
+        // live APVTS doesn't get polluted by the Metadata child.
+        auto stateForLoad = tree.createCopy();
+        if (auto existingMeta = stateForLoad.getChildWithName(kMetadataNodeId); existingMeta.isValid())
+            stateForLoad.removeChild(existingMeta, nullptr);
+        abSlots.loadSinglePresetIntoActive(stateForLoad, ref);
+    }
+    else
+    {
+        // AB / ABMorph: hand the whole tree to abSlots.loadABPreset; it strips
+        // <SlotB> and <MorphConfig> internally for slot A and reads <SlotB> for slot B.
+        auto stateForLoad = tree.createCopy();
+        if (auto existingMeta = stateForLoad.getChildWithName(kMetadataNodeId); existingMeta.isValid())
+            stateForLoad.removeChild(existingMeta, nullptr);
+        abSlots.loadABPreset(stateForLoad, ref);
+    }
+
+    return true;
+}
+
 juce::String PresetManager::savePreset(juce::AudioProcessorValueTreeState& apvts,
                                        ABSlotManager* abSlots,
                                        const juce::String& presetName,

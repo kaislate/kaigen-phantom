@@ -93,6 +93,14 @@ public:
                     const juce::String& presetName,
                     const juce::String& packName);
 
+    // Load a preset via ABSlotManager. Dispatches on the preset's kind:
+    //   Single → abSlots.loadSinglePresetIntoActive
+    //   AB / ABMorph → abSlots.loadABPreset
+    // Returns true on success, false if missing/parse/unsupported.
+    bool loadPresetInto(ABSlotManager& abSlots,
+                        const juce::String& presetName,
+                        const juce::String& packName);
+
     // Save APVTS state as a new preset in User/. If overwrite=false and a
     // preset with this name exists, a numeric suffix is appended.
     // Returns the saved preset's name (possibly disambiguated), or empty on failure.

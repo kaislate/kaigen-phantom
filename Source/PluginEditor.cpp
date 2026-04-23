@@ -411,8 +411,8 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                     [weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), presetName, packName]
                     {
                         if (auto* ed = weakSelf.getComponent())
-                            ed->processor.getPresetManager().loadPreset(
-                                ed->processor.apvts, presetName, packName);
+                            ed->processor.getPresetManager().loadPresetInto(
+                                ed->processor.getABSlotManager(), presetName, packName);
                     });
 
                 complete(juce::var(true));
