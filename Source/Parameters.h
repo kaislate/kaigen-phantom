@@ -102,6 +102,14 @@ namespace ParamID
     // ── Advanced mode toggle (UI state; not automated) ────────────────────
     /** True if the advanced controls panel is open. UI-only; DSP never reads. */
     inline constexpr auto ADVANCED_OPEN = "advanced_open";
+
+    // ── Pro Morph (Pro build only) ──────────────────────────────────────
+  #ifdef KAIGEN_PRO_BUILD
+    inline constexpr auto MORPH_ENABLED    = "morph_enabled";
+    inline constexpr auto MORPH_AMOUNT     = "morph_amount";
+    inline constexpr auto SCENE_ENABLED    = "scene_enabled";
+    inline constexpr auto SCENE_POSITION   = "scene_position";
+  #endif
 }
 
 // ─── Preset amplitude tables — Chebyshev polynomial weights ────────────
@@ -161,6 +169,12 @@ inline std::vector<juce::String> getAllParameterIDs()
         ParamID::SYNTH_BOOST_THRESHOLD,
         ParamID::SYNTH_BOOST_AMOUNT,
         ParamID::ADVANCED_OPEN,
+    #ifdef KAIGEN_PRO_BUILD
+        ParamID::MORPH_ENABLED,
+        ParamID::MORPH_AMOUNT,
+        ParamID::SCENE_ENABLED,
+        ParamID::SCENE_POSITION,
+    #endif
     };
 }
 
@@ -340,6 +354,22 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     params.push_back(std::make_unique<AudioParameterBool>(
         ParamID::ADVANCED_OPEN, "Advanced Panel", false,
         juce::AudioParameterBoolAttributes().withAutomatable(false)));
+
+    // ── Pro Morph (Pro build only) ──────────────────────────────────────────
+  #ifdef KAIGEN_PRO_BUILD
+    params.push_back(std::make_unique<AudioParameterBool>(
+        ParamID::MORPH_ENABLED, "Morph Enabled", false,
+        juce::AudioParameterBoolAttributes().withAutomatable(false)));
+    params.push_back(std::make_unique<APF>(
+        ParamID::MORPH_AMOUNT, "Morph Amount",
+        NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    params.push_back(std::make_unique<AudioParameterBool>(
+        ParamID::SCENE_ENABLED, "Scene Crossfade Enabled", false,
+        juce::AudioParameterBoolAttributes().withAutomatable(false)));
+    params.push_back(std::make_unique<APF>(
+        ParamID::SCENE_POSITION, "Scene Position",
+        NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+  #endif
 
     return { params.begin(), params.end() };
 }
