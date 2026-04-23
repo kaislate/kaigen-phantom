@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <memory>
 
-class PhantomEngine;
+#include "Engines/PhantomEngine.h"
 
 namespace kaigen::phantom
 {

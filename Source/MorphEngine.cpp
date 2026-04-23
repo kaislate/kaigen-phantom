@@ -207,7 +207,14 @@ void MorphEngine::setSceneCrossfadeEnabled(bool on)
         p->setValueNotifyingHost(on ? 1.0f : 0.0f);
         p->endChangeGesture();
     }
-    // Note: Task 16 handles lazy secondaryEngine construction on first enable.
+
+    if (on && secondaryEngine == nullptr)
+    {
+        secondaryEngine = std::make_unique<PhantomEngine>();
+        secondaryEngine->prepare(sampleRate, samplesPerBlock, 2);
+    }
+    // Keep secondaryEngine around once created; no destruction on disable
+    // (avoids churn; memory cost is acceptable).
 }
 
 juce::ValueTree MorphEngine::toMorphConfigTree() const

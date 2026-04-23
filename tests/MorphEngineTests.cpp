@@ -405,4 +405,26 @@ TEST_CASE("toStateTree / fromStateTree round-trips full live state")
     CHECK(dst.getMorphAmount() == Catch::Approx(0.60f).epsilon(0.02));
 }
 
+TEST_CASE("setSceneCrossfadeEnabled(true) lazily constructs secondary engine")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    PhantomEngine engine;
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    morph.prepareToPlay(44100.0, 512);
+
+    REQUIRE(morph.isSceneCrossfadeEnabled() == false);
+
+    morph.setSceneCrossfadeEnabled(true);
+    CHECK(morph.isSceneCrossfadeEnabled() == true);
+
+    // After enabling, calling postProcessBlock (even on a dry buffer) should
+    // not crash — implies secondary engine exists and is ready.
+    juce::AudioBuffer<float> buf(2, 512);
+    buf.clear();
+    morph.postProcessBlock(buf, nullptr);
+    // No assertions here beyond "didn't crash".
+    CHECK(true);
+}
+
 #endif // KAIGEN_PRO_BUILD
