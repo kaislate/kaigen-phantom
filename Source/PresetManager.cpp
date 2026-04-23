@@ -407,7 +407,8 @@ juce::String PresetManager::savePreset(juce::AudioProcessorValueTreeState& apvts
                                        const juce::String& designer,
                                        const juce::String& description,
                                        PresetKind kind,
-                                       bool overwrite)
+                                       bool overwrite,
+                                       const juce::ValueTree* morphConfig)
 {
     auto sanitized = sanitizeName(presetName);
     if (sanitized.isEmpty()) return {};
@@ -475,7 +476,15 @@ juce::String PresetManager::savePreset(juce::AudioProcessorValueTreeState& apvts
         state.appendChild(abSlots->buildPresetSlotBChild(), nullptr);
     }
 
-    // <MorphConfig> is Pro-build only — not emitted in this plan.
+    // MorphConfig child — use the provided Pro-build tree if supplied; otherwise
+    // fall back to the attribute-only form from the A/B compare spec (Standard).
+    if (kind == PresetKind::ABMorph && morphConfig != nullptr && morphConfig->isValid())
+    {
+        // Strip any existing MorphConfig; append the provided one.
+        if (auto existing = state.getChildWithName("MorphConfig"); existing.isValid())
+            state.removeChild(existing, nullptr);
+        state.appendChild(morphConfig->createCopy(), nullptr);
+    }
 
     auto xml = state.createXml();
     if (xml == nullptr) return {};

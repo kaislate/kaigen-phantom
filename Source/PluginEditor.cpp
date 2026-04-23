@@ -437,10 +437,20 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
 
                 const auto kind = kaigen::phantom::presetKindFromString(kindStr);
 
+              #ifdef KAIGEN_PRO_BUILD
+                juce::ValueTree morphConfigForSave;
+                if (kind == kaigen::phantom::PresetKind::ABMorph)
+                    morphConfigForSave = self.processor.getMorphEngine().toMorphConfigTree();
+              #endif
+
                 auto savedName = self.processor.getPresetManager().savePreset(
                     self.processor.apvts,
                     &self.processor.getABSlotManager(),
-                    name, type, designer, description, kind, overwrite);
+                    name, type, designer, description, kind, overwrite
+                  #ifdef KAIGEN_PRO_BUILD
+                    , morphConfigForSave.isValid() ? &morphConfigForSave : nullptr
+                  #endif
+                );
                 complete(juce::var(savedName));
             })
         .withNativeFunction("setFavorite",
