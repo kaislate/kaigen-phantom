@@ -50,6 +50,19 @@ target_compile_definitions(KaigenPhantomTests PRIVATE
     JUCE_DONT_DECLARE_PROJECTINFO=1
 )
 
+if(KAIGEN_PRO_BUILD)
+    # MorphEngineTests.cpp is created in Task 5; guard avoids configure error until then.
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/MorphEngineTests.cpp")
+        target_sources(KaigenPhantomTests PRIVATE
+            MorphEngineTests.cpp
+        )
+    endif()
+    target_sources(KaigenPhantomTests PRIVATE
+        ../Source/MorphEngine.cpp
+    )
+    target_compile_definitions(KaigenPhantomTests PRIVATE KAIGEN_PRO_BUILD=1)
+endif()
+
 include(CTest)
 include(Catch)
 catch_discover_tests(KaigenPhantomTests)

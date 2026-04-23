@@ -55,6 +55,9 @@ target_sources(KaigenPhantom PRIVATE
 
 if(KAIGEN_PRO_BUILD)
     target_compile_definitions(KaigenPhantom PRIVATE KAIGEN_PRO_BUILD=1)
+    target_sources(KaigenPhantom PRIVATE
+        Source/MorphEngine.cpp
+    )
     message(STATUS "Building Kaigen Phantom PRO (morph features enabled)")
 else()
     message(STATUS "Building Kaigen Phantom STANDARD")
