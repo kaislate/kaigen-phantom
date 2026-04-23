@@ -16,7 +16,21 @@ ABSlotManager::~ABSlotManager() = default;
 
 void ABSlotManager::parameterChanged(const juce::String&, float) {}
 
-void ABSlotManager::snapTo(Slot) {}
+void ABSlotManager::snapTo(Slot target)
+{
+    if (target == active) return;
+
+    // Commit live → currently-active slot.
+    slots[(int) active] = apvts.copyState();
+
+    // Replace live from target.
+    {
+        const juce::ScopedValueSetter<bool> guard { suppressModifiedUpdates, true };
+        apvts.replaceState(slots[(int) target]);
+    }
+
+    active = target;
+}
 void ABSlotManager::copy(Slot, Slot) {}
 bool ABSlotManager::isModified(Slot s) const noexcept { return modified[(int) s]; }
 juce::String ABSlotManager::getPresetRef(Slot s) const { return presetRef[(int) s]; }
