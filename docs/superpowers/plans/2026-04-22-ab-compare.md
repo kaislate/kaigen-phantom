@@ -546,19 +546,33 @@ void ABSlotManager::snapTo(Slot target)
 {
     if (target == active) return;
 
-    slots[(int) active] = apvts.copyState();
-
-    // Capture discrete-param values BEFORE replaceState if we may need to restore them.
+    // Capture discrete-param values from the ACTIVE SLOT'S STORED tree BEFORE
+    // the commit overwrites it. We deliberately read from the stored tree
+    // (not from live via p->getValue()) because between snaps the user may
+    // have edited live while intending to configure the TARGET slot —
+    // reading live would carry that target-intended edit back into the
+    // active slot's restoration, which is the opposite of "preserve the
+    // active slot's discrete settings across the snap."
     const bool preserveDiscrete = !designerAuthored && !includeDiscreteInSnap;
-    std::map<juce::String, float> savedDiscrete;
+    std::map<juce::String, float> savedDiscreteNorm;
     if (preserveDiscrete)
     {
+        const auto& activeTree = slots[(int) active];
         for (const auto& id : discreteParamIDs())
         {
-            if (auto* p = apvts.getParameter(id))
-                savedDiscrete[id] = p->getValue();
+            auto child = activeTree.getChildWithProperty("id", juce::var(id));
+            if (child.isValid())
+            {
+                if (auto* p = apvts.getParameter(id))
+                {
+                    const float denorm = (float) child.getProperty("value", 0.0f);
+                    savedDiscreteNorm[id] = p->convertTo0to1(denorm);
+                }
+            }
         }
     }
+
+    slots[(int) active] = apvts.copyState();
 
     {
         const juce::ScopedValueSetter<bool> guard { suppressModifiedUpdates, true };
@@ -568,12 +582,12 @@ void ABSlotManager::snapTo(Slot target)
     if (preserveDiscrete)
     {
         const juce::ScopedValueSetter<bool> guard { suppressModifiedUpdates, true };
-        for (const auto& [id, value] : savedDiscrete)
+        for (const auto& [id, normValue] : savedDiscreteNorm)
         {
             if (auto* p = apvts.getParameter(id))
             {
                 p->beginChangeGesture();
-                p->setValueNotifyingHost(value);
+                p->setValueNotifyingHost(normValue);
                 p->endChangeGesture();
             }
         }
@@ -584,6 +598,8 @@ void ABSlotManager::snapTo(Slot target)
 ```
 
 Add `#include <map>` at the top of the file if not already present (it isn't).
+
+**Semantic note:** this captures the active slot's *last-committed* discrete state, not live in-flight edits. Reason: the `includeDiscreteInSnap` setting governs *snap* crossovers, not edit history. Between snaps, user edits to discrete params are intended to configure whichever slot the user is *currently on*, not to be preserved across the next snap into the previous slot.
 
 - [ ] **Step 5: Run tests to verify they pass**
 
