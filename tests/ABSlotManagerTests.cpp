@@ -261,3 +261,104 @@ TEST_CASE("loadSinglePresetIntoActive writes only the active slot")
     CHECK(abSlots.getPresetRef(kaigen::phantom::ABSlotManager::Slot::A) == "Factory/Warm Bass");
     CHECK(abSlots.isModified(kaigen::phantom::ABSlotManager::Slot::A) == false);
 }
+
+TEST_CASE("loadABPreset populates both slots and sets designerAuthored")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+
+    // Build two distinct state trees for A and B.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.2f);
+    const auto stateA = proc.apvts.copyState();
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.8f);
+    const auto stateB = proc.apvts.copyState();
+
+    // Compose a preset root: root = stateA, with SlotB child containing stateB.
+    auto presetRoot = stateA.createCopy();
+    juce::ValueTree slotBChild { "SlotB" };
+    slotBChild.appendChild(stateB.createCopy(), nullptr);
+    presetRoot.appendChild(slotBChild, nullptr);
+
+    abSlots.loadABPreset(presetRoot, "Factory/Bright vs Dark");
+
+    // Slot A gets the root state, MINUS the SlotB child (stripping covered later).
+    // For now, just check slot B equals the SlotB child's payload.
+    CHECK(abSlots.getSlot(kaigen::phantom::ABSlotManager::Slot::B).toXmlString()
+          == stateB.toXmlString());
+    CHECK(abSlots.getPresetRef(kaigen::phantom::ABSlotManager::Slot::A) == "Factory/Bright vs Dark");
+    CHECK(abSlots.getPresetRef(kaigen::phantom::ABSlotManager::Slot::B) == "Factory/Bright vs Dark");
+    CHECK(abSlots.isModified(kaigen::phantom::ABSlotManager::Slot::A) == false);
+    CHECK(abSlots.isModified(kaigen::phantom::ABSlotManager::Slot::B) == false);
+}
+
+TEST_CASE("designerAuthored overrides includeDiscreteInSnap=false")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    abSlots.setIncludeDiscreteInSnap(false);
+
+    // Slot A: Ghost Mode = 0 (Replace); Slot B: Ghost Mode = 2 (Phantom Only).
+    proc.apvts.getParameter(ParamID::GHOST_MODE)->setValueNotifyingHost(0.0f);
+    const auto stateA = proc.apvts.copyState();
+    proc.apvts.getParameter(ParamID::GHOST_MODE)->setValueNotifyingHost(1.0f);
+    const auto stateB = proc.apvts.copyState();
+
+    auto presetRoot = stateA.createCopy();
+    juce::ValueTree slotBChild { "SlotB" };
+    slotBChild.appendChild(stateB.createCopy(), nullptr);
+    presetRoot.appendChild(slotBChild, nullptr);
+
+    abSlots.loadABPreset(presetRoot, "Factory/Test");
+
+    // Active is still A (load doesn't change it). Snap to B: discrete should flip
+    // because designer-authored bit overrides the off-by-default user setting.
+    abSlots.snapTo(kaigen::phantom::ABSlotManager::Slot::B);
+    const int liveGhostMode = (int) proc.apvts.getRawParameterValue(ParamID::GHOST_MODE)->load();
+    CHECK(liveGhostMode == 2);
+}
+
+TEST_CASE("designerAuthored cleared on any parameter edit")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    abSlots.setIncludeDiscreteInSnap(false);
+
+    proc.apvts.getParameter(ParamID::GHOST_MODE)->setValueNotifyingHost(0.0f);
+    const auto stateA = proc.apvts.copyState();
+    proc.apvts.getParameter(ParamID::GHOST_MODE)->setValueNotifyingHost(1.0f);
+    const auto stateB = proc.apvts.copyState();
+
+    auto presetRoot = stateA.createCopy();
+    juce::ValueTree slotBChild { "SlotB" };
+    slotBChild.appendChild(stateB.createCopy(), nullptr);
+    presetRoot.appendChild(slotBChild, nullptr);
+
+    abSlots.loadABPreset(presetRoot, "Factory/Test");
+
+    // User tweaks any param → designerAuthored cleared.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.5f);
+
+    // Now snap to B → discrete stays at slot A's value because the setting is off.
+    abSlots.snapTo(kaigen::phantom::ABSlotManager::Slot::B);
+    const int liveGhostMode = (int) proc.apvts.getRawParameterValue(ParamID::GHOST_MODE)->load();
+    CHECK(liveGhostMode == 0);
+}
+
+TEST_CASE("buildPresetSlotBChild wraps slot B in a <SlotB> node")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.33f);
+    abSlots.snapTo(kaigen::phantom::ABSlotManager::Slot::B);
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.77f);
+    abSlots.syncActiveSlotFromLive();
+
+    const auto child = abSlots.buildPresetSlotBChild();
+    REQUIRE(child.isValid());
+    CHECK(child.getType().toString() == "SlotB");
+    REQUIRE(child.getNumChildren() == 1);
+    const auto slotBState = child.getChild(0);
+    CHECK(slotBState.toXmlString()
+          == abSlots.getSlot(kaigen::phantom::ABSlotManager::Slot::B).toXmlString());
+}

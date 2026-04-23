@@ -189,8 +189,45 @@ void ABSlotManager::loadSinglePresetIntoActive(const juce::ValueTree& presetStat
     presetRef[(int) active] = ref;
     designerAuthored = false;
 }
-void ABSlotManager::loadABPreset(const juce::ValueTree&, const juce::String&) {}
-juce::ValueTree ABSlotManager::buildPresetSlotBChild() const { return {}; }
+void ABSlotManager::loadABPreset(const juce::ValueTree& presetRootState,
+                                 const juce::String& ref)
+{
+    if (!presetRootState.isValid() || presetRootState.getType() != apvts.state.getType())
+        return;
+
+    // Slot A = root state, WITHOUT <SlotB> or <MorphConfig> children.
+    auto slotA = presetRootState.createCopy();
+    if (auto existing = slotA.getChildWithName("SlotB"); existing.isValid())
+        slotA.removeChild(existing, nullptr);
+    if (auto existingMorph = slotA.getChildWithName("MorphConfig"); existingMorph.isValid())
+        slotA.removeChild(existingMorph, nullptr);
+    slots[0] = slotA;
+
+    // Slot B = contents of <SlotB>'s first child, if present. Otherwise leave empty
+    // (treated as "A/B preset with empty B" — unusual but not an error).
+    const auto slotBChild = presetRootState.getChildWithName("SlotB");
+    if (slotBChild.isValid() && slotBChild.getNumChildren() > 0)
+        slots[1] = slotBChild.getChild(0).createCopy();
+    else
+        slots[1] = slots[0].createCopy();
+
+    {
+        const juce::ScopedValueSetter<bool> guard { suppressModifiedUpdates, true };
+        apvts.replaceState(slots[(int) active]);
+    }
+
+    modified[0] = modified[1] = false;
+    presetRef[0] = presetRef[1] = ref;
+    designerAuthored = true;
+}
+
+juce::ValueTree ABSlotManager::buildPresetSlotBChild() const
+{
+    juce::ValueTree child { "SlotB" };
+    if (slots[1].isValid())
+        child.appendChild(slots[1].createCopy(), nullptr);
+    return child;
+}
 
 const juce::StringArray& ABSlotManager::discreteParamIDs()
 {
