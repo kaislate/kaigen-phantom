@@ -431,9 +431,14 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 const auto designer    = args.size() > 2 ? args[2].toString() : juce::String("User");
                 const auto description = args.size() > 3 ? args[3].toString() : juce::String();
                 const bool overwrite   = args.size() > 4 && args[4].isBool() && (bool) args[4];
+                const auto kindStr     = args.size() > 5 ? args[5].toString() : juce::String("single");
+
+                const auto kind = kaigen::phantom::presetKindFromString(kindStr);
 
                 auto savedName = self.processor.getPresetManager().savePreset(
-                    self.processor.apvts, name, type, designer, description, overwrite);
+                    self.processor.apvts,
+                    &self.processor.getABSlotManager(),
+                    name, type, designer, description, kind, overwrite);
                 complete(juce::var(savedName));
             })
         .withNativeFunction("setFavorite",
