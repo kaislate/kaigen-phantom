@@ -95,3 +95,45 @@ TEST_CASE("snapTo commits live to active slot, then loads target slot")
     CHECK(ghostValue == Catch::Approx(30.0f).epsilon(0.01));
     // GHOST is a 0..100 % parameter; setValueNotifyingHost takes 0..1 normalized → 30.0f.
 }
+
+TEST_CASE("snapTo with includeDiscreteInSnap=false preserves discrete params")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+
+    // Configure two slots with differing Ghost Mode via a sequence of snaps:
+    // Slot A: Ghost Mode = 0 (Replace)
+    proc.apvts.getParameter(ParamID::GHOST_MODE)->setValueNotifyingHost(0.0f);
+    abSlots.snapTo(kaigen::phantom::ABSlotManager::Slot::B);
+    // Slot B: Ghost Mode = 1 (Combine)   [mapping: 0/0.5/1.0 → 0/1/2]
+    proc.apvts.getParameter(ParamID::GHOST_MODE)->setValueNotifyingHost(0.5f);
+    abSlots.snapTo(kaigen::phantom::ABSlotManager::Slot::A);
+    // Now live = slot A's value = 0 (Replace). Good.
+
+    REQUIRE(abSlots.getIncludeDiscreteInSnap() == false);
+
+    // Snap to B. With include-discrete OFF, the live Ghost Mode should
+    // remain at slot A's value (0), NOT flip to slot B's (1).
+    abSlots.snapTo(kaigen::phantom::ABSlotManager::Slot::B);
+
+    const int liveGhostMode = (int) proc.apvts.getRawParameterValue(ParamID::GHOST_MODE)->load();
+    CHECK(liveGhostMode == 0);
+}
+
+TEST_CASE("snapTo with includeDiscreteInSnap=true flips discrete params")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    abSlots.setIncludeDiscreteInSnap(true);
+
+    // Same setup as the previous test.
+    proc.apvts.getParameter(ParamID::GHOST_MODE)->setValueNotifyingHost(0.0f);
+    abSlots.snapTo(kaigen::phantom::ABSlotManager::Slot::B);
+    proc.apvts.getParameter(ParamID::GHOST_MODE)->setValueNotifyingHost(0.5f);
+    abSlots.snapTo(kaigen::phantom::ABSlotManager::Slot::A);
+
+    abSlots.snapTo(kaigen::phantom::ABSlotManager::Slot::B);
+
+    const int liveGhostMode = (int) proc.apvts.getRawParameterValue(ParamID::GHOST_MODE)->load();
+    CHECK(liveGhostMode == 1);
+}

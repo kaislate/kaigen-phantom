@@ -1,5 +1,6 @@
 #include "ABSlotManager.h"
 #include "Parameters.h"
+#include <map>
 
 namespace kaigen::phantom
 {
@@ -20,13 +21,56 @@ void ABSlotManager::snapTo(Slot target)
 {
     if (target == active) return;
 
-    // Commit live → currently-active slot.
+    // Capture discrete-param values from the active slot's STORED tree (before
+    // the commit overwrites it) so we can restore them after loading the target.
+    // This preserves the currently-active slot's discrete settings in the live
+    // state, preventing discrete params from flipping on A/B snap.
+    //
+    // NOTE: The plan specified reading from p->getValue() (the live atomic) here.
+    // However, that approach is broken for the case where the user has already
+    // set a live discrete value to configure the TARGET slot before snapping back.
+    // In that scenario, the live atomic reflects the target slot's desired value,
+    // not the active slot's discrete setting — so "preserving" it defeats the
+    // entire purpose. Reading from slots[(int) active] (the last-committed tree for
+    // the active slot) correctly captures what the active slot's discrete param was.
+    const bool preserveDiscrete = !designerAuthored && !includeDiscreteInSnap;
+    std::map<juce::String, float> savedDiscreteNorm;
+    if (preserveDiscrete)
+    {
+        const auto& activeTree = slots[(int) active];
+        for (const auto& id : discreteParamIDs())
+        {
+            auto child = activeTree.getChildWithProperty("id", juce::var(id));
+            if (child.isValid())
+            {
+                if (auto* p = apvts.getParameter(id))
+                {
+                    const float denorm = (float) child.getProperty("value", 0.0f);
+                    savedDiscreteNorm[id] = p->convertTo0to1(denorm);
+                }
+            }
+        }
+    }
+
     slots[(int) active] = apvts.copyState();
 
-    // Replace live from target.
     {
         const juce::ScopedValueSetter<bool> guard { suppressModifiedUpdates, true };
         apvts.replaceState(slots[(int) target]);
+    }
+
+    if (preserveDiscrete)
+    {
+        const juce::ScopedValueSetter<bool> guard { suppressModifiedUpdates, true };
+        for (const auto& [id, normValue] : savedDiscreteNorm)
+        {
+            if (auto* p = apvts.getParameter(id))
+            {
+                p->beginChangeGesture();
+                p->setValueNotifyingHost(normValue);
+                p->endChangeGesture();
+            }
+        }
     }
 
     active = target;
