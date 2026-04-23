@@ -122,4 +122,32 @@ TEST_CASE("armedKnobCount counts multiple independent arcs")
     CHECK(armed.size() == 3);
 }
 
+TEST_CASE("setEnabled toggles the enabled flag")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    PhantomEngine engine;
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+
+    REQUIRE(morph.isEnabled() == false);
+    morph.setEnabled(true);
+    CHECK(morph.isEnabled() == true);
+    morph.setEnabled(false);
+    CHECK(morph.isEnabled() == false);
+}
+
+TEST_CASE("setSceneCrossfadeEnabled toggles the scene flag")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    PhantomEngine engine;
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+
+    REQUIRE(morph.isSceneCrossfadeEnabled() == false);
+    morph.setSceneCrossfadeEnabled(true);
+    CHECK(morph.isSceneCrossfadeEnabled() == true);
+    morph.setSceneCrossfadeEnabled(false);
+    CHECK(morph.isSceneCrossfadeEnabled() == false);
+}
+
 #endif // KAIGEN_PRO_BUILD

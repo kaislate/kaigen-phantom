@@ -67,11 +67,34 @@ std::vector<juce::String> MorphEngine::getArmedParamIDs() const
     return result;
 }
 
-void MorphEngine::setEnabled(bool) {}
+void MorphEngine::setEnabled(bool on)
+{
+    enabled = on;
+    // Also sync the APVTS parameter so the UI slider and DAW reflect state.
+    if (auto* p = apvts.getParameter(ParamID::MORPH_ENABLED))
+    {
+        const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
+        p->beginChangeGesture();
+        p->setValueNotifyingHost(on ? 1.0f : 0.0f);
+        p->endChangeGesture();
+    }
+}
+
 void MorphEngine::beginCapture() {}
 std::vector<juce::String> MorphEngine::endCapture(bool) { return {}; }
 
-void MorphEngine::setSceneCrossfadeEnabled(bool) {}
+void MorphEngine::setSceneCrossfadeEnabled(bool on)
+{
+    sceneEnabled = on;
+    if (auto* p = apvts.getParameter(ParamID::SCENE_ENABLED))
+    {
+        const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
+        p->beginChangeGesture();
+        p->setValueNotifyingHost(on ? 1.0f : 0.0f);
+        p->endChangeGesture();
+    }
+    // Note: Task 16 handles lazy secondaryEngine construction on first enable.
+}
 
 juce::ValueTree MorphEngine::toMorphConfigTree() const { return juce::ValueTree("MorphConfig"); }
 void MorphEngine::fromMorphConfigTree(const juce::ValueTree&) {}
