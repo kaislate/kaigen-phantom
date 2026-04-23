@@ -85,9 +85,10 @@ public:
     void loadABPreset(const juce::ValueTree& presetRootState,
                       const juce::String& presetRef);
 
-    // Called by PresetManager::savePreset when building the tree to write
-    juce::ValueTree buildPresetRootTree(Slot sourceSlot) const;   // for Single
-    juce::ValueTree buildPresetSlotBChild() const;                 // for A/B: the <SlotB> child
+    // Called by PresetManager::savePreset when building the tree to write.
+    // Save of slot A uses PresetManager's own copy of the slot tree (no helper
+    // needed). For A/B saves, this produces the <SlotB> child wrapping slot B.
+    juce::ValueTree buildPresetSlotBChild() const;
 
     // Setting accessors
     bool getIncludeDiscreteInSnap() const noexcept { return includeDiscreteInSnap; }
