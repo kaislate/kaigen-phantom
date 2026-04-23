@@ -134,6 +134,7 @@ state.ab = {
     slotsIdentical: true,
     includeDiscrete:false,
 };
+state.browserKindFilter = 'all';
 
 // Sort state for the preset browser list. Persists for the lifetime of the
 // editor window; resets to defaults when the plugin is re-opened.
@@ -165,6 +166,12 @@ function compareRows(a, b) {
     if (col === 'designer') return (dir * (a.meta.designer || '').localeCompare(b.meta.designer || '')) || byName;
     if (col === 'skip')     return (dir * ((a.preview?.skip ?? 0) - (b.preview?.skip ?? 0))) || byName;
     if (col === 'shape')    return (dir * (spectralCentroid(a.preview) - spectralCentroid(b.preview))) || byName;
+    if (col === 'kind') {
+        const order = { 'single': 0, 'ab': 1, 'ab_morph': 2 };
+        const va = order[a.meta.presetKind || 'single'] ?? 0;
+        const vb = order[b.meta.presetKind || 'single'] ?? 0;
+        return (va - vb) * dir;
+    }
     if (col === 'heart') {
         // Ascending = favorites on top. (true should compare as "less than" false in asc order.)
         const av = a.meta.isFavorite ? 0 : 1;
@@ -565,6 +572,12 @@ function renderBrowser() {
             </div>
             <div style="padding: 4px 12px 8px 12px; border-bottom: 1px solid rgba(0,0,0,0.12); display: flex; gap: 6px; align-items: center;">
               <input id="browser-search" type="text" placeholder="${isExplore ? 'Search packs…' : 'Search presets…'}" style="flex: 1; background: rgba(255,255,255,0.6); color: rgba(0,0,0,0.70); border: 1px solid rgba(0,0,0,0.12); padding: 4px 8px; border-radius: 3px; font-size: 11px; font-family: 'Space Grotesk', system-ui;">
+              <select id="browser-kind-filter" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; background: rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.10); border-radius: 3px; color: rgba(0,0,0,0.75);">
+                  <option value="all">All</option>
+                  <option value="single">Single</option>
+                  <option value="ab">A/B</option>
+                  <option value="morph">Morph</option>
+              </select>
               <button id="browser-close" style="background: none; border: none; color: rgba(0,0,0,0.70); cursor: pointer; font-size: 14px; padding: 2px 8px; font-weight: 600;">✕</button>
             </div>
             ${mainPane}
@@ -588,6 +601,15 @@ function renderBrowser() {
         if (isExplore) renderExplore(e.target.value);
         else renderBrowserList(e.target.value);
     });
+
+    const kindFilter = document.getElementById('browser-kind-filter');
+    if (kindFilter) {
+        kindFilter.value = state.browserKindFilter;
+        kindFilter.addEventListener('change', (e) => {
+            state.browserKindFilter = e.target.value;
+            renderBrowserList(document.getElementById('browser-search').value);
+        });
+    }
 
     if (isExplore) renderExplore('');
     else renderBrowserList('');
@@ -705,7 +727,7 @@ function renderBrowserList(searchTerm) {
     const q = (searchTerm || '').toLowerCase().trim();
 
     // Flatten + filter
-    const rows = [];
+    let rows = [];
     for (const [packName, list] of Object.entries(cache)) {
         for (const p of list) {
             if (browserFilter === 'favorites' && !p.metadata.isFavorite) continue;
@@ -713,6 +735,15 @@ function renderBrowserList(searchTerm) {
             if (q && !p.metadata.name.toLowerCase().includes(q)) continue;
             rows.push({ pack: packName, meta: p.metadata, preview: p.preview });
         }
+    }
+
+    // Kind filter
+    if (state.browserKindFilter === 'single') {
+        rows = rows.filter(r => !r.meta.presetKind || r.meta.presetKind === 'single');
+    } else if (state.browserKindFilter === 'ab') {
+        rows = rows.filter(r => r.meta.presetKind === 'ab');
+    } else if (state.browserKindFilter === 'morph') {
+        rows = rows.filter(r => r.meta.presetKind === 'ab_morph');
     }
 
     updateBrowserCount(rows.length);
