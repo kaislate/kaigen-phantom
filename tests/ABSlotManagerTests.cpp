@@ -39,3 +39,21 @@ TEST_CASE("ABSlotManager compiles and constructs")
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     CHECK(abSlots.getActive() == kaigen::phantom::ABSlotManager::Slot::A);
 }
+
+TEST_CASE("ABSlotManager constructor initializes both slots from live APVTS")
+{
+    TestProcessor proc;
+    // Set a non-default value so we can check both slots capture it.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.42f);
+
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+
+    auto slotA = abSlots.getSlot(kaigen::phantom::ABSlotManager::Slot::A);
+    auto slotB = abSlots.getSlot(kaigen::phantom::ABSlotManager::Slot::B);
+
+    REQUIRE(slotA.isValid());
+    REQUIRE(slotB.isValid());
+    // Both slots should match live state (copyState of same APVTS).
+    CHECK(slotA.toXmlString() == slotB.toXmlString());
+    CHECK(slotA.toXmlString() == proc.apvts.copyState().toXmlString());
+}

@@ -7,6 +7,8 @@ namespace kaigen::phantom
 ABSlotManager::ABSlotManager(juce::AudioProcessorValueTreeState& apvtsRef)
     : apvts(apvtsRef)
 {
+    slots[0] = apvts.copyState();
+    slots[1] = apvts.copyState();
     // Registration of APVTS listeners happens in a later task.
 }
 
