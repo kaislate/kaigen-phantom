@@ -64,6 +64,13 @@ void MorphEngine::preProcessBlock()
     }
 }
 
+void MorphEngine::syncSecondaryEngineFromSlotB()
+{
+    // This is called inline from postProcessBlock; the actual work happens there
+    // because we need the scope-held savedState. Kept as a named method for
+    // future refactoring when the primary engine is decoupled from APVTS.
+}
+
 void MorphEngine::postProcessBlock(juce::AudioBuffer<float>& mainBuffer,
                                    const juce::AudioBuffer<float>* sidechain)
 {
@@ -72,28 +79,42 @@ void MorphEngine::postProcessBlock(juce::AudioBuffer<float>& mainBuffer,
     const int n = mainBuffer.getNumSamples();
     const int nCh = juce::jmin(2, mainBuffer.getNumChannels());
 
-    // Prepare a scratch buffer for the secondary engine.
-    // Approximation for v1: copy the current main buffer (which is the primary's
-    // output) as the secondary's input. True shared-input requires threading the
-    // original pre-engine input into MorphEngine — deferred to v2.
-    // NOTE (v2): thread the original input through MorphEngine if this proves audibly wrong.
+    // Swap APVTS state to slot B, sync secondary engine, swap back.
+    const auto savedState = apvts.copyState();
+    const auto slotB = abSlots.getSlot(ABSlotManager::Slot::B);
 
-    juce::AudioBuffer<float> secondaryBuf(nCh, n);
-    for (int ch = 0; ch < nCh; ++ch)
-        secondaryBuf.copyFrom(ch, 0, mainBuffer, ch, 0, n);
-
-    secondaryEngine->process(secondaryBuf, sidechain);
-
-    const float pos = juce::jlimit(0.0f, 1.0f, smoothedScenePos);
-    const float primaryGain = 1.0f - pos;
-    const float secondaryGain = pos;
-
-    for (int ch = 0; ch < nCh; ++ch)
+    if (slotB.isValid())
     {
-        auto* main = mainBuffer.getWritePointer(ch);
-        const auto* sec = secondaryBuf.getReadPointer(ch);
-        for (int i = 0; i < n; ++i)
-            main[i] = main[i] * primaryGain + sec[i] * secondaryGain;
+        // Replace state with slot B (secondary engine's intended config).
+        {
+            const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
+            apvts.replaceState(slotB.createCopy());
+        }
+
+        juce::AudioBuffer<float> secondaryBuf(nCh, n);
+        for (int ch = 0; ch < nCh; ++ch)
+            secondaryBuf.copyFrom(ch, 0, mainBuffer, ch, 0, n);
+
+        secondaryEngine->process(secondaryBuf, sidechain);
+
+        // Restore primary state.
+        {
+            const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
+            apvts.replaceState(savedState);
+        }
+
+        // Mix: primary output is already in mainBuffer; blend secondary in.
+        const float pos = juce::jlimit(0.0f, 1.0f, smoothedScenePos);
+        const float primaryGain = 1.0f - pos;
+        const float secondaryGain = pos;
+
+        for (int ch = 0; ch < nCh; ++ch)
+        {
+            auto* main = mainBuffer.getWritePointer(ch);
+            const auto* sec = secondaryBuf.getReadPointer(ch);
+            for (int i = 0; i < n; ++i)
+                main[i] = main[i] * primaryGain + sec[i] * secondaryGain;
+        }
     }
 }
 

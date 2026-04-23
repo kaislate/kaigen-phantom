@@ -67,6 +67,7 @@ public:
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
+    void syncSecondaryEngineFromSlotB();
     void updateSmoothing();
     float smoothOne(float& target, float raw) const;
     void writeParamClamped(const juce::String& paramID, float denormalizedValue);

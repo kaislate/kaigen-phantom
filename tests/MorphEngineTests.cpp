@@ -447,4 +447,29 @@ TEST_CASE("postProcessBlock with scene disabled is a no-op")
     CHECK(buf.getSample(0, 511) == Catch::Approx(0.5f));
 }
 
+TEST_CASE("postProcessBlock at scene position 0 preserves primary output")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    PhantomEngine engine;
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    morph.prepareToPlay(44100.0, 512);
+
+    morph.setSceneCrossfadeEnabled(true);
+    // Force smoothed scene position to 0 by setting raw and settling.
+    proc.apvts.getParameter(ParamID::SCENE_POSITION)->setValueNotifyingHost(0.0f);
+    for (int i = 0; i < 200; ++i) morph.preProcessBlock();
+
+    juce::AudioBuffer<float> buf(2, 512);
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < 512; ++i)
+            buf.setSample(ch, i, 0.5f);
+
+    morph.postProcessBlock(buf, nullptr);
+
+    // At scene position 0, secondary contribution is zero; main stays 0.5
+    // (modulo whatever secondary engine does on 0.5-filled buffer mixed at 0).
+    CHECK(buf.getSample(0, 0) == Catch::Approx(0.5f).epsilon(0.05));
+}
+
 #endif // KAIGEN_PRO_BUILD
