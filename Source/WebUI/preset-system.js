@@ -11,15 +11,19 @@
 // ── Native function bridge ───────────────────────────────────────────────
 
 const native = {
-    getAllPresets:     null,
-    loadPreset:        null,
-    savePreset:        null,
-    setFavorite:       null,
-    deletePreset:      null,
-    getAllPacks:       null,
-    setInputFocused:   null,
-    returnFocusToHost: null,
-    forwardKeyToHost:  null,
+    getAllPresets:        null,
+    loadPreset:          null,
+    savePreset:          null,
+    setFavorite:         null,
+    deletePreset:        null,
+    getAllPacks:          null,
+    setInputFocused:     null,
+    returnFocusToHost:   null,
+    forwardKeyToHost:    null,
+    abGetState:          null,
+    abSnapTo:            null,
+    abCopy:              null,
+    abSetIncludeDiscrete:null,
 };
 
 function initNativeBridge() {
@@ -36,6 +40,10 @@ function initNativeBridge() {
     native.setInputFocused   = window.Juce.getNativeFunction('setInputFocused');
     native.returnFocusToHost = window.Juce.getNativeFunction('returnFocusToHost');
     native.forwardKeyToHost  = window.Juce.getNativeFunction('forwardKeyToHost');
+    native.abGetState            = window.Juce.getNativeFunction('abGetState');
+    native.abSnapTo              = window.Juce.getNativeFunction('abSnapTo');
+    native.abCopy                = window.Juce.getNativeFunction('abCopy');
+    native.abSetIncludeDiscrete  = window.Juce.getNativeFunction('abSetIncludeDiscrete');
     return true;
 }
 
@@ -119,6 +127,14 @@ const state = {
     packsCache:      null,  // [ { name, displayName, description, designer, hasCoverArt, presetCount } ]
 };
 
+state.ab = {
+    active:         'A',
+    modifiedA:      false,
+    modifiedB:      false,
+    slotsIdentical: true,
+    includeDiscrete:false,
+};
+
 // Sort state for the preset browser list. Persists for the lifetime of the
 // editor window; resets to defaults when the plugin is re-opened.
 const browserSort = { column: 'name', dir: 'asc' };
@@ -174,6 +190,11 @@ function cacheElements() {
     el.dropdown         = document.getElementById('preset-dropdown');
     el.browserModal     = document.getElementById('preset-browser-modal');
     el.saveModal        = document.getElementById('preset-save-modal');
+    el.abSlotA   = document.getElementById('ab-slot-a');
+    el.abSlotB   = document.getElementById('ab-slot-b');
+    el.abCopy    = document.getElementById('ab-copy');
+    el.abModDotA = document.getElementById('ab-mod-a');
+    el.abModDotB = document.getElementById('ab-mod-b');
 }
 
 // ── Header UI updates ────────────────────────────────────────────────────
@@ -199,6 +220,45 @@ function setCurrentPreset(name, pack, isFav) {
     state.isFavorite = !!isFav;
     state.isModified = false;
     refreshHeader();
+}
+
+// ── A/B Compare state + render ───────────────────────────────────────────
+
+function renderABState() {
+    if (!el.abSlotA || !el.abSlotB || !el.abCopy) return;
+    const s = state.ab;
+
+    // Active pill highlight
+    el.abSlotA.classList.toggle('active', s.active === 'A');
+    el.abSlotB.classList.toggle('active', s.active === 'B');
+
+    // Copy label dynamic
+    el.abCopy.textContent = s.active === 'A' ? 'A→B' : 'B→A';
+
+    // Disabled state
+    if (s.slotsIdentical) el.abCopy.classList.add('is-disabled');
+    else                  el.abCopy.classList.remove('is-disabled');
+
+    // Inactive-slot modified dot
+    if (el.abModDotA) {
+        el.abModDotA.classList.toggle('show',
+            s.modifiedA && s.active !== 'A');
+    }
+    if (el.abModDotB) {
+        el.abModDotB.classList.toggle('show',
+            s.modifiedB && s.active !== 'B');
+    }
+}
+
+async function refreshABState() {
+    if (!native.abGetState) return;
+    try {
+        const r = await native.abGetState();
+        if (r && typeof r === 'object') {
+            state.ab = Object.assign(state.ab, r);
+            renderABState();
+        }
+    } catch (e) { /* native not ready yet */ }
 }
 
 // ── Presets cache ────────────────────────────────────────────────────────
@@ -880,7 +940,13 @@ function wireParameterListeners() {
     const data = window.__JUCE__.initialisationData;
 
     const onChange = () => {
-        if (!state.isLoadingPreset) setModified(true);
+        if (!state.isLoadingPreset) {
+            setModified(true);
+            // A/B: mark the active slot as locally modified
+            if (state.ab.active === 'A') state.ab.modifiedA = true;
+            else                         state.ab.modifiedB = true;
+            renderABState();
+        }
     };
 
     if (window.Juce.getSliderState) {
@@ -929,6 +995,26 @@ function initClickHandlers() {
     if (el.nextBtn)       el.nextBtn.addEventListener('click', () => navigatePreset(1));
     if (el.saveBtn)       el.saveBtn.addEventListener('click', openSaveModal);
 
+    // A/B Compare cluster
+    if (el.abSlotA) el.abSlotA.addEventListener('click', async () => {
+        if (!native.abSnapTo) return;
+        await native.abSnapTo('A');
+        await refreshABState();
+    });
+
+    if (el.abSlotB) el.abSlotB.addEventListener('click', async () => {
+        if (!native.abSnapTo) return;
+        await native.abSnapTo('B');
+        await refreshABState();
+    });
+
+    if (el.abCopy) el.abCopy.addEventListener('click', async () => {
+        if (state.ab.slotsIdentical) return;
+        if (!native.abCopy) return;
+        await native.abCopy();
+        await refreshABState();
+    });
+
     // Close dropdown when clicking elsewhere.
     document.addEventListener('click', (e) => {
         if (!el.dropdown) return;
@@ -939,7 +1025,7 @@ function initClickHandlers() {
     });
 }
 
-function init() {
+async function init() {
     cacheElements();
     if (!initNativeBridge()) return;
     initClickHandlers();
@@ -948,6 +1034,7 @@ function init() {
     refreshHeader();
     // Prime the cache in the background.
     refreshCache();
+    await refreshABState();
 }
 
 if (document.readyState === 'loading') {
