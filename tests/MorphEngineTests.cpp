@@ -320,4 +320,33 @@ TEST_CASE("beginCapture + knob edits + endCapture(commit) sets arcs from delta")
     CHECK(std::find(modified.begin(), modified.end(), juce::String(ParamID::GHOST)) != modified.end());
 }
 
+TEST_CASE("beginCapture + knob edits + endCapture(cancel) restores baselines")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    PhantomEngine engine;
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+
+    morph.prepareToPlay(44100.0, 512);
+    morph.setEnabled(true);
+
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
+        proc.apvts.getParameter(ParamID::GHOST)->convertTo0to1(50.0f));
+
+    morph.beginCapture();
+
+    // "User" changes GHOST to 80.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
+        proc.apvts.getParameter(ParamID::GHOST)->convertTo0to1(80.0f));
+
+    const auto modified = morph.endCapture(false);   // cancel
+
+    CHECK(modified.empty());                         // nothing committed
+    CHECK(morph.hasNonZeroArc(ParamID::GHOST) == false);
+
+    // Live GHOST should be back at 50.
+    const float live = proc.apvts.getRawParameterValue(ParamID::GHOST)->load();
+    CHECK(live == Catch::Approx(50.0f).epsilon(0.01));
+}
+
 #endif // KAIGEN_PRO_BUILD
