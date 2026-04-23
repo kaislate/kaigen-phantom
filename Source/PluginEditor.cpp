@@ -374,6 +374,8 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                         meta->setProperty("description", p.metadata.description);
                         meta->setProperty("isFavorite",  p.metadata.isFavorite);
                         meta->setProperty("isFactory",   p.metadata.isFactory);
+                        meta->setProperty("presetKind",
+                            kaigen::phantom::presetKindToString(p.metadata.presetKind));
 
                         // Preview: 7 harmonic weights + crossover Hz + skip count
                         auto* preview = new juce::DynamicObject();
@@ -489,6 +491,69 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                     arr.add(juce::var(obj));
                 }
                 complete(juce::JSON::toString(juce::var(arr)));
+            })
+        .withNativeFunction("abGetState",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                auto& ab = self.processor.getABSlotManager();
+
+                juce::DynamicObject::Ptr obj = new juce::DynamicObject();
+                obj->setProperty("active",
+                    ab.getActive() == kaigen::phantom::ABSlotManager::Slot::A ? "A" : "B");
+                obj->setProperty("modifiedA",
+                    ab.isModified(kaigen::phantom::ABSlotManager::Slot::A));
+                obj->setProperty("modifiedB",
+                    ab.isModified(kaigen::phantom::ABSlotManager::Slot::B));
+
+                const bool identical =
+                    ab.getSlot(kaigen::phantom::ABSlotManager::Slot::A).toXmlString() ==
+                    ab.getSlot(kaigen::phantom::ABSlotManager::Slot::B).toXmlString();
+                obj->setProperty("slotsIdentical", identical);
+                obj->setProperty("includeDiscrete", ab.getIncludeDiscreteInSnap());
+
+                complete(juce::var(obj.get()));
+            })
+        .withNativeFunction("abSnapTo",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1) { complete(juce::var(false)); return; }
+                const auto slotStr = args[0].toString();
+                const auto target = (slotStr == "B") ? kaigen::phantom::ABSlotManager::Slot::B
+                                                     : kaigen::phantom::ABSlotManager::Slot::A;
+
+                juce::MessageManager::callAsync(
+                    [weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), target]
+                    {
+                        if (auto* ed = weakSelf.getComponent())
+                            ed->processor.getABSlotManager().snapTo(target);
+                    });
+                complete(juce::var(true));
+            })
+        .withNativeFunction("abCopy",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                juce::MessageManager::callAsync(
+                    [weakSelf = juce::Component::SafePointer<PhantomEditor>(&self)]
+                    {
+                        if (auto* ed = weakSelf.getComponent())
+                        {
+                            auto& ab = ed->processor.getABSlotManager();
+                            const auto src  = ab.getActive();
+                            const auto dest = (src == kaigen::phantom::ABSlotManager::Slot::A)
+                                              ? kaigen::phantom::ABSlotManager::Slot::B
+                                              : kaigen::phantom::ABSlotManager::Slot::A;
+                            ab.copy(src, dest);
+                        }
+                    });
+                complete(juce::var(true));
+            })
+        .withNativeFunction("abSetIncludeDiscrete",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1) { complete(juce::var(false)); return; }
+                const bool on = args[0].isBool() ? (bool) args[0] : (((int) args[0]) != 0);
+                self.processor.getABSlotManager().setIncludeDiscreteInSnap(on);
+                complete(juce::var(true));
             })
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });
 
