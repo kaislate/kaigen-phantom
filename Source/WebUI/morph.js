@@ -46,6 +46,11 @@
     // Show the panel now that we've confirmed Pro.
     el.panel.style.display = '';
 
+    // Signal Pro to other modules (e.g. save modal) and un-hide A/B + Morph option.
+    window.__morphProEnabled = true;
+    const abmWrap = document.getElementById('save-kind-abm-wrap');
+    if (abmWrap) abmWrap.style.display = '';
+
     // Morph settings section — only shown in Pro
     const morphSettings = document.getElementById('settings-morph-section');
     if (morphSettings) {

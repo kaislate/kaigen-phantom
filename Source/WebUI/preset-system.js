@@ -927,6 +927,9 @@ async function openSaveModal() {
                     <label id="save-kind-ab-wrap" style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
                         <input type="radio" name="save-kind" value="ab" id="save-kind-ab"> A/B
                     </label>
+                    <label id="save-kind-abm-wrap" style="display: none; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="radio" name="save-kind" value="ab_morph" id="save-kind-abm"> A/B + Morph
+                    </label>
                 </div>
                 <div id="save-kind-helper" style="display: none; font-size: 10px; color: rgba(199,74,74,0.9); margin-top: 4px;">
                     Slot B is unchanged from Slot A. Snap to B and make edits first, or save as Single.
@@ -951,6 +954,12 @@ async function openSaveModal() {
         </div>
     `;
     el.saveModal.style.display = 'flex';
+
+    // Un-hide A/B + Morph option when Pro morph module is active.
+    if (window.__morphProEnabled) {
+        const abmWrapModal = document.getElementById('save-kind-abm-wrap');
+        if (abmWrapModal) abmWrapModal.style.display = '';
+    }
 
     await refreshABState();  // ensure slotsIdentical is current
     const abRadio    = document.getElementById('save-kind-ab');
