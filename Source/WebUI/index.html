@@ -132,6 +132,33 @@
       <div class="logo-kaigen">KAIGEN</div>
     </div>
 
+    <!-- Pro Morph panel. Hidden by default (CSS); morph.js un-hides when Pro is detected. -->
+    <div id="mod-panel" class="mod-panel" style="display:none">
+      <div class="mod-row mod-row-morph">
+        <span class="mod-label">MORPH</span>
+        <div id="mod-enable" class="mod-enable" title="Enable morph"></div>
+        <div id="mod-lane-badge" class="mod-lane-badge">
+          <span class="mod-lane-dot"></span>Lane 1
+        </div>
+        <div id="mod-slider" class="mod-slider">
+          <div class="mod-slider-fill"></div>
+          <div class="mod-slider-handle"></div>
+        </div>
+        <span id="mod-value" class="mod-value">0.00</span>
+        <button id="mod-capture-btn" class="mod-btn mod-btn-primary">CAPTURE</button>
+        <button id="mod-cancel-btn" class="mod-btn" style="display:none">CANCEL</button>
+        <span id="mod-armed" class="mod-meta">0 armed</span>
+      </div>
+      <div class="mod-row mod-row-scene" id="mod-row-scene" style="display:none">
+        <span class="mod-label">SCENE</span>
+        <div id="mod-scene-slider" class="mod-slider mod-slider-small">
+          <div class="mod-slider-fill"></div>
+          <div class="mod-slider-handle"></div>
+        </div>
+        <span id="mod-scene-value" class="mod-value">0.00</span>
+      </div>
+    </div>
+
     <div class="body-grid">
       <!-- Left: Recipe wheel + harmonic modes — depressed panel -->
       <div class="wheel-area">

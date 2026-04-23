@@ -671,3 +671,108 @@ phantom-knob.mode-inactive{
   background: rgba(0, 0, 0, 0.14);
   color: rgba(0, 0, 0, 0.75);
 }
+
+/* ─── Pro Morph modulation panel ─────────────────────────────────────────── */
+.mod-panel {
+    background: linear-gradient(180deg, #2b2e34, #22252b);
+    color: rgba(255,255,255,0.85);
+    border-top: 1px solid rgba(0,0,0,0.3);
+    border-bottom: 1px solid rgba(0,0,0,0.3);
+    padding: 4px 0;
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+    font-size: 11px;
+}
+.mod-row {
+    padding: 8px 18px;
+    display: flex; align-items: center; gap: 12px;
+}
+.mod-row + .mod-row { border-top: 1px solid rgba(255,255,255,0.08); }
+.mod-label {
+    font-size: 8px; letter-spacing: 2px; text-transform: uppercase;
+    color: rgba(255,255,255,0.45); font-weight: 700;
+    min-width: 48px;
+}
+.mod-enable {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.15);
+    cursor: pointer;
+    transition: all 120ms;
+}
+.mod-enable.on {
+    background: radial-gradient(circle, #7FB3E8 0%, #4A8DD5 100%);
+    box-shadow: 0 0 6px rgba(74,141,213,0.6);
+    border-color: rgba(74,141,213,0.8);
+}
+.mod-lane-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px;
+    background: rgba(74,141,213,0.14);
+    border: 1px solid rgba(74,141,213,0.35);
+    border-radius: 4px;
+    color: #4A8DD5;
+    font-weight: 600; font-size: 10px; letter-spacing: 0.5px;
+}
+.mod-lane-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #4A8DD5;
+    box-shadow: 0 0 4px rgba(74,141,213,0.6);
+}
+.mod-slider {
+    flex: 1; max-width: 360px; height: 6px; border-radius: 3px;
+    background: rgba(0,0,0,0.4);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.6);
+    position: relative; cursor: pointer;
+}
+.mod-slider-small { max-width: 200px; height: 4px; }
+.mod-slider-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: linear-gradient(90deg, rgba(74,141,213,0.4), rgba(74,141,213,0.85));
+    border-radius: 3px; width: 0;
+    pointer-events: none;
+}
+.mod-slider-handle {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #4A8DD5;
+    border: 1px solid #2d5080;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    left: 0;
+    pointer-events: none;
+}
+.mod-value {
+    font-family: 'Consolas', monospace;
+    font-size: 11px; color: rgba(255,255,255,0.75);
+    min-width: 40px; text-align: right;
+}
+.mod-btn {
+    padding: 4px 10px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 3px;
+    color: rgba(255,255,255,0.75);
+    font-size: 10px; font-weight: 600; letter-spacing: 0.3px;
+    cursor: pointer;
+}
+.mod-btn-primary {
+    background: rgba(74,141,213,0.15);
+    border-color: rgba(74,141,213,0.4);
+    color: #4A8DD5;
+}
+.mod-btn-primary.capture-active {
+    background: rgba(231,181,88,0.2);
+    border-color: rgba(231,181,88,0.5);
+    color: #E7B558;
+}
+.mod-meta {
+    font-size: 9px; color: rgba(255,255,255,0.45);
+    margin-left: auto;
+}
+
+/* Knobs during capture mode — subtle breathing glow */
+@keyframes mod-capture-pulse {
+    0%, 100% { filter: drop-shadow(0 0 0 rgba(231,181,88,0)); }
+    50%      { filter: drop-shadow(0 0 3px rgba(231,181,88,0.3)); }
+}
+.mod-capture-active phantom-knob {
+    animation: mod-capture-pulse 1.5s ease-in-out infinite;
+}
