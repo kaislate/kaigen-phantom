@@ -42,11 +42,26 @@ void MorphEngine::prepareToPlay(double sr, int spb)
 
 void MorphEngine::preProcessBlock()
 {
-    // Smooth morph and scene position per block.
+    // Smoothing step.
     smoothedMorph    += smoothingAlpha * (rawMorph    - smoothedMorph);
     smoothedScenePos += smoothingAlpha * (rawScenePos - smoothedScenePos);
 
-    // Per-parameter interpolation comes in Task 9.
+    // Only apply arcs when morph is enabled and has at least one armed arc.
+    if (!enabled || lane1Arcs.empty()) return;
+
+    for (const auto& [paramID, entry] : lane1Arcs)
+    {
+        auto* p = apvts.getParameter(paramID);
+        if (p == nullptr) continue;
+
+        const auto& range = p->getNormalisableRange();
+        const float paramRange = range.end - range.start;
+
+        // value = base + depth * morph * paramRange   (then clamped by writeParamClamped)
+        const float target = entry.capturedBase + entry.depth * smoothedMorph * paramRange;
+
+        writeParamClamped(paramID, target);
+    }
 }
 
 void MorphEngine::postProcessBlock(juce::AudioBuffer<float>&, const juce::AudioBuffer<float>*) {}
@@ -162,7 +177,20 @@ std::vector<juce::String> MorphEngine::getContinuousParamIDs(juce::AudioProcesso
 
 void MorphEngine::updateSmoothing() {}
 float MorphEngine::smoothOne(float&, float) const { return 0.0f; }
-void MorphEngine::writeParamClamped(const juce::String&, float) {}
+
+void MorphEngine::writeParamClamped(const juce::String& paramID, float denormalizedValue)
+{
+    auto* p = apvts.getParameter(paramID);
+    if (p == nullptr) return;
+
+    const auto& range = p->getNormalisableRange();
+    const float clamped = juce::jlimit(range.start, range.end, denormalizedValue);
+
+    const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
+    p->beginChangeGesture();
+    p->setValueNotifyingHost(p->convertTo0to1(clamped));
+    p->endChangeGesture();
+}
 
 } // namespace kaigen::phantom
 

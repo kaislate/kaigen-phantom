@@ -170,4 +170,74 @@ TEST_CASE("MorphEngine responds to APVTS MORPH_AMOUNT changes")
     CHECK(morph.getMorphAmount() == Catch::Approx(0.7f).epsilon(0.02));
 }
 
+TEST_CASE("preProcessBlock applies arc interpolation at morph > 0")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    PhantomEngine engine;
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+
+    morph.prepareToPlay(44100.0, 512);
+    morph.setEnabled(true);
+
+    // GHOST range: 0..100 (%); default 100.
+    // Set base to 50, then arm arc of +0.40 (= +40 in range).
+    // At morph = 1.0, live should be 50 + 0.40 * 100 = 90.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
+        proc.apvts.getParameter(ParamID::GHOST)->convertTo0to1(50.0f));
+    morph.setArcDepth(ParamID::GHOST, 0.40f);
+
+    // Slam MORPH_AMOUNT to 1 and let smoothing converge.
+    proc.apvts.getParameter(ParamID::MORPH_AMOUNT)->setValueNotifyingHost(1.0f);
+    for (int i = 0; i < 200; ++i) morph.preProcessBlock();
+
+    const float live = proc.apvts.getRawParameterValue(ParamID::GHOST)->load();
+    CHECK(live == Catch::Approx(90.0f).epsilon(0.02));
+}
+
+TEST_CASE("preProcessBlock does nothing when morph disabled")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    PhantomEngine engine;
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+
+    morph.prepareToPlay(44100.0, 512);
+    morph.setEnabled(false);  // explicitly disabled
+
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
+        proc.apvts.getParameter(ParamID::GHOST)->convertTo0to1(50.0f));
+    morph.setArcDepth(ParamID::GHOST, 0.40f);
+    proc.apvts.getParameter(ParamID::MORPH_AMOUNT)->setValueNotifyingHost(1.0f);
+
+    for (int i = 0; i < 200; ++i) morph.preProcessBlock();
+
+    // Live should be unchanged (still 50).
+    const float live = proc.apvts.getRawParameterValue(ParamID::GHOST)->load();
+    CHECK(live == Catch::Approx(50.0f).epsilon(0.01));
+}
+
+TEST_CASE("preProcessBlock clamps at parameter max (plateau behavior)")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    PhantomEngine engine;
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+
+    morph.prepareToPlay(44100.0, 512);
+    morph.setEnabled(true);
+
+    // GHOST base 80, arc +0.50 -> target math = 80 + 0.50 * 100 = 130.
+    // Clamped at max 100.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
+        proc.apvts.getParameter(ParamID::GHOST)->convertTo0to1(80.0f));
+    morph.setArcDepth(ParamID::GHOST, 0.50f);
+
+    proc.apvts.getParameter(ParamID::MORPH_AMOUNT)->setValueNotifyingHost(1.0f);
+    for (int i = 0; i < 200; ++i) morph.preProcessBlock();
+
+    const float live = proc.apvts.getRawParameterValue(ParamID::GHOST)->load();
+    CHECK(live == Catch::Approx(100.0f).epsilon(0.01));   // clamped at max, NOT 130
+}
+
 #endif // KAIGEN_PRO_BUILD
