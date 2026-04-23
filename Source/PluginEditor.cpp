@@ -413,8 +413,18 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                     [weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), presetName, packName]
                     {
                         if (auto* ed = weakSelf.getComponent())
+                        {
                             ed->processor.getPresetManager().loadPresetInto(
-                                ed->processor.getABSlotManager(), presetName, packName);
+                                ed->processor.getABSlotManager(), presetName, packName
+                              #ifdef KAIGEN_PRO_BUILD
+                                , [weakSelf](const juce::ValueTree& morphConfig)
+                                {
+                                    if (auto* ed2 = weakSelf.getComponent())
+                                        ed2->processor.getMorphEngine().fromMorphConfigTree(morphConfig);
+                                }
+                              #endif
+                            );
+                        }
                     });
 
                 complete(juce::var(true));

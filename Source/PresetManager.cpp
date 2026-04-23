@@ -344,7 +344,8 @@ bool PresetManager::loadPreset(juce::AudioProcessorValueTreeState& apvts,
 
 bool PresetManager::loadPresetInto(ABSlotManager& abSlots,
                                    const juce::String& presetName,
-                                   const juce::String& packName)
+                                   const juce::String& packName,
+                                   std::function<void(const juce::ValueTree&)> onMorphConfig)
 {
     auto file = getPresetFile(presetName, packName);
     if (!file.existsAsFile()) return false;
@@ -395,6 +396,14 @@ bool PresetManager::loadPresetInto(ABSlotManager& abSlots,
         if (auto existingMeta = stateForLoad.getChildWithName(kMetadataNodeId); existingMeta.isValid())
             stateForLoad.removeChild(existingMeta, nullptr);
         abSlots.loadABPreset(stateForLoad, ref);
+    }
+
+    // If caller provided a callback AND the preset has <MorphConfig>, invoke it.
+    if (onMorphConfig)
+    {
+        auto morphConfig = tree.getChildWithName("MorphConfig");
+        if (morphConfig.isValid())
+            onMorphConfig(morphConfig);
     }
 
     return true;

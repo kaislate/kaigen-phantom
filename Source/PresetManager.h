@@ -100,7 +100,8 @@ public:
     // Returns true on success, false if missing/parse/unsupported.
     bool loadPresetInto(ABSlotManager& abSlots,
                         const juce::String& presetName,
-                        const juce::String& packName);
+                        const juce::String& packName,
+                        std::function<void(const juce::ValueTree&)> onMorphConfig = {});
 
     // Save APVTS state as a new preset in User/. If overwrite=false and a
     // preset with this name exists, a numeric suffix is appended.
