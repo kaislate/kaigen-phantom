@@ -150,4 +150,24 @@ TEST_CASE("setSceneCrossfadeEnabled toggles the scene flag")
     CHECK(morph.isSceneCrossfadeEnabled() == false);
 }
 
+TEST_CASE("MorphEngine responds to APVTS MORPH_AMOUNT changes")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    PhantomEngine engine;
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+
+    // Initially, raw morph is 0.
+    CHECK(morph.getMorphAmount() == Catch::Approx(0.0f));
+
+    // Set MORPH_AMOUNT via APVTS.
+    proc.apvts.getParameter(ParamID::MORPH_AMOUNT)->setValueNotifyingHost(0.7f);
+
+    // The listener should have bumped rawMorph. Smoothed catches up slowly —
+    // this test only checks that smoothing converges after enough blocks.
+    morph.prepareToPlay(44100.0, 512);
+    for (int i = 0; i < 200; ++i) morph.preProcessBlock();   // ~2.3 seconds of audio
+    CHECK(morph.getMorphAmount() == Catch::Approx(0.7f).epsilon(0.02));
+}
+
 #endif // KAIGEN_PRO_BUILD

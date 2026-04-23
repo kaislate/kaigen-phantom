@@ -13,15 +13,53 @@ MorphEngine::MorphEngine(juce::AudioProcessorValueTreeState& apvtsRef,
                          PhantomEngine& primaryEngineRef)
     : apvts(apvtsRef), abSlots(abSlotsRef), primaryEngine(primaryEngineRef)
 {
-    // Listener registration happens in Task 8.
+    apvts.addParameterListener(ParamID::MORPH_ENABLED,  this);
+    apvts.addParameterListener(ParamID::MORPH_AMOUNT,   this);
+    apvts.addParameterListener(ParamID::SCENE_ENABLED,  this);
+    apvts.addParameterListener(ParamID::SCENE_POSITION, this);
 }
 
-MorphEngine::~MorphEngine() = default;
+MorphEngine::~MorphEngine()
+{
+    apvts.removeParameterListener(ParamID::MORPH_ENABLED,  this);
+    apvts.removeParameterListener(ParamID::MORPH_AMOUNT,   this);
+    apvts.removeParameterListener(ParamID::SCENE_ENABLED,  this);
+    apvts.removeParameterListener(ParamID::SCENE_POSITION, this);
+}
 
-void MorphEngine::prepareToPlay(double sr, int spb) { sampleRate = sr; samplesPerBlock = spb; }
-void MorphEngine::preProcessBlock() {}
+void MorphEngine::prepareToPlay(double sr, int spb)
+{
+    sampleRate = sr;
+    samplesPerBlock = spb;
+
+    // Single-pole IIR: per-sample alpha → per-block alpha
+    // tau = 15 ms -> alpha_perSample = 1 - exp(-1 / (tau * sr))
+    // per-block alpha = 1 - (1 - alpha_perSample)^spb
+    constexpr float tauMs = 15.0f;
+    const float alphaPerSample = 1.0f - std::exp(-1.0f / ((tauMs / 1000.0f) * (float) sr));
+    smoothingAlpha = 1.0f - std::pow(1.0f - alphaPerSample, (float) spb);
+}
+
+void MorphEngine::preProcessBlock()
+{
+    // Smooth morph and scene position per block.
+    smoothedMorph    += smoothingAlpha * (rawMorph    - smoothedMorph);
+    smoothedScenePos += smoothingAlpha * (rawScenePos - smoothedScenePos);
+
+    // Per-parameter interpolation comes in Task 9.
+}
+
 void MorphEngine::postProcessBlock(juce::AudioBuffer<float>&, const juce::AudioBuffer<float>*) {}
-void MorphEngine::parameterChanged(const juce::String&, float) {}
+
+void MorphEngine::parameterChanged(const juce::String& paramID, float newValue)
+{
+    if (suppressArcUpdates) return;
+
+    if      (paramID == ParamID::MORPH_ENABLED)   enabled        = (newValue > 0.5f);
+    else if (paramID == ParamID::MORPH_AMOUNT)    rawMorph       = juce::jlimit(0.0f, 1.0f, newValue);
+    else if (paramID == ParamID::SCENE_ENABLED)   sceneEnabled   = (newValue > 0.5f);
+    else if (paramID == ParamID::SCENE_POSITION)  rawScenePos    = juce::jlimit(0.0f, 1.0f, newValue);
+}
 
 void MorphEngine::setArcDepth(const juce::String& paramID, float normalizedDepth)
 {
