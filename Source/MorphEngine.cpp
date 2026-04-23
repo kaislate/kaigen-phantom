@@ -23,11 +23,49 @@ void MorphEngine::preProcessBlock() {}
 void MorphEngine::postProcessBlock(juce::AudioBuffer<float>&, const juce::AudioBuffer<float>*) {}
 void MorphEngine::parameterChanged(const juce::String&, float) {}
 
-void MorphEngine::setArcDepth(const juce::String&, float) {}
-float MorphEngine::getArcDepth(const juce::String&) const { return 0.0f; }
-bool  MorphEngine::hasNonZeroArc(const juce::String&) const { return false; }
-int   MorphEngine::armedKnobCount() const { return 0; }
-std::vector<juce::String> MorphEngine::getArmedParamIDs() const { return {}; }
+void MorphEngine::setArcDepth(const juce::String& paramID, float normalizedDepth)
+{
+    // Clamp to bipolar range.
+    normalizedDepth = juce::jlimit(-1.0f, 1.0f, normalizedDepth);
+
+    if (std::abs(normalizedDepth) < 1e-6f)
+    {
+        lane1Arcs.erase(paramID);
+        return;
+    }
+
+    // Capture current base value for this parameter.
+    float base = 0.0f;
+    if (auto* p = apvts.getParameter(paramID))
+        base = p->convertFrom0to1(p->getValue());
+
+    lane1Arcs[paramID] = { normalizedDepth, base };
+}
+
+float MorphEngine::getArcDepth(const juce::String& paramID) const
+{
+    auto it = lane1Arcs.find(paramID);
+    return (it != lane1Arcs.end()) ? it->second.depth : 0.0f;
+}
+
+bool MorphEngine::hasNonZeroArc(const juce::String& paramID) const
+{
+    return lane1Arcs.find(paramID) != lane1Arcs.end();
+}
+
+int MorphEngine::armedKnobCount() const
+{
+    return (int) lane1Arcs.size();
+}
+
+std::vector<juce::String> MorphEngine::getArmedParamIDs() const
+{
+    std::vector<juce::String> result;
+    result.reserve(lane1Arcs.size());
+    for (const auto& [id, entry] : lane1Arcs)
+        result.push_back(id);
+    return result;
+}
 
 void MorphEngine::setEnabled(bool) {}
 void MorphEngine::beginCapture() {}
