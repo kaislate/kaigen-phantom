@@ -17,6 +17,7 @@ add_executable(KaigenPhantomTests
     EnvelopeFollowerTests.cpp
     PhantomEngineTests.cpp
     PresetPreviewTests.cpp
+    ABSlotManagerTests.cpp
     ../Source/Engines/BinauralStage.cpp
     ../Source/Engines/BassExtractor.cpp
     ../Source/Engines/Waveshaper.cpp
@@ -25,6 +26,7 @@ add_executable(KaigenPhantomTests
     ../Source/Engines/ZeroCrossingSynth.cpp
     ../Source/Engines/WaveletSynth.cpp
     ../Source/PresetManager.cpp
+    ../Source/ABSlotManager.cpp
 )
 
 target_link_libraries(KaigenPhantomTests
