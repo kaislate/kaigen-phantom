@@ -1087,6 +1087,20 @@ function initClickHandlers() {
         await refreshABState();
     });
 
+    // Settings: Compare toggle — include discrete params when snapping A/B
+    const discreteCheckbox = document.getElementById('setting-include-discrete');
+    if (discreteCheckbox) {
+        refreshABState().then(() => {
+            discreteCheckbox.checked = !!state.ab.includeDiscrete;
+        });
+
+        discreteCheckbox.addEventListener('change', async (e) => {
+            if (!native.abSetIncludeDiscrete) return;
+            await native.abSetIncludeDiscrete(e.target.checked);
+            await refreshABState();
+        });
+    }
+
     // Close dropdown when clicking elsewhere.
     document.addEventListener('click', (e) => {
         if (!el.dropdown) return;
