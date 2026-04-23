@@ -240,4 +240,48 @@ TEST_CASE("preProcessBlock clamps at parameter max (plateau behavior)")
     CHECK(live == Catch::Approx(100.0f).epsilon(0.01));   // clamped at max, NOT 130
 }
 
+TEST_CASE("preProcessBlock handles negative arc depth")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    PhantomEngine engine;
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+
+    morph.prepareToPlay(44100.0, 512);
+    morph.setEnabled(true);
+
+    // GHOST base 50, arc -0.30 → target = 50 - 30 = 20.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
+        proc.apvts.getParameter(ParamID::GHOST)->convertTo0to1(50.0f));
+    morph.setArcDepth(ParamID::GHOST, -0.30f);
+
+    proc.apvts.getParameter(ParamID::MORPH_AMOUNT)->setValueNotifyingHost(1.0f);
+    for (int i = 0; i < 200; ++i) morph.preProcessBlock();
+
+    const float live = proc.apvts.getRawParameterValue(ParamID::GHOST)->load();
+    CHECK(live == Catch::Approx(20.0f).epsilon(0.02));
+}
+
+TEST_CASE("preProcessBlock clamps at parameter min (lower plateau)")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    PhantomEngine engine;
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+
+    morph.prepareToPlay(44100.0, 512);
+    morph.setEnabled(true);
+
+    // GHOST base 20, arc -0.50 → target math = 20 - 50 = -30, clamped at 0.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
+        proc.apvts.getParameter(ParamID::GHOST)->convertTo0to1(20.0f));
+    morph.setArcDepth(ParamID::GHOST, -0.50f);
+
+    proc.apvts.getParameter(ParamID::MORPH_AMOUNT)->setValueNotifyingHost(1.0f);
+    for (int i = 0; i < 200; ++i) morph.preProcessBlock();
+
+    const float live = proc.apvts.getRawParameterValue(ParamID::GHOST)->load();
+    CHECK(live == Catch::Approx(0.0f).epsilon(0.01));
+}
+
 #endif // KAIGEN_PRO_BUILD
