@@ -133,8 +133,69 @@ void MorphEngine::setEnabled(bool on)
     }
 }
 
-void MorphEngine::beginCapture() {}
-std::vector<juce::String> MorphEngine::endCapture(bool) { return {}; }
+void MorphEngine::beginCapture()
+{
+    inCapture = true;
+    captureBaseline.clear();
+
+    // Snapshot baseline values for every continuous parameter.
+    for (const auto& id : getContinuousParamIDs(apvts))
+    {
+        if (auto* p = apvts.getParameter(id))
+            captureBaseline[id] = p->convertFrom0to1(p->getValue());
+    }
+}
+
+std::vector<juce::String> MorphEngine::endCapture(bool commit)
+{
+    std::vector<juce::String> modified;
+    if (!inCapture) return modified;
+
+    if (commit)
+    {
+        // For each parameter: delta = current - baseline → arc = delta / paramRange.
+        for (const auto& [id, baseline] : captureBaseline)
+        {
+            auto* p = apvts.getParameter(id);
+            if (p == nullptr) continue;
+
+            const float current = p->convertFrom0to1(p->getValue());
+            const auto& range = p->getNormalisableRange();
+            const float paramRange = range.end - range.start;
+
+            if (paramRange > 0.0f)
+            {
+                const float delta = current - baseline;
+                const float depth = juce::jlimit(-1.0f, 1.0f, delta / paramRange);
+
+                if (std::abs(depth) >= 1e-4f)
+                {
+                    // Overwrite the arc with new depth + baseline (NOT current).
+                    lane1Arcs[id] = { depth, baseline };
+                    modified.push_back(id);
+                }
+            }
+        }
+    }
+    else
+    {
+        // Restore baselines (cancel).
+        const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
+        for (const auto& [id, baseline] : captureBaseline)
+        {
+            if (auto* p = apvts.getParameter(id))
+            {
+                p->beginChangeGesture();
+                p->setValueNotifyingHost(p->convertTo0to1(baseline));
+                p->endChangeGesture();
+            }
+        }
+    }
+
+    inCapture = false;
+    captureBaseline.clear();
+    return modified;
+}
 
 void MorphEngine::setSceneCrossfadeEnabled(bool on)
 {

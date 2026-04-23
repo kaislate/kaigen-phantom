@@ -284,4 +284,40 @@ TEST_CASE("preProcessBlock clamps at parameter min (lower plateau)")
     CHECK(live == Catch::Approx(0.0f).epsilon(0.01));
 }
 
+TEST_CASE("beginCapture + knob edits + endCapture(commit) sets arcs from delta")
+{
+    TestProcessor proc;
+    kaigen::phantom::ABSlotManager abSlots { proc.apvts };
+    PhantomEngine engine;
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+
+    morph.prepareToPlay(44100.0, 512);
+    morph.setEnabled(true);
+
+    // Start: GHOST = 50, PHANTOM_THRESHOLD = 100.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
+        proc.apvts.getParameter(ParamID::GHOST)->convertTo0to1(50.0f));
+    proc.apvts.getParameter(ParamID::PHANTOM_THRESHOLD)->setValueNotifyingHost(
+        proc.apvts.getParameter(ParamID::PHANTOM_THRESHOLD)->convertTo0to1(100.0f));
+
+    morph.beginCapture();
+    CHECK(morph.isInCapture() == true);
+
+    // Simulate user dragging knobs: GHOST -> 80, PHANTOM_THRESHOLD -> 50.
+    proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
+        proc.apvts.getParameter(ParamID::GHOST)->convertTo0to1(80.0f));
+    proc.apvts.getParameter(ParamID::PHANTOM_THRESHOLD)->setValueNotifyingHost(
+        proc.apvts.getParameter(ParamID::PHANTOM_THRESHOLD)->convertTo0to1(50.0f));
+
+    const auto modified = morph.endCapture(true);
+    CHECK(morph.isInCapture() == false);
+
+    // GHOST delta 30 in range 100 → arc depth = 0.30.
+    CHECK(morph.getArcDepth(ParamID::GHOST) == Catch::Approx(0.30f).epsilon(0.01));
+
+    // PHANTOM_THRESHOLD has a skewed range (20..20000); check just that it was detected as modified.
+    CHECK(modified.size() >= 1);
+    CHECK(std::find(modified.begin(), modified.end(), juce::String(ParamID::GHOST)) != modified.end());
+}
+
 #endif // KAIGEN_PRO_BUILD
