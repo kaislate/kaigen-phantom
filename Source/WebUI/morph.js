@@ -46,6 +46,20 @@
     // Show the panel now that we've confirmed Pro.
     el.panel.style.display = '';
 
+    // Morph settings section — only shown in Pro
+    const morphSettings = document.getElementById('settings-morph-section');
+    if (morphSettings) {
+      morphSettings.style.display = '';
+    }
+    const sceneToggle = document.getElementById('setting-morph-scene-enabled');
+    if (sceneToggle) {
+      sceneToggle.addEventListener('change', async (e) => {
+        await native.morphSetSceneEnabled(e.target.checked);
+        await refreshState();
+      });
+      // Sync initial state once state is loaded (below).
+    }
+
     const state = {
       enabled: false,
       morphAmount: 0,
@@ -227,8 +241,11 @@
         state.continuousIDs = await native.morphGetContinuousParamIDs();
         await refreshState();
 
-        // Poll state at 30 fps so slider/value updates follow APVTS.
-        // Apply backpressure: skip if a poll is in flight.
+        // Sync settings checkbox with initial state
+        const sceneCheckbox = document.getElementById('setting-morph-scene-enabled');
+        if (sceneCheckbox) sceneCheckbox.checked = !!state.sceneEnabled;
+
+        // 30fps polling with backpressure
         let inFlight = false;
         setInterval(async () => {
           if (inFlight) return;
