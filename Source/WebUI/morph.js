@@ -151,10 +151,75 @@
     wireSlider(el.slider,      'morph_amount');
     wireSlider(el.sceneSlider, 'scene_position');
 
-    // ── Knob ring rendering (placeholder for Task 23) ─────────────────────
+    // ── Knob ring rendering ────────────────────────────────────────────────
     function renderKnobRings() {
-      // Populated in subsequent task; hook defined here so refreshState can call it.
+      document.querySelectorAll('phantom-knob').forEach(knob => {
+        const paramID = knob.getAttribute('data-param');
+        if (!paramID) return;
+
+        const relay = window.Juce.getSliderState(paramID);
+        const liveValue = relay ? relay.getNormalisedValue() : 0;
+        const arcDepth = state.arcDepths[paramID] || 0;
+
+        // For the ring, baseValue = (liveValue - arcDepth * morph), i.e. reverse-derive
+        // the base so the visual is consistent with the live pointer animation.
+        let baseValue = liveValue;
+        if (Math.abs(arcDepth) > 1e-4 && state.morphAmount > 1e-4) {
+          baseValue = Math.max(0, Math.min(1, liveValue - arcDepth * state.morphAmount));
+        }
+
+        knob.setMorphState({
+          enabled: state.enabled,
+          baseValue, arcDepth, liveValue,
+          morph: state.morphAmount,
+        });
+      });
     }
+
+    // Arc handle drag: listen on shadow roots of each phantom-knob.
+    document.addEventListener('pointerdown', async (e) => {
+      const target = e.composedPath()[0];
+      if (!(target instanceof Element) || !target.classList || !target.classList.contains('morph-arc-handle')) return;
+
+      const paramID = target.dataset.paramID;
+      if (!paramID) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const knobEl = target.getRootNode().host;    // the phantom-knob element
+      const rect = knobEl.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+
+      function anglesToDepth(clientX, clientY) {
+        const dx = clientX - cx;
+        const dy = clientY - cy;
+        const angleDeg = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+        // Map angle ∈ [135, 405] (wrap past 360 into 45) to normalized 0..1.
+        let rel = angleDeg;
+        if (rel < 135) rel += 360;
+        const norm = Math.max(0, Math.min(1, (rel - 135) / 270));
+        return norm;
+      }
+
+      function onMove(ev) {
+        const targetNorm = anglesToDepth(ev.clientX, ev.clientY);
+        const relay = window.Juce.getSliderState(paramID);
+        const liveNorm = relay ? relay.getNormalisedValue() : 0;
+        const morphVal = state.morphAmount || 0;
+        const currentDepth = state.arcDepths[paramID] || 0;
+        const impliedBase = liveNorm - currentDepth * morphVal;
+        const newDepth = Math.max(-1, Math.min(1, targetNorm - impliedBase));
+        native.morphSetArcDepth(paramID, newDepth);
+      }
+      function onUp() {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup',   onUp);
+      }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup',   onUp);
+    });
 
     // ── Initial fetch ──────────────────────────────────────────────────────
     (async () => {
