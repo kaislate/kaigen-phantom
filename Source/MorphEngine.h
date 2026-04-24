@@ -5,6 +5,7 @@
 #include <juce_data_structures/juce_data_structures.h>
 #include <unordered_map>
 #include <memory>
+#include <functional>
 
 #include "Engines/PhantomEngine.h"
 
@@ -18,7 +19,8 @@ class MorphEngine : private juce::AudioProcessorValueTreeState::Listener
 public:
     MorphEngine(juce::AudioProcessorValueTreeState& apvts,
                 ABSlotManager& abSlots,
-                PhantomEngine& primaryEngine);
+                PhantomEngine& primaryEngine,
+                std::function<void(PhantomEngine&)> engineSyncFromAPVTS);
     ~MorphEngine() override;
 
     // Called from PhantomProcessor::prepareToPlay before audio starts.
@@ -81,6 +83,7 @@ private:
     juce::AudioProcessorValueTreeState& apvts;
     ABSlotManager& abSlots;
     PhantomEngine& primaryEngine;
+    std::function<void(PhantomEngine&)> engineSyncFromAPVTS;
 
     std::unordered_map<juce::String, ArcEntry> lane1Arcs;
     juce::String curveName = "linear";
@@ -98,6 +101,10 @@ private:
     float rawScenePos = 0.0f;
     float smoothedScenePos = 0.0f;
     std::unique_ptr<PhantomEngine> secondaryEngine;
+
+    // Pre-allocated scratch buffers — resized once in prepareToPlay (C1 fix).
+    juce::AudioBuffer<float> secondaryScratchBuf;
+    juce::ValueTree savedPrimaryState;
 
     // Smoothing
     double sampleRate = 44100.0;

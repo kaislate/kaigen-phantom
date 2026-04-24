@@ -43,7 +43,7 @@ TEST_CASE("MorphEngine compiles and constructs")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     CHECK(morph.isEnabled() == false);
     CHECK(morph.armedKnobCount() == 0);
@@ -76,7 +76,7 @@ TEST_CASE("setArcDepth stores value and captures base")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     // Set GHOST to a non-default value; setArcDepth should capture it as base.
     proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(0.42f);
@@ -96,7 +96,7 @@ TEST_CASE("setArcDepth with 0.0 removes the entry (un-arms)")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     morph.setArcDepth(ParamID::GHOST, 0.50f);
     REQUIRE(morph.armedKnobCount() == 1);
@@ -111,7 +111,7 @@ TEST_CASE("armedKnobCount counts multiple independent arcs")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     morph.setArcDepth(ParamID::GHOST, 0.20f);
     morph.setArcDepth(ParamID::PHANTOM_THRESHOLD, -0.50f);
@@ -127,7 +127,7 @@ TEST_CASE("setEnabled toggles the enabled flag")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     REQUIRE(morph.isEnabled() == false);
     morph.setEnabled(true);
@@ -141,7 +141,7 @@ TEST_CASE("setSceneCrossfadeEnabled toggles the scene flag")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     REQUIRE(morph.isSceneCrossfadeEnabled() == false);
     morph.setSceneCrossfadeEnabled(true);
@@ -155,7 +155,7 @@ TEST_CASE("MorphEngine responds to APVTS MORPH_AMOUNT changes")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     // Initially, raw morph is 0.
     CHECK(morph.getMorphAmount() == Catch::Approx(0.0f));
@@ -175,7 +175,7 @@ TEST_CASE("preProcessBlock applies arc interpolation at morph > 0")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     morph.prepareToPlay(44100.0, 512);
     morph.setEnabled(true);
@@ -200,7 +200,7 @@ TEST_CASE("preProcessBlock does nothing when morph disabled")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     morph.prepareToPlay(44100.0, 512);
     morph.setEnabled(false);  // explicitly disabled
@@ -222,7 +222,7 @@ TEST_CASE("preProcessBlock clamps at parameter max (plateau behavior)")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     morph.prepareToPlay(44100.0, 512);
     morph.setEnabled(true);
@@ -245,7 +245,7 @@ TEST_CASE("preProcessBlock handles negative arc depth")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     morph.prepareToPlay(44100.0, 512);
     morph.setEnabled(true);
@@ -267,7 +267,7 @@ TEST_CASE("preProcessBlock clamps at parameter min (lower plateau)")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     morph.prepareToPlay(44100.0, 512);
     morph.setEnabled(true);
@@ -289,7 +289,7 @@ TEST_CASE("beginCapture + knob edits + endCapture(commit) sets arcs from delta")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     morph.prepareToPlay(44100.0, 512);
     morph.setEnabled(true);
@@ -325,7 +325,7 @@ TEST_CASE("beginCapture + knob edits + endCapture(cancel) restores baselines")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     morph.prepareToPlay(44100.0, 512);
     morph.setEnabled(true);
@@ -354,7 +354,7 @@ TEST_CASE("toMorphConfigTree / fromMorphConfigTree round-trips arc data")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots1 { proc.apvts };
     PhantomEngine engine1;
-    kaigen::phantom::MorphEngine src { proc.apvts, abSlots1, engine1 };
+    kaigen::phantom::MorphEngine src { proc.apvts, abSlots1, engine1, [](PhantomEngine&){} };
 
     // Arm a few arcs.
     proc.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
@@ -369,7 +369,7 @@ TEST_CASE("toMorphConfigTree / fromMorphConfigTree round-trips arc data")
     TestProcessor proc2;
     kaigen::phantom::ABSlotManager abSlots2 { proc2.apvts };
     PhantomEngine engine2;
-    kaigen::phantom::MorphEngine dst { proc2.apvts, abSlots2, engine2 };
+    kaigen::phantom::MorphEngine dst { proc2.apvts, abSlots2, engine2, [](PhantomEngine&){} };
 
     dst.fromMorphConfigTree(tree);
     CHECK(dst.getArcDepth(ParamID::GHOST)     == Catch::Approx(0.35f));
@@ -382,7 +382,7 @@ TEST_CASE("toStateTree / fromStateTree round-trips full live state")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots1 { proc.apvts };
     PhantomEngine engine1;
-    kaigen::phantom::MorphEngine src { proc.apvts, abSlots1, engine1 };
+    kaigen::phantom::MorphEngine src { proc.apvts, abSlots1, engine1, [](PhantomEngine&){} };
     src.prepareToPlay(44100.0, 512);
 
     src.setEnabled(true);
@@ -396,7 +396,7 @@ TEST_CASE("toStateTree / fromStateTree round-trips full live state")
     TestProcessor proc2;
     kaigen::phantom::ABSlotManager abSlots2 { proc2.apvts };
     PhantomEngine engine2;
-    kaigen::phantom::MorphEngine dst { proc2.apvts, abSlots2, engine2 };
+    kaigen::phantom::MorphEngine dst { proc2.apvts, abSlots2, engine2, [](PhantomEngine&){} };
     dst.prepareToPlay(44100.0, 512);
     dst.fromStateTree(tree);
 
@@ -410,7 +410,7 @@ TEST_CASE("setSceneCrossfadeEnabled(true) lazily constructs secondary engine")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
     morph.prepareToPlay(44100.0, 512);
 
     REQUIRE(morph.isSceneCrossfadeEnabled() == false);
@@ -432,7 +432,7 @@ TEST_CASE("postProcessBlock with scene disabled is a no-op")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
     morph.prepareToPlay(44100.0, 512);
 
     juce::AudioBuffer<float> buf(2, 512);
@@ -452,7 +452,7 @@ TEST_CASE("postProcessBlock at scene position 0 preserves primary output")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
     morph.prepareToPlay(44100.0, 512);
 
     morph.setSceneCrossfadeEnabled(true);
@@ -481,7 +481,7 @@ TEST_CASE("preProcessBlock arc writes do NOT mark active slot modified")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     morph.prepareToPlay(44100.0, 512);
     morph.setEnabled(true);
@@ -516,7 +516,7 @@ TEST_CASE("preProcessBlock on clean slot leaves modified=false")
     TestProcessor proc;
     kaigen::phantom::ABSlotManager abSlots { proc.apvts };
     PhantomEngine engine;
-    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine };
+    kaigen::phantom::MorphEngine morph { proc.apvts, abSlots, engine, [](PhantomEngine&){} };
 
     morph.prepareToPlay(44100.0, 512);
     morph.setEnabled(true);
@@ -565,7 +565,7 @@ TEST_CASE("MorphConfig round-trip preserves capturedBase across differing live s
     TestProcessor procA;
     kaigen::phantom::ABSlotManager abSlotsA { procA.apvts };
     PhantomEngine engineA;
-    kaigen::phantom::MorphEngine src { procA.apvts, abSlotsA, engineA };
+    kaigen::phantom::MorphEngine src { procA.apvts, abSlotsA, engineA, [](PhantomEngine&){} };
 
     // Source: GHOST base at 30, arc of +0.40.
     procA.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
@@ -579,7 +579,7 @@ TEST_CASE("MorphConfig round-trip preserves capturedBase across differing live s
     TestProcessor procB;
     kaigen::phantom::ABSlotManager abSlotsB { procB.apvts };
     PhantomEngine engineB;
-    kaigen::phantom::MorphEngine dst { procB.apvts, abSlotsB, engineB };
+    kaigen::phantom::MorphEngine dst { procB.apvts, abSlotsB, engineB, [](PhantomEngine&){} };
     procB.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
         procB.apvts.getParameter(ParamID::GHOST)->convertTo0to1(80.0f));
 

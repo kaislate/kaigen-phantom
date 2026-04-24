@@ -10,8 +10,10 @@ namespace kaigen::phantom
 
 MorphEngine::MorphEngine(juce::AudioProcessorValueTreeState& apvtsRef,
                          ABSlotManager& abSlotsRef,
-                         PhantomEngine& primaryEngineRef)
-    : apvts(apvtsRef), abSlots(abSlotsRef), primaryEngine(primaryEngineRef)
+                         PhantomEngine& primaryEngineRef,
+                         std::function<void(PhantomEngine&)> engineSyncFromAPVTSIn)
+    : apvts(apvtsRef), abSlots(abSlotsRef), primaryEngine(primaryEngineRef),
+      engineSyncFromAPVTS(std::move(engineSyncFromAPVTSIn))
 {
     apvts.addParameterListener(ParamID::MORPH_ENABLED,  this);
     apvts.addParameterListener(ParamID::MORPH_AMOUNT,   this);
@@ -38,6 +40,10 @@ void MorphEngine::prepareToPlay(double sr, int spb)
     constexpr float tauMs = 15.0f;
     const float alphaPerSample = 1.0f - std::exp(-1.0f / ((tauMs / 1000.0f) * (float) sr));
     smoothingAlpha = 1.0f - std::pow(1.0f - alphaPerSample, (float) spb);
+
+    // Pre-allocate scratch buffer for secondary engine (C1 fix: no audio-thread allocation).
+    // avoidReallocating=true: won't free+reallocate if already big enough.
+    secondaryScratchBuf.setSize(2, spb, false, false, true);
 }
 
 void MorphEngine::preProcessBlock()
@@ -76,45 +82,54 @@ void MorphEngine::postProcessBlock(juce::AudioBuffer<float>& mainBuffer,
 {
     if (!sceneEnabled || secondaryEngine == nullptr) return;
 
-    const int n = mainBuffer.getNumSamples();
+    const int n   = mainBuffer.getNumSamples();
     const int nCh = juce::jmin(2, mainBuffer.getNumChannels());
 
-    // Swap APVTS state to slot B, sync secondary engine, swap back.
-    const auto savedState = apvts.copyState();
-    const auto slotB = abSlots.getSlot(ABSlotManager::Slot::B);
+    const auto& slotB = abSlots.getSlot(ABSlotManager::Slot::B);
+    if (!slotB.isValid()) return;
 
-    if (slotB.isValid())
+    // Save current primary APVTS state so we can restore after secondary sync.
+    // NOTE: copyState() does ValueTree ref-count work (COW), which involves some
+    // heap activity via JUCE's ref-counted internals. This is JUCE's standard
+    // audio-thread pattern and is acceptable for v1. The critical C1 fix (no
+    // AudioBuffer construction per block) is fully resolved by secondaryScratchBuf.
+    savedPrimaryState = apvts.copyState();
+
+    // Suppress both listeners during the swap+sync+restore window:
+    //   abGuard   — prevents ABSlotManager from marking slot A modified
+    //   morphGuard — prevents MorphEngine's own parameterChanged from firing
+    auto abGuard = abSlots.scopedSuppressModified();
+    const juce::ScopedValueSetter<bool> morphGuard { suppressArcUpdates, true };
+
+    // Swap APVTS to slot B so that engineSyncFromAPVTS reads slot B's values.
+    apvts.replaceState(slotB.createCopy());
+
+    // Populate the secondary engine's DSP cache from slot B (I3 fix).
+    if (engineSyncFromAPVTS)
+        engineSyncFromAPVTS(*secondaryEngine);
+
+    // Copy primary output into the pre-allocated scratch buffer so secondary
+    // engine has the same input signal to process (v1 simplification: both
+    // engines see the same input; v2 could thread the pre-engine input separately).
+    for (int ch = 0; ch < nCh; ++ch)
+        secondaryScratchBuf.copyFrom(ch, 0, mainBuffer, ch, 0, n);
+
+    secondaryEngine->process(secondaryScratchBuf, sidechain);
+
+    // Restore the primary APVTS state (guards still active during restore).
+    apvts.replaceState(savedPrimaryState);
+
+    // Mix: primary output is already in mainBuffer; blend secondary in.
+    const float pos           = juce::jlimit(0.0f, 1.0f, smoothedScenePos);
+    const float primaryGain   = 1.0f - pos;
+    const float secondaryGain = pos;
+
+    for (int ch = 0; ch < nCh; ++ch)
     {
-        // Replace state with slot B (secondary engine's intended config).
-        {
-            const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
-            apvts.replaceState(slotB.createCopy());
-        }
-
-        juce::AudioBuffer<float> secondaryBuf(nCh, n);
-        for (int ch = 0; ch < nCh; ++ch)
-            secondaryBuf.copyFrom(ch, 0, mainBuffer, ch, 0, n);
-
-        secondaryEngine->process(secondaryBuf, sidechain);
-
-        // Restore primary state.
-        {
-            const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
-            apvts.replaceState(savedState);
-        }
-
-        // Mix: primary output is already in mainBuffer; blend secondary in.
-        const float pos = juce::jlimit(0.0f, 1.0f, smoothedScenePos);
-        const float primaryGain = 1.0f - pos;
-        const float secondaryGain = pos;
-
-        for (int ch = 0; ch < nCh; ++ch)
-        {
-            auto* main = mainBuffer.getWritePointer(ch);
-            const auto* sec = secondaryBuf.getReadPointer(ch);
-            for (int i = 0; i < n; ++i)
-                main[i] = main[i] * primaryGain + sec[i] * secondaryGain;
-        }
+        auto* main       = mainBuffer.getWritePointer(ch);
+        const auto* sec  = secondaryScratchBuf.getReadPointer(ch);
+        for (int i = 0; i < n; ++i)
+            main[i] = main[i] * primaryGain + sec[i] * secondaryGain;
     }
 }
 

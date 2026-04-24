@@ -10,6 +10,13 @@ PhantomProcessor::PhantomProcessor()
 {
     apvts.addParameterListener(ParamID::RECIPE_PRESET, this);
     presetManager.initialize();
+
+  #ifdef KAIGEN_PRO_BUILD
+    // Constructed here (not in the initializer list) so the capture of `this`
+    // is valid — apvts, abSlots, and engine are all fully constructed by now.
+    morphOpt.emplace(apvts, abSlots, engine,
+        [this](PhantomEngine& target) { syncParamsToEngine(target); });
+  #endif
 }
 
 PhantomProcessor::~PhantomProcessor()
@@ -51,7 +58,8 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
     spectrumReady.store(false);
 
     #ifdef KAIGEN_PRO_BUILD
-    morph.prepareToPlay(sr, samplesPerBlock);
+    if (morphOpt.has_value())
+        morphOpt->prepareToPlay(sr, samplesPerBlock);
     #endif
 }
 
@@ -71,29 +79,29 @@ bool PhantomProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
     return mainIn == mainOut;
 }
 
-void PhantomProcessor::syncParamsToEngine()
+void PhantomProcessor::syncParamsToEngine(PhantomEngine& target)
 {
-    engine.setCrossoverHz    (apvts.getRawParameterValue(ParamID::PHANTOM_THRESHOLD)->load());
-    engine.setPhantomStrength(apvts.getRawParameterValue(ParamID::PHANTOM_STRENGTH)->load() / 100.0f);
-    engine.setSaturation     (apvts.getRawParameterValue(ParamID::HARMONIC_SATURATION)->load() / 100.0f);
-    engine.setSynthStep      (apvts.getRawParameterValue(ParamID::SYNTH_STEP)->load() / 100.0f);
-    engine.setSynthDuty      (apvts.getRawParameterValue(ParamID::SYNTH_DUTY)->load() / 100.0f);
-    engine.setSynthSkip      ((int) apvts.getRawParameterValue(ParamID::SYNTH_SKIP)->load());
-    engine.setGhostAmount  (apvts.getRawParameterValue(ParamID::GHOST)->load() / 100.0f);
-    engine.setGhostMode    ((int) apvts.getRawParameterValue(ParamID::GHOST_MODE)->load());
-    engine.setOutputGainDb (apvts.getRawParameterValue(ParamID::OUTPUT_GAIN)->load());
-    engine.setEnvelopeAttackMs (apvts.getRawParameterValue(ParamID::ENV_ATTACK_MS)->load());
-    engine.setEnvelopeReleaseMs(apvts.getRawParameterValue(ParamID::ENV_RELEASE_MS)->load());
-    engine.setEnvSource((int) apvts.getRawParameterValue(ParamID::ENV_SOURCE)->load());
-    engine.setBinauralMode ((int) apvts.getRawParameterValue(ParamID::BINAURAL_MODE)->load());
-    engine.setBinauralWidth(apvts.getRawParameterValue(ParamID::BINAURAL_WIDTH)->load() / 100.0f);
-    engine.setStereoWidth  (apvts.getRawParameterValue(ParamID::STEREO_WIDTH)->load() / 100.0f);
-    engine.setSynthLPF(apvts.getRawParameterValue(ParamID::SYNTH_LPF_HZ)->load());
-    engine.setSynthHPF(apvts.getRawParameterValue(ParamID::SYNTH_HPF_HZ)->load());
+    target.setCrossoverHz    (apvts.getRawParameterValue(ParamID::PHANTOM_THRESHOLD)->load());
+    target.setPhantomStrength(apvts.getRawParameterValue(ParamID::PHANTOM_STRENGTH)->load() / 100.0f);
+    target.setSaturation     (apvts.getRawParameterValue(ParamID::HARMONIC_SATURATION)->load() / 100.0f);
+    target.setSynthStep      (apvts.getRawParameterValue(ParamID::SYNTH_STEP)->load() / 100.0f);
+    target.setSynthDuty      (apvts.getRawParameterValue(ParamID::SYNTH_DUTY)->load() / 100.0f);
+    target.setSynthSkip      ((int) apvts.getRawParameterValue(ParamID::SYNTH_SKIP)->load());
+    target.setGhostAmount  (apvts.getRawParameterValue(ParamID::GHOST)->load() / 100.0f);
+    target.setGhostMode    ((int) apvts.getRawParameterValue(ParamID::GHOST_MODE)->load());
+    target.setOutputGainDb (apvts.getRawParameterValue(ParamID::OUTPUT_GAIN)->load());
+    target.setEnvelopeAttackMs (apvts.getRawParameterValue(ParamID::ENV_ATTACK_MS)->load());
+    target.setEnvelopeReleaseMs(apvts.getRawParameterValue(ParamID::ENV_RELEASE_MS)->load());
+    target.setEnvSource((int) apvts.getRawParameterValue(ParamID::ENV_SOURCE)->load());
+    target.setBinauralMode ((int) apvts.getRawParameterValue(ParamID::BINAURAL_MODE)->load());
+    target.setBinauralWidth(apvts.getRawParameterValue(ParamID::BINAURAL_WIDTH)->load() / 100.0f);
+    target.setStereoWidth  (apvts.getRawParameterValue(ParamID::STEREO_WIDTH)->load() / 100.0f);
+    target.setSynthLPF(apvts.getRawParameterValue(ParamID::SYNTH_LPF_HZ)->load());
+    target.setSynthHPF(apvts.getRawParameterValue(ParamID::SYNTH_HPF_HZ)->load());
     {
         const int idx = (int) apvts.getRawParameterValue(ParamID::SYNTH_FILTER_SLOPE)->load();
         const int dBPerOct = (idx == 0) ? 6 : (idx == 2) ? 24 : 12;
-        engine.setSynthFilterSlope(dBPerOct);
+        target.setSynthFilterSlope(dBPerOct);
     }
 
     static const char* hIds[7] = {
@@ -103,21 +111,21 @@ void PhantomProcessor::syncParamsToEngine()
     std::array<float, 7> amps;
     for (int i = 0; i < 7; ++i)
         amps[(size_t) i] = apvts.getRawParameterValue(hIds[i])->load() / 100.0f;
-    engine.setHarmonicAmplitudes(amps);
-    engine.setSynthMode((int) apvts.getRawParameterValue(ParamID::MODE)->load());
-    engine.setWaveletLength(apvts.getRawParameterValue(ParamID::SYNTH_WAVELET_LENGTH)->load() / 100.0f);
-    engine.setGateThreshold(apvts.getRawParameterValue(ParamID::SYNTH_GATE_THRESHOLD)->load() / 100.0f);
-    engine.setH1Amplitude  (apvts.getRawParameterValue(ParamID::SYNTH_H1)->load() / 100.0f);
-    engine.setSubAmplitude (apvts.getRawParameterValue(ParamID::SYNTH_SUB)->load() / 100.0f);
-    engine.setMinPeriodSamples(apvts.getRawParameterValue(ParamID::SYNTH_MIN_SAMPLES)->load());
-    engine.setMaxPeriodSamples(apvts.getRawParameterValue(ParamID::SYNTH_MAX_SAMPLES)->load());
-    engine.setTrackingSpeed(apvts.getRawParameterValue(ParamID::TRACKING_SPEED)->load() / 100.0f);
-    engine.setUsePunch     (apvts.getRawParameterValue(ParamID::PUNCH_ENABLED)->load() > 0.5f);
-    engine.setPunchAmount  (apvts.getRawParameterValue(ParamID::PUNCH_AMOUNT)->load() / 100.0f);
-    engine.setBoostThreshold(apvts.getRawParameterValue(ParamID::SYNTH_BOOST_THRESHOLD)->load() / 100.0f);
-    engine.setBoostAmount   (apvts.getRawParameterValue(ParamID::SYNTH_BOOST_AMOUNT)->load() / 100.0f);
-    engine.setMidiTriggerEnabled(apvts.getRawParameterValue(ParamID::MIDI_TRIGGER_ENABLED)->load() > 0.5f);
-    engine.setMidiGateRelease   (apvts.getRawParameterValue(ParamID::MIDI_GATE_RELEASE)   ->load() > 0.5f);
+    target.setHarmonicAmplitudes(amps);
+    target.setSynthMode((int) apvts.getRawParameterValue(ParamID::MODE)->load());
+    target.setWaveletLength(apvts.getRawParameterValue(ParamID::SYNTH_WAVELET_LENGTH)->load() / 100.0f);
+    target.setGateThreshold(apvts.getRawParameterValue(ParamID::SYNTH_GATE_THRESHOLD)->load() / 100.0f);
+    target.setH1Amplitude  (apvts.getRawParameterValue(ParamID::SYNTH_H1)->load() / 100.0f);
+    target.setSubAmplitude (apvts.getRawParameterValue(ParamID::SYNTH_SUB)->load() / 100.0f);
+    target.setMinPeriodSamples(apvts.getRawParameterValue(ParamID::SYNTH_MIN_SAMPLES)->load());
+    target.setMaxPeriodSamples(apvts.getRawParameterValue(ParamID::SYNTH_MAX_SAMPLES)->load());
+    target.setTrackingSpeed(apvts.getRawParameterValue(ParamID::TRACKING_SPEED)->load() / 100.0f);
+    target.setUsePunch     (apvts.getRawParameterValue(ParamID::PUNCH_ENABLED)->load() > 0.5f);
+    target.setPunchAmount  (apvts.getRawParameterValue(ParamID::PUNCH_AMOUNT)->load() / 100.0f);
+    target.setBoostThreshold(apvts.getRawParameterValue(ParamID::SYNTH_BOOST_THRESHOLD)->load() / 100.0f);
+    target.setBoostAmount   (apvts.getRawParameterValue(ParamID::SYNTH_BOOST_AMOUNT)->load() / 100.0f);
+    target.setMidiTriggerEnabled(apvts.getRawParameterValue(ParamID::MIDI_TRIGGER_ENABLED)->load() > 0.5f);
+    target.setMidiGateRelease   (apvts.getRawParameterValue(ParamID::MIDI_GATE_RELEASE)   ->load() > 0.5f);
 }
 
 void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -269,11 +277,11 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     }
 
     #ifdef KAIGEN_PRO_BUILD
-        morph.preProcessBlock();   // apply arc interpolations for this block
+        morphOpt->preProcessBlock();   // apply arc interpolations for this block
     #endif
 
     // ── Sync params → engine ──────────────────────────────────────────
-    syncParamsToEngine();
+    syncParamsToEngine(engine);
 
     // ── Process through the waveshaper engine ────────────────────────
     // Read sidechain bus (bus index 1) if enabled
@@ -300,7 +308,7 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     engine.process(buffer, sidechainPtr);
 
   #ifdef KAIGEN_PRO_BUILD
-    morph.postProcessBlock(buffer, sidechainPtr);
+    morphOpt->postProcessBlock(buffer, sidechainPtr);
   #endif
 
     // Pitch display: use the synth's zero-crossing tracker directly — it reflects exactly
@@ -413,7 +421,7 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
   #ifdef KAIGEN_PRO_BUILD
     if (auto existing = state.getChildWithName("MorphState"); existing.isValid())
         state.removeChild(existing, nullptr);
-    state.appendChild(morph.toStateTree(), nullptr);
+    state.appendChild(morphOpt->toStateTree(), nullptr);
   #endif
 
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
@@ -441,7 +449,7 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
     abSlots.fromStateTree(abSlotsTree);
 
   #ifdef KAIGEN_PRO_BUILD
-    morph.fromStateTree(morphStateTree);
+    morphOpt->fromStateTree(morphStateTree);
   #endif
 }
 
