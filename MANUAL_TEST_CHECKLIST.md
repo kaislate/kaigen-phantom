@@ -166,7 +166,7 @@ git commit -m "test: verify end-to-end preset system functionality"
 Build with Debug config, copy VST3 to `C:\Users\kaislate\Downloads\KAIGEN\`, fully restart Ableton Live 12, load the plugin on a fresh track.
 
 - [ ] **Snap with include-discrete OFF (default).** Set slot A Ghost Mode = Replace. Snap to B. Set slot B Ghost Mode = Phantom Only. Snap A↔B a few times — Ghost Mode stays fixed (no audible click at crossover). Only continuous params flip.
-- [ ] **Standard build ignores `<MorphConfig>`.** Hand-craft a `.fxp` file containing `<SlotB>` *and* `<MorphConfig defaultPosition="0.5" curve="linear" />`, drop it into `%APPDATA%/Kaigen/KaigenPhantom/Presets/User/`. Load it — the plugin should treat it as a plain A/B preset (both slots restored; morph metadata silently ignored since `KAIGEN_PRO_BUILD` is not defined in this build).
+- [ ] **Preset `<MorphConfig>` round-trip.** Hand-craft a `.fxp` file containing `<SlotB>` *and* `<MorphConfig defaultPosition="0.5" curve="linear" />`, drop it into `%APPDATA%/Kaigen/KaigenPhantom/Presets/User/`. Load it — both slots restored; the morph knob should move to 0.5 (since defaultPosition is honored now that morph ships unconditionally).
 - [ ] **Snap with include-discrete ON.** Open settings, enable "Include discrete parameters when snapping A/B". Repeat the previous test — now Ghost Mode flips on snap and a click is audible if the two engines are in materially different states.
 - [ ] **Designer-authored preset override.** Turn include-discrete OFF. Load a factory A/B preset that has different Ghost Modes between slots (may need to create one for testing). Snap A↔B — discrete params flip regardless of the setting (designer intent).
 - [ ] **Designer-authored clears on edit.** From the previous state, tweak any knob. Snap A↔B — discrete params no longer flip (designerAuthored cleared).
@@ -175,15 +175,15 @@ Build with Debug config, copy VST3 to `C:\Users\kaislate\Downloads\KAIGEN\`, ful
 - [ ] **Browser A/B column.** Open preset browser. Existing presets render "—". Save a preset as A/B → row shows "A|B" badge. Sort by column works (Single → A/B → Morph). Filter dropdown narrows list correctly.
 - [ ] **Save modal Preset Kind.** With slots identical: A/B radio dimmed + helper text. With slots different: A/B radio enabled. Save as A/B — reload the preset — both slots match what was saved.
 
-## Pro Morph (KAIGEN_PRO_BUILD only)
+## Morph (arc modulation + Scene Crossfade — always shipped)
 
-Build the Pro variant:
+Build and deploy:
 
-    cmake -S . -B build-pro -DKAIGEN_PRO_BUILD=ON -DCMAKE_BUILD_TYPE=Release
-    cmake --build build-pro --target KaigenPhantom_VST3 --config Release
-    cp -r "build-pro/KaigenPhantom_artefacts/Release/VST3/Kaigen Phantom.vst3" "C:/Users/kaislate/Downloads/KAIGEN/"
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --target KaigenPhantom_VST3 --config Release
+    cp -r "build/KaigenPhantom_artefacts/Release/VST3/Kaigen Phantom.vst3" "C:/Users/kaislate/Downloads/KAIGEN/"
 
-Fully restart Ableton. Load the Pro plugin.
+Fully restart Ableton. Load the plugin.
 
 - [ ] **Modulation panel visible.** Dark horizontal strip between header and body. MORPH label, Lane 1 badge, slider, value, CAPTURE button, "0 armed" status.
 - [ ] **Enable toggle works.** Click the enable dot — lights amber. Knobs grow a thin outer track ring (barely visible since no arcs yet). Click again — rings vanish.
@@ -194,5 +194,4 @@ Fully restart Ableton. Load the Pro plugin.
 - [ ] **Scene Crossfade toggle.** Open settings → Morph → enable "Scene Crossfade". Panel grows a second SCENE row with its own slider. Set slot A and slot B to different sounds (via A/B compare). Sweep scene slider — audio crossfades between them. CPU in Ableton increases noticeably (~doubled).
 - [ ] **Save + reload preset with morph.** Arm 3 arcs, save as "A/B + Morph". Load a Single preset to wipe state. Reload the A/B + Morph preset. Arcs restore; slots restore; morph position restores (to 0 if saved at 0).
 - [ ] **Project save/reload.** Configure morph state, save Ableton project, close + reopen. Plugin state restores including arcs + enabled flag + morph position.
-- [ ] **Standard build loads Pro preset gracefully.** Copy the same Pro-authored preset `.fxp` into a Standard-build install of Phantom. Load it: A/B slots populate; morph data silently ignored; no error.
 
