@@ -181,7 +181,10 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         &self.synthWaveletLengthRelay, &self.synthGateThresholdRelay,
         &self.synthH1Relay, &self.synthSubRelay, &self.synthMinSamplesRelay, &self.synthMaxSamplesRelay, &self.trackingSpeedRelay,
         &self.punchAmountRelay,
-        &self.synthBoostThresholdRelay, &self.synthBoostAmountRelay
+        &self.synthBoostThresholdRelay, &self.synthBoostAmountRelay,
+      #ifdef KAIGEN_PRO_BUILD
+        &self.morphAmountRelay, &self.scenePositionRelay,
+      #endif
     };
     for (auto* r : sliderRelays)
         options = options.withOptionsFrom(*r);
@@ -728,6 +731,10 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         { ParamID::PUNCH_AMOUNT,            punchAmountRelay },
         { ParamID::SYNTH_BOOST_THRESHOLD,   synthBoostThresholdRelay },
         { ParamID::SYNTH_BOOST_AMOUNT,      synthBoostAmountRelay },
+      #ifdef KAIGEN_PRO_BUILD
+        { ParamID::MORPH_AMOUNT,            morphAmountRelay },
+        { ParamID::SCENE_POSITION,          scenePositionRelay },
+      #endif
     };
     for (auto& b : sliderBindings)
         sliderAttachments.push_back(std::make_unique<juce::WebSliderParameterAttachment>(

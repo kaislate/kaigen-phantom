@@ -11,9 +11,9 @@ namespace kaigen::phantom
 MorphEngine::MorphEngine(juce::AudioProcessorValueTreeState& apvtsRef,
                          ABSlotManager& abSlotsRef,
                          PhantomEngine& primaryEngineRef,
-                         std::function<void(PhantomEngine&)> engineSyncFromAPVTSIn)
+                         std::function<void(PhantomEngine&, std::function<float(const char*)>)> engineSyncIn)
     : apvts(apvtsRef), abSlots(abSlotsRef), primaryEngine(primaryEngineRef),
-      engineSyncFromAPVTS(std::move(engineSyncFromAPVTSIn))
+      engineSync(std::move(engineSyncIn))
 {
     apvts.addParameterListener(ParamID::MORPH_ENABLED,  this);
     apvts.addParameterListener(ParamID::MORPH_AMOUNT,   this);
@@ -44,6 +44,16 @@ void MorphEngine::prepareToPlay(double sr, int spb)
     // Pre-allocate scratch buffer for secondary engine (C1 fix: no audio-thread allocation).
     // avoidReallocating=true: won't free+reallocate if already big enough.
     secondaryScratchBuf.setSize(2, spb, false, false, true);
+}
+
+void MorphEngine::capturePreEngineInput(const juce::AudioBuffer<float>& input)
+{
+    if (!sceneEnabled || secondaryEngine == nullptr) return;
+
+    const int n   = input.getNumSamples();
+    const int nCh = juce::jmin(2, input.getNumChannels());
+    for (int ch = 0; ch < nCh; ++ch)
+        secondaryScratchBuf.copyFrom(ch, 0, input, ch, 0, n);
 }
 
 void MorphEngine::preProcessBlock()
@@ -88,36 +98,26 @@ void MorphEngine::postProcessBlock(juce::AudioBuffer<float>& mainBuffer,
     const auto& slotB = abSlots.getSlot(ABSlotManager::Slot::B);
     if (!slotB.isValid()) return;
 
-    // Save current primary APVTS state so we can restore after secondary sync.
-    // NOTE: copyState() does ValueTree ref-count work (COW), which involves some
-    // heap activity via JUCE's ref-counted internals. This is JUCE's standard
-    // audio-thread pattern and is acceptable for v1. The critical C1 fix (no
-    // AudioBuffer construction per block) is fully resolved by secondaryScratchBuf.
-    savedPrimaryState = apvts.copyState();
+    // Drive the secondary engine from slot B WITHOUT mutating APVTS. Build a
+    // lookup that reads PARAM nodes from slot B's ValueTree; the injected
+    // engineSync callable will use it to call the appropriate engine setters.
+    // This eliminates the flicker that the old APVTS-swap approach caused (UI
+    // knob positions briefly reflected slot B during the swap window).
+    auto valueForSlotB = [&slotB](const char* paramID) -> float
+    {
+        auto child = slotB.getChildWithProperty("id", juce::var(paramID));
+        if (!child.isValid()) return 0.0f;
+        return (float) child.getProperty("value", juce::var(0.0f));
+    };
 
-    // Suppress both listeners during the swap+sync+restore window:
-    //   abGuard   — prevents ABSlotManager from marking slot A modified
-    //   morphGuard — prevents MorphEngine's own parameterChanged from firing
-    auto abGuard = abSlots.scopedSuppressModified();
-    const juce::ScopedValueSetter<bool> morphGuard { suppressArcUpdates, true };
+    if (engineSync)
+        engineSync(*secondaryEngine, valueForSlotB);
 
-    // Swap APVTS to slot B so that engineSyncFromAPVTS reads slot B's values.
-    apvts.replaceState(slotB.createCopy());
-
-    // Populate the secondary engine's DSP cache from slot B (I3 fix).
-    if (engineSyncFromAPVTS)
-        engineSyncFromAPVTS(*secondaryEngine);
-
-    // Copy primary output into the pre-allocated scratch buffer so secondary
-    // engine has the same input signal to process (v1 simplification: both
-    // engines see the same input; v2 could thread the pre-engine input separately).
-    for (int ch = 0; ch < nCh; ++ch)
-        secondaryScratchBuf.copyFrom(ch, 0, mainBuffer, ch, 0, n);
-
+    // secondaryScratchBuf already holds the pre-engine INPUT (populated by
+    // capturePreEngineInput, called from PhantomProcessor::processBlock BEFORE
+    // engine.process mutates the main buffer in place). Process in place:
+    // secondaryScratchBuf transitions from slot-B-input to slot-B-output here.
     secondaryEngine->process(secondaryScratchBuf, sidechain);
-
-    // Restore the primary APVTS state (guards still active during restore).
-    apvts.replaceState(savedPrimaryState);
 
     // Mix: primary output is already in mainBuffer; blend secondary in.
     const float pos           = juce::jlimit(0.0f, 1.0f, smoothedScenePos);

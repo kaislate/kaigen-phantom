@@ -77,6 +77,13 @@ private:
     juce::WebSliderRelay synthBoostThresholdRelay   { "synth_boost_threshold" };
     juce::WebSliderRelay synthBoostAmountRelay      { "synth_boost_amount" };
 
+  #ifdef KAIGEN_PRO_BUILD
+    // Morph sliders — bound to APVTS morph_amount and scene_position so the
+    // WebView's mod-slider drags propagate through to the DSP smoothing path.
+    juce::WebSliderRelay morphAmountRelay           { "morph_amount" };
+    juce::WebSliderRelay scenePositionRelay         { "scene_position" };
+  #endif
+
     // ── Combo-box relays ──────────────────────────────────────────────
     juce::WebComboBoxRelay modeRelay             { "mode" };
     juce::WebComboBoxRelay ghostModeRelay        { "ghost_mode" };

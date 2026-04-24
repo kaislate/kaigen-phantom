@@ -146,25 +146,33 @@
       }
     });
 
-    // Slider interaction (drag to set morph amount via the APVTS param)
+    // Slider interaction — classic mousedown-on-slider + document-level move/up.
+    // Uses mouse events (not pointer events) for reliability in WebView2.
+    // Listens on document so a drag begun on the handle continues even if the
+    // cursor leaves the slider's bounding box mid-drag.
     function wireSlider(sliderEl, paramID) {
-      let dragging = false;
       const setFromClientX = (clientX) => {
         const rect = sliderEl.getBoundingClientRect();
+        if (rect.width <= 0) return;
         const norm = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
         const relay = window.Juce.getSliderState(paramID);
         if (relay) relay.setNormalisedValue(norm);
       };
 
-      sliderEl.addEventListener('pointerdown', (e) => {
+      let dragging = false;
+
+      sliderEl.addEventListener('mousedown', (e) => {
         dragging = true;
-        sliderEl.setPointerCapture(e.pointerId);
         setFromClientX(e.clientX);
+        e.preventDefault();   // prevent text selection / focus-stealing
       });
-      sliderEl.addEventListener('pointermove', (e) => { if (dragging) setFromClientX(e.clientX); });
-      sliderEl.addEventListener('pointerup', (e) => {
+
+      document.addEventListener('mousemove', (e) => {
+        if (dragging) setFromClientX(e.clientX);
+      });
+
+      document.addEventListener('mouseup', () => {
         dragging = false;
-        sliderEl.releasePointerCapture(e.pointerId);
       });
     }
     wireSlider(el.slider,      'morph_amount');

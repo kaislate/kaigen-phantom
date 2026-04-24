@@ -20,7 +20,7 @@ public:
     MorphEngine(juce::AudioProcessorValueTreeState& apvts,
                 ABSlotManager& abSlots,
                 PhantomEngine& primaryEngine,
-                std::function<void(PhantomEngine&)> engineSyncFromAPVTS);
+                std::function<void(PhantomEngine&, std::function<float(const char*)>)> engineSync);
     ~MorphEngine() override;
 
     // Called from PhantomProcessor::prepareToPlay before audio starts.
@@ -28,6 +28,12 @@ public:
 
     // Per-block hooks
     void preProcessBlock();
+    // MUST be called BEFORE PhantomEngine::process, with the raw pre-engine
+    // input buffer. Copies the input into an internal scratch so that the
+    // secondary engine (if Scene Crossfade is active) can process the same
+    // pre-engine input as the primary — not the primary's already-mutated
+    // output. No-op when scene crossfade is disabled.
+    void capturePreEngineInput(const juce::AudioBuffer<float>& input);
     void postProcessBlock(juce::AudioBuffer<float>& mainBuffer,
                           const juce::AudioBuffer<float>* sidechain);
 
@@ -83,7 +89,10 @@ private:
     juce::AudioProcessorValueTreeState& apvts;
     ABSlotManager& abSlots;
     PhantomEngine& primaryEngine;
-    std::function<void(PhantomEngine&)> engineSyncFromAPVTS;
+    // Injected by PhantomProcessor. Takes a target engine + a lookup callable
+    // that returns a denormalized param value given its ID. Lets us drive the
+    // secondary engine from slot B's ValueTree without mutating apvts state.
+    std::function<void(PhantomEngine&, std::function<float(const char*)>)> engineSync;
 
     std::unordered_map<juce::String, ArcEntry> lane1Arcs;
     juce::String curveName = "linear";

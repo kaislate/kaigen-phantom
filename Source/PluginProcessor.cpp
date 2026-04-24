@@ -14,8 +14,16 @@ PhantomProcessor::PhantomProcessor()
   #ifdef KAIGEN_PRO_BUILD
     // Constructed here (not in the initializer list) so the capture of `this`
     // is valid — apvts, abSlots, and engine are all fully constructed by now.
+    // MorphEngine takes a sync callable that accepts an engine + a value-lookup
+    // function. For Scene Crossfade, MorphEngine builds the lookup from slot B's
+    // ValueTree so the secondary engine can be driven without swapping APVTS state
+    // (which previously caused UI flicker as the primary knobs briefly reflected
+    // slot B's values during the swap window).
     morphOpt.emplace(apvts, abSlots, engine,
-        [this](PhantomEngine& target) { syncParamsToEngine(target); });
+        [this](PhantomEngine& target, std::function<float(const char*)> valueFor)
+        {
+            syncEngineFromValueLookup(target, valueFor);
+        });
   #endif
 }
 
@@ -81,25 +89,34 @@ bool PhantomProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 
 void PhantomProcessor::syncParamsToEngine(PhantomEngine& target)
 {
-    target.setCrossoverHz    (apvts.getRawParameterValue(ParamID::PHANTOM_THRESHOLD)->load());
-    target.setPhantomStrength(apvts.getRawParameterValue(ParamID::PHANTOM_STRENGTH)->load() / 100.0f);
-    target.setSaturation     (apvts.getRawParameterValue(ParamID::HARMONIC_SATURATION)->load() / 100.0f);
-    target.setSynthStep      (apvts.getRawParameterValue(ParamID::SYNTH_STEP)->load() / 100.0f);
-    target.setSynthDuty      (apvts.getRawParameterValue(ParamID::SYNTH_DUTY)->load() / 100.0f);
-    target.setSynthSkip      ((int) apvts.getRawParameterValue(ParamID::SYNTH_SKIP)->load());
-    target.setGhostAmount  (apvts.getRawParameterValue(ParamID::GHOST)->load() / 100.0f);
-    target.setGhostMode    ((int) apvts.getRawParameterValue(ParamID::GHOST_MODE)->load());
-    target.setOutputGainDb (apvts.getRawParameterValue(ParamID::OUTPUT_GAIN)->load());
-    target.setEnvelopeAttackMs (apvts.getRawParameterValue(ParamID::ENV_ATTACK_MS)->load());
-    target.setEnvelopeReleaseMs(apvts.getRawParameterValue(ParamID::ENV_RELEASE_MS)->load());
-    target.setEnvSource((int) apvts.getRawParameterValue(ParamID::ENV_SOURCE)->load());
-    target.setBinauralMode ((int) apvts.getRawParameterValue(ParamID::BINAURAL_MODE)->load());
-    target.setBinauralWidth(apvts.getRawParameterValue(ParamID::BINAURAL_WIDTH)->load() / 100.0f);
-    target.setStereoWidth  (apvts.getRawParameterValue(ParamID::STEREO_WIDTH)->load() / 100.0f);
-    target.setSynthLPF(apvts.getRawParameterValue(ParamID::SYNTH_LPF_HZ)->load());
-    target.setSynthHPF(apvts.getRawParameterValue(ParamID::SYNTH_HPF_HZ)->load());
+    syncEngineFromValueLookup(target, [this](const char* id)
     {
-        const int idx = (int) apvts.getRawParameterValue(ParamID::SYNTH_FILTER_SLOPE)->load();
+        return apvts.getRawParameterValue(id)->load();
+    });
+}
+
+void PhantomProcessor::syncEngineFromValueLookup(PhantomEngine& target,
+                                                 std::function<float(const char*)> valueFor)
+{
+    target.setCrossoverHz    (valueFor(ParamID::PHANTOM_THRESHOLD));
+    target.setPhantomStrength(valueFor(ParamID::PHANTOM_STRENGTH) / 100.0f);
+    target.setSaturation     (valueFor(ParamID::HARMONIC_SATURATION) / 100.0f);
+    target.setSynthStep      (valueFor(ParamID::SYNTH_STEP) / 100.0f);
+    target.setSynthDuty      (valueFor(ParamID::SYNTH_DUTY) / 100.0f);
+    target.setSynthSkip      ((int) valueFor(ParamID::SYNTH_SKIP));
+    target.setGhostAmount  (valueFor(ParamID::GHOST) / 100.0f);
+    target.setGhostMode    ((int) valueFor(ParamID::GHOST_MODE));
+    target.setOutputGainDb (valueFor(ParamID::OUTPUT_GAIN));
+    target.setEnvelopeAttackMs (valueFor(ParamID::ENV_ATTACK_MS));
+    target.setEnvelopeReleaseMs(valueFor(ParamID::ENV_RELEASE_MS));
+    target.setEnvSource((int) valueFor(ParamID::ENV_SOURCE));
+    target.setBinauralMode ((int) valueFor(ParamID::BINAURAL_MODE));
+    target.setBinauralWidth(valueFor(ParamID::BINAURAL_WIDTH) / 100.0f);
+    target.setStereoWidth  (valueFor(ParamID::STEREO_WIDTH) / 100.0f);
+    target.setSynthLPF(valueFor(ParamID::SYNTH_LPF_HZ));
+    target.setSynthHPF(valueFor(ParamID::SYNTH_HPF_HZ));
+    {
+        const int idx = (int) valueFor(ParamID::SYNTH_FILTER_SLOPE);
         const int dBPerOct = (idx == 0) ? 6 : (idx == 2) ? 24 : 12;
         target.setSynthFilterSlope(dBPerOct);
     }
@@ -110,22 +127,22 @@ void PhantomProcessor::syncParamsToEngine(PhantomEngine& target)
     };
     std::array<float, 7> amps;
     for (int i = 0; i < 7; ++i)
-        amps[(size_t) i] = apvts.getRawParameterValue(hIds[i])->load() / 100.0f;
+        amps[(size_t) i] = valueFor(hIds[i]) / 100.0f;
     target.setHarmonicAmplitudes(amps);
-    target.setSynthMode((int) apvts.getRawParameterValue(ParamID::MODE)->load());
-    target.setWaveletLength(apvts.getRawParameterValue(ParamID::SYNTH_WAVELET_LENGTH)->load() / 100.0f);
-    target.setGateThreshold(apvts.getRawParameterValue(ParamID::SYNTH_GATE_THRESHOLD)->load() / 100.0f);
-    target.setH1Amplitude  (apvts.getRawParameterValue(ParamID::SYNTH_H1)->load() / 100.0f);
-    target.setSubAmplitude (apvts.getRawParameterValue(ParamID::SYNTH_SUB)->load() / 100.0f);
-    target.setMinPeriodSamples(apvts.getRawParameterValue(ParamID::SYNTH_MIN_SAMPLES)->load());
-    target.setMaxPeriodSamples(apvts.getRawParameterValue(ParamID::SYNTH_MAX_SAMPLES)->load());
-    target.setTrackingSpeed(apvts.getRawParameterValue(ParamID::TRACKING_SPEED)->load() / 100.0f);
-    target.setUsePunch     (apvts.getRawParameterValue(ParamID::PUNCH_ENABLED)->load() > 0.5f);
-    target.setPunchAmount  (apvts.getRawParameterValue(ParamID::PUNCH_AMOUNT)->load() / 100.0f);
-    target.setBoostThreshold(apvts.getRawParameterValue(ParamID::SYNTH_BOOST_THRESHOLD)->load() / 100.0f);
-    target.setBoostAmount   (apvts.getRawParameterValue(ParamID::SYNTH_BOOST_AMOUNT)->load() / 100.0f);
-    target.setMidiTriggerEnabled(apvts.getRawParameterValue(ParamID::MIDI_TRIGGER_ENABLED)->load() > 0.5f);
-    target.setMidiGateRelease   (apvts.getRawParameterValue(ParamID::MIDI_GATE_RELEASE)   ->load() > 0.5f);
+    target.setSynthMode((int) valueFor(ParamID::MODE));
+    target.setWaveletLength(valueFor(ParamID::SYNTH_WAVELET_LENGTH) / 100.0f);
+    target.setGateThreshold(valueFor(ParamID::SYNTH_GATE_THRESHOLD) / 100.0f);
+    target.setH1Amplitude  (valueFor(ParamID::SYNTH_H1) / 100.0f);
+    target.setSubAmplitude (valueFor(ParamID::SYNTH_SUB) / 100.0f);
+    target.setMinPeriodSamples(valueFor(ParamID::SYNTH_MIN_SAMPLES));
+    target.setMaxPeriodSamples(valueFor(ParamID::SYNTH_MAX_SAMPLES));
+    target.setTrackingSpeed(valueFor(ParamID::TRACKING_SPEED) / 100.0f);
+    target.setUsePunch     (valueFor(ParamID::PUNCH_ENABLED) > 0.5f);
+    target.setPunchAmount  (valueFor(ParamID::PUNCH_AMOUNT) / 100.0f);
+    target.setBoostThreshold(valueFor(ParamID::SYNTH_BOOST_THRESHOLD) / 100.0f);
+    target.setBoostAmount   (valueFor(ParamID::SYNTH_BOOST_AMOUNT) / 100.0f);
+    target.setMidiTriggerEnabled(valueFor(ParamID::MIDI_TRIGGER_ENABLED) > 0.5f);
+    target.setMidiGateRelease   (valueFor(ParamID::MIDI_GATE_RELEASE)    > 0.5f);
 }
 
 void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -305,6 +322,13 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             }
         }
     }
+  #ifdef KAIGEN_PRO_BUILD
+    // Capture the pre-engine input so MorphEngine's secondary engine can
+    // process the SAME input (not the primary's already-mutated output).
+    // No-op when Scene Crossfade is disabled.
+    if (morphOpt.has_value()) morphOpt->capturePreEngineInput(buffer);
+  #endif
+
     engine.process(buffer, sidechainPtr);
 
   #ifdef KAIGEN_PRO_BUILD
