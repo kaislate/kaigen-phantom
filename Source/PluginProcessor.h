@@ -100,6 +100,11 @@ private:
     static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout();
 
     void syncParamsToEngine(PhantomEngine& target);
+    // Sync an engine from any source of denormalized param values (not just apvts).
+    // Used by MorphEngine's Scene Crossfade to drive the secondary engine from
+    // slot B's ValueTree without mutating the primary APVTS state.
+    void syncEngineFromValueLookup(PhantomEngine& target,
+                                   std::function<float(const char*)> valueFor);
 
     double sampleRate = 44100.0;
 

@@ -20,7 +20,7 @@ public:
     MorphEngine(juce::AudioProcessorValueTreeState& apvts,
                 ABSlotManager& abSlots,
                 PhantomEngine& primaryEngine,
-                std::function<void(PhantomEngine&)> engineSyncFromAPVTS);
+                std::function<void(PhantomEngine&, std::function<float(const char*)>)> engineSync);
     ~MorphEngine() override;
 
     // Called from PhantomProcessor::prepareToPlay before audio starts.
@@ -83,7 +83,10 @@ private:
     juce::AudioProcessorValueTreeState& apvts;
     ABSlotManager& abSlots;
     PhantomEngine& primaryEngine;
-    std::function<void(PhantomEngine&)> engineSyncFromAPVTS;
+    // Injected by PhantomProcessor. Takes a target engine + a lookup callable
+    // that returns a denormalized param value given its ID. Lets us drive the
+    // secondary engine from slot B's ValueTree without mutating apvts state.
+    std::function<void(PhantomEngine&, std::function<float(const char*)>)> engineSync;
 
     std::unordered_map<juce::String, ArcEntry> lane1Arcs;
     juce::String curveName = "linear";
