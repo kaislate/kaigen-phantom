@@ -29,6 +29,17 @@ body{
 .hidden,
 .candy-inner.hidden{display:none !important}
 
+/* ═══ Build tag — visible version stamp next to KAIGEN logo ═══ */
+.build-tag{
+  background:#4A8DD5;color:#fff;
+  font-size:9px;font-weight:700;letter-spacing:0.8px;
+  padding:2px 7px;border-radius:3px;
+  margin-left:10px;
+  text-shadow:0 1px 1px rgba(0,0,0,0.25);
+  box-shadow:0 1px 2px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.2);
+  user-select:none;
+}
+
 /* ═══ WRAP — Studio Gray plastic surface ═══ */
 .wrap{
   position:relative;width:1300px;height:820px;overflow:hidden;
@@ -677,11 +688,12 @@ phantom-knob.mode-inactive{
 .mod-panel {
     background: linear-gradient(180deg, #2b2e34, #22252b);
     color: rgba(255,255,255,0.85);
-    border-top: 1px solid rgba(0,0,0,0.3);
-    border-bottom: 1px solid rgba(0,0,0,0.3);
+    border-top: 1px solid rgba(0,0,0,0.4);
+    border-bottom: 2px solid rgba(74,141,213,0.35);  /* subtle blue accent separator from body */
     padding: 4px 0;
     font-family: -apple-system, 'Segoe UI', sans-serif;
     font-size: 11px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 2px 6px rgba(0,0,0,0.25);
 }
 .mod-row {
     padding: 8px 18px;
