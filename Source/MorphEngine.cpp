@@ -285,6 +285,7 @@ juce::ValueTree MorphEngine::toMorphConfigTree() const
         juce::ValueTree arc { "Arc" };
         arc.setProperty("paramID", id, nullptr);
         arc.setProperty("depth", entry.depth, nullptr);
+        arc.setProperty("capturedBase", entry.capturedBase, nullptr);   // NEW
         lane.appendChild(arc, nullptr);
     }
     root.appendChild(lane, nullptr);
@@ -328,11 +329,21 @@ void MorphEngine::fromMorphConfigTree(const juce::ValueTree& morphConfig)
 
             if (id.isNotEmpty() && std::abs(depth) >= 1e-6f)
             {
-                // Capture current live value as the base (the base is recomputed
-                // on load; the saved arc depth is relative delta).
-                float base = 0.0f;
-                if (auto* p = apvts.getParameter(id))
-                    base = p->convertFrom0to1(p->getValue());
+                float base;
+                if (arc.hasProperty("capturedBase"))
+                {
+                    // Preferred path: use the authored base from the preset.
+                    base = (float) arc.getProperty("capturedBase", juce::var(0.0f));
+                }
+                else
+                {
+                    // Fallback for legacy presets authored before capturedBase was persisted:
+                    // derive base from current live value. This preserves backwards compat
+                    // but drifts with live state.
+                    base = 0.0f;
+                    if (auto* p = apvts.getParameter(id))
+                        base = p->convertFrom0to1(p->getValue());
+                }
                 lane1Arcs[id] = { depth, base };
             }
         }

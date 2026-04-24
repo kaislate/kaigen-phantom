@@ -556,4 +556,48 @@ TEST_CASE("preProcessBlock on clean slot leaves modified=false")
     CHECK(abSlots.isModified(kaigen::phantom::ABSlotManager::Slot::A) == beforeBlocks);
 }
 
+// -----------------------------------------------------------------------
+// Regression test: I2 — MorphConfig round-trip must preserve capturedBase
+// -----------------------------------------------------------------------
+
+TEST_CASE("MorphConfig round-trip preserves capturedBase across differing live state")
+{
+    TestProcessor procA;
+    kaigen::phantom::ABSlotManager abSlotsA { procA.apvts };
+    PhantomEngine engineA;
+    kaigen::phantom::MorphEngine src { procA.apvts, abSlotsA, engineA };
+
+    // Source: GHOST base at 30, arc of +0.40.
+    procA.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
+        procA.apvts.getParameter(ParamID::GHOST)->convertTo0to1(30.0f));
+    src.setArcDepth(ParamID::GHOST, 0.40f);
+    // Arc's capturedBase is 30 at this point.
+
+    const auto tree = src.toMorphConfigTree();
+
+    // Destination: fresh processor with GHOST at a COMPLETELY DIFFERENT live value (80).
+    TestProcessor procB;
+    kaigen::phantom::ABSlotManager abSlotsB { procB.apvts };
+    PhantomEngine engineB;
+    kaigen::phantom::MorphEngine dst { procB.apvts, abSlotsB, engineB };
+    procB.apvts.getParameter(ParamID::GHOST)->setValueNotifyingHost(
+        procB.apvts.getParameter(ParamID::GHOST)->convertTo0to1(80.0f));
+
+    dst.fromMorphConfigTree(tree);
+
+    // The arc depth should match.
+    CHECK(dst.getArcDepth(ParamID::GHOST) == Catch::Approx(0.40f));
+
+    // Now drive morph to 1.0 in the destination. Expected result with CORRECT
+    // capturedBase (30): live = 30 + 0.40 * 100 = 70.
+    // With BUGGY capturedBase (reads live=80 at load time): live = 80 + 0.40 * 100 = 120 → clamp 100.
+    dst.prepareToPlay(44100.0, 512);
+    dst.setEnabled(true);
+    procB.apvts.getParameter(ParamID::MORPH_AMOUNT)->setValueNotifyingHost(1.0f);
+    for (int i = 0; i < 200; ++i) dst.preProcessBlock();
+
+    const float live = procB.apvts.getRawParameterValue(ParamID::GHOST)->load();
+    CHECK(live == Catch::Approx(70.0f).epsilon(0.02));   // Not 100 (clamp) and not 120 (out of range)
+}
+
 #endif // KAIGEN_PRO_BUILD
