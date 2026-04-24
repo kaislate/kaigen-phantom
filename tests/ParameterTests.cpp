@@ -61,11 +61,7 @@ TEST_CASE("createParameterLayout contains all required parameter IDs")
     REQUIRE(has(ParamID::SYNTH_BOOST_THRESHOLD));
     REQUIRE(has(ParamID::SYNTH_BOOST_AMOUNT));
 
-  #ifdef KAIGEN_PRO_BUILD
-    REQUIRE(ids.size() == 48u);   // 44 base + 4 Pro morph params (MORPH_ENABLED, MORPH_AMOUNT, SCENE_ENABLED, SCENE_POSITION)
-  #else
-    REQUIRE(ids.size() == 44u);
-  #endif
+    REQUIRE(ids.size() == 48u);   // 44 base + 4 morph params (MORPH_ENABLED, MORPH_AMOUNT, SCENE_ENABLED, SCENE_POSITION)
 }
 
 TEST_CASE("ghost parameter default is 100 percent")

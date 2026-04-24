@@ -6,7 +6,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Preset system developer mode
 option(DEVELOPER_MODE "Enable developer preset management panel" OFF)
-option(KAIGEN_PRO_BUILD "Build the Pro SKU with morph features" OFF)
+# KAIGEN_PRO_BUILD was introduced for a dual-SKU distribution (Standard vs Pro)
+# but unified to a single always-on binary 2026-04-24. The compile guards remain
+# in source code for potential future re-introduction of tiering, but the macro
+# is always defined now so all features ship in every build.
+
 
 if(DEVELOPER_MODE)
     add_definitions(-DDEVELOPER_MODE=1)
@@ -53,15 +57,10 @@ target_sources(KaigenPhantom PRIVATE
     Source/ABSlotManager.cpp
 )
 
-if(KAIGEN_PRO_BUILD)
-    target_compile_definitions(KaigenPhantom PRIVATE KAIGEN_PRO_BUILD=1)
-    target_sources(KaigenPhantom PRIVATE
-        Source/MorphEngine.cpp
-    )
-    message(STATUS "Building Kaigen Phantom PRO (morph features enabled)")
-else()
-    message(STATUS "Building Kaigen Phantom STANDARD")
-endif()
+target_compile_definitions(KaigenPhantom PRIVATE KAIGEN_PRO_BUILD=1)
+target_sources(KaigenPhantom PRIVATE
+    Source/MorphEngine.cpp
+)
 
 juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/index.html
