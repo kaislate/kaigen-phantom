@@ -48,6 +48,11 @@ public:
     // when includeDiscreteInSnap == false. Public for tests.
     static const juce::StringArray& discreteParamIDs();
 
+    // Returns a RAII guard that sets suppressModifiedUpdates=true for its lifetime.
+    // Intended for external collaborators (like MorphEngine) that need to drive
+    // APVTS without the listener marking the active slot modified.
+    [[nodiscard]] juce::ScopedValueSetter<bool> scopedSuppressModified();
+
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 

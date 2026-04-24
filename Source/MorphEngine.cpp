@@ -178,6 +178,7 @@ void MorphEngine::setEnabled(bool on)
     // Also sync the APVTS parameter so the UI slider and DAW reflect state.
     if (auto* p = apvts.getParameter(ParamID::MORPH_ENABLED))
     {
+        auto abGuard = abSlots.scopedSuppressModified();
         const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
         p->beginChangeGesture();
         p->setValueNotifyingHost(on ? 1.0f : 0.0f);
@@ -232,6 +233,7 @@ std::vector<juce::String> MorphEngine::endCapture(bool commit)
     else
     {
         // Restore baselines (cancel).
+        auto abGuard = abSlots.scopedSuppressModified();
         const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
         for (const auto& [id, baseline] : captureBaseline)
         {
@@ -254,6 +256,7 @@ void MorphEngine::setSceneCrossfadeEnabled(bool on)
     sceneEnabled = on;
     if (auto* p = apvts.getParameter(ParamID::SCENE_ENABLED))
     {
+        auto abGuard = abSlots.scopedSuppressModified();
         const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
         p->beginChangeGesture();
         p->setValueNotifyingHost(on ? 1.0f : 0.0f);
@@ -347,11 +350,13 @@ void MorphEngine::fromMorphConfigTree(const juce::ValueTree& morphConfig)
         // Sync APVTS parameters.
         if (auto* p = apvts.getParameter(ParamID::SCENE_ENABLED))
         {
+            auto abGuard = abSlots.scopedSuppressModified();
             const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
             p->setValueNotifyingHost(sceneEnabled ? 1.0f : 0.0f);
         }
         if (auto* p = apvts.getParameter(ParamID::SCENE_POSITION))
         {
+            auto abGuard = abSlots.scopedSuppressModified();
             const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
             p->setValueNotifyingHost(rawScenePos);
         }
@@ -425,6 +430,7 @@ void MorphEngine::fromStateTree(const juce::ValueTree& morphStateNode)
     }
 
     // Sync APVTS to reflect the restored state.
+    auto abGuard = abSlots.scopedSuppressModified();
     const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
     if (auto* p = apvts.getParameter(ParamID::MORPH_ENABLED))  p->setValueNotifyingHost(enabled ? 1.0f : 0.0f);
     if (auto* p = apvts.getParameter(ParamID::MORPH_AMOUNT))   p->setValueNotifyingHost(rawMorph);
@@ -463,7 +469,12 @@ void MorphEngine::writeParamClamped(const juce::String& paramID, float denormali
     const auto& range = p->getNormalisableRange();
     const float clamped = juce::jlimit(range.start, range.end, denormalizedValue);
 
-    const juce::ScopedValueSetter<bool> guard { suppressArcUpdates, true };
+    // Double guard: MorphEngine's own listener AND ABSlotManager's modified-flag
+    // listener must both be suppressed during this internal write, otherwise
+    // slot A gets spuriously marked modified every block.
+    auto abGuard = abSlots.scopedSuppressModified();
+    const juce::ScopedValueSetter<bool> morphGuard { suppressArcUpdates, true };
+
     p->beginChangeGesture();
     p->setValueNotifyingHost(p->convertTo0to1(clamped));
     p->endChangeGesture();
