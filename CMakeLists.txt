@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Preset system developer mode
 option(DEVELOPER_MODE "Enable developer preset management panel" OFF)
+option(KAIGEN_PRO_BUILD "Build the Pro SKU with morph features" OFF)
 
 if(DEVELOPER_MODE)
     add_definitions(-DDEVELOPER_MODE=1)
@@ -52,6 +53,16 @@ target_sources(KaigenPhantom PRIVATE
     Source/ABSlotManager.cpp
 )
 
+if(KAIGEN_PRO_BUILD)
+    target_compile_definitions(KaigenPhantom PRIVATE KAIGEN_PRO_BUILD=1)
+    target_sources(KaigenPhantom PRIVATE
+        Source/MorphEngine.cpp
+    )
+    message(STATUS "Building Kaigen Phantom PRO (morph features enabled)")
+else()
+    message(STATUS "Building Kaigen Phantom STANDARD")
+endif()
+
 juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/index.html
     Source/WebUI/styles.css
@@ -65,6 +76,7 @@ juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/juce-frontend.js
     Source/WebUI/preset-spectrum.js
     Source/WebUI/preset-system.js
+    Source/WebUI/morph.js
 )
 
 # Factory presets (optional, for Phase 2 implementation)

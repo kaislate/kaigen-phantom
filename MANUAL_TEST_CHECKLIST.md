@@ -175,3 +175,24 @@ Build with Debug config, copy VST3 to `C:\Users\kaislate\Downloads\KAIGEN\`, ful
 - [ ] **Browser A/B column.** Open preset browser. Existing presets render "—". Save a preset as A/B → row shows "A|B" badge. Sort by column works (Single → A/B → Morph). Filter dropdown narrows list correctly.
 - [ ] **Save modal Preset Kind.** With slots identical: A/B radio dimmed + helper text. With slots different: A/B radio enabled. Save as A/B — reload the preset — both slots match what was saved.
 
+## Pro Morph (KAIGEN_PRO_BUILD only)
+
+Build the Pro variant:
+
+    cmake -S . -B build-pro -DKAIGEN_PRO_BUILD=ON -DCMAKE_BUILD_TYPE=Release
+    cmake --build build-pro --target KaigenPhantom_VST3 --config Release
+    cp -r "build-pro/KaigenPhantom_artefacts/Release/VST3/Kaigen Phantom.vst3" "C:/Users/kaislate/Downloads/KAIGEN/"
+
+Fully restart Ableton. Load the Pro plugin.
+
+- [ ] **Modulation panel visible.** Dark horizontal strip between header and body. MORPH label, Lane 1 badge, slider, value, CAPTURE button, "0 armed" status.
+- [ ] **Enable toggle works.** Click the enable dot — lights amber. Knobs grow a thin outer track ring (barely visible since no arcs yet). Click again — rings vanish.
+- [ ] **Capture mode batch setup.** With morph enabled, press CAPTURE. Button switches to COMMIT; CANCEL appears. Drag 3–4 knobs to different positions. Press COMMIT. Knob rings now show blue modulation segments. "N armed" status updates. Move morph slider — knobs animate to the captured targets.
+- [ ] **Capture cancel restores.** Enter capture, drag a knob, press CANCEL. Knob returns to original position; no arc set.
+- [ ] **Direct arc drag.** With an arc armed, grab its blue handle at the tip of the arc. Drag around the ring — depth adjusts live.
+- [ ] **Plateau clamping.** Set an arc that pushes target past the knob's max (e.g., base 80%, depth +50%). Move morph slider — live pointer reaches max mid-sweep and stays there while morph continues.
+- [ ] **Scene Crossfade toggle.** Open settings → Morph → enable "Scene Crossfade". Panel grows a second SCENE row with its own slider. Set slot A and slot B to different sounds (via A/B compare). Sweep scene slider — audio crossfades between them. CPU in Ableton increases noticeably (~doubled).
+- [ ] **Save + reload preset with morph.** Arm 3 arcs, save as "A/B + Morph". Load a Single preset to wipe state. Reload the A/B + Morph preset. Arcs restore; slots restore; morph position restores (to 0 if saved at 0).
+- [ ] **Project save/reload.** Configure morph state, save Ableton project, close + reopen. Plugin state restores including arcs + enabled flag + morph position.
+- [ ] **Standard build loads Pro preset gracefully.** Copy the same Pro-authored preset `.fxp` into a Standard-build install of Phantom. Load it: A/B slots populate; morph data silently ignored; no error.
+

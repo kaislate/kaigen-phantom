@@ -362,6 +362,107 @@ class PhantomKnob extends HTMLElement {
     this._parts = { glowPath, valPath, valueTexts, waveformPoly, labelText };
   }
 
+  setMorphState({ enabled, baseValue, arcDepth, liveValue, morph }) {
+    this._morphState = {
+      enabled: !!enabled,
+      baseValue: baseValue || 0,
+      arcDepth: arcDepth || 0,
+      liveValue: liveValue || 0,
+      morph: morph || 0,
+    };
+    this._renderMorphRing();
+  }
+
+  _renderMorphRing() {
+    if (!this._svg || !this._morphState || !this._morphState.enabled) {
+      const existing = this._svg && this._svg.querySelector('.morph-ring');
+      if (existing) existing.remove();
+      return;
+    }
+
+    // Get or create ring group
+    let ringGroup = this._svg.querySelector('.morph-ring');
+    if (!ringGroup) {
+      ringGroup = document.createElementNS(SVG_NS, 'g');
+      ringGroup.setAttribute('class', 'morph-ring');
+      // Insert BEFORE the existing knob face so the ring sits behind/around it
+      this._svg.insertBefore(ringGroup, this._svg.firstChild);
+    }
+    ringGroup.innerHTML = '';
+
+    // Geometry: outer ring at ~48% of viewbox (outside the knob face at ~40%)
+    const cx = this._geom ? this._geom.cx : 50;
+    const cy = this._geom ? this._geom.cy : 50;
+    const r  = this._geom ? (this._geom.oledR * 1.18) : 30;
+
+    const ms = this._morphState;
+    const baseAngle  = ARC_START + ms.baseValue  * ARC_SWEEP;
+    const targetAngle = ARC_START + Math.max(0, Math.min(1,
+      ms.baseValue + ms.arcDepth)) * ARC_SWEEP;
+    const liveAngle  = ARC_START + Math.max(0, Math.min(1, ms.liveValue)) * ARC_SWEEP;
+
+    // Track (full parameter range)
+    const track = document.createElementNS(SVG_NS, 'path');
+    track.setAttribute('d', describeArc(cx, cy, r, ARC_START, ARC_END));
+    track.setAttribute('fill', 'none');
+    track.setAttribute('stroke', 'rgba(0,0,0,0.10)');
+    track.setAttribute('stroke-width', '2');
+    ringGroup.appendChild(track);
+
+    // Modulation segment (only if arc depth is non-zero)
+    if (Math.abs(ms.arcDepth) > 1e-4) {
+      // Bright portion: base → liveAngle (if within the segment direction)
+      const segStart = Math.min(baseAngle, targetAngle);
+      const segEnd   = Math.max(baseAngle, targetAngle);
+      const liveInSeg = Math.max(segStart, Math.min(segEnd, liveAngle));
+
+      // Full (dim) segment
+      const dimSeg = document.createElementNS(SVG_NS, 'path');
+      dimSeg.setAttribute('d', describeArc(cx, cy, r, segStart, segEnd));
+      dimSeg.setAttribute('fill', 'none');
+      dimSeg.setAttribute('stroke', 'rgba(74,141,213,0.35)');
+      dimSeg.setAttribute('stroke-width', '3');
+      dimSeg.setAttribute('stroke-linecap', 'round');
+      ringGroup.appendChild(dimSeg);
+
+      // Bright portion (from base toward live)
+      const brightStart = (ms.arcDepth >= 0) ? baseAngle : liveInSeg;
+      const brightEnd   = (ms.arcDepth >= 0) ? liveInSeg : baseAngle;
+      if (brightEnd > brightStart) {
+        const brightSeg = document.createElementNS(SVG_NS, 'path');
+        brightSeg.setAttribute('d', describeArc(cx, cy, r, brightStart, brightEnd));
+        brightSeg.setAttribute('fill', 'none');
+        brightSeg.setAttribute('stroke', '#4A8DD5');
+        brightSeg.setAttribute('stroke-width', '3');
+        brightSeg.setAttribute('stroke-linecap', 'round');
+        ringGroup.appendChild(brightSeg);
+      }
+
+      // Base tick
+      const baseXY = polarToXY(cx, cy, r, baseAngle);
+      const baseTick = document.createElementNS(SVG_NS, 'circle');
+      baseTick.setAttribute('cx', baseXY.x);
+      baseTick.setAttribute('cy', baseXY.y);
+      baseTick.setAttribute('r', '2.2');
+      baseTick.setAttribute('fill', 'rgba(0,0,0,0.55)');
+      ringGroup.appendChild(baseTick);
+
+      // Drag handle at target
+      const handleXY = polarToXY(cx, cy, r, targetAngle);
+      const handle = document.createElementNS(SVG_NS, 'circle');
+      handle.setAttribute('cx', handleXY.x);
+      handle.setAttribute('cy', handleXY.y);
+      handle.setAttribute('r', '3.5');
+      handle.setAttribute('fill', '#4A8DD5');
+      handle.setAttribute('stroke', 'rgba(0,0,0,0.3)');
+      handle.setAttribute('stroke-width', '1');
+      handle.setAttribute('class', 'morph-arc-handle');
+      handle.style.cursor = 'grab';
+      handle.dataset.paramID = this.getAttribute('data-param') || '';
+      ringGroup.appendChild(handle);
+    }
+  }
+
   _render() {
     this._ensureScaffold();
     const { cx, cy, oledR, arcR } = this._geom;

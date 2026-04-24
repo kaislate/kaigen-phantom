@@ -413,8 +413,18 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                     [weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), presetName, packName]
                     {
                         if (auto* ed = weakSelf.getComponent())
+                        {
                             ed->processor.getPresetManager().loadPresetInto(
-                                ed->processor.getABSlotManager(), presetName, packName);
+                                ed->processor.getABSlotManager(), presetName, packName
+                              #ifdef KAIGEN_PRO_BUILD
+                                , [weakSelf](const juce::ValueTree& morphConfig)
+                                {
+                                    if (auto* ed2 = weakSelf.getComponent())
+                                        ed2->processor.getMorphEngine().fromMorphConfigTree(morphConfig);
+                                }
+                              #endif
+                            );
+                        }
                     });
 
                 complete(juce::var(true));
@@ -437,10 +447,20 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
 
                 const auto kind = kaigen::phantom::presetKindFromString(kindStr);
 
+              #ifdef KAIGEN_PRO_BUILD
+                juce::ValueTree morphConfigForSave;
+                if (kind == kaigen::phantom::PresetKind::ABMorph)
+                    morphConfigForSave = self.processor.getMorphEngine().toMorphConfigTree();
+              #endif
+
                 auto savedName = self.processor.getPresetManager().savePreset(
                     self.processor.apvts,
                     &self.processor.getABSlotManager(),
-                    name, type, designer, description, kind, overwrite);
+                    name, type, designer, description, kind, overwrite
+                  #ifdef KAIGEN_PRO_BUILD
+                    , morphConfigForSave.isValid() ? &morphConfigForSave : nullptr
+                  #endif
+                );
                 complete(juce::var(savedName));
             })
         .withNativeFunction("setFavorite",
@@ -555,6 +575,97 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 self.processor.getABSlotManager().setIncludeDiscreteInSnap(on);
                 complete(juce::var(true));
             })
+      #ifdef KAIGEN_PRO_BUILD
+        .withNativeFunction("morphGetState",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                auto& m = self.processor.getMorphEngine();
+
+                juce::DynamicObject::Ptr obj = new juce::DynamicObject();
+                obj->setProperty("enabled",         m.isEnabled());
+                obj->setProperty("morphAmount",     m.getMorphAmount());
+                obj->setProperty("sceneEnabled",    m.isSceneCrossfadeEnabled());
+                obj->setProperty("scenePosition",   m.getScenePosition());
+                obj->setProperty("armedCount",      m.armedKnobCount());
+                obj->setProperty("inCapture",       m.isInCapture());
+                complete(juce::var(obj.get()));
+            })
+        .withNativeFunction("morphSetEnabled",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1) { complete(juce::var(false)); return; }
+                const bool on = args[0].isBool() ? (bool) args[0] : (((int) args[0]) != 0);
+                juce::MessageManager::callAsync([weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), on]()
+                {
+                    if (auto* ed = weakSelf.getComponent())
+                        ed->processor.getMorphEngine().setEnabled(on);
+                });
+                complete(juce::var(true));
+            })
+        .withNativeFunction("morphSetSceneEnabled",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1) { complete(juce::var(false)); return; }
+                const bool on = args[0].isBool() ? (bool) args[0] : (((int) args[0]) != 0);
+                juce::MessageManager::callAsync([weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), on]()
+                {
+                    if (auto* ed = weakSelf.getComponent())
+                        ed->processor.getMorphEngine().setSceneCrossfadeEnabled(on);
+                });
+                complete(juce::var(true));
+            })
+        .withNativeFunction("morphGetArcDepths",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                auto& m = self.processor.getMorphEngine();
+                juce::DynamicObject::Ptr obj = new juce::DynamicObject();
+                for (const auto& id : m.getArmedParamIDs())
+                    obj->setProperty(id, m.getArcDepth(id));
+                complete(juce::var(obj.get()));
+            })
+        .withNativeFunction("morphSetArcDepth",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 2) { complete(juce::var(false)); return; }
+                const auto id = args[0].toString();
+                const float depth = (float) (double) args[1];
+                juce::MessageManager::callAsync([weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), id, depth]()
+                {
+                    if (auto* ed = weakSelf.getComponent())
+                        ed->processor.getMorphEngine().setArcDepth(id, depth);
+                });
+                complete(juce::var(true));
+            })
+        .withNativeFunction("morphBeginCapture",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                juce::MessageManager::callAsync([weakSelf = juce::Component::SafePointer<PhantomEditor>(&self)]()
+                {
+                    if (auto* ed = weakSelf.getComponent())
+                        ed->processor.getMorphEngine().beginCapture();
+                });
+                complete(juce::var(true));
+            })
+        .withNativeFunction("morphEndCapture",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                const bool commit = (args.size() >= 1 && args[0].isBool()) ? (bool) args[0] : true;
+
+                // This one needs to return the modified list — has to be synchronous.
+                auto modified = self.processor.getMorphEngine().endCapture(commit);
+                juce::Array<juce::var> arr;
+                for (const auto& id : modified) arr.add(juce::var(id));
+                complete(juce::var(arr));
+            })
+        .withNativeFunction("morphGetContinuousParamIDs",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                const auto ids = kaigen::phantom::MorphEngine::getContinuousParamIDs(self.processor.apvts);
+                juce::Array<juce::var> arr;
+                for (const auto& id : ids) arr.add(juce::var(id));
+                complete(juce::var(arr));
+            })
+      #endif  // KAIGEN_PRO_BUILD
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });
 
     return options;

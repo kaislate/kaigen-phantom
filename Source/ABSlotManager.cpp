@@ -236,4 +236,9 @@ const juce::StringArray& ABSlotManager::discreteParamIDs()
     return ids;
 }
 
+juce::ScopedValueSetter<bool> ABSlotManager::scopedSuppressModified()
+{
+    return juce::ScopedValueSetter<bool> { suppressModifiedUpdates, true };
+}
+
 } // namespace kaigen::phantom
