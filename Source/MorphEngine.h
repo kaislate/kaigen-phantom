@@ -28,6 +28,12 @@ public:
 
     // Per-block hooks
     void preProcessBlock();
+    // MUST be called BEFORE PhantomEngine::process, with the raw pre-engine
+    // input buffer. Copies the input into an internal scratch so that the
+    // secondary engine (if Scene Crossfade is active) can process the same
+    // pre-engine input as the primary — not the primary's already-mutated
+    // output. No-op when scene crossfade is disabled.
+    void capturePreEngineInput(const juce::AudioBuffer<float>& input);
     void postProcessBlock(juce::AudioBuffer<float>& mainBuffer,
                           const juce::AudioBuffer<float>* sidechain);
 

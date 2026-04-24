@@ -46,6 +46,16 @@ void MorphEngine::prepareToPlay(double sr, int spb)
     secondaryScratchBuf.setSize(2, spb, false, false, true);
 }
 
+void MorphEngine::capturePreEngineInput(const juce::AudioBuffer<float>& input)
+{
+    if (!sceneEnabled || secondaryEngine == nullptr) return;
+
+    const int n   = input.getNumSamples();
+    const int nCh = juce::jmin(2, input.getNumChannels());
+    for (int ch = 0; ch < nCh; ++ch)
+        secondaryScratchBuf.copyFrom(ch, 0, input, ch, 0, n);
+}
+
 void MorphEngine::preProcessBlock()
 {
     // Smoothing step.
@@ -103,12 +113,10 @@ void MorphEngine::postProcessBlock(juce::AudioBuffer<float>& mainBuffer,
     if (engineSync)
         engineSync(*secondaryEngine, valueForSlotB);
 
-    // Copy primary output into the pre-allocated scratch buffer so secondary
-    // engine has the same input signal to process (v1 simplification: both
-    // engines see the same input; v2 could thread the pre-engine input separately).
-    for (int ch = 0; ch < nCh; ++ch)
-        secondaryScratchBuf.copyFrom(ch, 0, mainBuffer, ch, 0, n);
-
+    // secondaryScratchBuf already holds the pre-engine INPUT (populated by
+    // capturePreEngineInput, called from PhantomProcessor::processBlock BEFORE
+    // engine.process mutates the main buffer in place). Process in place:
+    // secondaryScratchBuf transitions from slot-B-input to slot-B-output here.
     secondaryEngine->process(secondaryScratchBuf, sidechain);
 
     // Mix: primary output is already in mainBuffer; blend secondary in.

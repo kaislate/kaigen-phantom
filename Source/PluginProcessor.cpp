@@ -322,6 +322,13 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             }
         }
     }
+  #ifdef KAIGEN_PRO_BUILD
+    // Capture the pre-engine input so MorphEngine's secondary engine can
+    // process the SAME input (not the primary's already-mutated output).
+    // No-op when Scene Crossfade is disabled.
+    if (morphOpt.has_value()) morphOpt->capturePreEngineInput(buffer);
+  #endif
+
     engine.process(buffer, sidechainPtr);
 
   #ifdef KAIGEN_PRO_BUILD
