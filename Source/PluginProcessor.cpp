@@ -28,17 +28,6 @@ PhantomProcessor::PhantomProcessor()
     modEngineB.addModulator(std::make_unique<Macro>("macro3", apvts, ParamID::MACRO3));
     modEngineB.addModulator(std::make_unique<Macro>("macro4", apvts, ParamID::MACRO4));
 
-    // PR3a proof-of-life routing — replaced by user-created routings via the
-    // macro editor UI in PR3b. Verifies the framework end-to-end:
-    // automating macro1 in the host should audibly affect engine A's ghost.
-    {
-        kaigen::phantom::Routing r;
-        r.sourceId = "macro1";
-        r.paramId  = ParamID::A_GHOST;
-        r.depth    = 0.5f;
-        modEngineA.addRouting(r);
-    }
-
     // Wire the modulation engines into the per-block param sync. This must
     // happen after the engines are populated above so the host caches
     // pointers to fully-configured engines.
