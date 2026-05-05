@@ -158,8 +158,8 @@ function draw() {
     // ── Gate threshold lines (RESYN mode only, Gate > 0) ─────────────────────
     // Gate is an absolute noise gate: wavelet peaks below the threshold are
     // silenced.  Lines show the threshold as an absolute amplitude level.
-    const gateState  = window.Juce?.getSliderState?.('synth_gate_threshold');
-    const modeCombo  = window.Juce?.getComboBoxState?.('mode');
+    const gateState  = window.Juce?.getSliderStateLogical?.('synth_gate_threshold');
+    const modeCombo  = window.Juce?.getComboBoxStateLogical?.('mode');
     const gateThr    = gateState  ? gateState.getNormalisedValue() : 0;
     const isResyn    = modeCombo  ? modeCombo.getChoiceIndex() === 1 : false;
 
@@ -180,7 +180,7 @@ function draw() {
 
     // ── Zero-crossing markers ────────────────────────────────────────────────
     {
-        const minSamplesState = window.Juce?.getSliderState?.('synth_min_samples');
+        const minSamplesState = window.Juce?.getSliderStateLogical?.('synth_min_samples');
         const minPeriod       = minSamplesState ? minSamplesState.getScaledValue() : 11;
 
         let lastCross = -Infinity;

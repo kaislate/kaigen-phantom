@@ -17,6 +17,7 @@ add_executable(KaigenPhantomTests
     PresetMigrationTests.cpp
     MorphCrossfaderTests.cpp
     DualEngineHostTests.cpp
+    EngineFocusTests.cpp
     ../Source/Engines/BinauralStage.cpp
     ../Source/Engines/BassExtractor.cpp
     ../Source/Engines/Waveshaper.cpp

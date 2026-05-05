@@ -117,6 +117,49 @@ body{
   box-shadow:1px 1px 4px rgba(0,0,0,0.12),0 0.5px 0 rgba(255,255,255,0.65);
 }
 
+/* ═══ ENGINE TABS — A | B | LINK selector (cool palette) ═══ */
+.engine-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px;
+    background: rgba(20, 24, 30, 0.6);
+    border: 1px solid rgba(74, 144, 226, 0.25);
+    border-radius: 6px;
+    user-select: none;
+}
+.engine-tab {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #6a7a8a;
+    font: 600 11px/1 'Space Grotesk', sans-serif;
+    letter-spacing: 1.5px;
+    padding: 4px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: color 120ms, background 120ms, border-color 120ms;
+}
+.engine-tab:hover {
+    color: #c8d8ea;
+}
+.engine-tab.is-active {
+    color: #f5f8fb;
+    background: rgba(74, 144, 226, 0.18);
+    border-color: rgba(74, 144, 226, 0.55);
+    box-shadow: 0 0 8px rgba(74, 144, 226, 0.25);
+}
+.engine-tab-link {
+    margin-left: 6px;
+    border-left: 1px solid rgba(74, 144, 226, 0.18);
+    padding-left: 12px;
+}
+.engine-tab-link.is-on {
+    color: #fafafa;
+    background: rgba(122, 168, 208, 0.22);
+    border-color: rgba(122, 168, 208, 0.6);
+    box-shadow: 0 0 8px rgba(122, 168, 208, 0.3);
+}
+
 /* Header buttons (bypass, settings) */
 .hdr-btn{
   width:30px;height:30px;border-radius:50%;border:none;

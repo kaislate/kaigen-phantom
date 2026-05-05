@@ -200,7 +200,7 @@ function drawSpectrum() {
     }
 
     // ── Crossover frequency line ───────────────────────────────────────
-    const xoverState = window.Juce?.getSliderState?.('phantom_threshold');
+    const xoverState = window.Juce?.getSliderStateLogical?.('phantom_threshold');
     if (xoverState) {
         const xoverHz = xoverState.getScaledValue();
         if (xoverHz > 20 && xoverHz < 20000) {

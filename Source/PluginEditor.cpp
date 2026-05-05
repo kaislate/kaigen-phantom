@@ -167,21 +167,41 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         .withNativeIntegrationEnabled();
 
     // ── Slider relays ─────────────────────────────────────────────────
+    // Per-engine relays are registered as A/B pairs so the JS dispatch layer
+    // can pick which side to bind based on the active engine tab.
     juce::WebSliderRelay* sliderRelays[] = {
         &self.inputGainRelay,
-        &self.ghostRelay, &self.phantomThresholdRelay, &self.phantomStrengthRelay,
-        &self.outputGainRelay,
-        &self.recipeH2Relay, &self.recipeH3Relay, &self.recipeH4Relay,
-        &self.recipeH5Relay, &self.recipeH6Relay, &self.recipeH7Relay, &self.recipeH8Relay,
-        &self.harmonicSaturationRelay,
-        &self.synthStepRelay, &self.synthDutyRelay, &self.synthSkipRelay,
-        &self.envAttackRelay, &self.envReleaseRelay,
-        &self.binauralWidthRelay, &self.stereoWidthRelay,
-        &self.synthLPFRelay, &self.synthHPFRelay,
-        &self.synthWaveletLengthRelay, &self.synthGateThresholdRelay,
-        &self.synthH1Relay, &self.synthSubRelay, &self.synthMinSamplesRelay, &self.synthMaxSamplesRelay, &self.trackingSpeedRelay,
-        &self.punchAmountRelay,
-        &self.synthBoostThresholdRelay, &self.synthBoostAmountRelay,
+        &self.ghostRelayA,                &self.ghostRelayB,
+        &self.phantomThresholdRelayA,     &self.phantomThresholdRelayB,
+        &self.phantomStrengthRelayA,      &self.phantomStrengthRelayB,
+        &self.outputGainRelayA,           &self.outputGainRelayB,
+        &self.recipeH2RelayA,             &self.recipeH2RelayB,
+        &self.recipeH3RelayA,             &self.recipeH3RelayB,
+        &self.recipeH4RelayA,             &self.recipeH4RelayB,
+        &self.recipeH5RelayA,             &self.recipeH5RelayB,
+        &self.recipeH6RelayA,             &self.recipeH6RelayB,
+        &self.recipeH7RelayA,             &self.recipeH7RelayB,
+        &self.recipeH8RelayA,             &self.recipeH8RelayB,
+        &self.harmonicSaturationRelayA,   &self.harmonicSaturationRelayB,
+        &self.synthStepRelayA,            &self.synthStepRelayB,
+        &self.synthDutyRelayA,            &self.synthDutyRelayB,
+        &self.synthSkipRelayA,            &self.synthSkipRelayB,
+        &self.envAttackRelayA,            &self.envAttackRelayB,
+        &self.envReleaseRelayA,           &self.envReleaseRelayB,
+        &self.binauralWidthRelayA,        &self.binauralWidthRelayB,
+        &self.stereoWidthRelayA,          &self.stereoWidthRelayB,
+        &self.synthLPFRelayA,             &self.synthLPFRelayB,
+        &self.synthHPFRelayA,             &self.synthHPFRelayB,
+        &self.synthWaveletLengthRelayA,   &self.synthWaveletLengthRelayB,
+        &self.synthGateThresholdRelayA,   &self.synthGateThresholdRelayB,
+        &self.synthH1RelayA,              &self.synthH1RelayB,
+        &self.synthSubRelayA,             &self.synthSubRelayB,
+        &self.synthMinSamplesRelayA,      &self.synthMinSamplesRelayB,
+        &self.synthMaxSamplesRelayA,      &self.synthMaxSamplesRelayB,
+        &self.trackingSpeedRelayA,        &self.trackingSpeedRelayB,
+        &self.punchAmountRelayA,          &self.punchAmountRelayB,
+        &self.synthBoostThresholdRelayA,  &self.synthBoostThresholdRelayB,
+        &self.synthBoostAmountRelayA,     &self.synthBoostAmountRelayB,
         &self.morphAmountRelay,
     };
     for (auto* r : sliderRelays)
@@ -189,19 +209,26 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
 
     // ── Combo-box relays ──────────────────────────────────────────────
     juce::WebComboBoxRelay* comboRelays[] = {
-        &self.modeRelay, &self.ghostModeRelay,
-        &self.recipePresetRelay, &self.binauralModeRelay,
-        &self.filterSlopeRelay
+        &self.modeRelayA,           &self.modeRelayB,
+        &self.ghostModeRelayA,      &self.ghostModeRelayB,
+        &self.recipePresetRelayA,   &self.recipePresetRelayB,
+        &self.binauralModeRelayA,   &self.binauralModeRelayB,
+        &self.filterSlopeRelayA,    &self.filterSlopeRelayB,
     };
     for (auto* r : comboRelays)
         options = options.withOptionsFrom(*r);
 
     // ── Toggle relays ────────────────────────────────────────────────
+    // Globals stay registered once.
     options = options.withOptionsFrom(self.bypassRelay);
-    options = options.withOptionsFrom(self.punchEnabledRelay);
     options = options.withOptionsFrom(self.inputGainAutoRelay);
-    options = options.withOptionsFrom(self.midiTriggerRelay);
-    options = options.withOptionsFrom(self.midiGateReleaseRelay);
+    // Per-engine toggles get both A and B registered.
+    options = options.withOptionsFrom(self.punchEnabledRelayA);
+    options = options.withOptionsFrom(self.punchEnabledRelayB);
+    options = options.withOptionsFrom(self.midiTriggerRelayA);
+    options = options.withOptionsFrom(self.midiTriggerRelayB);
+    options = options.withOptionsFrom(self.midiGateReleaseRelayA);
+    options = options.withOptionsFrom(self.midiGateReleaseRelayB);
 
     // ── Native functions for real-time data ──────────────────────────
     options = options
@@ -503,6 +530,29 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         // The processor no longer owns ABSlotManager or the legacy MorphEngine.
         // The morph_amount slider drives the audio crossfader directly via APVTS.
         // PR2 will reintroduce engine-tab-aware UI bindings.
+        .withNativeFunction("engineGetFocus",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                const auto f = self.processor.getEngineFocus();
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty("activeTab", f.activeTab == PhantomProcessor::ActiveTab::B ? "B" : "A");
+                obj->setProperty("linkOn", f.linkOn);
+                complete(juce::var(obj));
+            })
+        .withNativeFunction("engineSetFocus",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1 || ! args[0].isObject()) { complete({}); return; }
+                auto* obj = args[0].getDynamicObject();
+                if (obj == nullptr) { complete({}); return; }
+                PhantomProcessor::EngineFocus f;
+                f.activeTab = (obj->getProperty("activeTab").toString() == "B")
+                              ? PhantomProcessor::ActiveTab::B
+                              : PhantomProcessor::ActiveTab::A;
+                f.linkOn    = (bool) obj->getProperty("linkOn");
+                self.processor.setEngineFocus(f);
+                complete({});
+            })
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });
 
     return options;
@@ -531,43 +581,78 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
     });
 
     // ── Slider attachments ────────────────────────────────────────────
-    // PR1: per-engine params bind to engine A by default. Task 7 introduces a
-    // logical-name layer in the WebUI (window.__kaigenEngineFocus) that PR2
-    // will use to dispatch between A_* and B_* bindings on tab switch.
+    // PR2 Task 3: every per-engine param now has TWO attachments (A and B),
+    // each bound to its own a_*/b_* relay. The JS dispatch layer (Task 4)
+    // will pick which side to bind to a given DOM control based on
+    // window.__kaigenActiveTab (and __kaigenLinkOn for LINK fan-out).
+    // Globals (input_gain, morph_amount) stay single-attached.
     struct SliderBinding { const char* paramId; juce::WebSliderRelay& relay; };
     SliderBinding sliderBindings[] = {
-        { ParamID::INPUT_GAIN,            inputGainRelay },
-        { ParamID::A_GHOST,               ghostRelay },
-        { ParamID::A_PHANTOM_THRESHOLD,   phantomThresholdRelay },
-        { ParamID::A_PHANTOM_STRENGTH,    phantomStrengthRelay },
-        { ParamID::A_OUTPUT_GAIN,         outputGainRelay },
-        { ParamID::A_RECIPE_H2,           recipeH2Relay },
-        { ParamID::A_RECIPE_H3,           recipeH3Relay },
-        { ParamID::A_RECIPE_H4,           recipeH4Relay },
-        { ParamID::A_RECIPE_H5,           recipeH5Relay },
-        { ParamID::A_RECIPE_H6,           recipeH6Relay },
-        { ParamID::A_RECIPE_H7,           recipeH7Relay },
-        { ParamID::A_RECIPE_H8,           recipeH8Relay },
-        { ParamID::A_HARMONIC_SATURATION, harmonicSaturationRelay },
-        { ParamID::A_SYNTH_STEP,          synthStepRelay },
-        { ParamID::A_SYNTH_DUTY,          synthDutyRelay },
-        { ParamID::A_SYNTH_SKIP,          synthSkipRelay },
-        { ParamID::A_ENV_ATTACK_MS,       envAttackRelay },
-        { ParamID::A_ENV_RELEASE_MS,      envReleaseRelay },
-        { ParamID::A_BINAURAL_WIDTH,      binauralWidthRelay },
-        { ParamID::A_STEREO_WIDTH,        stereoWidthRelay },
-        { ParamID::A_SYNTH_LPF_HZ,            synthLPFRelay },
-        { ParamID::A_SYNTH_HPF_HZ,            synthHPFRelay },
-        { ParamID::A_SYNTH_WAVELET_LENGTH,    synthWaveletLengthRelay },
-        { ParamID::A_SYNTH_GATE_THRESHOLD,    synthGateThresholdRelay },
-        { ParamID::A_SYNTH_H1,                synthH1Relay },
-        { ParamID::A_SYNTH_SUB,               synthSubRelay },
-        { ParamID::A_SYNTH_MIN_SAMPLES,       synthMinSamplesRelay },
-        { ParamID::A_SYNTH_MAX_SAMPLES,       synthMaxSamplesRelay },
-        { ParamID::A_TRACKING_SPEED,          trackingSpeedRelay },
-        { ParamID::A_PUNCH_AMOUNT,            punchAmountRelay },
-        { ParamID::A_SYNTH_BOOST_THRESHOLD,   synthBoostThresholdRelay },
-        { ParamID::A_SYNTH_BOOST_AMOUNT,      synthBoostAmountRelay },
+        { ParamID::INPUT_GAIN,                inputGainRelay },
+
+        { ParamID::A_GHOST,                   ghostRelayA },
+        { ParamID::B_GHOST,                   ghostRelayB },
+        { ParamID::A_PHANTOM_THRESHOLD,       phantomThresholdRelayA },
+        { ParamID::B_PHANTOM_THRESHOLD,       phantomThresholdRelayB },
+        { ParamID::A_PHANTOM_STRENGTH,        phantomStrengthRelayA },
+        { ParamID::B_PHANTOM_STRENGTH,        phantomStrengthRelayB },
+        { ParamID::A_OUTPUT_GAIN,             outputGainRelayA },
+        { ParamID::B_OUTPUT_GAIN,             outputGainRelayB },
+        { ParamID::A_RECIPE_H2,               recipeH2RelayA },
+        { ParamID::B_RECIPE_H2,               recipeH2RelayB },
+        { ParamID::A_RECIPE_H3,               recipeH3RelayA },
+        { ParamID::B_RECIPE_H3,               recipeH3RelayB },
+        { ParamID::A_RECIPE_H4,               recipeH4RelayA },
+        { ParamID::B_RECIPE_H4,               recipeH4RelayB },
+        { ParamID::A_RECIPE_H5,               recipeH5RelayA },
+        { ParamID::B_RECIPE_H5,               recipeH5RelayB },
+        { ParamID::A_RECIPE_H6,               recipeH6RelayA },
+        { ParamID::B_RECIPE_H6,               recipeH6RelayB },
+        { ParamID::A_RECIPE_H7,               recipeH7RelayA },
+        { ParamID::B_RECIPE_H7,               recipeH7RelayB },
+        { ParamID::A_RECIPE_H8,               recipeH8RelayA },
+        { ParamID::B_RECIPE_H8,               recipeH8RelayB },
+        { ParamID::A_HARMONIC_SATURATION,     harmonicSaturationRelayA },
+        { ParamID::B_HARMONIC_SATURATION,     harmonicSaturationRelayB },
+        { ParamID::A_SYNTH_STEP,              synthStepRelayA },
+        { ParamID::B_SYNTH_STEP,              synthStepRelayB },
+        { ParamID::A_SYNTH_DUTY,              synthDutyRelayA },
+        { ParamID::B_SYNTH_DUTY,              synthDutyRelayB },
+        { ParamID::A_SYNTH_SKIP,              synthSkipRelayA },
+        { ParamID::B_SYNTH_SKIP,              synthSkipRelayB },
+        { ParamID::A_ENV_ATTACK_MS,           envAttackRelayA },
+        { ParamID::B_ENV_ATTACK_MS,           envAttackRelayB },
+        { ParamID::A_ENV_RELEASE_MS,          envReleaseRelayA },
+        { ParamID::B_ENV_RELEASE_MS,          envReleaseRelayB },
+        { ParamID::A_BINAURAL_WIDTH,          binauralWidthRelayA },
+        { ParamID::B_BINAURAL_WIDTH,          binauralWidthRelayB },
+        { ParamID::A_STEREO_WIDTH,            stereoWidthRelayA },
+        { ParamID::B_STEREO_WIDTH,            stereoWidthRelayB },
+        { ParamID::A_SYNTH_LPF_HZ,            synthLPFRelayA },
+        { ParamID::B_SYNTH_LPF_HZ,            synthLPFRelayB },
+        { ParamID::A_SYNTH_HPF_HZ,            synthHPFRelayA },
+        { ParamID::B_SYNTH_HPF_HZ,            synthHPFRelayB },
+        { ParamID::A_SYNTH_WAVELET_LENGTH,    synthWaveletLengthRelayA },
+        { ParamID::B_SYNTH_WAVELET_LENGTH,    synthWaveletLengthRelayB },
+        { ParamID::A_SYNTH_GATE_THRESHOLD,    synthGateThresholdRelayA },
+        { ParamID::B_SYNTH_GATE_THRESHOLD,    synthGateThresholdRelayB },
+        { ParamID::A_SYNTH_H1,                synthH1RelayA },
+        { ParamID::B_SYNTH_H1,                synthH1RelayB },
+        { ParamID::A_SYNTH_SUB,               synthSubRelayA },
+        { ParamID::B_SYNTH_SUB,               synthSubRelayB },
+        { ParamID::A_SYNTH_MIN_SAMPLES,       synthMinSamplesRelayA },
+        { ParamID::B_SYNTH_MIN_SAMPLES,       synthMinSamplesRelayB },
+        { ParamID::A_SYNTH_MAX_SAMPLES,       synthMaxSamplesRelayA },
+        { ParamID::B_SYNTH_MAX_SAMPLES,       synthMaxSamplesRelayB },
+        { ParamID::A_TRACKING_SPEED,          trackingSpeedRelayA },
+        { ParamID::B_TRACKING_SPEED,          trackingSpeedRelayB },
+        { ParamID::A_PUNCH_AMOUNT,            punchAmountRelayA },
+        { ParamID::B_PUNCH_AMOUNT,            punchAmountRelayB },
+        { ParamID::A_SYNTH_BOOST_THRESHOLD,   synthBoostThresholdRelayA },
+        { ParamID::B_SYNTH_BOOST_THRESHOLD,   synthBoostThresholdRelayB },
+        { ParamID::A_SYNTH_BOOST_AMOUNT,      synthBoostAmountRelayA },
+        { ParamID::B_SYNTH_BOOST_AMOUNT,      synthBoostAmountRelayB },
+
         { ParamID::MORPH_AMOUNT,              morphAmountRelay },
     };
     for (auto& b : sliderBindings)
@@ -577,27 +662,41 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
     // ── Combo attachments ─────────────────────────────────────────────
     struct ComboBinding { const char* paramId; juce::WebComboBoxRelay& relay; };
     ComboBinding comboBindings[] = {
-        { ParamID::A_MODE,                modeRelay },
-        { ParamID::A_GHOST_MODE,          ghostModeRelay },
-        { ParamID::A_RECIPE_PRESET,       recipePresetRelay },
-        { ParamID::A_BINAURAL_MODE,       binauralModeRelay },
-        { ParamID::A_SYNTH_FILTER_SLOPE,  filterSlopeRelay  },
+        { ParamID::A_MODE,                modeRelayA },
+        { ParamID::B_MODE,                modeRelayB },
+        { ParamID::A_GHOST_MODE,          ghostModeRelayA },
+        { ParamID::B_GHOST_MODE,          ghostModeRelayB },
+        { ParamID::A_RECIPE_PRESET,       recipePresetRelayA },
+        { ParamID::B_RECIPE_PRESET,       recipePresetRelayB },
+        { ParamID::A_BINAURAL_MODE,       binauralModeRelayA },
+        { ParamID::B_BINAURAL_MODE,       binauralModeRelayB },
+        { ParamID::A_SYNTH_FILTER_SLOPE,  filterSlopeRelayA },
+        { ParamID::B_SYNTH_FILTER_SLOPE,  filterSlopeRelayB },
     };
     for (auto& b : comboBindings)
         comboAttachments.push_back(std::make_unique<juce::WebComboBoxParameterAttachment>(
             *processor.apvts.getParameter(b.paramId), b.relay, nullptr));
 
     // ── Toggle attachments ────────────────────────────────────────────
+    // Globals (single attachment each).
     bypassAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
         *processor.apvts.getParameter(ParamID::BYPASS), bypassRelay, nullptr);
-    punchEnabledAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
-        *processor.apvts.getParameter(ParamID::A_PUNCH_ENABLED), punchEnabledRelay, nullptr);
     inputGainAutoAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
         *processor.apvts.getParameter(ParamID::INPUT_GAIN_AUTO), inputGainAutoRelay, nullptr);
-    midiTriggerAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
-        *processor.apvts.getParameter(ParamID::A_MIDI_TRIGGER_ENABLED), midiTriggerRelay, nullptr);
-    midiGateReleaseAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
-        *processor.apvts.getParameter(ParamID::A_MIDI_GATE_RELEASE), midiGateReleaseRelay, nullptr);
+
+    // Per-engine toggles — paired A/B attachments, each bound to its respective param.
+    punchEnabledAttachmentA = std::make_unique<juce::WebToggleButtonParameterAttachment>(
+        *processor.apvts.getParameter(ParamID::A_PUNCH_ENABLED), punchEnabledRelayA, nullptr);
+    punchEnabledAttachmentB = std::make_unique<juce::WebToggleButtonParameterAttachment>(
+        *processor.apvts.getParameter(ParamID::B_PUNCH_ENABLED), punchEnabledRelayB, nullptr);
+    midiTriggerAttachmentA = std::make_unique<juce::WebToggleButtonParameterAttachment>(
+        *processor.apvts.getParameter(ParamID::A_MIDI_TRIGGER_ENABLED), midiTriggerRelayA, nullptr);
+    midiTriggerAttachmentB = std::make_unique<juce::WebToggleButtonParameterAttachment>(
+        *processor.apvts.getParameter(ParamID::B_MIDI_TRIGGER_ENABLED), midiTriggerRelayB, nullptr);
+    midiGateReleaseAttachmentA = std::make_unique<juce::WebToggleButtonParameterAttachment>(
+        *processor.apvts.getParameter(ParamID::A_MIDI_GATE_RELEASE), midiGateReleaseRelayA, nullptr);
+    midiGateReleaseAttachmentB = std::make_unique<juce::WebToggleButtonParameterAttachment>(
+        *processor.apvts.getParameter(ParamID::B_MIDI_GATE_RELEASE), midiGateReleaseRelayB, nullptr);
 }
 
 PhantomEditor::~PhantomEditor() = default;

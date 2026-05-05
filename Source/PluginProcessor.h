@@ -4,6 +4,7 @@
 #include "Engines/PhantomEngine.h"
 #include "PresetManager.h"
 #include "DualEngineHost.h"
+#include "EngineFocus.h"
 
 class PhantomProcessor : public juce::AudioProcessor,
                          private juce::AudioProcessorValueTreeState::Listener
@@ -82,6 +83,16 @@ public:
     PhantomEngine& getActiveEngine() noexcept { return dualEngineHost.getActiveEngine(); }
     kaigen::phantom::DualEngineHost& getDualEngineHost() noexcept { return dualEngineHost; }
 
+    // ─── Engine focus (editor-state, not preset-state) ────────────────────
+    // Aliases let the WebView native bindings (Task 2) and editor code
+    // refer to PhantomProcessor::ActiveTab / ::EngineFocus without
+    // pulling in the kaigen::phantom namespace at every call site.
+    using ActiveTab   = kaigen::phantom::ActiveTab;
+    using EngineFocus = kaigen::phantom::EngineFocus;
+
+    EngineFocus getEngineFocus() const noexcept { return engineFocus; }
+    void setEngineFocus(EngineFocus newFocus) noexcept;
+
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout();
@@ -108,6 +119,11 @@ private:
     std::array<float, kFftSize * 2> fftOutputBuffer {}; // output (post-engine)
     int fftWritePos       = 0;
     int fftOutputWritePos = 0;
+
+    // Editor focus: which tab the UI is on + whether LINK is active.
+    // Editor preference, not preset state — stored alongside APVTS in the
+    // <PluginState> wrapper but outside of any preset.
+    EngineFocus engineFocus;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomProcessor)
 };

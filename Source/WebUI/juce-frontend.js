@@ -590,44 +590,132 @@ class ControlParameterIndexUpdater {
   }
 }
 
-// Engine focus ('A', 'B', 'LINK'). PR1 always 'A'.
-// NOTE: this value is SET but not yet READ. PR2 wires the actual dispatch:
-// it will rename the JUCE-side relays to a_<leaf> / b_<leaf> and have the
-// resolver below switch the prefix based on this value. Until then, the
-// resolver is a no-op — see resolveLogicalParamID.
-window.__kaigenEngineFocus = 'A';
+  // ────── Logical-name wrappers (PR2: tab-driven A/B dispatch) ──────
+  // window.__kaigenActiveTab : 'A' | 'B' — which engine is shown / read.
+  // window.__kaigenLinkOn    : boolean   — when true, writes mirror to both engines.
+  window.__kaigenActiveTab = window.__kaigenActiveTab || 'A';
+  window.__kaigenLinkOn    = !!window.__kaigenLinkOn;
 
-// List of un-prefixed (global) APVTS param IDs. Retained for documentation
-// of which params are global vs per-engine; functionally unused in PR1
-// because the resolver below is a no-op for every name.
-const KAIGEN_GLOBAL_PARAMS = [
+  const KAIGEN_GLOBAL_PARAMS = new Set([
     'bypass', 'input_gain', 'input_gain_auto', 'advanced_open',
     'morph_amount', 'morph_curve', 'morph_a_level_db',
-    'morph_b_level_db', 'morph_bypass_idle_engine',
-];
+    'morph_b_level_db', 'morph_bypass_idle_engine'
+  ]);
 
-// PR1: relays are registered with bare leaf names ("ghost", "binaural_mode",
-// etc.) in PluginEditor.h, and the JUCE-side WebSliderParameterAttachment in
-// PluginEditor.cpp binds those relays to a_<leaf> APVTS params — so the
-// WebView always edits Engine A. PR2 will rename the relays to
-// a_<leaf> / b_<leaf> and use window.__kaigenEngineFocus to pick the prefix.
-// Until then, the resolver is a no-op (returns the bare leaf name) for every
-// name, including globals — the engine-focus value exists but is not read.
-function resolveLogicalParamID(logicalName) {
-    return logicalName;
-}
+  // Cache of wrappers keyed by logical name (one wrapper per logical
+  // name; reused on subsequent lookups so bound knobs see a stable
+  // listener target across tab changes).
+  const _logicalSliderCache = new Map();
+  const _logicalToggleCache = new Map();
+  const _logicalComboCache  = new Map();
 
-function getSliderStateLogical(logicalName) {
-    return getSliderState(resolveLogicalParamID(logicalName));
-}
+  // Custom event so tab-change broadcasts re-fire every wrapper's
+  // valueChangedEvent — that's how bound knobs re-render to the new
+  // side's value without per-knob rebinding.
+  const TAB_CHANGED_EVENT = "kaigen-tab-changed";
 
-function getToggleStateLogical(logicalName) {
-    return getToggleState(resolveLogicalParamID(logicalName));
-}
+  function _makeLogicalWrapper(logicalName, getStatePrefixed) {
+    const aState = getStatePrefixed("a_" + logicalName);
+    const bState = getStatePrefixed("b_" + logicalName);
+    if (!aState || !bState) {
+      console.warn("[kaigen] missing a_/b_ relay for logical name", logicalName);
+      return null;
+    }
 
-function getComboBoxStateLogical(logicalName) {
-    return getComboBoxState(resolveLogicalParamID(logicalName));
-}
+    const valueListeners = new ListenerList();
+    const propsListeners = new ListenerList();
+
+    // Forward underlying value-changed events, filtered by active tab.
+    aState.valueChangedEvent.addListener(() => {
+      if (window.__kaigenActiveTab !== 'B') valueListeners.callListeners();
+    });
+    bState.valueChangedEvent.addListener(() => {
+      if (window.__kaigenActiveTab === 'B') valueListeners.callListeners();
+    });
+
+    // Same for properties-changed events (some underlying states may not
+    // expose this — guard the addListener calls).
+    if (aState.propertiesChangedEvent && aState.propertiesChangedEvent.addListener) {
+      aState.propertiesChangedEvent.addListener(() => {
+        if (window.__kaigenActiveTab !== 'B') propsListeners.callListeners();
+      });
+    }
+    if (bState.propertiesChangedEvent && bState.propertiesChangedEvent.addListener) {
+      bState.propertiesChangedEvent.addListener(() => {
+        if (window.__kaigenActiveTab === 'B') propsListeners.callListeners();
+      });
+    }
+
+    // Re-fire on tab change so listeners (knob redraw, label refresh) re-read.
+    window.addEventListener(TAB_CHANGED_EVENT, () => {
+      valueListeners.callListeners();
+      propsListeners.callListeners();
+    });
+
+    const active = () => (window.__kaigenActiveTab === 'B' ? bState : aState);
+    const fanOut = (method, ...args) => {
+      if (window.__kaigenLinkOn) {
+        aState[method] && aState[method](...args);
+        bState[method] && bState[method](...args);
+      } else {
+        const s = active();
+        s[method] && s[method](...args);
+      }
+    };
+
+    const wrapper = {
+      // Common surface (slider/toggle/combo all expose these):
+      valueChangedEvent: valueListeners,
+      propertiesChangedEvent: propsListeners,
+      get properties() { return active().properties; },
+
+      // SliderState surface:
+      setNormalisedValue: (v) => fanOut('setNormalisedValue', v),
+      getNormalisedValue: () => active().getNormalisedValue(),
+      getScaledValue:     () => (active().getScaledValue ? active().getScaledValue() : undefined),
+      sliderDragStarted:  () => fanOut('sliderDragStarted'),
+      sliderDragEnded:    () => fanOut('sliderDragEnded'),
+
+      // ToggleState surface:
+      getValue: () => (active().getValue ? active().getValue() : undefined),
+      setValue: (v) => fanOut('setValue', v),
+
+      // ComboBoxState surface:
+      getChoiceIndex: () => (active().getChoiceIndex ? active().getChoiceIndex() : undefined),
+      setChoiceIndex: (i) => fanOut('setChoiceIndex', i),
+    };
+
+    return wrapper;
+  }
+
+  function getSliderStateLogical(logicalName) {
+    if (KAIGEN_GLOBAL_PARAMS.has(logicalName)) return getSliderState(logicalName);
+    if (_logicalSliderCache.has(logicalName)) return _logicalSliderCache.get(logicalName);
+    const w = _makeLogicalWrapper(logicalName, getSliderState);
+    if (w) _logicalSliderCache.set(logicalName, w);
+    return w;
+  }
+
+  function getToggleStateLogical(logicalName) {
+    if (KAIGEN_GLOBAL_PARAMS.has(logicalName)) return getToggleState(logicalName);
+    if (_logicalToggleCache.has(logicalName)) return _logicalToggleCache.get(logicalName);
+    const w = _makeLogicalWrapper(logicalName, getToggleState);
+    if (w) _logicalToggleCache.set(logicalName, w);
+    return w;
+  }
+
+  function getComboBoxStateLogical(logicalName) {
+    if (KAIGEN_GLOBAL_PARAMS.has(logicalName)) return getComboBoxState(logicalName);
+    if (_logicalComboCache.has(logicalName)) return _logicalComboCache.get(logicalName);
+    const w = _makeLogicalWrapper(logicalName, getComboBoxState);
+    if (w) _logicalComboCache.set(logicalName, w);
+    return w;
+  }
+
+  // Public API for the tab UI (Task 6) to broadcast the tab change.
+  function broadcastKaigenTabChanged() {
+    window.dispatchEvent(new Event(TAB_CHANGED_EVENT));
+  }
 
 // Expose API on window.Juce (ES export replaced for non-module loading)
 window.Juce = {
@@ -639,5 +727,6 @@ window.Juce = {
   getComboBoxState,
   getComboBoxStateLogical,
   getBackendResourceAddress,
+  broadcastKaigenTabChanged,
   ControlParameterIndexUpdater,
 };
