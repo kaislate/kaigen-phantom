@@ -590,12 +590,47 @@ class ControlParameterIndexUpdater {
   }
 }
 
+// Engine focus ('A', 'B', 'LINK'). PR1 always 'A'. PR2 wires this to the tab UI.
+window.__kaigenEngineFocus = 'A';
+
+// List of un-prefixed (global) APVTS param IDs. Anything else is per-engine and
+// needs an a_/b_ prefix derived from window.__kaigenEngineFocus.
+const KAIGEN_GLOBAL_PARAMS = [
+    'bypass', 'input_gain', 'input_gain_auto', 'advanced_open',
+    'morph_amount', 'morph_curve', 'morph_a_level_db',
+    'morph_b_level_db', 'morph_bypass_idle_engine',
+];
+
+function resolveLogicalParamID(logicalName) {
+    if (KAIGEN_GLOBAL_PARAMS.includes(logicalName)) return logicalName;
+    const focus = window.__kaigenEngineFocus || 'A';
+    const prefix = (focus === 'B') ? 'b_' : 'a_';
+    return prefix + logicalName;
+}
+
+function getSliderStateLogical(logicalName) {
+    // Logical name = un-prefixed leaf (e.g. "ghost"). Resolves to a_/b_ APVTS id
+    // based on engine focus. Global params are listed and pass through as-is.
+    return getSliderState(resolveLogicalParamID(logicalName));
+}
+
+function getToggleStateLogical(logicalName) {
+    return getToggleState(resolveLogicalParamID(logicalName));
+}
+
+function getComboBoxStateLogical(logicalName) {
+    return getComboBoxState(resolveLogicalParamID(logicalName));
+}
+
 // Expose API on window.Juce (ES export replaced for non-module loading)
 window.Juce = {
   getNativeFunction,
   getSliderState,
+  getSliderStateLogical,
   getToggleState,
+  getToggleStateLogical,
   getComboBoxState,
+  getComboBoxStateLogical,
   getBackendResourceAddress,
   ControlParameterIndexUpdater,
 };

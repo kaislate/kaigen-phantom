@@ -111,15 +111,6 @@
         <!-- Save button (etched) -->
         <button id="preset-save-btn" style="background: none; border: none; color: #656769; cursor: pointer; padding: 3px 5px; font-size: 12px; transition: color 0.2s; text-shadow: 0 1px 0 rgba(255,255,255,0.5); display: none;" title="Save preset">💾</button>
       </div>
-      <div class="ab-group" id="ab-cluster" style="margin: 0 12px;">
-        <button class="ab-btn active" id="ab-slot-a" title="Snap to slot A">A
-          <span class="ab-mod-dot" id="ab-mod-a"></span>
-        </button>
-        <button class="cp-btn" id="ab-copy" title="Copy active slot to other slot">A→B</button>
-        <button class="ab-btn" id="ab-slot-b" title="Snap to slot B">B
-          <span class="ab-mod-dot" id="ab-mod-b"></span>
-        </button>
-      </div>
       <div style="flex: 1;"></div>
       <div class="mt"><div class="mb active" data-mode="0">Effect</div><div class="mb" data-mode="1">Resyn</div></div>
       <button class="hdr-btn" id="bypass-btn" title="Bypass">&#x23FB;</button>
@@ -133,30 +124,16 @@
       <span class="build-tag" title="Build identifier — use to verify you have the latest DLL loaded">MORPH-9</span>
     </div>
 
-    <!-- Morph panel. Always visible in the unified build; morph.js populates live state. -->
+    <!-- Morph panel — thin morph_amount crossfader between Engine A and Engine B. -->
     <div id="mod-panel" class="mod-panel">
       <div class="mod-row mod-row-morph">
         <span class="mod-label">MORPH</span>
         <div id="mod-enable" class="mod-enable" title="Enable morph"></div>
-        <div id="mod-lane-badge" class="mod-lane-badge">
-          <span class="mod-lane-dot"></span>Lane 1
-        </div>
         <div id="mod-slider" class="mod-slider">
           <div class="mod-slider-fill"></div>
           <div class="mod-slider-handle"></div>
         </div>
         <span id="mod-value" class="mod-value">0.00</span>
-        <button id="mod-capture-btn" class="mod-btn mod-btn-primary">CAPTURE</button>
-        <button id="mod-cancel-btn" class="mod-btn" style="display:none">CANCEL</button>
-        <span id="mod-armed" class="mod-meta">0 armed</span>
-      </div>
-      <div class="mod-row mod-row-scene" id="mod-row-scene" style="display:none">
-        <span class="mod-label">SCENE</span>
-        <div id="mod-scene-slider" class="mod-slider mod-slider-small">
-          <div class="mod-slider-fill"></div>
-          <div class="mod-slider-handle"></div>
-        </div>
-        <span id="mod-scene-value" class="mod-value">0.00</span>
       </div>
     </div>
 
@@ -379,30 +356,6 @@
             <button class="tog" id="midi-gate-release-btn" data-param="midi_gate_release">Gate Release</button>
           </span>
         </div>
-      </div>
-      <div class="settings-section" style="margin-top: 20px;">
-        <div style="font-size: 10px; color: rgba(0,0,0,0.50); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">COMPARE</div>
-        <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 12px; color: rgba(0,0,0,0.80);">
-          <input type="checkbox" id="setting-include-discrete" style="margin-top: 3px;">
-          <span>
-            Include discrete parameters when snapping A/B
-            <div style="font-size: 10px; color: rgba(0,0,0,0.50); margin-top: 2px;">
-              Mode, Bypass, Ghost Mode, and Binaural Mode also flip between slots.
-            </div>
-          </span>
-        </label>
-      </div>
-      <div id="settings-morph-section" class="settings-section" style="display:none; margin-top: 20px;">
-        <div style="font-size: 10px; color: rgba(0,0,0,0.50); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">MORPH</div>
-        <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 12px; color: rgba(0,0,0,0.80); margin-bottom: 10px;">
-          <input type="checkbox" id="setting-morph-scene-enabled" style="margin-top: 3px;">
-          <span>
-            Enable Scene Crossfade (dual engine)
-            <div style="font-size: 10px; color: rgba(0,0,0,0.50); margin-top: 2px;">
-              Adds a secondary audio engine for structural param crossfading. Uses ~2× CPU when active and slots differ meaningfully.
-            </div>
-          </span>
-        </label>
       </div>
     </div>
   </div>
