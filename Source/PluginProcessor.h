@@ -127,6 +127,17 @@ private:
     int fftWritePos       = 0;
     int fftOutputWritePos = 0;
 
+    // Per-engine output FFT capture (split-mode spectrum view).
+    // Same size as the existing input fftBuffer; populated from
+    // dualEngineHost.getEngineAOutput()/getEngineBOutput() in processBlock
+    // after dualEngineHost.process(...) returns. Read by the WebView
+    // native binding (see Task 4) on the message thread, hence atomic
+    // write positions for the producer-side ring buffer.
+    std::array<float, kFftSize * 2> fftBufferEngineA {};
+    std::array<float, kFftSize * 2> fftBufferEngineB {};
+    std::atomic<int> fftWritePosEngineA { 0 };
+    std::atomic<int> fftWritePosEngineB { 0 };
+
     // Editor focus: which tab the UI is on + whether LINK is active.
     // Editor preference, not preset state — stored alongside APVTS in the
     // <PluginState> wrapper but outside of any preset.

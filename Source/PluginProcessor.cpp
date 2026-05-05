@@ -60,6 +60,12 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
     fftBuffer.fill(0.0f);
     spectrumData.fill(0.0f);
     spectrumReady.store(false);
+
+    // Per-engine spectrum capture (split-mode view).
+    fftBufferEngineA.fill(0.0f);
+    fftBufferEngineB.fill(0.0f);
+    fftWritePosEngineA.store(0, std::memory_order_relaxed);
+    fftWritePosEngineB.store(0, std::memory_order_relaxed);
 }
 
 void PhantomProcessor::releaseResources() {}
@@ -254,6 +260,35 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     // The host owns the per-engine APVTS sync, runs both engines on the same
     // input, and crossfades into `buffer` (in place).
     dualEngineHost.process(buffer, sidechainPtr);
+
+    // ── Per-engine FFT capture (split-mode spectrum view) ────────────
+    // aScratch / bScratch hold each engine's post-process / pre-crossfader
+    // output. They're valid until the next dualEngineHost.process() call,
+    // i.e. until the next processBlock — so capture them now into the two
+    // ring buffers consumed by the native binding on the UI thread.
+    {
+        const auto& aOut = dualEngineHost.getEngineAOutput();
+        const auto& bOut = dualEngineHost.getEngineBOutput();
+
+        if (aOut.getNumChannels() > 0 && bOut.getNumChannels() > 0
+            && aOut.getNumSamples() == n && bOut.getNumSamples() == n)
+        {
+            const float* aL = aOut.getReadPointer(0);
+            const float* bL = bOut.getReadPointer(0);
+            int posA = fftWritePosEngineA.load(std::memory_order_relaxed);
+            int posB = fftWritePosEngineB.load(std::memory_order_relaxed);
+            constexpr int kRingMask = (kFftSize * 2) - 1; // power-of-two ring
+            for (int i = 0; i < n; ++i)
+            {
+                fftBufferEngineA[(size_t) posA] = aL[i];
+                fftBufferEngineB[(size_t) posB] = bL[i];
+                posA = (posA + 1) & kRingMask;
+                posB = (posB + 1) & kRingMask;
+            }
+            fftWritePosEngineA.store(posA, std::memory_order_relaxed);
+            fftWritePosEngineB.store(posB, std::memory_order_relaxed);
+        }
+    }
 
     // Pitch display: use the active engine's zero-crossing tracker — it reflects
     // exactly what the visible engine is synthesising and covers the full frequency
