@@ -784,3 +784,26 @@ If the test passes cleanly, no commits in this step.
 - Native binding names: `engineGetFocus` and `engineSetFocus`. Task 2 registers them; Task 6 JS calls them. Match.
 
 **4. No spec gap left without a task.** The diverged-indicator is intentionally deferred (called out explicitly).
+
+### Integration-test coverage gap (intentional)
+
+The plan's Task 1 Step 4 originally prescribed a `PhantomProcessor` round-trip
+integration test (`MemoryBlock` save → fresh processor → restore → focus
+survives). The shipped test instead exercises the free helpers
+(`writeEngineFocusToTree` / `readEngineFocusFromTree`) directly, without
+constructing a `PhantomProcessor`. The trade-off:
+
+- **Pro**: test target stays lean — no `PluginEditor.cpp`, no `juce_gui_extra`,
+  no WebView2 SDK link, no `PhantomWebUI` binary-data target. The unwind from
+  Task 1's first review pass is preserved.
+- **Con**: the test no longer covers the `getStateInformation` /
+  `setStateInformation` integration. If anyone changes the wrapper structure
+  in `PluginProcessor.cpp` (e.g., wraps the tree in another layer, switches
+  XML format, or skips the focus child under some condition), the helper-
+  direct tests won't catch it.
+
+The integration is a thin pass-through (one `writeEngineFocusToTree` call in
+`getStateInformation`; one guarded `readEngineFocusFromTree` call in
+`setStateInformation`). The manual smoke test (Task 7) verifies end-to-end
+via DAW project save/restore. Acceptable trade-off for PR2; revisit if
+PR3+ adds substantial logic to the integration path.
