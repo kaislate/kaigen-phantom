@@ -577,4 +577,54 @@ if (binauralModeSelectAdv) {
   }
 })();
 
+// =============================================================================
+// 12. Spectrum view-mode toggle (Per-engine spectrum PR — Task 6)
+// =============================================================================
+// Wires the small SPLIT/COMBINED pill button at the spectrum's top-right to the
+// spectrumGetViewMode / spectrumSetViewMode native bindings. State persists in
+// the <SpectrumView> plugin-state child via the bindings; spectrum.js picks up
+// the new mode on its next data poll.
+(function () {
+  'use strict';
+
+  if (typeof window.Juce === 'undefined' || typeof window.Juce.getNativeFunction !== 'function') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+    return;
+  }
+  init();
+
+  function init() {
+    const btn = document.getElementById('spectrum-mode-toggle');
+    if (!btn) return;
+
+    const getMode = window.Juce.getNativeFunction('spectrumGetViewMode');
+    const setMode = window.Juce.getNativeFunction('spectrumSetViewMode');
+    if (!getMode || !setMode) {
+      console.warn('[spectrum-toggle] native bindings missing');
+      return;
+    }
+
+    let mode = 'Split';
+
+    function applyToUI(m) {
+      btn.classList.toggle('is-combined', m === 'Combined');
+    }
+
+    btn.addEventListener('click', async () => {
+      mode = (mode === 'Split') ? 'Combined' : 'Split';
+      applyToUI(mode);
+      await setMode(mode);
+    });
+
+    // Initial sync from persisted state.
+    getMode().then(m => {
+      mode = (m === 'Combined') ? 'Combined' : 'Split';
+      applyToUI(mode);
+    }).catch(() => {
+      mode = 'Split';
+      applyToUI(mode);
+    });
+  }
+})();
+
 })();

@@ -451,6 +451,30 @@ phantom-knob.mode-inactive{
   width:100%;height:100%;position:relative;z-index:1;
 }
 
+/* Spectrum view-mode toggle (Per-engine spectrum PR) — small pill at top-right */
+.spectrum-mode-toggle{
+  position:absolute;top:4px;right:8px;z-index:5;
+  background:rgba(20,24,30,0.6);
+  border:1px solid rgba(74,144,226,0.25);
+  color:#6a7a8a;
+  font:600 9px/1 'Space Grotesk', sans-serif;
+  letter-spacing:1.2px;
+  padding:3px 8px;
+  border-radius:4px;
+  cursor:pointer;
+  transition:color 120ms, background 120ms, border-color 120ms;
+  user-select:none;
+}
+.spectrum-mode-toggle:hover{ color:#c8d8ea; }
+.spectrum-mode-toggle .lbl-combined{ display:none; }
+.spectrum-mode-toggle.is-combined .lbl-split{ display:none; }
+.spectrum-mode-toggle.is-combined .lbl-combined{ display:inline; }
+.spectrum-mode-toggle.is-combined{
+  color:#f5f8fb;
+  background:rgba(74,144,226,0.18);
+  border-color:rgba(74,144,226,0.55);
+}
+
 /* I/O meters — now siblings of spectrum-wrap so they match its height */
 .io-meter{
   width:16px;flex-shrink:0;background:#000;border-radius:4px;border:none;
