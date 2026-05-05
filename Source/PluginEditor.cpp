@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "BinaryData.h"
+#include "PresetMigration.h"
 
 #if JUCE_WINDOWS
 #include <windows.h>
@@ -203,6 +204,10 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         &self.synthBoostThresholdRelayA,  &self.synthBoostThresholdRelayB,
         &self.synthBoostAmountRelayA,     &self.synthBoostAmountRelayB,
         &self.morphAmountRelay,
+        &self.macro1Relay,
+        &self.macro2Relay,
+        &self.macro3Relay,
+        &self.macro4Relay,
     };
     for (auto* r : sliderRelays)
         options = options.withOptionsFrom(*r);
@@ -607,6 +612,140 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                     : PhantomProcessor::SpectrumViewMode::Split);
                 complete({});
             })
+        // ── Modulation: routing CRUD + macro metadata (PR3b Task 3) ──────
+        .withNativeFunction("modulationGetState",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                juce::DynamicObject::Ptr root = new juce::DynamicObject();
+
+                auto buildEngine = [&](kaigen::phantom::ModulationEngine& eng, const juce::String& prefix) -> juce::var
+                {
+                    juce::DynamicObject::Ptr engObj = new juce::DynamicObject();
+
+                    // Modulators (macros for PR3b — hardcoded by id since this PR knows the inventory)
+                    juce::Array<juce::var> mods;
+                    const auto macroIds = (prefix == "a_")
+                                        ? std::vector<const char*>{ "macro1", "macro2" }
+                                        : std::vector<const char*>{ "macro3", "macro4" };
+                    for (const auto& mid : macroIds)
+                    {
+                        auto* m = eng.findModulator(mid);
+                        if (m == nullptr) continue;
+                        juce::DynamicObject::Ptr mObj = new juce::DynamicObject();
+                        mObj->setProperty("id", juce::String(mid));
+                        if (auto* macro = dynamic_cast<kaigen::phantom::Macro*>(m))
+                            mObj->setProperty("name", macro->getName());
+                        else
+                            mObj->setProperty("name", juce::String(mid));
+                        mods.add(juce::var(mObj.get()));
+                    }
+                    engObj->setProperty("modulators", mods);
+
+                    // Routings
+                    juce::Array<juce::var> routes;
+                    auto snapshot = eng.getRoutingsSnapshot();
+                    for (const auto& r : *snapshot)
+                    {
+                        juce::DynamicObject::Ptr rObj = new juce::DynamicObject();
+                        rObj->setProperty("source", r.sourceId);
+                        rObj->setProperty("param",  r.paramId);
+                        rObj->setProperty("depth",  r.depth);
+                        rObj->setProperty("invert", r.polarityInverted);
+                        routes.add(juce::var(rObj.get()));
+                    }
+                    engObj->setProperty("routings", routes);
+
+                    // Eligible params (for the "+ Add destination" picker)
+                    juce::Array<juce::var> eligible;
+                    for (const auto& leaf : kaigen::phantom::PresetMigration::getPerEngineLeaves())
+                    {
+                        const juce::String pid = prefix + leaf;
+                        if (auto* p = self.processor.apvts.getParameter(pid))
+                        {
+                            juce::DynamicObject::Ptr pObj = new juce::DynamicObject();
+                            pObj->setProperty("id",   pid);
+                            pObj->setProperty("name", p->getName(64));
+                            eligible.add(juce::var(pObj.get()));
+                        }
+                    }
+                    engObj->setProperty("eligible", eligible);
+
+                    return juce::var(engObj.get());
+                };
+
+                root->setProperty("engineA", buildEngine(self.processor.getModulationEngineA(), "a_"));
+                root->setProperty("engineB", buildEngine(self.processor.getModulationEngineB(), "b_"));
+
+                complete(juce::var(root.get()));
+            })
+        .withNativeFunction("modulationAddRouting",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1 || ! args[0].isObject()) { complete(juce::var(false)); return; }
+                auto* obj = args[0].getDynamicObject();
+                if (obj == nullptr) { complete(juce::var(false)); return; }
+
+                kaigen::phantom::Routing r;
+                r.sourceId = obj->getProperty("source").toString();
+                r.paramId  = obj->getProperty("param").toString();
+                {
+                    const auto depthVar = obj->getProperty("depth");
+                    r.depth = depthVar.isVoid() ? 0.5f : (float) depthVar;
+                }
+
+                const bool isA = r.paramId.startsWith("a_");
+                auto& eng = isA ? self.processor.getModulationEngineA()
+                               : self.processor.getModulationEngineB();
+                const bool ok = eng.addRouting(r);
+                complete(juce::var(ok));
+            })
+        .withNativeFunction("modulationRemoveRouting",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1 || ! args[0].isObject()) { complete({}); return; }
+                auto* obj = args[0].getDynamicObject();
+                if (obj == nullptr) { complete({}); return; }
+                const auto src = obj->getProperty("source").toString();
+                const auto pid = obj->getProperty("param").toString();
+                const bool isA = pid.startsWith("a_");
+                auto& eng = isA ? self.processor.getModulationEngineA()
+                               : self.processor.getModulationEngineB();
+                eng.removeRouting(src, pid);
+                complete({});
+            })
+        .withNativeFunction("modulationSetRoutingDepth",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1 || ! args[0].isObject()) { complete(juce::var(false)); return; }
+                auto* obj = args[0].getDynamicObject();
+                if (obj == nullptr) { complete(juce::var(false)); return; }
+                const auto src = obj->getProperty("source").toString();
+                const auto pid = obj->getProperty("param").toString();
+                const auto depthVar = obj->getProperty("depth");
+                const float depth = depthVar.isVoid() ? 0.5f : (float) depthVar;
+                const bool isA = pid.startsWith("a_");
+                auto& eng = isA ? self.processor.getModulationEngineA()
+                               : self.processor.getModulationEngineB();
+                const bool ok = eng.setRoutingDepth(src, pid, depth);
+                complete(juce::var(ok));
+            })
+        .withNativeFunction("modulationSetMacroName",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1 || ! args[0].isObject()) { complete({}); return; }
+                auto* obj = args[0].getDynamicObject();
+                if (obj == nullptr) { complete({}); return; }
+                const auto sourceId = obj->getProperty("source").toString();
+                const auto name     = obj->getProperty("name").toString();
+
+                const bool isA = (sourceId == "macro1" || sourceId == "macro2");
+                auto& eng = isA ? self.processor.getModulationEngineA()
+                               : self.processor.getModulationEngineB();
+                auto* m = eng.findModulator(sourceId);
+                if (auto* macro = dynamic_cast<kaigen::phantom::Macro*>(m))
+                    macro->setName(name);
+                complete({});
+            })
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });
 
     return options;
@@ -708,6 +847,11 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         { ParamID::B_SYNTH_BOOST_AMOUNT,      synthBoostAmountRelayB },
 
         { ParamID::MORPH_AMOUNT,              morphAmountRelay },
+
+        { ParamID::MACRO1,                    macro1Relay },
+        { ParamID::MACRO2,                    macro2Relay },
+        { ParamID::MACRO3,                    macro3Relay },
+        { ParamID::MACRO4,                    macro4Relay },
     };
     for (auto& b : sliderBindings)
         sliderAttachments.push_back(std::make_unique<juce::WebSliderParameterAttachment>(

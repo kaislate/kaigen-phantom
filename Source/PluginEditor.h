@@ -115,6 +115,14 @@ private:
     // Morph slider — global. Drives the audio crossfader between engines A and B.
     juce::WebSliderRelay morphAmountRelay            { "morph_amount" };
 
+    // Macro modulators — global APVTS params (PR3a). Each macro is owned by
+    // a ModulationEngine (A: macro1/2, B: macro3/4) but the param itself is
+    // global so host automation works regardless of the active engine tab.
+    juce::WebSliderRelay macro1Relay                 { "macro1" };
+    juce::WebSliderRelay macro2Relay                 { "macro2" };
+    juce::WebSliderRelay macro3Relay                 { "macro3" };
+    juce::WebSliderRelay macro4Relay                 { "macro4" };
+
     // ── Combo-box relays ──────────────────────────────────────────────
     juce::WebComboBoxRelay modeRelayA                { "a_mode" };
     juce::WebComboBoxRelay modeRelayB                { "b_mode" };
