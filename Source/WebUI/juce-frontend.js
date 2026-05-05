@@ -590,27 +590,34 @@ class ControlParameterIndexUpdater {
   }
 }
 
-// Engine focus ('A', 'B', 'LINK'). PR1 always 'A'. PR2 wires this to the tab UI.
+// Engine focus ('A', 'B', 'LINK'). PR1 always 'A'.
+// NOTE: this value is SET but not yet READ. PR2 wires the actual dispatch:
+// it will rename the JUCE-side relays to a_<leaf> / b_<leaf> and have the
+// resolver below switch the prefix based on this value. Until then, the
+// resolver is a no-op — see resolveLogicalParamID.
 window.__kaigenEngineFocus = 'A';
 
-// List of un-prefixed (global) APVTS param IDs. Anything else is per-engine and
-// needs an a_/b_ prefix derived from window.__kaigenEngineFocus.
+// List of un-prefixed (global) APVTS param IDs. Retained for documentation
+// of which params are global vs per-engine; functionally unused in PR1
+// because the resolver below is a no-op for every name.
 const KAIGEN_GLOBAL_PARAMS = [
     'bypass', 'input_gain', 'input_gain_auto', 'advanced_open',
     'morph_amount', 'morph_curve', 'morph_a_level_db',
     'morph_b_level_db', 'morph_bypass_idle_engine',
 ];
 
+// PR1: relays are registered with bare leaf names ("ghost", "binaural_mode",
+// etc.) in PluginEditor.h, and the JUCE-side WebSliderParameterAttachment in
+// PluginEditor.cpp binds those relays to a_<leaf> APVTS params — so the
+// WebView always edits Engine A. PR2 will rename the relays to
+// a_<leaf> / b_<leaf> and use window.__kaigenEngineFocus to pick the prefix.
+// Until then, the resolver is a no-op (returns the bare leaf name) for every
+// name, including globals — the engine-focus value exists but is not read.
 function resolveLogicalParamID(logicalName) {
-    if (KAIGEN_GLOBAL_PARAMS.includes(logicalName)) return logicalName;
-    const focus = window.__kaigenEngineFocus || 'A';
-    const prefix = (focus === 'B') ? 'b_' : 'a_';
-    return prefix + logicalName;
+    return logicalName;
 }
 
 function getSliderStateLogical(logicalName) {
-    // Logical name = un-prefixed leaf (e.g. "ghost"). Resolves to a_/b_ APVTS id
-    // based on engine focus. Global params are listed and pass through as-is.
     return getSliderState(resolveLogicalParamID(logicalName));
 }
 

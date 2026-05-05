@@ -30,10 +30,12 @@ public:
     bool producesMidi() const override { return false; }
     double getTailLengthSeconds() const override
     {
-        // PR1: tail length is read from engine A's release. PR2 will reconcile this
-        // when per-engine envelope params can diverge meaningfully under playback.
-        const float releaseMs = apvts.getRawParameterValue(ParamID::A_ENV_RELEASE_MS)->load();
-        return (double)(releaseMs / 1000.0f) + 0.1;
+        // Both engines run in parallel and either may be audible (depending on
+        // morph), so the host-reported tail must cover whichever release is
+        // longer. Add a small safety margin to outlast envelope tail-down.
+        const float aMs = apvts.getRawParameterValue(ParamID::A_ENV_RELEASE_MS)->load();
+        const float bMs = apvts.getRawParameterValue(ParamID::B_ENV_RELEASE_MS)->load();
+        return (double)(juce::jmax(aMs, bMs) / 1000.0f) + 0.1;
     }
 
     int getNumPrograms() override { return 1; }
