@@ -501,4 +501,80 @@ if (binauralModeSelectAdv) {
   setTimeout(applyFromState, 50);
 })();
 
+// =============================================================================
+// 11. Engine-tab UI controller (PR2 Task 6)
+// =============================================================================
+// Wires the A/B/LINK buttons to the JS state flags
+// (window.__kaigenActiveTab, window.__kaigenLinkOn) and the native
+// engineSetFocus binding, and syncs the UI to the persisted engineGetFocus
+// on editor open.
+(function () {
+  'use strict';
+
+  if (typeof window.Juce === 'undefined' || typeof window.Juce.getNativeFunction !== 'function') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+    return;
+  }
+  init();
+
+  function init() {
+    const tabA    = document.getElementById('engine-tab-a');
+    const tabB    = document.getElementById('engine-tab-b');
+    const tabLink = document.getElementById('engine-tab-link');
+    if (!tabA || !tabB || !tabLink) return;
+
+    const engineGetFocus = window.Juce.getNativeFunction('engineGetFocus');
+    const engineSetFocus = window.Juce.getNativeFunction('engineSetFocus');
+    if (!engineGetFocus || !engineSetFocus) {
+      console.warn('[engine-tabs] native bindings missing');
+      return;
+    }
+
+    function applyToUI(activeTab, linkOn) {
+      tabA.classList.toggle('is-active', activeTab === 'A');
+      tabA.setAttribute('aria-selected', activeTab === 'A' ? 'true' : 'false');
+      tabB.classList.toggle('is-active', activeTab === 'B');
+      tabB.setAttribute('aria-selected', activeTab === 'B' ? 'true' : 'false');
+      tabLink.classList.toggle('is-on', !!linkOn);
+      tabLink.setAttribute('aria-pressed', linkOn ? 'true' : 'false');
+    }
+
+    function setActiveTab(newTab) {
+      if (window.__kaigenActiveTab === newTab) return;
+      window.__kaigenActiveTab = newTab;
+      applyToUI(window.__kaigenActiveTab, window.__kaigenLinkOn);
+      engineSetFocus({ activeTab: window.__kaigenActiveTab, linkOn: window.__kaigenLinkOn });
+      window.Juce.broadcastKaigenTabChanged();
+    }
+
+    function toggleLink() {
+      window.__kaigenLinkOn = !window.__kaigenLinkOn;
+      applyToUI(window.__kaigenActiveTab, window.__kaigenLinkOn);
+      engineSetFocus({ activeTab: window.__kaigenActiveTab, linkOn: window.__kaigenLinkOn });
+      // No tab-change broadcast: LINK toggle doesn't change which side is read.
+    }
+
+    tabA.addEventListener('click', () => setActiveTab('A'));
+    tabB.addEventListener('click', () => setActiveTab('B'));
+    tabLink.addEventListener('click', toggleLink);
+
+    // Initial sync from persisted state.
+    engineGetFocus().then(focus => {
+      if (focus && typeof focus === 'object') {
+        window.__kaigenActiveTab = (focus.activeTab === 'B') ? 'B' : 'A';
+        window.__kaigenLinkOn    = !!focus.linkOn;
+      } else {
+        window.__kaigenActiveTab = 'A';
+        window.__kaigenLinkOn    = false;
+      }
+      applyToUI(window.__kaigenActiveTab, window.__kaigenLinkOn);
+      window.Juce.broadcastKaigenTabChanged();   // make every wrapper redraw to the restored tab
+    }).catch(() => {
+      window.__kaigenActiveTab = 'A';
+      window.__kaigenLinkOn    = false;
+      applyToUI('A', false);
+    });
+  }
+})();
+
 })();

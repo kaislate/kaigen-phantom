@@ -584,8 +584,8 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
     // PR2 Task 3: every per-engine param now has TWO attachments (A and B),
     // each bound to its own a_*/b_* relay. The JS dispatch layer (Task 4)
     // will pick which side to bind to a given DOM control based on
-    // window.__kaigenEngineFocus. Globals (input_gain, morph_amount) stay
-    // single-attached.
+    // window.__kaigenActiveTab (and __kaigenLinkOn for LINK fan-out).
+    // Globals (input_gain, morph_amount) stay single-attached.
     struct SliderBinding { const char* paramId; juce::WebSliderRelay& relay; };
     SliderBinding sliderBindings[] = {
         { ParamID::INPUT_GAIN,                inputGainRelay },
