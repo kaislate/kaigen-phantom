@@ -38,6 +38,11 @@ PhantomProcessor::PhantomProcessor()
         r.depth    = 0.5f;
         modEngineA.addRouting(r);
     }
+
+    // Wire the modulation engines into the per-block param sync. This must
+    // happen after the engines are populated above so the host caches
+    // pointers to fully-configured engines.
+    dualEngineHost.setModulationEngines(&modEngineA, &modEngineB);
 }
 
 PhantomProcessor::~PhantomProcessor()

@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Engines/PhantomEngine.h"
 #include "MorphCrossfader.h"
+#include "Modulation/ModulationEngine.h"
 #include <functional>
 
 namespace kaigen::phantom
@@ -47,6 +48,14 @@ public:
     const juce::AudioBuffer<float>& getEngineAOutput() const noexcept { return aScratch; }
     const juce::AudioBuffer<float>& getEngineBOutput() const noexcept { return bScratch; }
 
+    /** Inject the modulation engines that intercept per-param value lookup
+     *  in syncEngineFromPrefix. Owned by PhantomProcessor; pointers are
+     *  non-owning. Pass nullptr for either side to disable modulation
+     *  on that engine (default state — must be set after construction
+     *  for routings to take effect). */
+    void setModulationEngines(kaigen::phantom::ModulationEngine* modA,
+                              kaigen::phantom::ModulationEngine* modB) noexcept;
+
 private:
     void syncEngineFromPrefix(PhantomEngine& target, const char* prefix);
 
@@ -60,6 +69,9 @@ private:
     // input so that A and B both process the same pre-engine signal.
     juce::AudioBuffer<float> aScratch;
     juce::AudioBuffer<float> bScratch;
+
+    kaigen::phantom::ModulationEngine* modA { nullptr };
+    kaigen::phantom::ModulationEngine* modB { nullptr };
 };
 
 } // namespace kaigen::phantom
