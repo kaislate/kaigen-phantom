@@ -241,9 +241,33 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                     inputBins .add(self.processor.spectrumData      [(size_t) i]);
                     outputBins.add(self.processor.spectrumOutputData[(size_t) i]);
                 }
+
+                // Per-engine spectra — computed UI-side from the ring buffers
+                // populated in processBlock (Task 3). Same Hann window + FFT +
+                // log-binning pipeline as input/output, on the engine's mono
+                // channel-0 output.
+                std::array<float, PhantomProcessor::kSpectrumBins> engineABins {};
+                std::array<float, PhantomProcessor::kSpectrumBins> engineBBins {};
+                self.processor.computeEngineSpectrum(
+                    PhantomProcessor::SpectrumEngineId::A, engineABins);
+                self.processor.computeEngineSpectrum(
+                    PhantomProcessor::SpectrumEngineId::B, engineBBins);
+
+                juce::Array<juce::var> engineAArr, engineBArr;
+                for (int i = 0; i < PhantomProcessor::kSpectrumBins; ++i)
+                {
+                    engineAArr.add(engineABins[(size_t) i]);
+                    engineBArr.add(engineBBins[(size_t) i]);
+                }
+
                 auto* obj = new juce::DynamicObject();
-                obj->setProperty("input",  inputBins);
-                obj->setProperty("output", outputBins);
+                obj->setProperty("input",   inputBins);
+                obj->setProperty("output",  outputBins);
+                obj->setProperty("engineA", engineAArr);
+                obj->setProperty("engineB", engineBArr);
+                obj->setProperty("viewMode",
+                    self.processor.getSpectrumViewMode() == PhantomProcessor::SpectrumViewMode::Combined
+                        ? "Combined" : "Split");
                 complete(juce::var(obj));
             })
         .withNativeFunction("getPeakLevels",
@@ -551,6 +575,23 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                               : PhantomProcessor::ActiveTab::A;
                 f.linkOn    = (bool) obj->getProperty("linkOn");
                 self.processor.setEngineFocus(f);
+                complete({});
+            })
+        .withNativeFunction("spectrumGetViewMode",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                const auto m = self.processor.getSpectrumViewMode();
+                complete(juce::var(m == PhantomProcessor::SpectrumViewMode::Combined
+                                    ? "Combined" : "Split"));
+            })
+        .withNativeFunction("spectrumSetViewMode",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1) { complete({}); return; }
+                const auto s = args[0].toString();
+                self.processor.setSpectrumViewMode(s == "Combined"
+                    ? PhantomProcessor::SpectrumViewMode::Combined
+                    : PhantomProcessor::SpectrumViewMode::Split);
                 complete({});
             })
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });

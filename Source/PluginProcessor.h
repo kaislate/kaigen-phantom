@@ -68,6 +68,17 @@ public:
     std::array<float, kSpectrumBins> spectrumOutputData {}; // output (post-engine)
     std::atomic<bool> spectrumReady { false };
 
+    /** Selector for computeEngineSpectrum: which engine ring buffer to read. */
+    enum class SpectrumEngineId { A, B };
+
+    /** UI-thread helper. Reads the most recent kFftSize samples from the
+     *  per-engine FFT ring buffer (populated in processBlock — see Task 3),
+     *  applies the same Hann window + FFT + log-binning pipeline as the
+     *  input/output spectra, and writes binned magnitudes (range 0..1) to
+     *  `dst`. Called from the WebView native binding on the message thread. */
+    void computeEngineSpectrum(SpectrumEngineId which,
+                               std::array<float, kSpectrumBins>& dst) const;
+
     // Oscilloscope ring buffers (written by audio thread, read by editor)
     static constexpr int kOscBufSize = PhantomEngine::kOscBufSize;
     std::array<float, kOscBufSize> oscInputBuf  {};
@@ -137,6 +148,13 @@ private:
     std::array<float, kFftSize * 2> fftBufferEngineB {};
     std::atomic<int> fftWritePosEngineA { 0 };
     std::atomic<int> fftWritePosEngineB { 0 };
+
+    // Scratch buffer used by computeEngineSpectrum() (UI/message thread).
+    // Mutable because the method is logically const (it does not change
+    // observable state — it only reads the ring buffer and writes to the
+    // caller-provided destination), but the FFT in-place transform needs
+    // writable storage.
+    mutable std::array<float, kFftSize * 2> spectrumEngineScratch {};
 
     // Editor focus: which tab the UI is on + whether LINK is active.
     // Editor preference, not preset state — stored alongside APVTS in the

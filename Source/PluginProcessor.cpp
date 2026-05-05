@@ -358,6 +358,62 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     }
 }
 
+void PhantomProcessor::computeEngineSpectrum(SpectrumEngineId which,
+                                             std::array<float, kSpectrumBins>& dst) const
+{
+    // Source ring buffer + atomic write position for the requested engine.
+    const auto& ring   = (which == SpectrumEngineId::A) ? fftBufferEngineA   : fftBufferEngineB;
+    const int   wrPos  = ((which == SpectrumEngineId::A) ? fftWritePosEngineA
+                                                         : fftWritePosEngineB).load(std::memory_order_acquire);
+
+    // Copy the most recent kFftSize samples from the ring into the scratch
+    // FFT buffer (size = kFftSize * 2; second half zero-padded for the FFT).
+    constexpr int kRingMask = (kFftSize * 2) - 1; // power-of-two ring
+    int readPos = (wrPos - kFftSize) & kRingMask;
+    for (int k = 0; k < kFftSize; ++k)
+    {
+        spectrumEngineScratch[(size_t) k] = ring[(size_t) readPos];
+        readPos = (readPos + 1) & kRingMask;
+    }
+
+    // Hann window — same coefficients as the input/output FFT in processBlock.
+    for (int k = 0; k < kFftSize; ++k)
+    {
+        const float w = 0.5f * (1.0f - std::cos(
+            juce::MathConstants<float>::twoPi * k / (float)(kFftSize - 1)));
+        spectrumEngineScratch[(size_t) k] *= w;
+    }
+    for (int k = kFftSize; k < kFftSize * 2; ++k)
+        spectrumEngineScratch[(size_t) k] = 0.0f;
+
+    spectrumFFT.performFrequencyOnlyForwardTransform(spectrumEngineScratch.data());
+
+    // Log-frequency binning — identical to spectrumData / spectrumOutputData.
+    const float sr         = (float) sampleRate;
+    const float fftSizeF   = (float) kFftSize;
+    const int   maxBin     = kFftSize / 2 - 1;
+    const float logMin     = std::log10(30.0f);
+    const float logMax     = std::log10(16000.0f);
+    const float normalizer = 2.0f / (float) (kFftSize / 2);
+
+    for (int b = 0; b < kSpectrumBins; ++b)
+    {
+        const float fLow  = std::pow(10.0f, logMin + (logMax - logMin) *  b      / kSpectrumBins);
+        const float fHigh = std::pow(10.0f, logMin + (logMax - logMin) * (b + 1) / kSpectrumBins);
+
+        const int binLow  = juce::jmax(1,      (int) std::floor(fLow  * fftSizeF / sr));
+        const int binHigh = juce::jmin(maxBin, (int) std::ceil (fHigh * fftSizeF / sr));
+
+        float mag = 0.0f;
+        for (int k = binLow; k <= binHigh; ++k)
+            mag = juce::jmax(mag, spectrumEngineScratch[(size_t) k]);
+
+        const float normMag = mag * normalizer;
+        const float dB      = juce::Decibels::gainToDecibels(normMag, -96.0f);
+        dst[(size_t) b]     = juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f);
+    }
+}
+
 void PhantomProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
     // Recipe Preset is a per-engine choice: when either engine's selector changes,
