@@ -13,8 +13,8 @@ DualEngineHost::DualEngineHost(juce::AudioProcessorValueTreeState& a)
 void DualEngineHost::setModulationEngines(kaigen::phantom::ModulationEngine* a,
                                           kaigen::phantom::ModulationEngine* b) noexcept
 {
-    modA = a;
-    modB = b;
+    modA.store(a, std::memory_order_release);
+    modB.store(b, std::memory_order_release);
 }
 
 void DualEngineHost::prepareToPlay(double sampleRate, int blockSize, int numChannels)
@@ -54,8 +54,8 @@ void DualEngineHost::syncEngineFromPrefix(PhantomEngine& target, const char* pre
 {
     // Capture by-value: prefix is a string literal at all call sites
     // (see process()), so its lifetime is fine for the duration of this lambda.
-    auto* modEng = (juce::String(prefix) == "a_") ? modA
-                 : (juce::String(prefix) == "b_") ? modB
+    auto* modEng = (juce::String(prefix) == "a_") ? modA.load(std::memory_order_acquire)
+                 : (juce::String(prefix) == "b_") ? modB.load(std::memory_order_acquire)
                  : nullptr;
 
     auto valueFor = [this, prefix, modEng](const char* leaf) -> float {

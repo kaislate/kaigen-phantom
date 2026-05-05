@@ -4,6 +4,7 @@
 #include "Engines/PhantomEngine.h"
 #include "MorphCrossfader.h"
 #include "Modulation/ModulationEngine.h"
+#include <atomic>
 #include <functional>
 
 namespace kaigen::phantom
@@ -70,8 +71,8 @@ private:
     juce::AudioBuffer<float> aScratch;
     juce::AudioBuffer<float> bScratch;
 
-    kaigen::phantom::ModulationEngine* modA { nullptr };
-    kaigen::phantom::ModulationEngine* modB { nullptr };
+    std::atomic<kaigen::phantom::ModulationEngine*> modA { nullptr };
+    std::atomic<kaigen::phantom::ModulationEngine*> modB { nullptr };
 };
 
 } // namespace kaigen::phantom
