@@ -240,6 +240,39 @@ function drawSpectrumCombined(ctx, w, h) {
 }
 
 // ─── Split view: side-by-side per-engine panes ─────────────────────────────
+//
+// When morph sits at exactly 0 or 1 with morph_bypass_idle_engine on, the
+// idle engine's process() is skipped in DualEngineHost — its scratch still
+// holds the un-processed input copy that was memcpy'd in pre-skip, so the
+// pane below would otherwise show the input pass-through. We draw a
+// translucent dim layer + "ENGINE X OFF" label over the bypassed pane so
+// the user can still see the spectrum but knows the engine isn't running.
+function isEngineBypassed(side) {
+    const morphState   = window.Juce && window.Juce.getSliderState
+                       ? window.Juce.getSliderState('morph_amount') : null;
+    const bypassToggle = window.Juce && window.Juce.getToggleState
+                       ? window.Juce.getToggleState('morph_bypass_idle_engine') : null;
+    if (!morphState || !bypassToggle) return false;
+    if (!bypassToggle.getValue()) return false;
+    const m = morphState.getNormalisedValue();
+    const eps = 1e-6;
+    return (side === 'A') ? (m >= 1 - eps) : (m <= eps);
+}
+
+function drawBypassOverlay(ctx, xOffset, paneW, h, side) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(xOffset, 0, paneW, h);
+
+    const fontPx = Math.max(11, Math.round(h * 0.16));
+    ctx.font = '600 ' + fontPx + 'px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('ENGINE ' + side + ' OFF', xOffset + paneW / 2, h / 2);
+    ctx.restore();
+}
+
 function drawSpectrumSplit(ctx, w, h) {
     const halfW = Math.floor(w / 2);
 
@@ -258,6 +291,11 @@ function drawSpectrumSplit(ctx, w, h) {
     ctx.clip();
     drawOnePane(ctx, halfW, w - halfW, h, 'B');
     ctx.restore();
+
+    // Bypass overlays (drawn AFTER panes, BEFORE divider/labels so
+    // the spectrum shows through but the side label still reads on top).
+    if (isEngineBypassed('A')) drawBypassOverlay(ctx, 0,     halfW,        h, 'A');
+    if (isEngineBypassed('B')) drawBypassOverlay(ctx, halfW, w - halfW,    h, 'B');
 
     // Center divider
     ctx.strokeStyle = 'rgba(255,255,255,0.10)';
