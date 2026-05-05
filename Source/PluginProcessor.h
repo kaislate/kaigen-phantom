@@ -6,6 +6,8 @@
 #include "DualEngineHost.h"
 #include "EngineFocus.h"
 #include "SpectrumViewMode.h"
+#include "Modulation/ModulationEngine.h"
+#include "Modulation/Macro.h"
 
 class PhantomProcessor : public juce::AudioProcessor,
                          private juce::AudioProcessorValueTreeState::Listener
@@ -95,6 +97,13 @@ public:
     PhantomEngine& getActiveEngine() noexcept { return dualEngineHost.getActiveEngine(); }
     kaigen::phantom::DualEngineHost& getDualEngineHost() noexcept { return dualEngineHost; }
 
+    // ─── Modulation engines (PR3a) ────────────────────────────────────────
+    // Per-engine modulation containers. Engine A scopes Macro 1+2 to a_*
+    // params; Engine B scopes Macro 3+4 to b_* params. Routings between a
+    // macro and a param are owned by the corresponding engine here.
+    kaigen::phantom::ModulationEngine& getModulationEngineA() noexcept { return modEngineA; }
+    kaigen::phantom::ModulationEngine& getModulationEngineB() noexcept { return modEngineB; }
+
     // ─── Engine focus (editor-state, not preset-state) ────────────────────
     // Aliases let the WebView native bindings (Task 2) and editor code
     // refer to PhantomProcessor::ActiveTab / ::EngineFocus without
@@ -166,6 +175,15 @@ private:
     EngineFocus engineFocus;
 
     SpectrumViewMode spectrumViewMode { SpectrumViewMode::Split };
+
+    // ─── Modulation engines (PR3a) ────────────────────────────────────────
+    // Declared after `apvts` (public, above) so the references they hold
+    // outlive only the APVTS — and after `dualEngineHost` so destruction
+    // order is engines-first, mod engines second (mod engines don't depend
+    // on dualEngineHost yet but Task 5 will wire DualEngineHost to read
+    // these for value-lookup intercept).
+    kaigen::phantom::ModulationEngine modEngineA { apvts, "a_" };
+    kaigen::phantom::ModulationEngine modEngineB { apvts, "b_" };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomProcessor)
 };

@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 #include "PresetMigration.h"
 #include "EngineFocus.h"
+#include "Modulation/Routing.h"
 
 PhantomProcessor::PhantomProcessor()
     : AudioProcessor(BusesProperties()
@@ -16,6 +17,27 @@ PhantomProcessor::PhantomProcessor()
     apvts.addParameterListener(ParamID::A_RECIPE_PRESET, this);
     apvts.addParameterListener(ParamID::B_RECIPE_PRESET, this);
     presetManager.initialize();
+
+    // ── Modulation engines (PR3a) ─────────────────────────────────────
+    // Engine A owns Macros 1+2 (scoped to a_* params); Engine B owns 3+4
+    // (scoped to b_*). The Macro modulators back onto APVTS so host
+    // automation drives them.
+    using kaigen::phantom::Macro;
+    modEngineA.addModulator(std::make_unique<Macro>("macro1", apvts, ParamID::MACRO1));
+    modEngineA.addModulator(std::make_unique<Macro>("macro2", apvts, ParamID::MACRO2));
+    modEngineB.addModulator(std::make_unique<Macro>("macro3", apvts, ParamID::MACRO3));
+    modEngineB.addModulator(std::make_unique<Macro>("macro4", apvts, ParamID::MACRO4));
+
+    // PR3a proof-of-life routing — replaced by user-created routings via the
+    // macro editor UI in PR3b. Verifies the framework end-to-end:
+    // automating macro1 in the host should audibly affect engine A's ghost.
+    {
+        kaigen::phantom::Routing r;
+        r.sourceId = "macro1";
+        r.paramId  = ParamID::A_GHOST;
+        r.depth    = 0.5f;
+        modEngineA.addRouting(r);
+    }
 }
 
 PhantomProcessor::~PhantomProcessor()
@@ -475,6 +497,14 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
     kaigen::phantom::writeEngineFocusToTree(wrapper, engineFocus);
     kaigen::phantom::writeSpectrumViewModeToTree(wrapper, spectrumViewMode);
 
+    // <ModulationConfig> — per-engine modulator + routing tables. Preset-side
+    // persistence (within an APVTS-state child or sibling) lands in PR3b; for
+    // PR3a we just stage the data alongside <EditorFocus> / <SpectrumView>.
+    juce::ValueTree modConfig("ModulationConfig");
+    modConfig.appendChild(modEngineA.toValueTree(), nullptr);
+    modConfig.appendChild(modEngineB.toValueTree(), nullptr);
+    wrapper.appendChild(modConfig, nullptr);
+
     if (auto xml = wrapper.createXml())
         copyXmlToBinary(*xml, destData);
 }
@@ -516,6 +546,22 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
 
         if (wrapper.getChildWithName("SpectrumView").isValid())
             spectrumViewMode = kaigen::phantom::readSpectrumViewModeFromTree(wrapper);
+
+        // <ModulationConfig> — restore per-engine modulators + routings. The
+        // ValueTree contains one <Engine> child per engine, each tagged with
+        // a "prefix" property ("a_" or "b_"); dispatch on that to the right
+        // engine. Missing or invalid nodes leave the in-memory state alone.
+        if (auto modConfig = wrapper.getChildWithName("ModulationConfig"); modConfig.isValid())
+        {
+            for (int i = 0; i < modConfig.getNumChildren(); ++i)
+            {
+                auto engineNode = modConfig.getChild(i);
+                if (! engineNode.hasType("Engine")) continue;
+                const auto p = engineNode.getProperty("prefix").toString();
+                if      (p == "a_") modEngineA.fromValueTree(engineNode);
+                else if (p == "b_") modEngineB.fromValueTree(engineNode);
+            }
+        }
     }
 }
 
