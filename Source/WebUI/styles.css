@@ -517,7 +517,7 @@ phantom-knob.mode-inactive{
   margin:0;
 }
 .wrap.advanced-open .advanced-panel{
-  max-height:200px;
+  max-height:150px;
   opacity:1;
   transform:scaleY(1);
 }
@@ -530,7 +530,7 @@ phantom-knob.mode-inactive{
 
 .adv-content{
   position:relative;z-index:2;
-  height:200px;
+  height:150px;
   display:flex;flex-direction:row;align-items:stretch;
   padding:0 20px;gap:0;
 }
