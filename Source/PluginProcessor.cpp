@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "PresetMigration.h"
+#include "EngineFocus.h"
 
 PhantomProcessor::PhantomProcessor()
     : AudioProcessor(BusesProperties()
@@ -359,6 +360,11 @@ juce::AudioProcessorEditor* PhantomProcessor::createEditor()
     return new PhantomEditor(*this);
 }
 
+void PhantomProcessor::setEngineFocus(EngineFocus newFocus) noexcept
+{
+    engineFocus = newFocus;
+}
+
 void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     // New format: a wrapper <PluginState> tree containing a single
@@ -376,6 +382,8 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
 
     juce::ValueTree wrapper("PluginState");
     wrapper.appendChild(apvtsChild, nullptr);
+
+    kaigen::phantom::writeEngineFocusToTree(wrapper, engineFocus);
 
     if (auto xml = wrapper.createXml())
         copyXmlToBinary(*xml, destData);
@@ -410,6 +418,11 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
         {
             apvts.replaceState(wrapper);
         }
+
+        if (wrapper.getChildWithName("EditorFocus").isValid())
+            engineFocus = kaigen::phantom::readEngineFocusFromTree(wrapper);
+        // else: leave in-memory engineFocus untouched — preserves user state on
+        // partial wrapper loads or on plugin-state restores from pre-PR2 hosts.
     }
 }
 
