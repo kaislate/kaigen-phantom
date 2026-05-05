@@ -54,6 +54,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/Engines/EnvelopeFollower.cpp
     Source/Engines/PhantomEngine.cpp
     Source/PresetManager.cpp
+    Source/PresetMigration.cpp
     Source/ABSlotManager.cpp
 )
 
