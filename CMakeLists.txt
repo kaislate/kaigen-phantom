@@ -6,11 +6,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Preset system developer mode
 option(DEVELOPER_MODE "Enable developer preset management panel" OFF)
-# KAIGEN_PRO_BUILD was introduced for a dual-SKU distribution (Standard vs Pro)
-# but unified to a single always-on binary 2026-04-24. The compile guards remain
-# in source code for potential future re-introduction of tiering, but the macro
-# is always defined now so all features ship in every build.
-
 
 if(DEVELOPER_MODE)
     add_definitions(-DDEVELOPER_MODE=1)
@@ -55,20 +50,8 @@ target_sources(KaigenPhantom PRIVATE
     Source/Engines/PhantomEngine.cpp
     Source/PresetManager.cpp
     Source/PresetMigration.cpp
-    Source/ABSlotManager.cpp
-    Source/DualEngineHost.cpp
-)
-
-target_compile_definitions(KaigenPhantom PRIVATE KAIGEN_PRO_BUILD=1)
-target_sources(KaigenPhantom PRIVATE
-    # Source/MorphEngine.cpp -- excluded by PR1 Task 5 (2026-05-04). MorphEngine
-    # references retired un-prefixed param IDs (MORPH_ENABLED, SCENE_ENABLED,
-    # SCENE_POSITION) that were removed in PR1 Task 2; PluginProcessor no longer
-    # uses MorphEngine after Task 5. The cpp file + MorphEngine.h are scheduled
-    # for outright deletion in PR1 Task 8 — this exclusion is the temporary
-    # bridge that keeps the static lib linkable in the meantime. (The editor
-    # still references MorphEngine; that gets cleaned up in PR1 Task 6.)
     Source/MorphCrossfader.cpp
+    Source/DualEngineHost.cpp
 )
 
 juce_add_binary_data(PhantomWebUI SOURCES

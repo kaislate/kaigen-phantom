@@ -441,15 +441,13 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 const auto description = args.size() > 3 ? args[3].toString() : juce::String();
                 const bool overwrite   = args.size() > 4 && args[4].isBool() && (bool) args[4];
 
-                // PR1: every save is Single-kind because ABSlotManager is no
-                // longer wired up. PR2 reintroduces AB-style saves through the
-                // new dual-engine APVTS layout.
+                // PR1: every save is Single — PresetManager's API was
+                // simplified after ABSlotManager was retired. PR2 will
+                // reintroduce AB-style saves through the new dual-engine
+                // APVTS layout.
                 auto savedName = self.processor.getPresetManager().savePreset(
                     self.processor.apvts,
-                    nullptr,
-                    name, type, designer, description,
-                    kaigen::phantom::PresetKind::Single, overwrite,
-                    nullptr);
+                    name, type, designer, description, overwrite);
                 complete(juce::var(savedName));
             })
         .withNativeFunction("setFavorite",
