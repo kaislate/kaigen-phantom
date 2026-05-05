@@ -3,113 +3,84 @@
 
 namespace ParamID
 {
+    #define KAIGEN_PER_ENGINE(LOGICAL) \
+        inline constexpr auto A_##LOGICAL = "a_" #LOGICAL; \
+        inline constexpr auto B_##LOGICAL = "b_" #LOGICAL;
+
     // ── Mode & Global ─────────────────────────────────────────────────
-    inline constexpr auto MODE               = "mode";
-    inline constexpr auto BYPASS             = "bypass";
-    inline constexpr auto GHOST              = "ghost";
-    inline constexpr auto GHOST_MODE         = "ghost_mode";
-    inline constexpr auto PHANTOM_THRESHOLD  = "phantom_threshold";
-    inline constexpr auto PHANTOM_STRENGTH   = "phantom_strength";
-    inline constexpr auto INPUT_GAIN         = "input_gain";
-    inline constexpr auto INPUT_GAIN_AUTO    = "input_gain_auto";
-    inline constexpr auto OUTPUT_GAIN        = "output_gain";
+    KAIGEN_PER_ENGINE(MODE)
+    inline constexpr auto BYPASS             = "bypass";       // global
+    KAIGEN_PER_ENGINE(GHOST)
+    KAIGEN_PER_ENGINE(GHOST_MODE)
+    KAIGEN_PER_ENGINE(PHANTOM_THRESHOLD)
+    KAIGEN_PER_ENGINE(PHANTOM_STRENGTH)
+    inline constexpr auto INPUT_GAIN         = "input_gain";       // global
+    inline constexpr auto INPUT_GAIN_AUTO    = "input_gain_auto";  // global
+    KAIGEN_PER_ENGINE(OUTPUT_GAIN)
 
-    // ── Recipe Engine (ZeroCrossingSynth harmonic amplitudes H2..H8) ────
-    inline constexpr auto RECIPE_H2          = "recipe_h2";
-    inline constexpr auto RECIPE_H3          = "recipe_h3";
-    inline constexpr auto RECIPE_H4          = "recipe_h4";
-    inline constexpr auto RECIPE_H5          = "recipe_h5";
-    inline constexpr auto RECIPE_H6          = "recipe_h6";
-    inline constexpr auto RECIPE_H7          = "recipe_h7";
-    inline constexpr auto RECIPE_H8          = "recipe_h8";
-    inline constexpr auto RECIPE_PRESET      = "recipe_preset";
-    inline constexpr auto HARMONIC_SATURATION = "harmonic_saturation";
+    // ── Recipe Engine ──────────────────────────────────────────────────
+    KAIGEN_PER_ENGINE(RECIPE_H2)
+    KAIGEN_PER_ENGINE(RECIPE_H3)
+    KAIGEN_PER_ENGINE(RECIPE_H4)
+    KAIGEN_PER_ENGINE(RECIPE_H5)
+    KAIGEN_PER_ENGINE(RECIPE_H6)
+    KAIGEN_PER_ENGINE(RECIPE_H7)
+    KAIGEN_PER_ENGINE(RECIPE_H8)
+    KAIGEN_PER_ENGINE(RECIPE_PRESET)
+    KAIGEN_PER_ENGINE(HARMONIC_SATURATION)
 
-    // ── Waveform shape ────────────────────────────────────────────────────
-    /** 0 = pure sine, 100 = square. Morphs the synthesised oscillator shape. */
-    inline constexpr auto SYNTH_STEP         = "synth_step";
-    /** Pulse width: 50 = symmetric. Controls even/odd harmonic balance. */
-    inline constexpr auto SYNTH_DUTY         = "synth_duty";
-    /** Zero-crossing skip count [1-8]. Each +1 halves the effective fundamental,
-     *  shifting all harmonics down and introducing sub-harmonic content. */
-    inline constexpr auto SYNTH_SKIP         = "synth_skip";
+    // ── Waveform shape ────────────────────────────────────────────────
+    KAIGEN_PER_ENGINE(SYNTH_STEP)
+    KAIGEN_PER_ENGINE(SYNTH_DUTY)
+    KAIGEN_PER_ENGINE(SYNTH_SKIP)
 
-    // ── Envelope Follower ────────────────────────────────────────────
-    inline constexpr auto ENV_ATTACK_MS      = "env_attack_ms";
-    inline constexpr auto ENV_RELEASE_MS     = "env_release_ms";
-    inline constexpr auto ENV_SOURCE           = "env_source";
+    // ── Envelope Follower ─────────────────────────────────────────────
+    KAIGEN_PER_ENGINE(ENV_ATTACK_MS)
+    KAIGEN_PER_ENGINE(ENV_RELEASE_MS)
+    KAIGEN_PER_ENGINE(ENV_SOURCE)
 
     // ── Binaural ──────────────────────────────────────────────────────
-    inline constexpr auto BINAURAL_MODE      = "binaural_mode";
-    inline constexpr auto BINAURAL_WIDTH     = "binaural_width";
+    KAIGEN_PER_ENGINE(BINAURAL_MODE)
+    KAIGEN_PER_ENGINE(BINAURAL_WIDTH)
 
     // ── Stereo ────────────────────────────────────────────────────────
-    inline constexpr auto STEREO_WIDTH       = "stereo_width";
+    KAIGEN_PER_ENGINE(STEREO_WIDTH)
 
     // ── Synth Filter ──────────────────────────────────────────────────
-    /** Low-pass filter on synthesised harmonics. 200–20000 Hz. Default 20000 (transparent). */
-    inline constexpr auto SYNTH_FILTER_SLOPE = "synth_filter_slope";
-    inline constexpr auto SYNTH_LPF_HZ      = "synth_lpf_hz";
-    /** High-pass filter on synthesised harmonics. 20–2000 Hz. Default 20 (transparent). */
-    inline constexpr auto SYNTH_HPF_HZ      = "synth_hpf_hz";
+    KAIGEN_PER_ENGINE(SYNTH_FILTER_SLOPE)
+    KAIGEN_PER_ENGINE(SYNTH_LPF_HZ)
+    KAIGEN_PER_ENGINE(SYNTH_HPF_HZ)
 
-    // ── RESYN (WaveletSynth) controls ─────────────────────────────────────
-    /** Fraction of each wavelet period to synthesise. 0.05–1.0. Default 1.0 (full). */
-    inline constexpr auto SYNTH_WAVELET_LENGTH = "synth_wavelet_length";
-    /** Gate threshold: min negative-peak amplitude for a crossing to be valid. 0–1. Default 0. */
-    inline constexpr auto SYNTH_GATE_THRESHOLD = "synth_gate_threshold";
-    /** H1 (fundamental) amplitude in RESYN mode. 0–200%. Default 100. */
-    inline constexpr auto SYNTH_H1 = "synth_h1";
-    /** Sub-harmonic (one octave below fundamental) amplitude. 0–200%. Default 0. */
-    inline constexpr auto SYNTH_SUB = "synth_sub";
+    // ── RESYN (WaveletSynth) ──────────────────────────────────────────
+    KAIGEN_PER_ENGINE(SYNTH_WAVELET_LENGTH)
+    KAIGEN_PER_ENGINE(SYNTH_GATE_THRESHOLD)
+    KAIGEN_PER_ENGINE(SYNTH_H1)
+    KAIGEN_PER_ENGINE(SYNTH_SUB)
 
-    // ── Crossing detection ────────────────────────────────────────────────
-    /** Minimum waveset length in samples. Crossings closer than this are rejected (noise gate).
-     *  2–500 samples. Default 11 (≈4 kHz at 44.1 kHz). Low = allow high-freq wavesets. High = bass-only. */
-    inline constexpr auto SYNTH_MIN_SAMPLES = "synth_min_samples";
+    // ── Crossing detection / pitch ────────────────────────────────────
+    KAIGEN_PER_ENGINE(SYNTH_MIN_SAMPLES)
+    KAIGEN_PER_ENGINE(SYNTH_MAX_SAMPLES)
+    KAIGEN_PER_ENGINE(TRACKING_SPEED)
+    KAIGEN_PER_ENGINE(PUNCH_ENABLED)
+    KAIGEN_PER_ENGINE(PUNCH_AMOUNT)
+    KAIGEN_PER_ENGINE(SYNTH_BOOST_THRESHOLD)
+    KAIGEN_PER_ENGINE(SYNTH_BOOST_AMOUNT)
 
-    /** Maximum waveset length in samples. Crossings further apart than this are rejected.
-     *  100–8000 samples. Default 5513 (≈8 Hz at 44.1 kHz). */
-    inline constexpr auto SYNTH_MAX_SAMPLES = "synth_max_samples";
+    // ── MIDI triggering ───────────────────────────────────────────────
+    KAIGEN_PER_ENGINE(MIDI_TRIGGER_ENABLED)
+    KAIGEN_PER_ENGINE(MIDI_GATE_RELEASE)
 
-    // ── Pitch tracking ────────────────────────────────────────────────────
-    /** Period-tracking EMA speed. 0.1–80 stored; ÷100 in processor → alpha 0.001–0.800.
-     *  Low = stable/glide. High = fast/responsive. Default 15 → alpha 0.15. */
-    inline constexpr auto TRACKING_SPEED = "tracking_speed";
-
-    // ── Punch (per-wavelet peak amplitude modulation) ─────────────────────
-    /** Toggle: replace smooth envelope with per-wavelet peak amplitude. */
-    inline constexpr auto PUNCH_ENABLED = "punch_enabled";
-    /** Blend amount 0–100%: 0 = pure envelope, 100 = pure wavelet peak. */
-    inline constexpr auto PUNCH_AMOUNT  = "punch_amount";
-
-    /** Upward expansion threshold: wavelets above this level get boosted. 0–100%. Default 0 (off). */
-    inline constexpr auto SYNTH_BOOST_THRESHOLD = "synth_boost_threshold";
-    /** Upward expansion amount: additional gain for wavelets above threshold. 0–200%. Default 0. */
-    inline constexpr auto SYNTH_BOOST_AMOUNT    = "synth_boost_amount";
-
-    // ── MIDI triggering ────────────────────────────────────────────────────
-    /** When true, MIDI note-on events retrigger the envelope follower (resetting
-     *  env to 0 so the Attack curve starts fresh per note). When false, the
-     *  envelope tracks audio amplitude only, with no per-note retrigger. */
-    inline constexpr auto MIDI_TRIGGER_ENABLED = "midi_trigger_enabled";
-    /** When true (and MIDI_TRIGGER_ENABLED is on), MIDI note-off forces the
-     *  envelope into release and the wavelet engine into free-run, so the tail
-     *  decays over the full Release time instead of being capped by the
-     *  engine's amplitude floor (~500 ms). */
-    inline constexpr auto MIDI_GATE_RELEASE    = "midi_gate_release";
-
-    // ── Advanced mode toggle (UI state; not automated) ────────────────────
-    /** True if the advanced controls panel is open. UI-only; DSP never reads. */
+    // ── Advanced UI toggle (global; UI-only) ───────────────────────────
     inline constexpr auto ADVANCED_OPEN = "advanced_open";
 
-    // ── Pro Morph (Pro build only) ──────────────────────────────────────
-  #ifdef KAIGEN_PRO_BUILD
-    inline constexpr auto MORPH_ENABLED    = "morph_enabled";
-    inline constexpr auto MORPH_AMOUNT     = "morph_amount";
-    inline constexpr auto SCENE_ENABLED    = "scene_enabled";
-    inline constexpr auto SCENE_POSITION   = "scene_position";
-  #endif
+    // ── Morph crossfader (top-level, always-on) ────────────────────────
+    inline constexpr auto MORPH_AMOUNT             = "morph_amount";
+    inline constexpr auto MORPH_CURVE              = "morph_curve";
+    inline constexpr auto MORPH_A_LEVEL_DB         = "morph_a_level_db";
+    inline constexpr auto MORPH_B_LEVEL_DB         = "morph_b_level_db";
+    inline constexpr auto MORPH_BYPASS_IDLE_ENGINE = "morph_bypass_idle_engine";
+
+    #undef KAIGEN_PER_ENGINE
 }
 
 // ─── Preset amplitude tables — Chebyshev polynomial weights ────────────
@@ -122,60 +93,73 @@ inline constexpr float kStableAmps[7]     = { 1.00f, 0.00f, 0.70f, 0.00f, 0.50f,
 inline constexpr float kWeirdAmps[7]      = { 0.00f, 1.00f, 0.00f, 0.80f, 0.00f, 0.60f, 0.00f };
 
 // ─── ID registry ───────────────────────────────────────────────────────
+/** Flat enumeration of every APVTS param ID. Used for set-membership checks
+ *  (preset migration, smoke tests). The order here is for human readability
+ *  only — it does NOT match `createParameterLayout()`'s emission order
+ *  (which groups A's per-engine block, then B's, then globals + morph).
+ *  Downstream code must not rely on this order being meaningful. */
 inline std::vector<juce::String> getAllParameterIDs()
 {
-    return {
-        ParamID::MODE,
-        ParamID::BYPASS,
-        ParamID::GHOST,
-        ParamID::GHOST_MODE,
-        ParamID::PHANTOM_THRESHOLD,
-        ParamID::PHANTOM_STRENGTH,
-        ParamID::INPUT_GAIN,
-        ParamID::INPUT_GAIN_AUTO,
-        ParamID::OUTPUT_GAIN,
-        ParamID::RECIPE_H2,
-        ParamID::RECIPE_H3,
-        ParamID::RECIPE_H4,
-        ParamID::RECIPE_H5,
-        ParamID::RECIPE_H6,
-        ParamID::RECIPE_H7,
-        ParamID::RECIPE_H8,
-        ParamID::RECIPE_PRESET,
-        ParamID::HARMONIC_SATURATION,
-        ParamID::SYNTH_STEP,
-        ParamID::SYNTH_DUTY,
-        ParamID::SYNTH_SKIP,
-        ParamID::ENV_ATTACK_MS,
-        ParamID::ENV_RELEASE_MS,
-        ParamID::ENV_SOURCE,
-        ParamID::MIDI_TRIGGER_ENABLED,
-        ParamID::MIDI_GATE_RELEASE,
-        ParamID::BINAURAL_MODE,
-        ParamID::BINAURAL_WIDTH,
-        ParamID::STEREO_WIDTH,
-        ParamID::SYNTH_LPF_HZ,
-        ParamID::SYNTH_HPF_HZ,
-        ParamID::SYNTH_FILTER_SLOPE,
-        ParamID::SYNTH_WAVELET_LENGTH,
-        ParamID::SYNTH_GATE_THRESHOLD,
-        ParamID::SYNTH_H1,
-        ParamID::SYNTH_SUB,
-        ParamID::SYNTH_MIN_SAMPLES,
-        ParamID::SYNTH_MAX_SAMPLES,
-        ParamID::TRACKING_SPEED,
-        ParamID::PUNCH_ENABLED,
-        ParamID::PUNCH_AMOUNT,
-        ParamID::SYNTH_BOOST_THRESHOLD,
-        ParamID::SYNTH_BOOST_AMOUNT,
-        ParamID::ADVANCED_OPEN,
-    #ifdef KAIGEN_PRO_BUILD
-        ParamID::MORPH_ENABLED,
-        ParamID::MORPH_AMOUNT,
-        ParamID::SCENE_ENABLED,
-        ParamID::SCENE_POSITION,
-    #endif
-    };
+    std::vector<juce::String> ids;
+    auto addAB = [&](const char* a, const char* b) { ids.push_back(a); ids.push_back(b); };
+
+    addAB(ParamID::A_MODE, ParamID::B_MODE);
+    ids.push_back(ParamID::BYPASS);
+    addAB(ParamID::A_GHOST, ParamID::B_GHOST);
+    addAB(ParamID::A_GHOST_MODE, ParamID::B_GHOST_MODE);
+    addAB(ParamID::A_PHANTOM_THRESHOLD, ParamID::B_PHANTOM_THRESHOLD);
+    addAB(ParamID::A_PHANTOM_STRENGTH, ParamID::B_PHANTOM_STRENGTH);
+    ids.push_back(ParamID::INPUT_GAIN);
+    ids.push_back(ParamID::INPUT_GAIN_AUTO);
+    addAB(ParamID::A_OUTPUT_GAIN, ParamID::B_OUTPUT_GAIN);
+
+    addAB(ParamID::A_RECIPE_H2, ParamID::B_RECIPE_H2);
+    addAB(ParamID::A_RECIPE_H3, ParamID::B_RECIPE_H3);
+    addAB(ParamID::A_RECIPE_H4, ParamID::B_RECIPE_H4);
+    addAB(ParamID::A_RECIPE_H5, ParamID::B_RECIPE_H5);
+    addAB(ParamID::A_RECIPE_H6, ParamID::B_RECIPE_H6);
+    addAB(ParamID::A_RECIPE_H7, ParamID::B_RECIPE_H7);
+    addAB(ParamID::A_RECIPE_H8, ParamID::B_RECIPE_H8);
+    addAB(ParamID::A_RECIPE_PRESET, ParamID::B_RECIPE_PRESET);
+    addAB(ParamID::A_HARMONIC_SATURATION, ParamID::B_HARMONIC_SATURATION);
+
+    addAB(ParamID::A_SYNTH_STEP, ParamID::B_SYNTH_STEP);
+    addAB(ParamID::A_SYNTH_DUTY, ParamID::B_SYNTH_DUTY);
+    addAB(ParamID::A_SYNTH_SKIP, ParamID::B_SYNTH_SKIP);
+
+    addAB(ParamID::A_ENV_ATTACK_MS, ParamID::B_ENV_ATTACK_MS);
+    addAB(ParamID::A_ENV_RELEASE_MS, ParamID::B_ENV_RELEASE_MS);
+    addAB(ParamID::A_ENV_SOURCE, ParamID::B_ENV_SOURCE);
+    addAB(ParamID::A_MIDI_TRIGGER_ENABLED, ParamID::B_MIDI_TRIGGER_ENABLED);
+    addAB(ParamID::A_MIDI_GATE_RELEASE, ParamID::B_MIDI_GATE_RELEASE);
+
+    addAB(ParamID::A_BINAURAL_MODE, ParamID::B_BINAURAL_MODE);
+    addAB(ParamID::A_BINAURAL_WIDTH, ParamID::B_BINAURAL_WIDTH);
+    addAB(ParamID::A_STEREO_WIDTH, ParamID::B_STEREO_WIDTH);
+
+    addAB(ParamID::A_SYNTH_LPF_HZ, ParamID::B_SYNTH_LPF_HZ);
+    addAB(ParamID::A_SYNTH_HPF_HZ, ParamID::B_SYNTH_HPF_HZ);
+    addAB(ParamID::A_SYNTH_FILTER_SLOPE, ParamID::B_SYNTH_FILTER_SLOPE);
+    addAB(ParamID::A_SYNTH_WAVELET_LENGTH, ParamID::B_SYNTH_WAVELET_LENGTH);
+    addAB(ParamID::A_SYNTH_GATE_THRESHOLD, ParamID::B_SYNTH_GATE_THRESHOLD);
+    addAB(ParamID::A_SYNTH_H1, ParamID::B_SYNTH_H1);
+    addAB(ParamID::A_SYNTH_SUB, ParamID::B_SYNTH_SUB);
+    addAB(ParamID::A_SYNTH_MIN_SAMPLES, ParamID::B_SYNTH_MIN_SAMPLES);
+    addAB(ParamID::A_SYNTH_MAX_SAMPLES, ParamID::B_SYNTH_MAX_SAMPLES);
+    addAB(ParamID::A_TRACKING_SPEED, ParamID::B_TRACKING_SPEED);
+    addAB(ParamID::A_PUNCH_ENABLED, ParamID::B_PUNCH_ENABLED);
+    addAB(ParamID::A_PUNCH_AMOUNT, ParamID::B_PUNCH_AMOUNT);
+    addAB(ParamID::A_SYNTH_BOOST_THRESHOLD, ParamID::B_SYNTH_BOOST_THRESHOLD);
+    addAB(ParamID::A_SYNTH_BOOST_AMOUNT, ParamID::B_SYNTH_BOOST_AMOUNT);
+
+    ids.push_back(ParamID::ADVANCED_OPEN);
+    ids.push_back(ParamID::MORPH_AMOUNT);
+    ids.push_back(ParamID::MORPH_CURVE);
+    ids.push_back(ParamID::MORPH_A_LEVEL_DB);
+    ids.push_back(ParamID::MORPH_B_LEVEL_DB);
+    ids.push_back(ParamID::MORPH_BYPASS_IDLE_ENGINE);
+
+    return ids;
 }
 
 inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
@@ -186,190 +170,204 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
 
     std::vector<std::unique_ptr<RangedAudioParameter>> params;
 
-    // ── Mode & Global ─────────────────────────────────────────────────
-    params.push_back(std::make_unique<APC>(
-        ParamID::MODE, "Mode", StringArray{ "Effect", "RESYN" }, 0));
+    // Per-engine params: emitted twice (once for each of A and B) via this lambda.
+    // `prefix` is the param-ID prefix ("a_" or "b_") and `displayPrefix` is the
+    // user-visible display-name prefix ("A. " or "B. ").
+    auto makeEngineParams = [&params](const char* prefix, const char* displayPrefix)
+    {
+        auto pid  = [prefix]       (const char* name)    { return juce::String(prefix)        + name; };
+        auto disp = [displayPrefix](const char* display) { return juce::String(displayPrefix) + display; };
+
+        // ── Mode & Global (per-engine portion) ────────────────────────
+        params.push_back(std::make_unique<APC>(
+            pid("mode"), disp("Mode"), juce::StringArray{ "Effect", "RESYN" }, 0));
+        params.push_back(std::make_unique<APF>(
+            pid("ghost"), disp("Ghost"),
+            juce::NormalisableRange<float>(0.0f, 100.0f), 100.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+        params.push_back(std::make_unique<APC>(
+            pid("ghost_mode"), disp("Ghost Mode"),
+            juce::StringArray{ "Replace", "Combine", "Phantom Only" }, 0));
+        params.push_back(std::make_unique<APF>(
+            pid("phantom_threshold"), disp("Phantom Threshold"),
+            juce::NormalisableRange<float>(20.0f, 20000.0f, 0.0f, 0.25f), 120.0f,
+            juce::AudioParameterFloatAttributes().withLabel("Hz")));
+        params.push_back(std::make_unique<APF>(
+            pid("phantom_strength"), disp("Phantom Strength"),
+            juce::NormalisableRange<float>(0.0f, 100.0f), 80.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+        params.push_back(std::make_unique<APF>(
+            pid("output_gain"), disp("Output Gain"),
+            juce::NormalisableRange<float>(-24.0f, 12.0f), 0.0f,
+            juce::AudioParameterFloatAttributes().withLabel("dB")));
+
+        // ── Recipe Engine (Chebyshev H2..H8) ──────────────────────────
+        const char* ampLogical[7] = {
+            "recipe_h2", "recipe_h3", "recipe_h4",
+            "recipe_h5", "recipe_h6", "recipe_h7", "recipe_h8"
+        };
+        const char* ampNames[7] = { "H2 Amp","H3 Amp","H4 Amp","H5 Amp","H6 Amp","H7 Amp","H8 Amp" };
+        for (int i = 0; i < 7; ++i)
+            params.push_back(std::make_unique<APF>(
+                pid(ampLogical[i]), disp(ampNames[i]),
+                juce::NormalisableRange<float>(0.0f, 100.0f), kStableAmps[i] * 100.0f,
+                juce::AudioParameterFloatAttributes().withLabel("%")));
+
+        params.push_back(std::make_unique<APC>(
+            pid("recipe_preset"), disp("Recipe Preset"),
+            juce::StringArray{ "Warm", "Aggressive", "Hollow", "Dense", "Stable", "Weird", "Custom" }, 4));
+        params.push_back(std::make_unique<APF>(
+            pid("harmonic_saturation"), disp("Harmonic Saturation"),
+            juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+
+        // ── Waveform shape ────────────────────────────────────────────
+        params.push_back(std::make_unique<APF>(
+            pid("synth_step"), disp("Step"),
+            juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+        params.push_back(std::make_unique<APF>(
+            pid("synth_duty"), disp("Duty Cycle"),
+            juce::NormalisableRange<float>(5.0f, 95.0f), 50.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+        params.push_back(std::make_unique<APF>(
+            pid("synth_skip"), disp("Skip"),
+            juce::NormalisableRange<float>(0.0f, 8.0f, 1.0f), 0.0f,
+            juce::AudioParameterFloatAttributes()));
+
+        // ── Envelope Follower ────────────────────────────────────────
+        params.push_back(std::make_unique<APF>(
+            pid("env_attack_ms"), disp("Envelope Attack"),
+            juce::NormalisableRange<float>(0.1f, 2000.0f, 0.0f, 0.3f), 1.0f,
+            juce::AudioParameterFloatAttributes().withLabel("ms")));
+        params.push_back(std::make_unique<APF>(
+            pid("env_release_ms"), disp("Envelope Release"),
+            juce::NormalisableRange<float>(5.0f, 5000.0f, 0.0f, 0.3f), 50.0f,
+            juce::AudioParameterFloatAttributes().withLabel("ms")));
+        params.push_back(std::make_unique<APC>(
+            pid("env_source"), disp("Envelope Source"),
+            juce::StringArray{ "Input", "Sidechain" }, 0));
+        params.push_back(std::make_unique<juce::AudioParameterBool>(
+            pid("midi_trigger_enabled"), disp("MIDI Trigger"), false));
+        params.push_back(std::make_unique<juce::AudioParameterBool>(
+            pid("midi_gate_release"),    disp("MIDI Gate Release"), false));
+
+        // ── Synth Filter ──────────────────────────────────────────────
+        params.push_back(std::make_unique<APF>(
+            pid("synth_lpf_hz"), disp("Synth LPF"),
+            juce::NormalisableRange<float>(200.0f, 20000.0f, 0.0f, 0.3f), 20000.0f,
+            juce::AudioParameterFloatAttributes().withLabel("Hz")));
+        params.push_back(std::make_unique<APF>(
+            pid("synth_hpf_hz"), disp("Synth HPF"),
+            juce::NormalisableRange<float>(20.0f, 2000.0f, 0.0f, 0.3f), 20.0f,
+            juce::AudioParameterFloatAttributes().withLabel("Hz")));
+        params.push_back(std::make_unique<APC>(
+            pid("synth_filter_slope"), disp("Filter Slope"),
+            juce::StringArray{ "-6 dB/oct", "-12 dB/oct", "-24 dB/oct" }, 1));
+
+        // ── RESYN controls ────────────────────────────────────────────
+        params.push_back(std::make_unique<APF>(
+            pid("synth_wavelet_length"), disp("Wavelet Length"),
+            juce::NormalisableRange<float>(5.0f, 100.0f), 100.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+        params.push_back(std::make_unique<APF>(
+            pid("synth_gate_threshold"), disp("Gate Threshold"),
+            juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+        params.push_back(std::make_unique<APF>(
+            pid("synth_h1"), disp("H1 Amp"),
+            juce::NormalisableRange<float>(0.0f, 200.0f), 100.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+        params.push_back(std::make_unique<APF>(
+            pid("synth_sub"), disp("Sub Amp"),
+            juce::NormalisableRange<float>(0.0f, 200.0f), 0.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+
+        // ── Crossing detection ────────────────────────────────────────
+        // Skew 0.35: more resolution at the low end where most useful values live.
+        params.push_back(std::make_unique<APF>(
+            pid("synth_min_samples"), disp("Min Waveset"),
+            juce::NormalisableRange<float>(2.0f, 500.0f, 1.0f, 0.35f), 11.0f,
+            juce::AudioParameterFloatAttributes().withLabel("smp")));
+
+        params.push_back(std::make_unique<APF>(
+            pid("synth_max_samples"), disp("Max Waveset"),
+            juce::NormalisableRange<float>(100.0f, 8000.0f, 1.0f, 0.35f), 5513.0f,
+            juce::AudioParameterFloatAttributes().withLabel("smp")));
+
+        // ── Pitch tracking ────────────────────────────────────────────
+        // Range 0.1–80 maps to alpha 0.001–0.800 (÷1000 in processor).
+        // Skew 0.25: most knob travel covers the slow/glide region.
+        params.push_back(std::make_unique<APF>(
+            pid("tracking_speed"), disp("Tracking Speed"),
+            juce::NormalisableRange<float>(0.1f, 100.0f, 0.0f, 0.25f), 15.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+
+        // ── Punch ─────────────────────────────────────────────────────
+        params.push_back(std::make_unique<juce::AudioParameterBool>(
+            pid("punch_enabled"), disp("Punch"), false));
+        params.push_back(std::make_unique<APF>(
+            pid("punch_amount"), disp("Punch Amount"),
+            juce::NormalisableRange<float>(0.0f, 100.0f), 100.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+        params.push_back(std::make_unique<APF>(
+            pid("synth_boost_threshold"), disp("Boost Threshold"),
+            juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+        params.push_back(std::make_unique<APF>(
+            pid("synth_boost_amount"), disp("Boost Amount"),
+            juce::NormalisableRange<float>(0.0f, 200.0f), 0.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+
+        // ── Binaural ──────────────────────────────────────────────────
+        params.push_back(std::make_unique<APC>(
+            pid("binaural_mode"), disp("Binaural Mode"),
+            juce::StringArray{ "Off", "Spread", "Voice-Split" }, 0));
+        params.push_back(std::make_unique<APF>(
+            pid("binaural_width"), disp("Binaural Width"),
+            juce::NormalisableRange<float>(0.0f, 100.0f), 50.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+
+        // ── Stereo ────────────────────────────────────────────────────
+        params.push_back(std::make_unique<APF>(
+            pid("stereo_width"), disp("Stereo Width"),
+            juce::NormalisableRange<float>(0.0f, 200.0f), 100.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+    };
+
+    makeEngineParams("a_", "A. ");
+    makeEngineParams("b_", "B. ");
+
+    // Global (un-prefixed) ───────────────────────────────────────────────
     params.push_back(std::make_unique<AudioParameterBool>(
         ParamID::BYPASS, "Bypass", false));
-    params.push_back(std::make_unique<APF>(
-        ParamID::GHOST, "Ghost",
-        NormalisableRange<float>(0.0f, 100.0f), 100.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-    params.push_back(std::make_unique<APC>(
-        ParamID::GHOST_MODE, "Ghost Mode",
-        StringArray{ "Replace", "Combine", "Phantom Only" }, 0));
-    params.push_back(std::make_unique<APF>(
-        ParamID::PHANTOM_THRESHOLD, "Phantom Threshold",
-        NormalisableRange<float>(20.0f, 20000.0f, 0.0f, 0.25f), 120.0f,
-        AudioParameterFloatAttributes().withLabel("Hz")));
-    params.push_back(std::make_unique<APF>(
-        ParamID::PHANTOM_STRENGTH, "Phantom Strength",
-        NormalisableRange<float>(0.0f, 100.0f), 80.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
     params.push_back(std::make_unique<APF>(
         ParamID::INPUT_GAIN, "Input Gain",
         NormalisableRange<float>(-12.0f, 24.0f), 0.0f,
         AudioParameterFloatAttributes().withLabel("dB")));
     params.push_back(std::make_unique<AudioParameterBool>(
         ParamID::INPUT_GAIN_AUTO, "Input Auto Gain", false));
-    params.push_back(std::make_unique<APF>(
-        ParamID::OUTPUT_GAIN, "Output Gain",
-        NormalisableRange<float>(-24.0f, 12.0f), 0.0f,
-        AudioParameterFloatAttributes().withLabel("dB")));
-
-    // ── Recipe Engine (Chebyshev H2..H8) ──────────────────────────────
-    const char* ampIDs[7] = {
-        ParamID::RECIPE_H2, ParamID::RECIPE_H3, ParamID::RECIPE_H4,
-        ParamID::RECIPE_H5, ParamID::RECIPE_H6, ParamID::RECIPE_H7, ParamID::RECIPE_H8
-    };
-    const char* ampNames[7] = { "H2 Amp","H3 Amp","H4 Amp","H5 Amp","H6 Amp","H7 Amp","H8 Amp" };
-    for (int i = 0; i < 7; ++i)
-        params.push_back(std::make_unique<APF>(
-            ampIDs[i], ampNames[i],
-            NormalisableRange<float>(0.0f, 100.0f), kStableAmps[i] * 100.0f,
-            AudioParameterFloatAttributes().withLabel("%")));
-
-    params.push_back(std::make_unique<APC>(
-        ParamID::RECIPE_PRESET, "Recipe Preset",
-        StringArray{ "Warm", "Aggressive", "Hollow", "Dense", "Stable", "Weird", "Custom" }, 4));
-    params.push_back(std::make_unique<APF>(
-        ParamID::HARMONIC_SATURATION, "Harmonic Saturation",
-        NormalisableRange<float>(0.0f, 100.0f), 0.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-
-    // ── Waveform shape ────────────────────────────────────────────────────
-    params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_STEP, "Step",
-        NormalisableRange<float>(0.0f, 100.0f), 0.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-    params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_DUTY, "Duty Cycle",
-        NormalisableRange<float>(5.0f, 95.0f), 50.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-    params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_SKIP, "Skip",
-        NormalisableRange<float>(0.0f, 8.0f, 1.0f), 0.0f,
-        AudioParameterFloatAttributes()));
-
-    // ── Envelope Follower ────────────────────────────────────────────
-    params.push_back(std::make_unique<APF>(
-        ParamID::ENV_ATTACK_MS, "Envelope Attack",
-        NormalisableRange<float>(0.1f, 2000.0f, 0.0f, 0.3f), 1.0f,
-        AudioParameterFloatAttributes().withLabel("ms")));
-    params.push_back(std::make_unique<APF>(
-        ParamID::ENV_RELEASE_MS, "Envelope Release",
-        NormalisableRange<float>(5.0f, 5000.0f, 0.0f, 0.3f), 50.0f,
-        AudioParameterFloatAttributes().withLabel("ms")));
-    params.push_back(std::make_unique<APC>(
-        ParamID::ENV_SOURCE, "Envelope Source",
-        StringArray{ "Input", "Sidechain" }, 0));
-    params.push_back(std::make_unique<AudioParameterBool>(
-        ParamID::MIDI_TRIGGER_ENABLED, "MIDI Trigger", false));
-    params.push_back(std::make_unique<AudioParameterBool>(
-        ParamID::MIDI_GATE_RELEASE,    "MIDI Gate Release", false));
-
-    // ── Synth Filter ──────────────────────────────────────────────────
-    params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_LPF_HZ, "Synth LPF",
-        NormalisableRange<float>(200.0f, 20000.0f, 0.0f, 0.3f), 20000.0f,
-        AudioParameterFloatAttributes().withLabel("Hz")));
-    params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_HPF_HZ, "Synth HPF",
-        NormalisableRange<float>(20.0f, 2000.0f, 0.0f, 0.3f), 20.0f,
-        AudioParameterFloatAttributes().withLabel("Hz")));
-    params.push_back(std::make_unique<APC>(
-        ParamID::SYNTH_FILTER_SLOPE, "Filter Slope",
-        StringArray{ "-6 dB/oct", "-12 dB/oct", "-24 dB/oct" }, 1));
-
-    // ── RESYN controls ────────────────────────────────────────────────
-    params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_WAVELET_LENGTH, "Wavelet Length",
-        NormalisableRange<float>(5.0f, 100.0f), 100.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-    params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_GATE_THRESHOLD, "Gate Threshold",
-        NormalisableRange<float>(0.0f, 100.0f), 0.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-    params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_H1, "H1 Amp",
-        NormalisableRange<float>(0.0f, 200.0f), 100.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-    params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_SUB, "Sub Amp",
-        NormalisableRange<float>(0.0f, 200.0f), 0.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-
-    // ── Crossing detection ────────────────────────────────────────────
-    // Skew 0.35: more resolution at the low end where most useful values live.
-    params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_MIN_SAMPLES, "Min Waveset",
-        NormalisableRange<float>(2.0f, 500.0f, 1.0f, 0.35f), 11.0f,
-        AudioParameterFloatAttributes().withLabel("smp")));
-
-    params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_MAX_SAMPLES, "Max Waveset",
-        NormalisableRange<float>(100.0f, 8000.0f, 1.0f, 0.35f), 5513.0f,
-        AudioParameterFloatAttributes().withLabel("smp")));
-
-    // ── Pitch tracking ────────────────────────────────────────────────
-    // Range 0.1–80 maps to alpha 0.001–0.800 (÷1000 in processor).
-    // Skew 0.25: most knob travel covers the slow/glide region.
-    params.push_back(std::make_unique<APF>(
-        ParamID::TRACKING_SPEED, "Tracking Speed",
-        NormalisableRange<float>(0.1f, 100.0f, 0.0f, 0.25f), 15.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-
-    // ── Punch ─────────────────────────────────────────────────────────
-    params.push_back(std::make_unique<AudioParameterBool>(
-        ParamID::PUNCH_ENABLED, "Punch", false));
-    params.push_back(std::make_unique<APF>(
-        ParamID::PUNCH_AMOUNT, "Punch Amount",
-        NormalisableRange<float>(0.0f, 100.0f), 100.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-    params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_BOOST_THRESHOLD, "Boost Threshold",
-        NormalisableRange<float>(0.0f, 100.0f), 0.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-    params.push_back(std::make_unique<APF>(
-        ParamID::SYNTH_BOOST_AMOUNT, "Boost Amount",
-        NormalisableRange<float>(0.0f, 200.0f), 0.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-
-    // ── Binaural ──────────────────────────────────────────────────────
-    params.push_back(std::make_unique<APC>(
-        ParamID::BINAURAL_MODE, "Binaural Mode",
-        StringArray{ "Off", "Spread", "Voice-Split" }, 0));
-    params.push_back(std::make_unique<APF>(
-        ParamID::BINAURAL_WIDTH, "Binaural Width",
-        NormalisableRange<float>(0.0f, 100.0f), 50.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-
-    // ── Stereo ────────────────────────────────────────────────────────
-    params.push_back(std::make_unique<APF>(
-        ParamID::STEREO_WIDTH, "Stereo Width",
-        NormalisableRange<float>(0.0f, 200.0f), 100.0f,
-        AudioParameterFloatAttributes().withLabel("%")));
-
-    // ── Advanced mode toggle ──────────────────────────────────────────────
     params.push_back(std::make_unique<AudioParameterBool>(
         ParamID::ADVANCED_OPEN, "Advanced Panel", false,
         juce::AudioParameterBoolAttributes().withAutomatable(false)));
 
-    // ── Pro Morph (Pro build only) ──────────────────────────────────────────
-  #ifdef KAIGEN_PRO_BUILD
-    params.push_back(std::make_unique<AudioParameterBool>(
-        ParamID::MORPH_ENABLED, "Morph Enabled", false,
-        juce::AudioParameterBoolAttributes().withAutomatable(false)));
+    // Morph crossfader ───────────────────────────────────────────────────
     params.push_back(std::make_unique<APF>(
-        ParamID::MORPH_AMOUNT, "Morph Amount",
+        ParamID::MORPH_AMOUNT, "Morph",
         NormalisableRange<float>(0.0f, 1.0f), 0.0f));
-    params.push_back(std::make_unique<AudioParameterBool>(
-        ParamID::SCENE_ENABLED, "Scene Crossfade Enabled", false,
-        juce::AudioParameterBoolAttributes().withAutomatable(false)));
+    params.push_back(std::make_unique<APC>(
+        ParamID::MORPH_CURVE, "Morph Curve",
+        StringArray{ "Linear", "Eq-Power", "S-Curve" }, 0));
     params.push_back(std::make_unique<APF>(
-        ParamID::SCENE_POSITION, "Scene Position",
-        NormalisableRange<float>(0.0f, 1.0f), 0.0f));
-  #endif
+        ParamID::MORPH_A_LEVEL_DB, "Morph A Level",
+        NormalisableRange<float>(-24.0f, 12.0f), 0.0f,
+        AudioParameterFloatAttributes().withLabel("dB")));
+    params.push_back(std::make_unique<APF>(
+        ParamID::MORPH_B_LEVEL_DB, "Morph B Level",
+        NormalisableRange<float>(-24.0f, 12.0f), 0.0f,
+        AudioParameterFloatAttributes().withLabel("dB")));
+    params.push_back(std::make_unique<AudioParameterBool>(
+        ParamID::MORPH_BYPASS_IDLE_ENGINE, "Morph Bypass Idle Engine", true));
 
     return { params.begin(), params.end() };
 }
