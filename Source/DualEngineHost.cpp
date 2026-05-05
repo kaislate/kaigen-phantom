@@ -52,50 +52,52 @@ void DualEngineHost::syncEngineFromPrefix(PhantomEngine& target, const char* pre
         return apvts.getRawParameterValue(id)->load();
     };
 
-    target.setCrossoverHz    (valueFor("phantom_threshold"));
-    target.setPhantomStrength(valueFor("phantom_strength") / 100.0f);
-    target.setSaturation     (valueFor("harmonic_saturation") / 100.0f);
-    target.setSynthStep      (valueFor("synth_step") / 100.0f);
-    target.setSynthDuty      (valueFor("synth_duty") / 100.0f);
-    target.setSynthSkip      ((int) valueFor("synth_skip"));
-    target.setGhostAmount    (valueFor("ghost") / 100.0f);
-    target.setGhostMode      ((int) valueFor("ghost_mode"));
-    target.setOutputGainDb   (valueFor("output_gain"));
-    target.setEnvelopeAttackMs (valueFor("env_attack_ms"));
-    target.setEnvelopeReleaseMs(valueFor("env_release_ms"));
-    target.setEnvSource      ((int) valueFor("env_source"));
-    target.setBinauralMode   ((int) valueFor("binaural_mode"));
-    target.setBinauralWidth  (valueFor("binaural_width") / 100.0f);
-    target.setStereoWidth    (valueFor("stereo_width") / 100.0f);
-    target.setSynthLPF       (valueFor("synth_lpf_hz"));
-    target.setSynthHPF       (valueFor("synth_hpf_hz"));
+    target.setCrossoverHz    (valueFor(ParamID::LEAF_PHANTOM_THRESHOLD));
+    target.setPhantomStrength(valueFor(ParamID::LEAF_PHANTOM_STRENGTH) / 100.0f);
+    target.setSaturation     (valueFor(ParamID::LEAF_HARMONIC_SATURATION) / 100.0f);
+    target.setSynthStep      (valueFor(ParamID::LEAF_SYNTH_STEP) / 100.0f);
+    target.setSynthDuty      (valueFor(ParamID::LEAF_SYNTH_DUTY) / 100.0f);
+    target.setSynthSkip      ((int) valueFor(ParamID::LEAF_SYNTH_SKIP));
+    target.setGhostAmount    (valueFor(ParamID::LEAF_GHOST) / 100.0f);
+    target.setGhostMode      ((int) valueFor(ParamID::LEAF_GHOST_MODE));
+    target.setOutputGainDb   (valueFor(ParamID::LEAF_OUTPUT_GAIN));
+    target.setEnvelopeAttackMs (valueFor(ParamID::LEAF_ENV_ATTACK_MS));
+    target.setEnvelopeReleaseMs(valueFor(ParamID::LEAF_ENV_RELEASE_MS));
+    target.setEnvSource      ((int) valueFor(ParamID::LEAF_ENV_SOURCE));
+    target.setBinauralMode   ((int) valueFor(ParamID::LEAF_BINAURAL_MODE));
+    target.setBinauralWidth  (valueFor(ParamID::LEAF_BINAURAL_WIDTH) / 100.0f);
+    target.setStereoWidth    (valueFor(ParamID::LEAF_STEREO_WIDTH) / 100.0f);
+    target.setSynthLPF       (valueFor(ParamID::LEAF_SYNTH_LPF_HZ));
+    target.setSynthHPF       (valueFor(ParamID::LEAF_SYNTH_HPF_HZ));
     {
-        const int idx = (int) valueFor("synth_filter_slope");
+        const int idx = (int) valueFor(ParamID::LEAF_SYNTH_FILTER_SLOPE);
         const int dBPerOct = (idx == 0) ? 6 : (idx == 2) ? 24 : 12;
         target.setSynthFilterSlope(dBPerOct);
     }
 
-    static const char* hLeaves[7] = {
-        "recipe_h2","recipe_h3","recipe_h4","recipe_h5","recipe_h6","recipe_h7","recipe_h8"
+    static constexpr const char* hLeaves[7] = {
+        ParamID::LEAF_RECIPE_H2, ParamID::LEAF_RECIPE_H3, ParamID::LEAF_RECIPE_H4,
+        ParamID::LEAF_RECIPE_H5, ParamID::LEAF_RECIPE_H6, ParamID::LEAF_RECIPE_H7,
+        ParamID::LEAF_RECIPE_H8
     };
     std::array<float, 7> amps;
     for (int i = 0; i < 7; ++i) amps[(size_t) i] = valueFor(hLeaves[i]) / 100.0f;
     target.setHarmonicAmplitudes(amps);
 
-    target.setSynthMode      ((int) valueFor("mode"));
-    target.setWaveletLength  (valueFor("synth_wavelet_length") / 100.0f);
-    target.setGateThreshold  (valueFor("synth_gate_threshold") / 100.0f);
-    target.setH1Amplitude    (valueFor("synth_h1") / 100.0f);
-    target.setSubAmplitude   (valueFor("synth_sub") / 100.0f);
-    target.setMinPeriodSamples(valueFor("synth_min_samples"));
-    target.setMaxPeriodSamples(valueFor("synth_max_samples"));
-    target.setTrackingSpeed  (valueFor("tracking_speed") / 100.0f);
-    target.setUsePunch       (valueFor("punch_enabled") > 0.5f);
-    target.setPunchAmount    (valueFor("punch_amount") / 100.0f);
-    target.setBoostThreshold (valueFor("synth_boost_threshold") / 100.0f);
-    target.setBoostAmount    (valueFor("synth_boost_amount") / 100.0f);
-    target.setMidiTriggerEnabled(valueFor("midi_trigger_enabled") > 0.5f);
-    target.setMidiGateRelease(valueFor("midi_gate_release")    > 0.5f);
+    target.setSynthMode      ((int) valueFor(ParamID::LEAF_MODE));
+    target.setWaveletLength  (valueFor(ParamID::LEAF_SYNTH_WAVELET_LENGTH) / 100.0f);
+    target.setGateThreshold  (valueFor(ParamID::LEAF_SYNTH_GATE_THRESHOLD) / 100.0f);
+    target.setH1Amplitude    (valueFor(ParamID::LEAF_SYNTH_H1) / 100.0f);
+    target.setSubAmplitude   (valueFor(ParamID::LEAF_SYNTH_SUB) / 100.0f);
+    target.setMinPeriodSamples(valueFor(ParamID::LEAF_SYNTH_MIN_SAMPLES));
+    target.setMaxPeriodSamples(valueFor(ParamID::LEAF_SYNTH_MAX_SAMPLES));
+    target.setTrackingSpeed  (valueFor(ParamID::LEAF_TRACKING_SPEED) / 100.0f);
+    target.setUsePunch       (valueFor(ParamID::LEAF_PUNCH_ENABLED) > 0.5f);
+    target.setPunchAmount    (valueFor(ParamID::LEAF_PUNCH_AMOUNT) / 100.0f);
+    target.setBoostThreshold (valueFor(ParamID::LEAF_SYNTH_BOOST_THRESHOLD) / 100.0f);
+    target.setBoostAmount    (valueFor(ParamID::LEAF_SYNTH_BOOST_AMOUNT) / 100.0f);
+    target.setMidiTriggerEnabled(valueFor(ParamID::LEAF_MIDI_TRIGGER_ENABLED) > 0.5f);
+    target.setMidiGateRelease(valueFor(ParamID::LEAF_MIDI_GATE_RELEASE)    > 0.5f);
 }
 
 void DualEngineHost::process(juce::AudioBuffer<float>& buffer,

@@ -3,72 +3,73 @@
 
 namespace ParamID
 {
-    #define KAIGEN_PER_ENGINE(LOGICAL) \
-        inline constexpr auto A_##LOGICAL = "a_" #LOGICAL; \
-        inline constexpr auto B_##LOGICAL = "b_" #LOGICAL;
+    #define KAIGEN_PER_ENGINE(IDENT, STR_LEAF)                            \
+        inline constexpr auto A_##IDENT    = "a_" STR_LEAF;               \
+        inline constexpr auto B_##IDENT    = "b_" STR_LEAF;               \
+        inline constexpr auto LEAF_##IDENT = STR_LEAF;
 
     // ── Mode & Global ─────────────────────────────────────────────────
-    KAIGEN_PER_ENGINE(MODE)
+    KAIGEN_PER_ENGINE(MODE, "mode")
     inline constexpr auto BYPASS             = "bypass";       // global
-    KAIGEN_PER_ENGINE(GHOST)
-    KAIGEN_PER_ENGINE(GHOST_MODE)
-    KAIGEN_PER_ENGINE(PHANTOM_THRESHOLD)
-    KAIGEN_PER_ENGINE(PHANTOM_STRENGTH)
+    KAIGEN_PER_ENGINE(GHOST, "ghost")
+    KAIGEN_PER_ENGINE(GHOST_MODE, "ghost_mode")
+    KAIGEN_PER_ENGINE(PHANTOM_THRESHOLD, "phantom_threshold")
+    KAIGEN_PER_ENGINE(PHANTOM_STRENGTH, "phantom_strength")
     inline constexpr auto INPUT_GAIN         = "input_gain";       // global
     inline constexpr auto INPUT_GAIN_AUTO    = "input_gain_auto";  // global
-    KAIGEN_PER_ENGINE(OUTPUT_GAIN)
+    KAIGEN_PER_ENGINE(OUTPUT_GAIN, "output_gain")
 
     // ── Recipe Engine ──────────────────────────────────────────────────
-    KAIGEN_PER_ENGINE(RECIPE_H2)
-    KAIGEN_PER_ENGINE(RECIPE_H3)
-    KAIGEN_PER_ENGINE(RECIPE_H4)
-    KAIGEN_PER_ENGINE(RECIPE_H5)
-    KAIGEN_PER_ENGINE(RECIPE_H6)
-    KAIGEN_PER_ENGINE(RECIPE_H7)
-    KAIGEN_PER_ENGINE(RECIPE_H8)
-    KAIGEN_PER_ENGINE(RECIPE_PRESET)
-    KAIGEN_PER_ENGINE(HARMONIC_SATURATION)
+    KAIGEN_PER_ENGINE(RECIPE_H2, "recipe_h2")
+    KAIGEN_PER_ENGINE(RECIPE_H3, "recipe_h3")
+    KAIGEN_PER_ENGINE(RECIPE_H4, "recipe_h4")
+    KAIGEN_PER_ENGINE(RECIPE_H5, "recipe_h5")
+    KAIGEN_PER_ENGINE(RECIPE_H6, "recipe_h6")
+    KAIGEN_PER_ENGINE(RECIPE_H7, "recipe_h7")
+    KAIGEN_PER_ENGINE(RECIPE_H8, "recipe_h8")
+    KAIGEN_PER_ENGINE(RECIPE_PRESET, "recipe_preset")
+    KAIGEN_PER_ENGINE(HARMONIC_SATURATION, "harmonic_saturation")
 
     // ── Waveform shape ────────────────────────────────────────────────
-    KAIGEN_PER_ENGINE(SYNTH_STEP)
-    KAIGEN_PER_ENGINE(SYNTH_DUTY)
-    KAIGEN_PER_ENGINE(SYNTH_SKIP)
+    KAIGEN_PER_ENGINE(SYNTH_STEP, "synth_step")
+    KAIGEN_PER_ENGINE(SYNTH_DUTY, "synth_duty")
+    KAIGEN_PER_ENGINE(SYNTH_SKIP, "synth_skip")
 
     // ── Envelope Follower ─────────────────────────────────────────────
-    KAIGEN_PER_ENGINE(ENV_ATTACK_MS)
-    KAIGEN_PER_ENGINE(ENV_RELEASE_MS)
-    KAIGEN_PER_ENGINE(ENV_SOURCE)
+    KAIGEN_PER_ENGINE(ENV_ATTACK_MS, "env_attack_ms")
+    KAIGEN_PER_ENGINE(ENV_RELEASE_MS, "env_release_ms")
+    KAIGEN_PER_ENGINE(ENV_SOURCE, "env_source")
 
     // ── Binaural ──────────────────────────────────────────────────────
-    KAIGEN_PER_ENGINE(BINAURAL_MODE)
-    KAIGEN_PER_ENGINE(BINAURAL_WIDTH)
+    KAIGEN_PER_ENGINE(BINAURAL_MODE, "binaural_mode")
+    KAIGEN_PER_ENGINE(BINAURAL_WIDTH, "binaural_width")
 
     // ── Stereo ────────────────────────────────────────────────────────
-    KAIGEN_PER_ENGINE(STEREO_WIDTH)
+    KAIGEN_PER_ENGINE(STEREO_WIDTH, "stereo_width")
 
     // ── Synth Filter ──────────────────────────────────────────────────
-    KAIGEN_PER_ENGINE(SYNTH_FILTER_SLOPE)
-    KAIGEN_PER_ENGINE(SYNTH_LPF_HZ)
-    KAIGEN_PER_ENGINE(SYNTH_HPF_HZ)
+    KAIGEN_PER_ENGINE(SYNTH_FILTER_SLOPE, "synth_filter_slope")
+    KAIGEN_PER_ENGINE(SYNTH_LPF_HZ, "synth_lpf_hz")
+    KAIGEN_PER_ENGINE(SYNTH_HPF_HZ, "synth_hpf_hz")
 
     // ── RESYN (WaveletSynth) ──────────────────────────────────────────
-    KAIGEN_PER_ENGINE(SYNTH_WAVELET_LENGTH)
-    KAIGEN_PER_ENGINE(SYNTH_GATE_THRESHOLD)
-    KAIGEN_PER_ENGINE(SYNTH_H1)
-    KAIGEN_PER_ENGINE(SYNTH_SUB)
+    KAIGEN_PER_ENGINE(SYNTH_WAVELET_LENGTH, "synth_wavelet_length")
+    KAIGEN_PER_ENGINE(SYNTH_GATE_THRESHOLD, "synth_gate_threshold")
+    KAIGEN_PER_ENGINE(SYNTH_H1, "synth_h1")
+    KAIGEN_PER_ENGINE(SYNTH_SUB, "synth_sub")
 
     // ── Crossing detection / pitch ────────────────────────────────────
-    KAIGEN_PER_ENGINE(SYNTH_MIN_SAMPLES)
-    KAIGEN_PER_ENGINE(SYNTH_MAX_SAMPLES)
-    KAIGEN_PER_ENGINE(TRACKING_SPEED)
-    KAIGEN_PER_ENGINE(PUNCH_ENABLED)
-    KAIGEN_PER_ENGINE(PUNCH_AMOUNT)
-    KAIGEN_PER_ENGINE(SYNTH_BOOST_THRESHOLD)
-    KAIGEN_PER_ENGINE(SYNTH_BOOST_AMOUNT)
+    KAIGEN_PER_ENGINE(SYNTH_MIN_SAMPLES, "synth_min_samples")
+    KAIGEN_PER_ENGINE(SYNTH_MAX_SAMPLES, "synth_max_samples")
+    KAIGEN_PER_ENGINE(TRACKING_SPEED, "tracking_speed")
+    KAIGEN_PER_ENGINE(PUNCH_ENABLED, "punch_enabled")
+    KAIGEN_PER_ENGINE(PUNCH_AMOUNT, "punch_amount")
+    KAIGEN_PER_ENGINE(SYNTH_BOOST_THRESHOLD, "synth_boost_threshold")
+    KAIGEN_PER_ENGINE(SYNTH_BOOST_AMOUNT, "synth_boost_amount")
 
     // ── MIDI triggering ───────────────────────────────────────────────
-    KAIGEN_PER_ENGINE(MIDI_TRIGGER_ENABLED)
-    KAIGEN_PER_ENGINE(MIDI_GATE_RELEASE)
+    KAIGEN_PER_ENGINE(MIDI_TRIGGER_ENABLED, "midi_trigger_enabled")
+    KAIGEN_PER_ENGINE(MIDI_GATE_RELEASE, "midi_gate_release")
 
     // ── Advanced UI toggle (global; UI-only) ───────────────────────────
     inline constexpr auto ADVANCED_OPEN = "advanced_open";
