@@ -60,6 +60,7 @@ target_sources(KaigenPhantom PRIVATE
 target_compile_definitions(KaigenPhantom PRIVATE KAIGEN_PRO_BUILD=1)
 target_sources(KaigenPhantom PRIVATE
     Source/MorphEngine.cpp
+    Source/MorphCrossfader.cpp
 )
 
 juce_add_binary_data(PhantomWebUI SOURCES
