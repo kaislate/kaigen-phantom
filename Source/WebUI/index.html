@@ -333,6 +333,75 @@
         </div>
       </div>
     </div>
+
+    <!-- Bottom modulation panel (PR3b: macros only; LFO/Random slots are
+         placeholders until PR4/5). Drawer slides up above this row when
+         a slot is clicked. -->
+    <div id="modulation-panel" class="modulation-panel" aria-label="Modulation panel">
+      <div id="modulation-drawer" class="modulation-drawer" aria-hidden="true"></div>
+      <div class="modulation-row" role="tablist">
+        <!-- Engine A side -->
+        <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo1" disabled
+                title="LFO 1 (PR4)" aria-disabled="true">
+          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-name">LFO 1</span>
+        </button>
+        <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo2" disabled
+                title="LFO 2 (PR4)" aria-disabled="true">
+          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-name">LFO 2</span>
+        </button>
+        <button class="mod-slot mod-slot-random" data-slot-type="random" data-slot-id="randomA" disabled
+                title="Random A (PR5)" aria-disabled="true">
+          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-name">RAND</span>
+        </button>
+        <button class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro1"
+                title="Macro 1">
+          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-name">MAC 1</span>
+        </button>
+        <button class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro2"
+                title="Macro 2">
+          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-name">MAC 2</span>
+        </button>
+
+        <!-- Center morph slot (placeholder; existing morph slider is the canonical control) -->
+        <button class="mod-slot mod-slot-morph" data-slot-type="morph" data-slot-id="morph"
+                title="Morph (use existing slider)" aria-disabled="true" disabled>
+          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-name">MORPH</span>
+        </button>
+
+        <!-- Engine B side -->
+        <button class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro3"
+                title="Macro 3">
+          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-name">MAC 3</span>
+        </button>
+        <button class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro4"
+                title="Macro 4">
+          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-name">MAC 4</span>
+        </button>
+        <button class="mod-slot mod-slot-random" data-slot-type="random" data-slot-id="randomB" disabled
+                title="Random B (PR5)" aria-disabled="true">
+          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-name">RAND</span>
+        </button>
+        <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo3" disabled
+                title="LFO 3 (PR4)" aria-disabled="true">
+          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-name">LFO 3</span>
+        </button>
+        <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo4" disabled
+                title="LFO 4 (PR4)" aria-disabled="true">
+          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-name">LFO 4</span>
+        </button>
+      </div>
+    </div>
   </div>
 <div id="settings-overlay" class="settings-overlay hidden">
   <div class="settings-backdrop"></div>

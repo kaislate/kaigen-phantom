@@ -718,3 +718,92 @@ phantom-knob.mode-inactive{
     font-size: 11px; color: rgba(255,255,255,0.75);
     min-width: 40px; text-align: right;
 }
+
+/* ═══ BOTTOM MODULATION PANEL (PR3b) ═══ */
+.modulation-panel {
+  position: relative;
+  background: rgba(14, 17, 22, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.modulation-drawer {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 220ms ease-out;
+  background: rgba(20, 24, 30, 0.98);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.modulation-drawer.is-open {
+  max-height: 220px;
+}
+
+.modulation-row {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  gap: 6px;
+  padding: 8px 12px;
+}
+
+.mod-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 6px;
+  background: rgba(31, 36, 44, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 120ms, border-color 120ms;
+}
+.mod-slot[disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.mod-slot:not([disabled]):hover {
+  background: rgba(40, 46, 56, 0.7);
+}
+.mod-slot.is-active {
+  background: rgba(40, 60, 84, 0.6);
+  border-color: rgba(93, 211, 224, 0.55);
+  box-shadow: 0 0 8px rgba(93, 211, 224, 0.3);
+}
+
+.mod-slot-dot {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #444 30%, #1f242c 70%);
+  border: 2px solid #555;
+  box-shadow: 0 0 0 transparent;
+  transition: box-shadow 120ms;
+}
+.mod-slot-macro .mod-slot-dot {
+  background: radial-gradient(circle, #5DD3E0 30%, #1f242c 70%);
+  border: 2px solid #5DD3E0;
+  box-shadow: 0 0 6px rgba(93, 211, 224, 0.5);
+}
+.mod-slot-lfo .mod-slot-dot {
+  background: radial-gradient(circle, #4A90E2 30%, #1f242c 70%);
+  border: 2px solid #4A90E2;
+}
+.mod-slot-random .mod-slot-dot {
+  background: radial-gradient(circle, #6B5DC9 30%, #1f242c 70%);
+  border: 2px solid #6B5DC9;
+}
+.mod-slot-morph .mod-slot-dot {
+  background: radial-gradient(circle at 35% 35%, #fafaff 10%, #b8b8c4 50%, #4a4d54 80%);
+  border: 2px solid #EFEFF2;
+  box-shadow: 0 0 8px rgba(239, 239, 242, 0.5);
+}
+
+.mod-slot-name {
+  font: 700 9px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 1px;
+  color: #6a7a8a;
+}
+.mod-slot-macro .mod-slot-name { color: #5DD3E0; }
+.mod-slot-lfo .mod-slot-name { color: #4A90E2; }
+.mod-slot-random .mod-slot-name { color: #9990E0; }
+.mod-slot-morph .mod-slot-name { color: #EFEFF2; }
