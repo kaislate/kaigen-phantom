@@ -231,8 +231,17 @@ juce::ValueTree ABSlotManager::buildPresetSlotBChild() const
 
 const juce::StringArray& ABSlotManager::discreteParamIDs()
 {
-    static const juce::StringArray ids { ParamID::MODE, ParamID::BYPASS,
-                                         ParamID::GHOST_MODE, ParamID::BINAURAL_MODE };
+    // PR1: per-engine discrete params are namespaced (a_/b_); BYPASS remains global.
+    // ABSlotManager itself is on the deletion list for PR1 Task 8 — this update
+    // exists only so the file keeps compiling while PluginProcessor finishes
+    // detaching from it. PresetManager (which still uses ABSlotManager today)
+    // will be untangled in Task 8 alongside the deletion.
+    static const juce::StringArray ids {
+        ParamID::A_MODE,         ParamID::B_MODE,
+        ParamID::BYPASS,
+        ParamID::A_GHOST_MODE,   ParamID::B_GHOST_MODE,
+        ParamID::A_BINAURAL_MODE, ParamID::B_BINAURAL_MODE
+    };
     return ids;
 }
 

@@ -1,6 +1,7 @@
 #include "PresetManager.h"
 #include "ABSlotManager.h"
 #include "Parameters.h"
+#include "PresetMigration.h"
 #include <juce_core/juce_core.h>
 
 namespace kaigen::phantom
@@ -132,10 +133,19 @@ PreviewData PresetManager::readPreviewFromState(const juce::ValueTree& state)
 {
     PreviewData data;
 
-    static const juce::String paramIds[7] = {
-        ParamID::RECIPE_H2, ParamID::RECIPE_H3, ParamID::RECIPE_H4,
-        ParamID::RECIPE_H5, ParamID::RECIPE_H6, ParamID::RECIPE_H7,
-        ParamID::RECIPE_H8,
+    // PR1: preset preview shows engine A's harmonics. Per-engine PARAM ids are
+    // prefixed (a_*); legacy un-prefixed ids are also accepted so old preset
+    // files render correctly in the browser before being explicitly loaded
+    // (which is the point at which migration formally rewrites them).
+    static const juce::String paramIdsA[7] = {
+        ParamID::A_RECIPE_H2, ParamID::A_RECIPE_H3, ParamID::A_RECIPE_H4,
+        ParamID::A_RECIPE_H5, ParamID::A_RECIPE_H6, ParamID::A_RECIPE_H7,
+        ParamID::A_RECIPE_H8,
+    };
+    static const juce::String legacyIds[7] = {
+        ParamID::LEAF_RECIPE_H2, ParamID::LEAF_RECIPE_H3, ParamID::LEAF_RECIPE_H4,
+        ParamID::LEAF_RECIPE_H5, ParamID::LEAF_RECIPE_H6, ParamID::LEAF_RECIPE_H7,
+        ParamID::LEAF_RECIPE_H8,
     };
 
     // APVTS serializes each parameter as a <PARAM id="..." value="..."/> child.
@@ -148,13 +158,13 @@ PreviewData PresetManager::readPreviewFromState(const juce::ValueTree& state)
         const auto id = child.getProperty("id").toString();
         const auto value = (float) (double) child.getProperty("value", 0.0);
 
-        if (id == ParamID::PHANTOM_THRESHOLD)
+        if (id == ParamID::A_PHANTOM_THRESHOLD || id == ParamID::LEAF_PHANTOM_THRESHOLD)
         {
             data.crossover = value;
             continue;
         }
 
-        if (id == ParamID::SYNTH_SKIP)
+        if (id == ParamID::A_SYNTH_SKIP || id == ParamID::LEAF_SYNTH_SKIP)
         {
             // APVTS stores this as a stepped float; round and clamp to the valid 0..8 range
             // so corrupted or out-of-range presets still render safely.
@@ -164,7 +174,7 @@ PreviewData PresetManager::readPreviewFromState(const juce::ValueTree& state)
 
         for (int h = 0; h < 7; ++h)
         {
-            if (id == paramIds[h])
+            if (id == paramIdsA[h] || id == legacyIds[h])
             {
                 // APVTS stores recipe_h* as 0..100 (percent); normalize to 0..1
                 // so consumers treat PreviewData.h[] uniformly on a 0..1 scale.
@@ -333,6 +343,12 @@ bool PresetManager::loadPreset(juce::AudioProcessorValueTreeState& apvts,
     auto tree = juce::ValueTree::fromXml(*xml);
     if (!tree.isValid()) return false;
 
+    // Run preset migration. Pre-PR1 presets had un-prefixed per-engine PARAM
+    // ids and may carry <SlotB> / <MorphConfig> children — migration rewrites
+    // them in place to the new dual-engine format. Idempotent on already-new
+    // presets, so safe to run unconditionally.
+    PresetMigration::migrateInPlace(tree);
+
     // Accept trees tagged with the APVTS state type OR a plain state tree;
     // we replace wholesale, and the Metadata child is carried along.
     if (tree.getType() != apvts.state.getType())
@@ -355,6 +371,12 @@ bool PresetManager::loadPresetInto(ABSlotManager& abSlots,
 
     auto tree = juce::ValueTree::fromXml(*xml);
     if (!tree.isValid()) return false;
+
+    // Run migration on legacy presets (un-prefixed PARAMs, <SlotB>, <MorphConfig>).
+    // After migration, slot B's harmonics are available as b_* PARAMs in the
+    // root tree (same shape as a fresh save), so we infer kind from the
+    // post-migration tree. Idempotent on already-new presets.
+    PresetMigration::migrateInPlace(tree);
 
     // Determine kind: prefer explicit metadata prop; else infer from SlotB presence.
     PresetKind kind = PresetKind::Single;

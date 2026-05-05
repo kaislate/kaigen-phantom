@@ -180,3 +180,51 @@ TEST_CASE("PresetMigration: legacy state with both SlotB and MorphConfig clears 
     REQUIRE_FALSE(state.getChildWithName("SlotB").isValid());
     REQUIRE_FALSE(state.getChildWithName("MorphConfig").isValid());
 }
+
+TEST_CASE("PresetMigration: root-is-APVTS legacy state migrates correctly", "[migration]")
+{
+    // Pre-PR1 production format: APVTS state was written at the root, no
+    // <PluginState> wrapper, no <APVTSState> child. PARAM children are
+    // direct children of the root.
+    juce::ValueTree state("PHANTOM_STATE");
+
+    auto addParam = [&](const juce::String& id, float value) {
+        juce::ValueTree p("PARAM");
+        p.setProperty("id", id, nullptr);
+        p.setProperty("value", value, nullptr);
+        state.appendChild(p, nullptr);
+    };
+
+    addParam("mode", 1.0f);
+    addParam("ghost", 50.0f);
+    addParam("recipe_h2", 80.0f);
+    addParam("bypass", 0.0f);
+
+    REQUIRE(PresetMigration::isLegacy(state));
+    PresetMigration::migrateInPlace(state);
+
+    auto findParam = [&](const juce::String& id) -> juce::ValueTree {
+        for (int i = 0; i < state.getNumChildren(); ++i) {
+            auto c = state.getChild(i);
+            if (c.hasType("PARAM") && c.getProperty("id").toString() == id) return c;
+        }
+        return {};
+    };
+
+    // a_* renamed and b_* mirrored
+    REQUIRE(findParam("a_ghost").isValid());
+    REQUIRE((float) findParam("a_ghost").getProperty("value") == 50.0f);
+    REQUIRE(findParam("b_ghost").isValid());
+    REQUIRE((float) findParam("b_ghost").getProperty("value") == 50.0f);
+
+    REQUIRE(findParam("a_recipe_h2").isValid());
+    REQUIRE(findParam("b_recipe_h2").isValid());
+
+    // Globals stay un-prefixed
+    REQUIRE(findParam("bypass").isValid());
+    REQUIRE_FALSE(findParam("a_bypass").isValid());
+
+    // No SlotB/MorphConfig artifacts
+    REQUIRE_FALSE(state.getChildWithName("SlotB").isValid());
+    REQUIRE_FALSE(state.getChildWithName("MorphConfig").isValid());
+}

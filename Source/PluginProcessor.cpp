@@ -1,35 +1,26 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "PresetMigration.h"
 
 PhantomProcessor::PhantomProcessor()
     : AudioProcessor(BusesProperties()
         .withInput ("Input",     juce::AudioChannelSet::stereo(), true)
         .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)
         .withOutput("Output",    juce::AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "PHANTOM_STATE", makeLayout())
+      apvts(*this, nullptr, "PHANTOM_STATE", makeLayout()),
+      dualEngineHost(apvts)
 {
-    apvts.addParameterListener(ParamID::RECIPE_PRESET, this);
+    // The Recipe Preset selector is per-engine: subscribe to both so picking a
+    // preset from either tab populates that engine's harmonic amps.
+    apvts.addParameterListener(ParamID::A_RECIPE_PRESET, this);
+    apvts.addParameterListener(ParamID::B_RECIPE_PRESET, this);
     presetManager.initialize();
-
-  #ifdef KAIGEN_PRO_BUILD
-    // Constructed here (not in the initializer list) so the capture of `this`
-    // is valid — apvts, abSlots, and engine are all fully constructed by now.
-    // MorphEngine takes a sync callable that accepts an engine + a value-lookup
-    // function. For Scene Crossfade, MorphEngine builds the lookup from slot B's
-    // ValueTree so the secondary engine can be driven without swapping APVTS state
-    // (which previously caused UI flicker as the primary knobs briefly reflected
-    // slot B's values during the swap window).
-    morphOpt.emplace(apvts, abSlots, engine,
-        [this](PhantomEngine& target, std::function<float(const char*)> valueFor)
-        {
-            syncEngineFromValueLookup(target, valueFor);
-        });
-  #endif
 }
 
 PhantomProcessor::~PhantomProcessor()
 {
-    apvts.removeParameterListener(ParamID::RECIPE_PRESET, this);
+    apvts.removeParameterListener(ParamID::A_RECIPE_PRESET, this);
+    apvts.removeParameterListener(ParamID::B_RECIPE_PRESET, this);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout PhantomProcessor::makeLayout()
@@ -40,7 +31,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout PhantomProcessor::makeLayout
 void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
 {
     sampleRate = sr;
-    engine.prepare(sr, samplesPerBlock, 2);
+    // Engines only ever process the main stereo bus; sidechain is read
+    // separately and passed as a parameter to process(). Match the prior
+    // behavior of hardcoding 2 here so sidechain configurations don't
+    // silently double internal-buffer memory in both engines.
+    dualEngineHost.prepareToPlay(sr, samplesPerBlock, 2);
 
     // Auto input gain coefficients.
     // Per-sample rates converted to per-block by raising (1-alpha) to the power of blockSize,
@@ -64,11 +59,6 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
     fftBuffer.fill(0.0f);
     spectrumData.fill(0.0f);
     spectrumReady.store(false);
-
-    #ifdef KAIGEN_PRO_BUILD
-    if (morphOpt.has_value())
-        morphOpt->prepareToPlay(sr, samplesPerBlock);
-    #endif
 }
 
 void PhantomProcessor::releaseResources() {}
@@ -85,64 +75,6 @@ bool PhantomProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 
     // Input must match output (stereo→stereo or mono→mono)
     return mainIn == mainOut;
-}
-
-void PhantomProcessor::syncParamsToEngine(PhantomEngine& target)
-{
-    syncEngineFromValueLookup(target, [this](const char* id)
-    {
-        return apvts.getRawParameterValue(id)->load();
-    });
-}
-
-void PhantomProcessor::syncEngineFromValueLookup(PhantomEngine& target,
-                                                 std::function<float(const char*)> valueFor)
-{
-    target.setCrossoverHz    (valueFor(ParamID::PHANTOM_THRESHOLD));
-    target.setPhantomStrength(valueFor(ParamID::PHANTOM_STRENGTH) / 100.0f);
-    target.setSaturation     (valueFor(ParamID::HARMONIC_SATURATION) / 100.0f);
-    target.setSynthStep      (valueFor(ParamID::SYNTH_STEP) / 100.0f);
-    target.setSynthDuty      (valueFor(ParamID::SYNTH_DUTY) / 100.0f);
-    target.setSynthSkip      ((int) valueFor(ParamID::SYNTH_SKIP));
-    target.setGhostAmount  (valueFor(ParamID::GHOST) / 100.0f);
-    target.setGhostMode    ((int) valueFor(ParamID::GHOST_MODE));
-    target.setOutputGainDb (valueFor(ParamID::OUTPUT_GAIN));
-    target.setEnvelopeAttackMs (valueFor(ParamID::ENV_ATTACK_MS));
-    target.setEnvelopeReleaseMs(valueFor(ParamID::ENV_RELEASE_MS));
-    target.setEnvSource((int) valueFor(ParamID::ENV_SOURCE));
-    target.setBinauralMode ((int) valueFor(ParamID::BINAURAL_MODE));
-    target.setBinauralWidth(valueFor(ParamID::BINAURAL_WIDTH) / 100.0f);
-    target.setStereoWidth  (valueFor(ParamID::STEREO_WIDTH) / 100.0f);
-    target.setSynthLPF(valueFor(ParamID::SYNTH_LPF_HZ));
-    target.setSynthHPF(valueFor(ParamID::SYNTH_HPF_HZ));
-    {
-        const int idx = (int) valueFor(ParamID::SYNTH_FILTER_SLOPE);
-        const int dBPerOct = (idx == 0) ? 6 : (idx == 2) ? 24 : 12;
-        target.setSynthFilterSlope(dBPerOct);
-    }
-
-    static const char* hIds[7] = {
-        ParamID::RECIPE_H2, ParamID::RECIPE_H3, ParamID::RECIPE_H4,
-        ParamID::RECIPE_H5, ParamID::RECIPE_H6, ParamID::RECIPE_H7, ParamID::RECIPE_H8
-    };
-    std::array<float, 7> amps;
-    for (int i = 0; i < 7; ++i)
-        amps[(size_t) i] = valueFor(hIds[i]) / 100.0f;
-    target.setHarmonicAmplitudes(amps);
-    target.setSynthMode((int) valueFor(ParamID::MODE));
-    target.setWaveletLength(valueFor(ParamID::SYNTH_WAVELET_LENGTH) / 100.0f);
-    target.setGateThreshold(valueFor(ParamID::SYNTH_GATE_THRESHOLD) / 100.0f);
-    target.setH1Amplitude  (valueFor(ParamID::SYNTH_H1) / 100.0f);
-    target.setSubAmplitude (valueFor(ParamID::SYNTH_SUB) / 100.0f);
-    target.setMinPeriodSamples(valueFor(ParamID::SYNTH_MIN_SAMPLES));
-    target.setMaxPeriodSamples(valueFor(ParamID::SYNTH_MAX_SAMPLES));
-    target.setTrackingSpeed(valueFor(ParamID::TRACKING_SPEED) / 100.0f);
-    target.setUsePunch     (valueFor(ParamID::PUNCH_ENABLED) > 0.5f);
-    target.setPunchAmount  (valueFor(ParamID::PUNCH_AMOUNT) / 100.0f);
-    target.setBoostThreshold(valueFor(ParamID::SYNTH_BOOST_THRESHOLD) / 100.0f);
-    target.setBoostAmount   (valueFor(ParamID::SYNTH_BOOST_AMOUNT) / 100.0f);
-    target.setMidiTriggerEnabled(valueFor(ParamID::MIDI_TRIGGER_ENABLED) > 0.5f);
-    target.setMidiGateRelease   (valueFor(ParamID::MIDI_GATE_RELEASE)    > 0.5f);
 }
 
 void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -171,20 +103,21 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         return;
     }
 
-    // ── MIDI events → engine ──────────────────────────────────────────
-    // The engine's own gating (setMidiTriggerEnabled / setMidiGateRelease)
-    // decides whether to act on these — we just forward every event.
+    // ── MIDI events → both engines ────────────────────────────────────
+    // The engines' own gating (setMidiTriggerEnabled / setMidiGateRelease)
+    // decides whether to act on these — we just forward every event to both
+    // engines. DualEngineHost fans out the call to engine A and B internally.
     for (const auto meta : midiMessages)
     {
         const auto& m = meta.getMessage();
-        if      (m.isNoteOn())  engine.handleMidiNoteOn();
-        else if (m.isNoteOff()) engine.handleMidiNoteOff();
+        if      (m.isNoteOn())  dualEngineHost.handleMidiNoteOn();
+        else if (m.isNoteOff()) dualEngineHost.handleMidiNoteOff();
     }
 
     // ── Input Gain → engine detection only ────────────────────────────
-    // Buffer audio stays at unity. The gain is forwarded to the engine where
+    // Buffer audio stays at unity. The gain is forwarded to both engines where
     // it scales the signal feeding the synth's period/gate/upward-expander
-    // detectors only — so raising Input Gain helps the engine track quiet
+    // detectors only — so raising Input Gain helps the engines track quiet
     // material without raising output level.
     float detectionGainLin;
     {
@@ -222,7 +155,7 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
                 apvts.getRawParameterValue(ParamID::INPUT_GAIN)->load());
         }
     }
-    engine.setInputDetectionGain(detectionGainLin);
+    dualEngineHost.setInputDetectionGain(detectionGainLin);
 
     // ── Input peak levels + FFT/pitch capture (pre-engine) ──────────
     // Reading input here ensures pitch detection sees the dry fundamental,
@@ -285,7 +218,7 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
 
                 spectrumReady.store(true, std::memory_order_release);
 
-                // (pitch is now sourced from the synth's crossing tracker — see below)
+                // (pitch is now sourced from the active engine's crossing tracker — see below)
             }
         }
         oscInputWrPos.store(oscInWp, std::memory_order_relaxed);
@@ -293,15 +226,9 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         peakInR.store(pR, std::memory_order_relaxed);
     }
 
-    #ifdef KAIGEN_PRO_BUILD
-        morphOpt->preProcessBlock();   // apply arc interpolations for this block
-    #endif
-
-    // ── Sync params → engine ──────────────────────────────────────────
-    syncParamsToEngine(engine);
-
-    // ── Process through the waveshaper engine ────────────────────────
-    // Read sidechain bus (bus index 1) if enabled
+    // ── Process through the dual-engine host ─────────────────────────
+    // Read sidechain bus (bus index 1) if enabled. Both engines see the
+    // same sidechain pointer; DualEngineHost forwards it to both internally.
     const juce::AudioBuffer<float>* sidechainPtr = nullptr;
     {
         const int nSCBusChannels = getChannelCountOfBus(true, 1);
@@ -322,23 +249,15 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             }
         }
     }
-  #ifdef KAIGEN_PRO_BUILD
-    // Capture the pre-engine input so MorphEngine's secondary engine can
-    // process the SAME input (not the primary's already-mutated output).
-    // No-op when Scene Crossfade is disabled.
-    if (morphOpt.has_value()) morphOpt->capturePreEngineInput(buffer);
-  #endif
 
-    engine.process(buffer, sidechainPtr);
+    // The host owns the per-engine APVTS sync, runs both engines on the same
+    // input, and crossfades into `buffer` (in place).
+    dualEngineHost.process(buffer, sidechainPtr);
 
-  #ifdef KAIGEN_PRO_BUILD
-    morphOpt->postProcessBlock(buffer, sidechainPtr);
-  #endif
-
-    // Pitch display: use the synth's zero-crossing tracker directly — it reflects exactly
-    // what is being synthesised and covers the full frequency range (not FFT's 30-500 Hz).
-    // Returns 0 when input is quiet (so UI shows "---").
-    currentPitch.store(engine.getEstimatedHz(), std::memory_order_relaxed);
+    // Pitch display: use the active engine's zero-crossing tracker — it reflects
+    // exactly what the visible engine is synthesising and covers the full frequency
+    // range (not FFT's 30-500 Hz). Returns 0 when input is quiet (so UI shows "---").
+    currentPitch.store(getActiveEngine().getEstimatedHz(), std::memory_order_relaxed);
 
     // ── Output peak levels + output spectrum FFT ─────────────────────
     {
@@ -405,26 +324,34 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
 
 void PhantomProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
-    if (parameterID == ParamID::RECIPE_PRESET)
-    {
-        const int idx = juce::roundToInt(newValue);
-        const float* tables[] = {
-            kWarmAmps, kAggressiveAmps, kHollowAmps, kDenseAmps,
-            kStableAmps, kWeirdAmps,
-            nullptr   // Custom (index 6)
-        };
+    // Recipe Preset is a per-engine choice: when either engine's selector changes,
+    // populate that engine's H2..H8 amplitudes from the chosen recipe table.
+    // "Custom" (index 6) leaves the harmonics untouched.
+    const bool isA = (parameterID == ParamID::A_RECIPE_PRESET);
+    const bool isB = (parameterID == ParamID::B_RECIPE_PRESET);
+    if (!isA && !isB) return;
 
-        if (idx >= 0 && idx < 6 && tables[idx] != nullptr)
-        {
-            const char* hIds[] = {
-                ParamID::RECIPE_H2, ParamID::RECIPE_H3, ParamID::RECIPE_H4,
-                ParamID::RECIPE_H5, ParamID::RECIPE_H6, ParamID::RECIPE_H7, ParamID::RECIPE_H8
-            };
-            for (int i = 0; i < 7; ++i)
-                if (auto* p = apvts.getParameter(hIds[i]))
-                    p->setValueNotifyingHost(p->convertTo0to1(tables[idx][i] * 100.0f));
-        }
-    }
+    const int idx = juce::roundToInt(newValue);
+    const float* tables[] = {
+        kWarmAmps, kAggressiveAmps, kHollowAmps, kDenseAmps,
+        kStableAmps, kWeirdAmps,
+        nullptr   // Custom (index 6)
+    };
+
+    if (idx < 0 || idx >= 6 || tables[idx] == nullptr) return;
+
+    const char* hIds[7] = {
+        isA ? ParamID::A_RECIPE_H2 : ParamID::B_RECIPE_H2,
+        isA ? ParamID::A_RECIPE_H3 : ParamID::B_RECIPE_H3,
+        isA ? ParamID::A_RECIPE_H4 : ParamID::B_RECIPE_H4,
+        isA ? ParamID::A_RECIPE_H5 : ParamID::B_RECIPE_H5,
+        isA ? ParamID::A_RECIPE_H6 : ParamID::B_RECIPE_H6,
+        isA ? ParamID::A_RECIPE_H7 : ParamID::B_RECIPE_H7,
+        isA ? ParamID::A_RECIPE_H8 : ParamID::B_RECIPE_H8,
+    };
+    for (int i = 0; i < 7; ++i)
+        if (auto* p = apvts.getParameter(hIds[i]))
+            p->setValueNotifyingHost(p->convertTo0to1(tables[idx][i] * 100.0f));
 }
 
 juce::AudioProcessorEditor* PhantomProcessor::createEditor()
@@ -434,47 +361,56 @@ juce::AudioProcessorEditor* PhantomProcessor::createEditor()
 
 void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    abSlots.syncActiveSlotFromLive();
+    // New format: a wrapper <PluginState> tree containing a single
+    // <APVTSState> child. The APVTS's own state type ("PHANTOM_STATE") is
+    // intentionally renamed at the wrapper level — PresetMigration and the
+    // load path both look up the child by the literal name "APVTSState" so
+    // future schema changes don't have to chase the APVTS-side identifier.
+    // Legacy formats (with <SlotB>/<MorphConfig> children, or un-prefixed
+    // params) are handled at load time by PresetMigration.
+    auto srcState = apvts.copyState();
+    juce::ValueTree apvtsChild("APVTSState");
+    apvtsChild.copyPropertiesFrom(srcState, nullptr);
+    for (int i = 0; i < srcState.getNumChildren(); ++i)
+        apvtsChild.appendChild(srcState.getChild(i).createCopy(), nullptr);
 
-    auto state = apvts.copyState();
+    juce::ValueTree wrapper("PluginState");
+    wrapper.appendChild(apvtsChild, nullptr);
 
-    if (auto existing = state.getChildWithName("ABSlots"); existing.isValid())
-        state.removeChild(existing, nullptr);
-    state.appendChild(abSlots.toStateTree(), nullptr);
-
-  #ifdef KAIGEN_PRO_BUILD
-    if (auto existing = state.getChildWithName("MorphState"); existing.isValid())
-        state.removeChild(existing, nullptr);
-    state.appendChild(morphOpt->toStateTree(), nullptr);
-  #endif
-
-    std::unique_ptr<juce::XmlElement> xml(state.createXml());
-    copyXmlToBinary(*xml, destData);
+    if (auto xml = wrapper.createXml())
+        copyXmlToBinary(*xml, destData);
 }
 
 void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-    std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
-    if (xml == nullptr || !xml->hasTagName(apvts.state.getType())) return;
+    if (auto xml = std::unique_ptr<juce::XmlElement>(getXmlFromBinary(data, sizeInBytes)))
+    {
+        auto wrapper = juce::ValueTree::fromXml(*xml);
+        if (!wrapper.isValid()) return;
 
-    auto tree = juce::ValueTree::fromXml(*xml);
+        // Run migration on whatever the host handed us. migrateInPlace is a
+        // no-op on already-new-format states (idempotent), so this is safe to
+        // run unconditionally.
+        kaigen::phantom::PresetMigration::migrateInPlace(wrapper);
 
-    auto abSlotsTree = tree.getChildWithName("ABSlots");
-    if (abSlotsTree.isValid())
-        tree.removeChild(abSlotsTree, nullptr);
-
-  #ifdef KAIGEN_PRO_BUILD
-    auto morphStateTree = tree.getChildWithName("MorphState");
-    if (morphStateTree.isValid())
-        tree.removeChild(morphStateTree, nullptr);
-  #endif
-
-    apvts.replaceState(tree);
-    abSlots.fromStateTree(abSlotsTree);
-
-  #ifdef KAIGEN_PRO_BUILD
-    morphOpt->fromStateTree(morphStateTree);
-  #endif
+        // Locate the APVTS-state subtree. New format: <PluginState> wrapper with
+        // an <APVTSState> child. Older format: the root IS the APVTS state.
+        auto apvtsState = wrapper.getChildWithName("APVTSState");
+        if (apvtsState.isValid())
+        {
+            // Re-cast to the APVTS's expected root type before replaceState —
+            // some JUCE codepaths assert on the type matching apvts.state's.
+            juce::ValueTree retyped(apvts.state.getType());
+            retyped.copyPropertiesFrom(apvtsState, nullptr);
+            for (int i = 0; i < apvtsState.getNumChildren(); ++i)
+                retyped.appendChild(apvtsState.getChild(i).createCopy(), nullptr);
+            apvts.replaceState(retyped);
+        }
+        else if (wrapper.getType() == apvts.state.getType())
+        {
+            apvts.replaceState(wrapper);
+        }
+    }
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

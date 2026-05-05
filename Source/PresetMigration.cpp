@@ -50,8 +50,11 @@ void PresetMigration::migrateInPlace(juce::ValueTree& state)
 {
     if (!isLegacy(state)) return;
 
+    // Mirror the fallback isLegacy uses: when there's no <APVTSState> child,
+    // the root IS the APVTS state (pre-PR1 production format).
     auto apvts = state.getChildWithName("APVTSState");
-    if (!apvts.isValid()) return;
+    const bool rootIsApvts = !apvts.isValid();
+    if (rootIsApvts) apvts = state;
 
     std::unordered_set<juce::String> perEngine;
     for (const auto& leaf : getPerEngineLeaves()) perEngine.insert(leaf);
@@ -81,7 +84,9 @@ void PresetMigration::migrateInPlace(juce::ValueTree& state)
         }
     }
 
-    // Step 3: handle <SlotB> if present.
+    // Step 3: handle <SlotB>. In the wrapper format it's a sibling of <APVTSState>
+    // (so we look on `state`); in the root-is-APVTS format it lived as a child of
+    // the root alongside the PARAMs (so we look on `state` too — same place).
     auto slotB = state.getChildWithName("SlotB");
     if (slotB.isValid())
     {
