@@ -242,29 +242,42 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                     outputBins.add(self.processor.spectrumOutputData[(size_t) i]);
                 }
 
-                // Per-engine spectra — computed UI-side from the ring buffers
-                // populated in processBlock (Task 3). Same Hann window + FFT +
-                // log-binning pipeline as input/output, on the engine's mono
-                // channel-0 output.
-                std::array<float, PhantomProcessor::kSpectrumBins> engineABins {};
-                std::array<float, PhantomProcessor::kSpectrumBins> engineBBins {};
-                self.processor.computeEngineSpectrum(
-                    PhantomProcessor::SpectrumEngineId::A, engineABins);
-                self.processor.computeEngineSpectrum(
-                    PhantomProcessor::SpectrumEngineId::B, engineBBins);
-
-                juce::Array<juce::var> engineAArr, engineBArr;
-                for (int i = 0; i < PhantomProcessor::kSpectrumBins; ++i)
-                {
-                    engineAArr.add(engineABins[(size_t) i]);
-                    engineBArr.add(engineBBins[(size_t) i]);
-                }
-
                 auto* obj = new juce::DynamicObject();
                 obj->setProperty("input",   inputBins);
                 obj->setProperty("output",  outputBins);
-                obj->setProperty("engineA", engineAArr);
-                obj->setProperty("engineB", engineBArr);
+
+                // Per-engine spectra are only consumed by the JS Split-mode
+                // renderer. Skip the two FFTs (one per engine, kFftSize=8192)
+                // when the user is in Combined mode — saves significant CPU at
+                // the ~30Hz UI poll cadence. The viewMode key still travels
+                // unconditionally so JS knows which renderer to dispatch to.
+                const bool needPerEngine =
+                    self.processor.getSpectrumViewMode() == PhantomProcessor::SpectrumViewMode::Split;
+
+                if (needPerEngine)
+                {
+                    // Per-engine spectra — computed UI-side from the ring buffers
+                    // populated in processBlock (Task 3). Same Hann window + FFT +
+                    // log-binning pipeline as input/output, on the engine's mono
+                    // channel-0 output.
+                    std::array<float, PhantomProcessor::kSpectrumBins> engineABins {};
+                    std::array<float, PhantomProcessor::kSpectrumBins> engineBBins {};
+                    self.processor.computeEngineSpectrum(
+                        PhantomProcessor::SpectrumEngineId::A, engineABins);
+                    self.processor.computeEngineSpectrum(
+                        PhantomProcessor::SpectrumEngineId::B, engineBBins);
+
+                    juce::Array<juce::var> engineAArr, engineBArr;
+                    for (int i = 0; i < PhantomProcessor::kSpectrumBins; ++i)
+                    {
+                        engineAArr.add(engineABins[(size_t) i]);
+                        engineBArr.add(engineBBins[(size_t) i]);
+                    }
+
+                    obj->setProperty("engineA", engineAArr);
+                    obj->setProperty("engineB", engineBArr);
+                }
+
                 obj->setProperty("viewMode",
                     self.processor.getSpectrumViewMode() == PhantomProcessor::SpectrumViewMode::Combined
                         ? "Combined" : "Split");

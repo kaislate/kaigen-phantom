@@ -408,7 +408,13 @@ document.addEventListener('spectrum-data', (e) => {
     smoothInto(smoothedEngineB, engB);
 
     if (!Array.isArray(data) && typeof data.viewMode === 'string') {
-        viewMode = data.viewMode;
+        const next = data.viewMode;
+        if (next !== viewMode) {
+            viewMode = next;
+            window.dispatchEvent(new CustomEvent('spectrum-data', { detail: { viewMode: next } }));
+        } else {
+            viewMode = next;
+        }
     }
 });
 

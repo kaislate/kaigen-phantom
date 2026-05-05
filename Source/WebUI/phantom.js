@@ -616,6 +616,17 @@ if (binauralModeSelectAdv) {
       await setMode(mode);
     });
 
+    // Keep button state in sync with whatever spectrum.js is rendering.
+    // Defends against the race where a host-restored Combined state arrives
+    // via spectrum-data before getMode() resolves.
+    window.addEventListener('spectrum-data', (ev) => {
+      const incoming = ev.detail && ev.detail.viewMode;
+      if (incoming && incoming !== mode) {
+        mode = incoming;
+        applyToUI(mode);
+      }
+    });
+
     // Initial sync from persisted state.
     getMode().then(m => {
       mode = (m === 'Combined') ? 'Combined' : 'Split';

@@ -132,6 +132,10 @@ private:
     // FFT for spectrum analysis — 8192-point for ~5Hz resolution
     static constexpr int kFftOrder = 13;
     static constexpr int kFftSize  = 1 << kFftOrder;
+    // Ring-buffer mask for the per-engine FFT capture rings. Single source of
+    // truth; used at both the producer (processBlock) and consumer
+    // (computeEngineSpectrum) call sites.
+    static constexpr int kEngineRingMask = (kFftSize * 2) - 1;
     juce::dsp::FFT spectrumFFT { kFftOrder };
     std::array<float, kFftSize * 2> fftBuffer {};       // input (pre-engine)
     std::array<float, kFftSize * 2> fftOutputBuffer {}; // output (post-engine)

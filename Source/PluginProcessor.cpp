@@ -277,13 +277,12 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             const float* bL = bOut.getReadPointer(0);
             int posA = fftWritePosEngineA.load(std::memory_order_relaxed);
             int posB = fftWritePosEngineB.load(std::memory_order_relaxed);
-            constexpr int kRingMask = (kFftSize * 2) - 1; // power-of-two ring
             for (int i = 0; i < n; ++i)
             {
                 fftBufferEngineA[(size_t) posA] = aL[i];
                 fftBufferEngineB[(size_t) posB] = bL[i];
-                posA = (posA + 1) & kRingMask;
-                posB = (posB + 1) & kRingMask;
+                posA = (posA + 1) & kEngineRingMask;
+                posB = (posB + 1) & kEngineRingMask;
             }
             fftWritePosEngineA.store(posA, std::memory_order_relaxed);
             fftWritePosEngineB.store(posB, std::memory_order_relaxed);
@@ -368,12 +367,11 @@ void PhantomProcessor::computeEngineSpectrum(SpectrumEngineId which,
 
     // Copy the most recent kFftSize samples from the ring into the scratch
     // FFT buffer (size = kFftSize * 2; second half zero-padded for the FFT).
-    constexpr int kRingMask = (kFftSize * 2) - 1; // power-of-two ring
-    int readPos = (wrPos - kFftSize) & kRingMask;
+    int readPos = (wrPos - kFftSize) & kEngineRingMask;
     for (int k = 0; k < kFftSize; ++k)
     {
         spectrumEngineScratch[(size_t) k] = ring[(size_t) readPos];
-        readPos = (readPos + 1) & kRingMask;
+        readPos = (readPos + 1) & kEngineRingMask;
     }
 
     // Hann window — same coefficients as the input/output FFT in processBlock.
