@@ -52,6 +52,9 @@ target_sources(KaigenPhantom PRIVATE
     Source/PresetMigration.cpp
     Source/MorphCrossfader.cpp
     Source/DualEngineHost.cpp
+    Source/Modulation/Routing.cpp
+    Source/Modulation/Macro.cpp
+    Source/Modulation/ModulationEngine.cpp
 )
 
 juce_add_binary_data(PhantomWebUI SOURCES

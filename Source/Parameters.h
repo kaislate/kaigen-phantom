@@ -81,6 +81,12 @@ namespace ParamID
     inline constexpr auto MORPH_B_LEVEL_DB         = "morph_b_level_db";
     inline constexpr auto MORPH_BYPASS_IDLE_ENGINE = "morph_bypass_idle_engine";
 
+    // ── Macros (PR3a) — global, automatable ────────────────────────────
+    inline constexpr auto MACRO1 = "macro1";
+    inline constexpr auto MACRO2 = "macro2";
+    inline constexpr auto MACRO3 = "macro3";
+    inline constexpr auto MACRO4 = "macro4";
+
     #undef KAIGEN_PER_ENGINE
 }
 
@@ -159,6 +165,11 @@ inline std::vector<juce::String> getAllParameterIDs()
     ids.push_back(ParamID::MORPH_A_LEVEL_DB);
     ids.push_back(ParamID::MORPH_B_LEVEL_DB);
     ids.push_back(ParamID::MORPH_BYPASS_IDLE_ENGINE);
+
+    ids.push_back(ParamID::MACRO1);
+    ids.push_back(ParamID::MACRO2);
+    ids.push_back(ParamID::MACRO3);
+    ids.push_back(ParamID::MACRO4);
 
     return ids;
 }
@@ -369,6 +380,21 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         AudioParameterFloatAttributes().withLabel("dB")));
     params.push_back(std::make_unique<AudioParameterBool>(
         ParamID::MORPH_BYPASS_IDLE_ENGINE, "Morph Bypass Idle Engine", true));
+
+    // Macros (PR3a) — global APVTS params, automatable. Read by Macro
+    // modulators in ModulationEngine.
+    params.push_back(std::make_unique<APF>(
+        ParamID::MACRO1, "Macro 1",
+        NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    params.push_back(std::make_unique<APF>(
+        ParamID::MACRO2, "Macro 2",
+        NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    params.push_back(std::make_unique<APF>(
+        ParamID::MACRO3, "Macro 3",
+        NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    params.push_back(std::make_unique<APF>(
+        ParamID::MACRO4, "Macro 4",
+        NormalisableRange<float>(0.0f, 1.0f), 0.0f));
 
     return { params.begin(), params.end() };
 }

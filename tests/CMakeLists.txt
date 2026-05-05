@@ -19,6 +19,9 @@ add_executable(KaigenPhantomTests
     DualEngineHostTests.cpp
     EngineFocusTests.cpp
     SpectrumViewModeTests.cpp
+    RoutingTests.cpp
+    ModulatorTests.cpp
+    ModulationEngineTests.cpp
     ../Source/Engines/BinauralStage.cpp
     ../Source/Engines/BassExtractor.cpp
     ../Source/Engines/Waveshaper.cpp
@@ -30,6 +33,9 @@ add_executable(KaigenPhantomTests
     ../Source/PresetMigration.cpp
     ../Source/MorphCrossfader.cpp
     ../Source/DualEngineHost.cpp
+    ../Source/Modulation/Routing.cpp
+    ../Source/Modulation/Macro.cpp
+    ../Source/Modulation/ModulationEngine.cpp
 )
 
 target_link_libraries(KaigenPhantomTests

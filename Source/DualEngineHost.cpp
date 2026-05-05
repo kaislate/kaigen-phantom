@@ -10,6 +10,13 @@ DualEngineHost::DualEngineHost(juce::AudioProcessorValueTreeState& a)
 {
 }
 
+void DualEngineHost::setModulationEngines(kaigen::phantom::ModulationEngine* a,
+                                          kaigen::phantom::ModulationEngine* b) noexcept
+{
+    modA = a;
+    modB = b;
+}
+
 void DualEngineHost::prepareToPlay(double sampleRate, int blockSize, int numChannels)
 {
     engineA.prepare(sampleRate, blockSize, numChannels);
@@ -47,9 +54,14 @@ void DualEngineHost::syncEngineFromPrefix(PhantomEngine& target, const char* pre
 {
     // Capture by-value: prefix is a string literal at all call sites
     // (see process()), so its lifetime is fine for the duration of this lambda.
-    auto valueFor = [this, prefix](const char* leaf) -> float {
+    auto* modEng = (juce::String(prefix) == "a_") ? modA
+                 : (juce::String(prefix) == "b_") ? modB
+                 : nullptr;
+
+    auto valueFor = [this, prefix, modEng](const char* leaf) -> float {
         const auto id = juce::String(prefix) + leaf;
-        return apvts.getRawParameterValue(id)->load();
+        const float base = apvts.getRawParameterValue(id)->load();
+        return modEng ? modEng->getModulatedValue(id, base) : base;
     };
 
     target.setCrossoverHz    (valueFor(ParamID::LEAF_PHANTOM_THRESHOLD));
