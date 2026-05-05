@@ -5,6 +5,7 @@
 #include "PresetManager.h"
 #include "DualEngineHost.h"
 #include "EngineFocus.h"
+#include "SpectrumViewMode.h"
 
 class PhantomProcessor : public juce::AudioProcessor,
                          private juce::AudioProcessorValueTreeState::Listener
@@ -67,6 +68,17 @@ public:
     std::array<float, kSpectrumBins> spectrumOutputData {}; // output (post-engine)
     std::atomic<bool> spectrumReady { false };
 
+    /** Selector for computeEngineSpectrum: which engine ring buffer to read. */
+    enum class SpectrumEngineId { A, B };
+
+    /** UI-thread helper. Reads the most recent kFftSize samples from the
+     *  per-engine FFT ring buffer (populated in processBlock — see Task 3),
+     *  applies the same Hann window + FFT + log-binning pipeline as the
+     *  input/output spectra, and writes binned magnitudes (range 0..1) to
+     *  `dst`. Called from the WebView native binding on the message thread. */
+    void computeEngineSpectrum(SpectrumEngineId which,
+                               std::array<float, kSpectrumBins>& dst) const;
+
     // Oscilloscope ring buffers (written by audio thread, read by editor)
     static constexpr int kOscBufSize = PhantomEngine::kOscBufSize;
     std::array<float, kOscBufSize> oscInputBuf  {};
@@ -93,6 +105,12 @@ public:
     EngineFocus getEngineFocus() const noexcept { return engineFocus; }
     void setEngineFocus(EngineFocus newFocus) noexcept;
 
+    // Spectrum view mode — editor-state, persisted in plugin state.
+    using SpectrumViewMode = kaigen::phantom::SpectrumViewMode;
+
+    SpectrumViewMode getSpectrumViewMode() const noexcept { return spectrumViewMode; }
+    void setSpectrumViewMode(SpectrumViewMode m) noexcept { spectrumViewMode = m; }
+
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout();
@@ -114,16 +132,40 @@ private:
     // FFT for spectrum analysis — 8192-point for ~5Hz resolution
     static constexpr int kFftOrder = 13;
     static constexpr int kFftSize  = 1 << kFftOrder;
+    // Ring-buffer mask for the per-engine FFT capture rings. Single source of
+    // truth; used at both the producer (processBlock) and consumer
+    // (computeEngineSpectrum) call sites.
+    static constexpr int kEngineRingMask = (kFftSize * 2) - 1;
     juce::dsp::FFT spectrumFFT { kFftOrder };
     std::array<float, kFftSize * 2> fftBuffer {};       // input (pre-engine)
     std::array<float, kFftSize * 2> fftOutputBuffer {}; // output (post-engine)
     int fftWritePos       = 0;
     int fftOutputWritePos = 0;
 
+    // Per-engine output FFT capture (split-mode spectrum view).
+    // Same size as the existing input fftBuffer; populated from
+    // dualEngineHost.getEngineAOutput()/getEngineBOutput() in processBlock
+    // after dualEngineHost.process(...) returns. Read by the WebView
+    // native binding (see Task 4) on the message thread, hence atomic
+    // write positions for the producer-side ring buffer.
+    std::array<float, kFftSize * 2> fftBufferEngineA {};
+    std::array<float, kFftSize * 2> fftBufferEngineB {};
+    std::atomic<int> fftWritePosEngineA { 0 };
+    std::atomic<int> fftWritePosEngineB { 0 };
+
+    // Scratch buffer used by computeEngineSpectrum() (UI/message thread).
+    // Mutable because the method is logically const (it does not change
+    // observable state — it only reads the ring buffer and writes to the
+    // caller-provided destination), but the FFT in-place transform needs
+    // writable storage.
+    mutable std::array<float, kFftSize * 2> spectrumEngineScratch {};
+
     // Editor focus: which tab the UI is on + whether LINK is active.
     // Editor preference, not preset state — stored alongside APVTS in the
     // <PluginState> wrapper but outside of any preset.
     EngineFocus engineFocus;
+
+    SpectrumViewMode spectrumViewMode { SpectrumViewMode::Split };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomProcessor)
 };

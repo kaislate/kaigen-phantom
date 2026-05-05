@@ -39,6 +39,14 @@ public:
     PhantomEngine& getActiveEngine() noexcept { return engineA; }   // PR 1: always A
     MorphCrossfader& getCrossfader() noexcept { return crossfader; }
 
+    /** Per-engine output buffers (post-process, pre-crossfader). Caller
+     *  may read these for visualization (FFT capture) but must NOT modify
+     *  them — they're consumed by the next process() call. Valid only
+     *  immediately after process() returns and until the next process()
+     *  call. */
+    const juce::AudioBuffer<float>& getEngineAOutput() const noexcept { return aScratch; }
+    const juce::AudioBuffer<float>& getEngineBOutput() const noexcept { return bScratch; }
+
 private:
     void syncEngineFromPrefix(PhantomEngine& target, const char* prefix);
 

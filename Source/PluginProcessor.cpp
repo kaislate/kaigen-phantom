@@ -60,6 +60,12 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
     fftBuffer.fill(0.0f);
     spectrumData.fill(0.0f);
     spectrumReady.store(false);
+
+    // Per-engine spectrum capture (split-mode view).
+    fftBufferEngineA.fill(0.0f);
+    fftBufferEngineB.fill(0.0f);
+    fftWritePosEngineA.store(0, std::memory_order_relaxed);
+    fftWritePosEngineB.store(0, std::memory_order_relaxed);
 }
 
 void PhantomProcessor::releaseResources() {}
@@ -255,6 +261,34 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     // input, and crossfades into `buffer` (in place).
     dualEngineHost.process(buffer, sidechainPtr);
 
+    // ── Per-engine FFT capture (split-mode spectrum view) ────────────
+    // aScratch / bScratch hold each engine's post-process / pre-crossfader
+    // output. They're valid until the next dualEngineHost.process() call,
+    // i.e. until the next processBlock — so capture them now into the two
+    // ring buffers consumed by the native binding on the UI thread.
+    {
+        const auto& aOut = dualEngineHost.getEngineAOutput();
+        const auto& bOut = dualEngineHost.getEngineBOutput();
+
+        if (aOut.getNumChannels() > 0 && bOut.getNumChannels() > 0
+            && aOut.getNumSamples() == n && bOut.getNumSamples() == n)
+        {
+            const float* aL = aOut.getReadPointer(0);
+            const float* bL = bOut.getReadPointer(0);
+            int posA = fftWritePosEngineA.load(std::memory_order_relaxed);
+            int posB = fftWritePosEngineB.load(std::memory_order_relaxed);
+            for (int i = 0; i < n; ++i)
+            {
+                fftBufferEngineA[(size_t) posA] = aL[i];
+                fftBufferEngineB[(size_t) posB] = bL[i];
+                posA = (posA + 1) & kEngineRingMask;
+                posB = (posB + 1) & kEngineRingMask;
+            }
+            fftWritePosEngineA.store(posA, std::memory_order_relaxed);
+            fftWritePosEngineB.store(posB, std::memory_order_relaxed);
+        }
+    }
+
     // Pitch display: use the active engine's zero-crossing tracker — it reflects
     // exactly what the visible engine is synthesising and covers the full frequency
     // range (not FFT's 30-500 Hz). Returns 0 when input is quiet (so UI shows "---").
@@ -323,6 +357,61 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     }
 }
 
+void PhantomProcessor::computeEngineSpectrum(SpectrumEngineId which,
+                                             std::array<float, kSpectrumBins>& dst) const
+{
+    // Source ring buffer + atomic write position for the requested engine.
+    const auto& ring   = (which == SpectrumEngineId::A) ? fftBufferEngineA   : fftBufferEngineB;
+    const int   wrPos  = ((which == SpectrumEngineId::A) ? fftWritePosEngineA
+                                                         : fftWritePosEngineB).load(std::memory_order_acquire);
+
+    // Copy the most recent kFftSize samples from the ring into the scratch
+    // FFT buffer (size = kFftSize * 2; second half zero-padded for the FFT).
+    int readPos = (wrPos - kFftSize) & kEngineRingMask;
+    for (int k = 0; k < kFftSize; ++k)
+    {
+        spectrumEngineScratch[(size_t) k] = ring[(size_t) readPos];
+        readPos = (readPos + 1) & kEngineRingMask;
+    }
+
+    // Hann window — same coefficients as the input/output FFT in processBlock.
+    for (int k = 0; k < kFftSize; ++k)
+    {
+        const float w = 0.5f * (1.0f - std::cos(
+            juce::MathConstants<float>::twoPi * k / (float)(kFftSize - 1)));
+        spectrumEngineScratch[(size_t) k] *= w;
+    }
+    for (int k = kFftSize; k < kFftSize * 2; ++k)
+        spectrumEngineScratch[(size_t) k] = 0.0f;
+
+    spectrumFFT.performFrequencyOnlyForwardTransform(spectrumEngineScratch.data());
+
+    // Log-frequency binning — identical to spectrumData / spectrumOutputData.
+    const float sr         = (float) sampleRate;
+    const float fftSizeF   = (float) kFftSize;
+    const int   maxBin     = kFftSize / 2 - 1;
+    const float logMin     = std::log10(30.0f);
+    const float logMax     = std::log10(16000.0f);
+    const float normalizer = 2.0f / (float) (kFftSize / 2);
+
+    for (int b = 0; b < kSpectrumBins; ++b)
+    {
+        const float fLow  = std::pow(10.0f, logMin + (logMax - logMin) *  b      / kSpectrumBins);
+        const float fHigh = std::pow(10.0f, logMin + (logMax - logMin) * (b + 1) / kSpectrumBins);
+
+        const int binLow  = juce::jmax(1,      (int) std::floor(fLow  * fftSizeF / sr));
+        const int binHigh = juce::jmin(maxBin, (int) std::ceil (fHigh * fftSizeF / sr));
+
+        float mag = 0.0f;
+        for (int k = binLow; k <= binHigh; ++k)
+            mag = juce::jmax(mag, spectrumEngineScratch[(size_t) k]);
+
+        const float normMag = mag * normalizer;
+        const float dB      = juce::Decibels::gainToDecibels(normMag, -96.0f);
+        dst[(size_t) b]     = juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f);
+    }
+}
+
 void PhantomProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
     // Recipe Preset is a per-engine choice: when either engine's selector changes,
@@ -384,6 +473,7 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
     wrapper.appendChild(apvtsChild, nullptr);
 
     kaigen::phantom::writeEngineFocusToTree(wrapper, engineFocus);
+    kaigen::phantom::writeSpectrumViewModeToTree(wrapper, spectrumViewMode);
 
     if (auto xml = wrapper.createXml())
         copyXmlToBinary(*xml, destData);
@@ -423,6 +513,9 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
             engineFocus = kaigen::phantom::readEngineFocusFromTree(wrapper);
         // else: leave in-memory engineFocus untouched — preserves user state on
         // partial wrapper loads or on plugin-state restores from pre-PR2 hosts.
+
+        if (wrapper.getChildWithName("SpectrumView").isValid())
+            spectrumViewMode = kaigen::phantom::readSpectrumViewModeFromTree(wrapper);
     }
 }
 
