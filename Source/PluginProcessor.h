@@ -1,13 +1,9 @@
 #pragma once
 #include <JuceHeader.h>
-#include <optional>
 #include "Parameters.h"
 #include "Engines/PhantomEngine.h"
 #include "PresetManager.h"
-#include "ABSlotManager.h"
-#ifdef KAIGEN_PRO_BUILD
-#include "MorphEngine.h"
-#endif
+#include "DualEngineHost.h"
 
 class PhantomProcessor : public juce::AudioProcessor,
                          private juce::AudioProcessorValueTreeState::Listener
@@ -34,8 +30,12 @@ public:
     bool producesMidi() const override { return false; }
     double getTailLengthSeconds() const override
     {
-        const float releaseMs = apvts.getRawParameterValue(ParamID::ENV_RELEASE_MS)->load();
-        return (double)(releaseMs / 1000.0f) + 0.1;
+        // Both engines run in parallel and either may be audible (depending on
+        // morph), so the host-reported tail must cover whichever release is
+        // longer. Add a small safety margin to outlast envelope tail-down.
+        const float aMs = apvts.getRawParameterValue(ParamID::A_ENV_RELEASE_MS)->load();
+        const float bMs = apvts.getRawParameterValue(ParamID::B_ENV_RELEASE_MS)->load();
+        return (double)(juce::jmax(aMs, bMs) / 1000.0f) + 0.1;
     }
 
     int getNumPrograms() override { return 1; }
@@ -53,14 +53,6 @@ public:
     juce::AudioProcessorValueTreeState apvts;
 
     kaigen::phantom::PresetManager presetManager;
-
-    // NOTE: MUST be declared AFTER `apvts`. Constructor subscribes to APVTS
-    // parameter listeners in order (see Parameters.h getAllParameterIDs()).
-    // If moved above `apvts`, the listener registration loop will find no
-    // registered parameters and the modified-flag tracking will silently break.
-    kaigen::phantom::ABSlotManager abSlots { apvts };
-
-    kaigen::phantom::ABSlotManager& getABSlotManager() { return abSlots; }
 
     // Real-time data exposed to the UI
     std::atomic<float> currentPitch { -1.0f };
@@ -81,30 +73,18 @@ public:
     std::atomic<int>               oscInputWrPos  { 0 };
     std::atomic<int>               oscOutputWrPos { 0 };
 
-    // Engine — public so editor can read oscilloscope synth capture
-    PhantomEngine engine;
+    // Dual-engine host: owns A + B engine instances and the morph crossfader.
+    // PR1 always shows engine A in the editor; PR2 introduces tab switching.
+    kaigen::phantom::DualEngineHost dualEngineHost;
 
-  #ifdef KAIGEN_PRO_BUILD
-    // NOTE: Constructed in PhantomProcessor ctor body (not initializer list)
-    // because the sync lambda captures `this`, which requires the object to be
-    // sufficiently constructed (apvts, abSlots, engine all exist first).
-    // MUST be declared AFTER apvts, abSlots, and engine — same ordering rules
-    // as the old direct-init, now enforced by ctor-body emplace order.
-    std::optional<kaigen::phantom::MorphEngine> morphOpt;
-
-    kaigen::phantom::MorphEngine& getMorphEngine() { return *morphOpt; }
-  #endif
+    /** Editor accessor: which engine the UI is currently visualising.
+     *  PR1 = always A. PR2 will dispatch on the active tab. */
+    PhantomEngine& getActiveEngine() noexcept { return dualEngineHost.getActiveEngine(); }
+    kaigen::phantom::DualEngineHost& getDualEngineHost() noexcept { return dualEngineHost; }
 
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout();
-
-    void syncParamsToEngine(PhantomEngine& target);
-    // Sync an engine from any source of denormalized param values (not just apvts).
-    // Used by MorphEngine's Scene Crossfade to drive the secondary engine from
-    // slot B's ValueTree without mutating the primary APVTS state.
-    void syncEngineFromValueLookup(PhantomEngine& target,
-                                   std::function<float(const char*)> valueFor);
 
     double sampleRate = 44100.0;
 

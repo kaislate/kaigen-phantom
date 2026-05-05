@@ -7,10 +7,11 @@ if (!window.Juce) {
   return;
 }
 
-const getSliderState   = window.Juce.getSliderState;
-const getComboBoxState = window.Juce.getComboBoxState;
-const getToggleState   = window.Juce.getToggleState;
-const getNativeFunction = window.Juce.getNativeFunction;
+const getSliderState        = window.Juce.getSliderState;
+const getSliderStateLogical = window.Juce.getSliderStateLogical;
+const getComboBoxState      = window.Juce.getComboBoxState;
+const getToggleState        = window.Juce.getToggleState;
+const getNativeFunction     = window.Juce.getNativeFunction;
 
 // ── Bypass toggle ─────────────────────────────────────────────────────────
 const bypassState = getToggleState?.("bypass");
@@ -45,8 +46,8 @@ if (autoGainBtn && inputGainAutoState) {
 }
 
 // ── MIDI triggering toggles ───────────────────────────────────────────────────
-const midiTriggerState = getToggleState?.("midi_trigger_enabled");
-const midiGateReleaseState = getToggleState?.("midi_gate_release");
+const midiTriggerState     = window.Juce.getToggleStateLogical?.("midi_trigger_enabled");
+const midiGateReleaseState = window.Juce.getToggleStateLogical?.("midi_gate_release");
 const midiTriggerBtn = document.getElementById("midi-trigger-btn");
 const midiGateReleaseBtn = document.getElementById("midi-gate-release-btn");
 if (midiTriggerBtn && midiTriggerState) {
@@ -76,7 +77,7 @@ if (midiGateReleaseBtn && midiGateReleaseState) {
 }
 
 // ── Punch toggle ──────────────────────────────────────────────────────────────
-const punchEnabledState = getToggleState?.("punch_enabled");
+const punchEnabledState = window.Juce.getToggleStateLogical?.("punch_enabled");
 const punchBtn = document.getElementById("punch-btn");
 if (punchBtn && punchEnabledState) {
   punchBtn.addEventListener("click", () => {
@@ -138,7 +139,7 @@ function formatDisplayValue(state) {
 
 document.querySelectorAll("phantom-knob[data-param], phantom-mini-knob[data-param]").forEach((el) => {
   const paramName = el.dataset.param;
-  const state = getSliderState(paramName);
+  const state = getSliderStateLogical(paramName);
 
   function updateKnob() {
     el.value = state.getNormalisedValue();
@@ -171,14 +172,14 @@ const harmonicParamIds = [
 function updateWheelAmplitudes() {
   if (!window.PhantomRecipeWheel) return;
   const amps = harmonicParamIds.map(id => {
-    const state = getSliderState(id);
+    const state = getSliderStateLogical(id);
     return state ? state.getNormalisedValue() : 0;
   });
   window.PhantomRecipeWheel.setAmplitudes(amps);
 }
 
 harmonicParamIds.forEach(id => {
-  const state = getSliderState(id);
+  const state = getSliderStateLogical(id);
   if (state) state.valueChangedEvent.addListener(updateWheelAmplitudes);
 });
 updateWheelAmplitudes();
@@ -188,7 +189,7 @@ document.addEventListener('spoke-change', e => {
   const { index, value } = e.detail;
   const id = harmonicParamIds[index];
   if (!id) return;
-  const state = getSliderState(id);
+  const state = getSliderStateLogical(id);
   if (!state) return;
   // Snap to Custom preset (index 6) when user manually drags a spoke
   presetState.setChoiceIndex(6);
@@ -201,7 +202,7 @@ document.addEventListener('spoke-change', e => {
 // 4. Wire mode toggle (Effect / Instrument)
 // =============================================================================
 
-const modeState = getComboBoxState("mode");
+const modeState = window.Juce.getComboBoxStateLogical("mode");
 
 function applyMode(idx) {
   document
@@ -235,7 +236,7 @@ applyMode(modeState.getChoiceIndex() || 0);
 // 4. Wire preset strip
 // =============================================================================
 
-const presetState = getComboBoxState("recipe_preset");
+const presetState = window.Juce.getComboBoxStateLogical("recipe_preset");
 
 document.querySelectorAll(".lw[data-preset]").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -259,7 +260,7 @@ updatePresetUI();
 // 5. Wire ghost mode toggle (Replace / Additive)
 // =============================================================================
 
-const ghostModeState = getComboBoxState("ghost_mode");
+const ghostModeState = window.Juce.getComboBoxStateLogical("ghost_mode");
 
 document.querySelectorAll(".tog[data-gmode]").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -280,7 +281,7 @@ ghostModeState.valueChangedEvent.addListener(updateGhostModeUI);
 updateGhostModeUI();
 
 // ── Filter slope toggle (-6 / -12 / -24 dB/oct) ──────────────────────────────
-const filterSlopeState = getComboBoxState("synth_filter_slope");
+const filterSlopeState = window.Juce.getComboBoxStateLogical("synth_filter_slope");
 if (filterSlopeState) {
   document.querySelectorAll(".tog[data-fslope]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -363,7 +364,7 @@ document.querySelector(".settings-backdrop")?.addEventListener("click", () => {
 
 const binauralSelect = document.getElementById("binaural-mode-select");
 if (binauralSelect) {
-  const binauralState = getComboBoxState?.("binaural_mode");
+  const binauralState = window.Juce.getComboBoxStateLogical?.("binaural_mode");
   if (binauralState) {
     binauralSelect.addEventListener("change", () => {
       binauralState.setChoiceIndex(parseInt(binauralSelect.value));
@@ -380,7 +381,7 @@ if (binauralSelect) {
 
 const envSourceSelect = document.getElementById("env-source-select");
 if (envSourceSelect) {
-  const envSourceState = getComboBoxState?.("env_source");
+  const envSourceState = window.Juce.getComboBoxStateLogical?.("env_source");
   if (envSourceState) {
     envSourceSelect.addEventListener("change", () => {
       envSourceState.setChoiceIndex(parseInt(envSourceSelect.value));
@@ -475,7 +476,7 @@ if (seamLatchEl) seamLatchEl.addEventListener('click', toggleAdvanced);
 // Wire binaural-mode-select-adv to the same param as the settings-overlay select.
 const binauralModeSelectAdv = document.getElementById('binaural-mode-select-adv');
 if (binauralModeSelectAdv) {
-  const state = getSliderState('binaural_mode');
+  const state = getSliderStateLogical('binaural_mode');
   if (state) {
     binauralModeSelectAdv.addEventListener('change', (e) => {
       state.sliderDragStarted();

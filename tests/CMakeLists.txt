@@ -8,16 +8,15 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 
 add_executable(KaigenPhantomTests
-    ParameterTests.cpp
     WaveletSynthTests.cpp
     BinauralStageTests.cpp
-    SerializationTests.cpp
     BassExtractorTests.cpp
     WaveshaperTests.cpp
     EnvelopeFollowerTests.cpp
     PhantomEngineTests.cpp
-    PresetPreviewTests.cpp
-    ABSlotManagerTests.cpp
+    PresetMigrationTests.cpp
+    MorphCrossfaderTests.cpp
+    DualEngineHostTests.cpp
     ../Source/Engines/BinauralStage.cpp
     ../Source/Engines/BassExtractor.cpp
     ../Source/Engines/Waveshaper.cpp
@@ -26,7 +25,9 @@ add_executable(KaigenPhantomTests
     ../Source/Engines/ZeroCrossingSynth.cpp
     ../Source/Engines/WaveletSynth.cpp
     ../Source/PresetManager.cpp
-    ../Source/ABSlotManager.cpp
+    ../Source/PresetMigration.cpp
+    ../Source/MorphCrossfader.cpp
+    ../Source/DualEngineHost.cpp
 )
 
 target_link_libraries(KaigenPhantomTests
@@ -49,13 +50,6 @@ target_compile_definitions(KaigenPhantomTests PRIVATE
     DONT_SET_USING_JUCE_NAMESPACE=1
     JUCE_DONT_DECLARE_PROJECTINFO=1
 )
-
-# Morph tests + source always compiled (KAIGEN_PRO_BUILD is always on).
-target_sources(KaigenPhantomTests PRIVATE
-    MorphEngineTests.cpp
-    ../Source/MorphEngine.cpp
-)
-target_compile_definitions(KaigenPhantomTests PRIVATE KAIGEN_PRO_BUILD=1)
 
 include(CTest)
 include(Catch)

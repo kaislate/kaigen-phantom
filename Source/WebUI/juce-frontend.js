@@ -590,12 +590,54 @@ class ControlParameterIndexUpdater {
   }
 }
 
+// Engine focus ('A', 'B', 'LINK'). PR1 always 'A'.
+// NOTE: this value is SET but not yet READ. PR2 wires the actual dispatch:
+// it will rename the JUCE-side relays to a_<leaf> / b_<leaf> and have the
+// resolver below switch the prefix based on this value. Until then, the
+// resolver is a no-op — see resolveLogicalParamID.
+window.__kaigenEngineFocus = 'A';
+
+// List of un-prefixed (global) APVTS param IDs. Retained for documentation
+// of which params are global vs per-engine; functionally unused in PR1
+// because the resolver below is a no-op for every name.
+const KAIGEN_GLOBAL_PARAMS = [
+    'bypass', 'input_gain', 'input_gain_auto', 'advanced_open',
+    'morph_amount', 'morph_curve', 'morph_a_level_db',
+    'morph_b_level_db', 'morph_bypass_idle_engine',
+];
+
+// PR1: relays are registered with bare leaf names ("ghost", "binaural_mode",
+// etc.) in PluginEditor.h, and the JUCE-side WebSliderParameterAttachment in
+// PluginEditor.cpp binds those relays to a_<leaf> APVTS params — so the
+// WebView always edits Engine A. PR2 will rename the relays to
+// a_<leaf> / b_<leaf> and use window.__kaigenEngineFocus to pick the prefix.
+// Until then, the resolver is a no-op (returns the bare leaf name) for every
+// name, including globals — the engine-focus value exists but is not read.
+function resolveLogicalParamID(logicalName) {
+    return logicalName;
+}
+
+function getSliderStateLogical(logicalName) {
+    return getSliderState(resolveLogicalParamID(logicalName));
+}
+
+function getToggleStateLogical(logicalName) {
+    return getToggleState(resolveLogicalParamID(logicalName));
+}
+
+function getComboBoxStateLogical(logicalName) {
+    return getComboBoxState(resolveLogicalParamID(logicalName));
+}
+
 // Expose API on window.Juce (ES export replaced for non-module loading)
 window.Juce = {
   getNativeFunction,
   getSliderState,
+  getSliderStateLogical,
   getToggleState,
+  getToggleStateLogical,
   getComboBoxState,
+  getComboBoxStateLogical,
   getBackendResourceAddress,
   ControlParameterIndexUpdater,
 };
