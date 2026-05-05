@@ -5,6 +5,7 @@
 #include "PresetManager.h"
 #include "DualEngineHost.h"
 #include "EngineFocus.h"
+#include "SpectrumViewMode.h"
 
 class PhantomProcessor : public juce::AudioProcessor,
                          private juce::AudioProcessorValueTreeState::Listener
@@ -93,6 +94,12 @@ public:
     EngineFocus getEngineFocus() const noexcept { return engineFocus; }
     void setEngineFocus(EngineFocus newFocus) noexcept;
 
+    // Spectrum view mode — editor-state, persisted in plugin state.
+    using SpectrumViewMode = kaigen::phantom::SpectrumViewMode;
+
+    SpectrumViewMode getSpectrumViewMode() const noexcept { return spectrumViewMode; }
+    void setSpectrumViewMode(SpectrumViewMode m) noexcept { spectrumViewMode = m; }
+
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout();
@@ -124,6 +131,8 @@ private:
     // Editor preference, not preset state — stored alongside APVTS in the
     // <PluginState> wrapper but outside of any preset.
     EngineFocus engineFocus;
+
+    SpectrumViewMode spectrumViewMode { SpectrumViewMode::Split };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomProcessor)
 };

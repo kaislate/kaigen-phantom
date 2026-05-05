@@ -384,6 +384,7 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
     wrapper.appendChild(apvtsChild, nullptr);
 
     kaigen::phantom::writeEngineFocusToTree(wrapper, engineFocus);
+    kaigen::phantom::writeSpectrumViewModeToTree(wrapper, spectrumViewMode);
 
     if (auto xml = wrapper.createXml())
         copyXmlToBinary(*xml, destData);
@@ -423,6 +424,9 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
             engineFocus = kaigen::phantom::readEngineFocusFromTree(wrapper);
         // else: leave in-memory engineFocus untouched — preserves user state on
         // partial wrapper loads or on plugin-state restores from pre-PR2 hosts.
+
+        if (wrapper.getChildWithName("SpectrumView").isValid())
+            spectrumViewMode = kaigen::phantom::readSpectrumViewModeFromTree(wrapper);
     }
 }
 
