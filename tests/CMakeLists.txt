@@ -33,6 +33,7 @@ add_executable(KaigenPhantomTests
     ../Source/MorphCrossfader.cpp
     ../Source/DualEngineHost.cpp
     ../Source/Modulation/Routing.cpp
+    ../Source/Modulation/Macro.cpp
 )
 
 target_link_libraries(KaigenPhantomTests
