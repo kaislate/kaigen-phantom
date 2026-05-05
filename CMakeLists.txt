@@ -72,6 +72,7 @@ juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/preset-system.js
     Source/WebUI/morph.js
     Source/WebUI/modulation-panel.js
+    Source/WebUI/macro-editor.js
 )
 
 # Factory presets (optional, for Phase 2 implementation)
