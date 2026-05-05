@@ -182,9 +182,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         &self.synthH1Relay, &self.synthSubRelay, &self.synthMinSamplesRelay, &self.synthMaxSamplesRelay, &self.trackingSpeedRelay,
         &self.punchAmountRelay,
         &self.synthBoostThresholdRelay, &self.synthBoostAmountRelay,
-      #ifdef KAIGEN_PRO_BUILD
-        &self.morphAmountRelay, &self.scenePositionRelay,
-      #endif
+        &self.morphAmountRelay,
     };
     for (auto* r : sliderRelays)
         options = options.withOptionsFrom(*r);
@@ -249,7 +247,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 {
                     obj->setProperty("note", "---");
                 }
-                const int presetIdx = (int) self.processor.apvts.getRawParameterValue(ParamID::RECIPE_PRESET)->load();
+                const int presetIdx = (int) self.processor.apvts.getRawParameterValue(ParamID::A_RECIPE_PRESET)->load();
                 static const char* presetNames[] = { "Warm","Aggressive","Hollow","Dense","Stable","Weird","Custom" };
                 obj->setProperty("preset", juce::String(presetNames[juce::jlimit(0, 6, presetIdx)]));
                 complete(juce::var(obj));
@@ -257,11 +255,12 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         .withNativeFunction("getOscilloscopeData",
             [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
+                auto& engine = self.processor.getActiveEngine();
                 juce::Array<juce::var> inArr, synthArr, outArr;
                 for (int i = 0; i < PhantomEngine::kOscBufSize; ++i)
                 {
                     inArr  .add((double) self.processor.oscInputBuf [(size_t) i]);
-                    synthArr.add((double) self.processor.engine.oscSynthBuf[(size_t) i]);
+                    synthArr.add((double) engine.oscSynthBuf[(size_t) i]);
                     outArr .add((double) self.processor.oscOutputBuf[(size_t) i]);
                 }
                 auto* obj = new juce::DynamicObject();
@@ -269,10 +268,10 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 obj->setProperty("synth",       synthArr);
                 obj->setProperty("output",      outArr);
                 obj->setProperty("inputWrPos",  (int) self.processor.oscInputWrPos .load(std::memory_order_relaxed));
-                obj->setProperty("synthWrPos",  (int) self.processor.engine.oscSynthWrPos.load(std::memory_order_relaxed));
+                obj->setProperty("synthWrPos",  (int) engine.oscSynthWrPos.load(std::memory_order_relaxed));
                 obj->setProperty("outputWrPos", (int) self.processor.oscOutputWrPos.load(std::memory_order_relaxed));
                 obj->setProperty("sampleRate",   (double) self.processor.getSampleRate());
-                obj->setProperty("synthPeak",    (double) self.processor.engine.getSynthInputPeak());
+                obj->setProperty("synthPeak",    (double) engine.getSynthInputPeak());
                 complete(juce::var(obj));
             })
         .withNativeFunction("setEditorHeight",
@@ -412,21 +411,16 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 const auto packName   = args[1].toString();
 
                 // APVTS mutation must run on the message thread.
+                // PR1: ABSlotManager is no longer owned by the processor; load
+                // via the simple APVTS-only path. PR2 will reintroduce
+                // tab/A-B-aware preset routing as part of the new dual-engine UX.
                 juce::MessageManager::callAsync(
                     [weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), presetName, packName]
                     {
                         if (auto* ed = weakSelf.getComponent())
                         {
-                            ed->processor.getPresetManager().loadPresetInto(
-                                ed->processor.getABSlotManager(), presetName, packName
-                              #ifdef KAIGEN_PRO_BUILD
-                                , [weakSelf](const juce::ValueTree& morphConfig)
-                                {
-                                    if (auto* ed2 = weakSelf.getComponent())
-                                        ed2->processor.getMorphEngine().fromMorphConfigTree(morphConfig);
-                                }
-                              #endif
-                            );
+                            ed->processor.getPresetManager().loadPreset(
+                                ed->processor.apvts, presetName, packName);
                         }
                     });
 
@@ -446,24 +440,16 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 const auto designer    = args.size() > 2 ? args[2].toString() : juce::String("User");
                 const auto description = args.size() > 3 ? args[3].toString() : juce::String();
                 const bool overwrite   = args.size() > 4 && args[4].isBool() && (bool) args[4];
-                const auto kindStr     = args.size() > 5 ? args[5].toString() : juce::String("single");
 
-                const auto kind = kaigen::phantom::presetKindFromString(kindStr);
-
-              #ifdef KAIGEN_PRO_BUILD
-                juce::ValueTree morphConfigForSave;
-                if (kind == kaigen::phantom::PresetKind::ABMorph)
-                    morphConfigForSave = self.processor.getMorphEngine().toMorphConfigTree();
-              #endif
-
+                // PR1: every save is Single-kind because ABSlotManager is no
+                // longer wired up. PR2 reintroduces AB-style saves through the
+                // new dual-engine APVTS layout.
                 auto savedName = self.processor.getPresetManager().savePreset(
                     self.processor.apvts,
-                    &self.processor.getABSlotManager(),
-                    name, type, designer, description, kind, overwrite
-                  #ifdef KAIGEN_PRO_BUILD
-                    , morphConfigForSave.isValid() ? &morphConfigForSave : nullptr
-                  #endif
-                );
+                    nullptr,
+                    name, type, designer, description,
+                    kaigen::phantom::PresetKind::Single, overwrite,
+                    nullptr);
                 complete(juce::var(savedName));
             })
         .withNativeFunction("setFavorite",
@@ -515,160 +501,10 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 }
                 complete(juce::JSON::toString(juce::var(arr)));
             })
-        .withNativeFunction("abGetState",
-            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
-            {
-                auto& ab = self.processor.getABSlotManager();
-
-                juce::DynamicObject::Ptr obj = new juce::DynamicObject();
-                obj->setProperty("active",
-                    ab.getActive() == kaigen::phantom::ABSlotManager::Slot::A ? "A" : "B");
-                obj->setProperty("modifiedA",
-                    ab.isModified(kaigen::phantom::ABSlotManager::Slot::A));
-                obj->setProperty("modifiedB",
-                    ab.isModified(kaigen::phantom::ABSlotManager::Slot::B));
-
-                const bool identical =
-                    ab.getSlot(kaigen::phantom::ABSlotManager::Slot::A).toXmlString() ==
-                    ab.getSlot(kaigen::phantom::ABSlotManager::Slot::B).toXmlString();
-                obj->setProperty("slotsIdentical", identical);
-                obj->setProperty("includeDiscrete", ab.getIncludeDiscreteInSnap());
-
-                complete(juce::var(obj.get()));
-            })
-        .withNativeFunction("abSnapTo",
-            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
-            {
-                if (args.size() < 1) { complete(juce::var(false)); return; }
-                const auto slotStr = args[0].toString();
-                const auto target = (slotStr == "B") ? kaigen::phantom::ABSlotManager::Slot::B
-                                                     : kaigen::phantom::ABSlotManager::Slot::A;
-
-                juce::MessageManager::callAsync(
-                    [weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), target]
-                    {
-                        if (auto* ed = weakSelf.getComponent())
-                            ed->processor.getABSlotManager().snapTo(target);
-                    });
-                complete(juce::var(true));
-            })
-        .withNativeFunction("abCopy",
-            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
-            {
-                juce::MessageManager::callAsync(
-                    [weakSelf = juce::Component::SafePointer<PhantomEditor>(&self)]
-                    {
-                        if (auto* ed = weakSelf.getComponent())
-                        {
-                            auto& ab = ed->processor.getABSlotManager();
-                            const auto src  = ab.getActive();
-                            const auto dest = (src == kaigen::phantom::ABSlotManager::Slot::A)
-                                              ? kaigen::phantom::ABSlotManager::Slot::B
-                                              : kaigen::phantom::ABSlotManager::Slot::A;
-                            ab.copy(src, dest);
-                        }
-                    });
-                complete(juce::var(true));
-            })
-        .withNativeFunction("abSetIncludeDiscrete",
-            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
-            {
-                if (args.size() < 1) { complete(juce::var(false)); return; }
-                const bool on = args[0].isBool() ? (bool) args[0] : (((int) args[0]) != 0);
-                self.processor.getABSlotManager().setIncludeDiscreteInSnap(on);
-                complete(juce::var(true));
-            })
-      #ifdef KAIGEN_PRO_BUILD
-        .withNativeFunction("morphGetState",
-            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
-            {
-                auto& m = self.processor.getMorphEngine();
-
-                juce::DynamicObject::Ptr obj = new juce::DynamicObject();
-                obj->setProperty("enabled",         m.isEnabled());
-                obj->setProperty("morphAmount",     m.getMorphAmount());
-                obj->setProperty("sceneEnabled",    m.isSceneCrossfadeEnabled());
-                obj->setProperty("scenePosition",   m.getScenePosition());
-                obj->setProperty("armedCount",      m.armedKnobCount());
-                obj->setProperty("inCapture",       m.isInCapture());
-                complete(juce::var(obj.get()));
-            })
-        .withNativeFunction("morphSetEnabled",
-            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
-            {
-                if (args.size() < 1) { complete(juce::var(false)); return; }
-                const bool on = args[0].isBool() ? (bool) args[0] : (((int) args[0]) != 0);
-                juce::MessageManager::callAsync([weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), on]()
-                {
-                    if (auto* ed = weakSelf.getComponent())
-                        ed->processor.getMorphEngine().setEnabled(on);
-                });
-                complete(juce::var(true));
-            })
-        .withNativeFunction("morphSetSceneEnabled",
-            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
-            {
-                if (args.size() < 1) { complete(juce::var(false)); return; }
-                const bool on = args[0].isBool() ? (bool) args[0] : (((int) args[0]) != 0);
-                juce::MessageManager::callAsync([weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), on]()
-                {
-                    if (auto* ed = weakSelf.getComponent())
-                        ed->processor.getMorphEngine().setSceneCrossfadeEnabled(on);
-                });
-                complete(juce::var(true));
-            })
-        .withNativeFunction("morphGetArcDepths",
-            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
-            {
-                auto& m = self.processor.getMorphEngine();
-                juce::DynamicObject::Ptr obj = new juce::DynamicObject();
-                for (const auto& id : m.getArmedParamIDs())
-                    obj->setProperty(id, m.getArcDepth(id));
-                complete(juce::var(obj.get()));
-            })
-        .withNativeFunction("morphSetArcDepth",
-            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
-            {
-                if (args.size() < 2) { complete(juce::var(false)); return; }
-                const auto id = args[0].toString();
-                const float depth = (float) (double) args[1];
-                juce::MessageManager::callAsync([weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), id, depth]()
-                {
-                    if (auto* ed = weakSelf.getComponent())
-                        ed->processor.getMorphEngine().setArcDepth(id, depth);
-                });
-                complete(juce::var(true));
-            })
-        .withNativeFunction("morphBeginCapture",
-            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
-            {
-                juce::MessageManager::callAsync([weakSelf = juce::Component::SafePointer<PhantomEditor>(&self)]()
-                {
-                    if (auto* ed = weakSelf.getComponent())
-                        ed->processor.getMorphEngine().beginCapture();
-                });
-                complete(juce::var(true));
-            })
-        .withNativeFunction("morphEndCapture",
-            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
-            {
-                const bool commit = (args.size() >= 1 && args[0].isBool()) ? (bool) args[0] : true;
-
-                // This one needs to return the modified list — has to be synchronous.
-                auto modified = self.processor.getMorphEngine().endCapture(commit);
-                juce::Array<juce::var> arr;
-                for (const auto& id : modified) arr.add(juce::var(id));
-                complete(juce::var(arr));
-            })
-        .withNativeFunction("morphGetContinuousParamIDs",
-            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
-            {
-                const auto ids = kaigen::phantom::MorphEngine::getContinuousParamIDs(self.processor.apvts);
-                juce::Array<juce::var> arr;
-                for (const auto& id : ids) arr.add(juce::var(id));
-                complete(juce::var(arr));
-            })
-      #endif  // KAIGEN_PRO_BUILD
+        // PR1: A/B compare and arc-morph native bindings have been removed.
+        // The processor no longer owns ABSlotManager or the legacy MorphEngine.
+        // The morph_amount slider drives the audio crossfader directly via APVTS.
+        // PR2 will reintroduce engine-tab-aware UI bindings.
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });
 
     return options;
@@ -697,44 +533,44 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
     });
 
     // ── Slider attachments ────────────────────────────────────────────
+    // PR1: per-engine params bind to engine A by default. Task 7 introduces a
+    // logical-name layer in the WebUI (window.__kaigenEngineFocus) that PR2
+    // will use to dispatch between A_* and B_* bindings on tab switch.
     struct SliderBinding { const char* paramId; juce::WebSliderRelay& relay; };
     SliderBinding sliderBindings[] = {
-        { ParamID::INPUT_GAIN,          inputGainRelay },
-        { ParamID::GHOST,               ghostRelay },
-        { ParamID::PHANTOM_THRESHOLD,   phantomThresholdRelay },
-        { ParamID::PHANTOM_STRENGTH,    phantomStrengthRelay },
-        { ParamID::OUTPUT_GAIN,         outputGainRelay },
-        { ParamID::RECIPE_H2,           recipeH2Relay },
-        { ParamID::RECIPE_H3,           recipeH3Relay },
-        { ParamID::RECIPE_H4,           recipeH4Relay },
-        { ParamID::RECIPE_H5,           recipeH5Relay },
-        { ParamID::RECIPE_H6,           recipeH6Relay },
-        { ParamID::RECIPE_H7,           recipeH7Relay },
-        { ParamID::RECIPE_H8,           recipeH8Relay },
-        { ParamID::HARMONIC_SATURATION, harmonicSaturationRelay },
-        { ParamID::SYNTH_STEP,          synthStepRelay },
-        { ParamID::SYNTH_DUTY,          synthDutyRelay },
-        { ParamID::SYNTH_SKIP,          synthSkipRelay },
-        { ParamID::ENV_ATTACK_MS,       envAttackRelay },
-        { ParamID::ENV_RELEASE_MS,      envReleaseRelay },
-        { ParamID::BINAURAL_WIDTH,      binauralWidthRelay },
-        { ParamID::STEREO_WIDTH,        stereoWidthRelay },
-        { ParamID::SYNTH_LPF_HZ,            synthLPFRelay },
-        { ParamID::SYNTH_HPF_HZ,            synthHPFRelay },
-        { ParamID::SYNTH_WAVELET_LENGTH,    synthWaveletLengthRelay },
-        { ParamID::SYNTH_GATE_THRESHOLD,    synthGateThresholdRelay },
-        { ParamID::SYNTH_H1,                synthH1Relay },
-        { ParamID::SYNTH_SUB,               synthSubRelay },
-        { ParamID::SYNTH_MIN_SAMPLES,       synthMinSamplesRelay },
-        { ParamID::SYNTH_MAX_SAMPLES,       synthMaxSamplesRelay },
-        { ParamID::TRACKING_SPEED,          trackingSpeedRelay },
-        { ParamID::PUNCH_AMOUNT,            punchAmountRelay },
-        { ParamID::SYNTH_BOOST_THRESHOLD,   synthBoostThresholdRelay },
-        { ParamID::SYNTH_BOOST_AMOUNT,      synthBoostAmountRelay },
-      #ifdef KAIGEN_PRO_BUILD
-        { ParamID::MORPH_AMOUNT,            morphAmountRelay },
-        { ParamID::SCENE_POSITION,          scenePositionRelay },
-      #endif
+        { ParamID::INPUT_GAIN,            inputGainRelay },
+        { ParamID::A_GHOST,               ghostRelay },
+        { ParamID::A_PHANTOM_THRESHOLD,   phantomThresholdRelay },
+        { ParamID::A_PHANTOM_STRENGTH,    phantomStrengthRelay },
+        { ParamID::A_OUTPUT_GAIN,         outputGainRelay },
+        { ParamID::A_RECIPE_H2,           recipeH2Relay },
+        { ParamID::A_RECIPE_H3,           recipeH3Relay },
+        { ParamID::A_RECIPE_H4,           recipeH4Relay },
+        { ParamID::A_RECIPE_H5,           recipeH5Relay },
+        { ParamID::A_RECIPE_H6,           recipeH6Relay },
+        { ParamID::A_RECIPE_H7,           recipeH7Relay },
+        { ParamID::A_RECIPE_H8,           recipeH8Relay },
+        { ParamID::A_HARMONIC_SATURATION, harmonicSaturationRelay },
+        { ParamID::A_SYNTH_STEP,          synthStepRelay },
+        { ParamID::A_SYNTH_DUTY,          synthDutyRelay },
+        { ParamID::A_SYNTH_SKIP,          synthSkipRelay },
+        { ParamID::A_ENV_ATTACK_MS,       envAttackRelay },
+        { ParamID::A_ENV_RELEASE_MS,      envReleaseRelay },
+        { ParamID::A_BINAURAL_WIDTH,      binauralWidthRelay },
+        { ParamID::A_STEREO_WIDTH,        stereoWidthRelay },
+        { ParamID::A_SYNTH_LPF_HZ,            synthLPFRelay },
+        { ParamID::A_SYNTH_HPF_HZ,            synthHPFRelay },
+        { ParamID::A_SYNTH_WAVELET_LENGTH,    synthWaveletLengthRelay },
+        { ParamID::A_SYNTH_GATE_THRESHOLD,    synthGateThresholdRelay },
+        { ParamID::A_SYNTH_H1,                synthH1Relay },
+        { ParamID::A_SYNTH_SUB,               synthSubRelay },
+        { ParamID::A_SYNTH_MIN_SAMPLES,       synthMinSamplesRelay },
+        { ParamID::A_SYNTH_MAX_SAMPLES,       synthMaxSamplesRelay },
+        { ParamID::A_TRACKING_SPEED,          trackingSpeedRelay },
+        { ParamID::A_PUNCH_AMOUNT,            punchAmountRelay },
+        { ParamID::A_SYNTH_BOOST_THRESHOLD,   synthBoostThresholdRelay },
+        { ParamID::A_SYNTH_BOOST_AMOUNT,      synthBoostAmountRelay },
+        { ParamID::MORPH_AMOUNT,              morphAmountRelay },
     };
     for (auto& b : sliderBindings)
         sliderAttachments.push_back(std::make_unique<juce::WebSliderParameterAttachment>(
@@ -743,11 +579,11 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
     // ── Combo attachments ─────────────────────────────────────────────
     struct ComboBinding { const char* paramId; juce::WebComboBoxRelay& relay; };
     ComboBinding comboBindings[] = {
-        { ParamID::MODE,          modeRelay },
-        { ParamID::GHOST_MODE,    ghostModeRelay },
-        { ParamID::RECIPE_PRESET, recipePresetRelay },
-        { ParamID::BINAURAL_MODE,       binauralModeRelay },
-        { ParamID::SYNTH_FILTER_SLOPE,  filterSlopeRelay  },
+        { ParamID::A_MODE,                modeRelay },
+        { ParamID::A_GHOST_MODE,          ghostModeRelay },
+        { ParamID::A_RECIPE_PRESET,       recipePresetRelay },
+        { ParamID::A_BINAURAL_MODE,       binauralModeRelay },
+        { ParamID::A_SYNTH_FILTER_SLOPE,  filterSlopeRelay  },
     };
     for (auto& b : comboBindings)
         comboAttachments.push_back(std::make_unique<juce::WebComboBoxParameterAttachment>(
@@ -757,13 +593,13 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
     bypassAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
         *processor.apvts.getParameter(ParamID::BYPASS), bypassRelay, nullptr);
     punchEnabledAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
-        *processor.apvts.getParameter(ParamID::PUNCH_ENABLED), punchEnabledRelay, nullptr);
+        *processor.apvts.getParameter(ParamID::A_PUNCH_ENABLED), punchEnabledRelay, nullptr);
     inputGainAutoAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
         *processor.apvts.getParameter(ParamID::INPUT_GAIN_AUTO), inputGainAutoRelay, nullptr);
     midiTriggerAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
-        *processor.apvts.getParameter(ParamID::MIDI_TRIGGER_ENABLED), midiTriggerRelay, nullptr);
+        *processor.apvts.getParameter(ParamID::A_MIDI_TRIGGER_ENABLED), midiTriggerRelay, nullptr);
     midiGateReleaseAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
-        *processor.apvts.getParameter(ParamID::MIDI_GATE_RELEASE), midiGateReleaseRelay, nullptr);
+        *processor.apvts.getParameter(ParamID::A_MIDI_GATE_RELEASE), midiGateReleaseRelay, nullptr);
 }
 
 PhantomEditor::~PhantomEditor() = default;

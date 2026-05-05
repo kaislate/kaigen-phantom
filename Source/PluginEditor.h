@@ -77,12 +77,9 @@ private:
     juce::WebSliderRelay synthBoostThresholdRelay   { "synth_boost_threshold" };
     juce::WebSliderRelay synthBoostAmountRelay      { "synth_boost_amount" };
 
-  #ifdef KAIGEN_PRO_BUILD
-    // Morph sliders — bound to APVTS morph_amount and scene_position so the
-    // WebView's mod-slider drags propagate through to the DSP smoothing path.
+    // Morph slider — bound to APVTS morph_amount which now drives the audio
+    // crossfader between engines A and B (rather than the old parameter-arc system).
     juce::WebSliderRelay morphAmountRelay           { "morph_amount" };
-    juce::WebSliderRelay scenePositionRelay         { "scene_position" };
-  #endif
 
     // ── Combo-box relays ──────────────────────────────────────────────
     juce::WebComboBoxRelay modeRelay             { "mode" };
