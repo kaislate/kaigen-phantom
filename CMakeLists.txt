@@ -56,6 +56,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/PresetManager.cpp
     Source/PresetMigration.cpp
     Source/ABSlotManager.cpp
+    Source/DualEngineHost.cpp
 )
 
 target_compile_definitions(KaigenPhantom PRIVATE KAIGEN_PRO_BUILD=1)

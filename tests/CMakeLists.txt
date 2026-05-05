@@ -63,8 +63,10 @@ target_compile_definitions(KaigenPhantomTests PRIVATE
 target_sources(KaigenPhantomTests PRIVATE
     # MorphEngineTests.cpp  -- temporarily excluded; will be deleted in PR1 Task 8.
     MorphCrossfaderTests.cpp
+    DualEngineHostTests.cpp
     ../Source/MorphEngine.cpp
     ../Source/MorphCrossfader.cpp
+    ../Source/DualEngineHost.cpp
 )
 target_compile_definitions(KaigenPhantomTests PRIVATE KAIGEN_PRO_BUILD=1)
 
