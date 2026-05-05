@@ -599,7 +599,8 @@ class ControlParameterIndexUpdater {
   const KAIGEN_GLOBAL_PARAMS = new Set([
     'bypass', 'input_gain', 'input_gain_auto', 'advanced_open',
     'morph_amount', 'morph_curve', 'morph_a_level_db',
-    'morph_b_level_db', 'morph_bypass_idle_engine'
+    'morph_b_level_db', 'morph_bypass_idle_engine',
+    'macro1', 'macro2', 'macro3', 'macro4'
   ]);
 
   // Cache of wrappers keyed by logical name (one wrapper per logical

@@ -34,6 +34,75 @@
       return (macroId === 'macro1' || macroId === 'macro2') ? 'engineA' : 'engineB';
     }
 
+    // Mirror of phantom.js's formatDisplayValue, scoped down to what macro
+    // params actually need (0-1 normalised, no label). Kept inline rather
+    // than pulled out of phantom.js to avoid expanding that module's API
+    // surface for one caller.
+    function formatMacroDisplay(state) {
+      if (typeof state.getScaledValue !== 'function') return '';
+      const val = state.getScaledValue();
+      const props = state.properties || {};
+      const label = (props.label || '').trim();
+      if (props.start === 0 && props.end === 1 && !label) {
+        return `${Math.round(val * 100)}%`;
+      }
+      return `${val.toFixed(2)}${label ? ' ' + label : ''}`;
+    }
+
+    // Tracks slider-state listener IDs per macro so re-renders (which
+    // recreate the knob element) can detach the old listeners. Without
+    // this, every routing add/remove leaks an updateKnob closure that
+    // keeps the detached knob alive and keeps firing on host changes.
+    const _knobListeners = new Map();  // paramId → { vId, pId, state }
+
+    // Wire a runtime-created phantom-knob to its APVTS slider relay.
+    // Mirrors the auto-bind block in phantom.js (search "phantom-knob[data-param]").
+    function bindKnobToParam(knob, paramId) {
+      const getter = window.Juce && window.Juce.getSliderStateLogical;
+      if (typeof getter !== 'function') {
+        console.warn('[macro-editor] getSliderStateLogical unavailable');
+        return;
+      }
+      const state = getter(paramId);
+      if (!state) {
+        console.warn('[macro-editor] no slider state for', paramId);
+        return;
+      }
+
+      // Detach any previous binding for this macro (re-render path).
+      const prev = _knobListeners.get(paramId);
+      if (prev) {
+        if (prev.state.valueChangedEvent && typeof prev.vId === 'number') {
+          prev.state.valueChangedEvent.removeListener(prev.vId);
+        }
+        if (prev.state.propertiesChangedEvent && typeof prev.pId === 'number') {
+          prev.state.propertiesChangedEvent.removeListener(prev.pId);
+        }
+      }
+
+      function updateKnob() {
+        knob.value = state.getNormalisedValue();
+        knob.displayValue = formatMacroDisplay(state);
+      }
+
+      // Host → UI
+      const vId = state.valueChangedEvent.addListener(updateKnob);
+      let pId;
+      if (state.propertiesChangedEvent && state.propertiesChangedEvent.addListener) {
+        pId = state.propertiesChangedEvent.addListener(updateKnob);
+      }
+      _knobListeners.set(paramId, { vId, pId, state });
+
+      // UI → host (drag)
+      knob.addEventListener('knob-change', (e) => {
+        state.sliderDragStarted();
+        state.setNormalisedValue(e.detail.value);
+        state.sliderDragEnded();
+      });
+
+      updateKnob();
+    }
+
     async function render(host, macroId) {
       const state = await getState();
       const eng = state[engineForMacro(macroId)];
@@ -54,6 +123,11 @@
       knob.setAttribute('data-param', macroId);   // global APVTS param; getSliderState short-circuits
       knob.classList.add('macro-editor-knob');
       left.appendChild(knob);
+
+      // phantom.js's auto-binder runs only at page-boot via querySelectorAll,
+      // so dynamically-created knobs miss it. Bind explicitly here using the
+      // same slider-state pattern.
+      bindKnobToParam(knob, macroId);
 
       const nameInput = document.createElement('input');
       nameInput.type = 'text';
