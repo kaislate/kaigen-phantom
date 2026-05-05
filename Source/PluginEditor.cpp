@@ -503,6 +503,29 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         // The processor no longer owns ABSlotManager or the legacy MorphEngine.
         // The morph_amount slider drives the audio crossfader directly via APVTS.
         // PR2 will reintroduce engine-tab-aware UI bindings.
+        .withNativeFunction("engineGetFocus",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                const auto f = self.processor.getEngineFocus();
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty("activeTab", f.activeTab == PhantomProcessor::ActiveTab::B ? "B" : "A");
+                obj->setProperty("linkOn", f.linkOn);
+                complete(juce::var(obj));
+            })
+        .withNativeFunction("engineSetFocus",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1 || ! args[0].isObject()) { complete({}); return; }
+                auto* obj = args[0].getDynamicObject();
+                if (obj == nullptr) { complete({}); return; }
+                PhantomProcessor::EngineFocus f;
+                f.activeTab = (obj->getProperty("activeTab").toString() == "B")
+                              ? PhantomProcessor::ActiveTab::B
+                              : PhantomProcessor::ActiveTab::A;
+                f.linkOn    = (bool) obj->getProperty("linkOn");
+                self.processor.setEngineFocus(f);
+                complete({});
+            })
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });
 
     return options;
