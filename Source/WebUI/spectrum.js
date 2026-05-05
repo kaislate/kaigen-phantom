@@ -34,9 +34,13 @@ const BIN_FREQ_HIGH = 16000;
 const DISPLAY_FREQ_LOW  = 20;
 const DISPLAY_FREQ_HIGH = 20000;
 
-const smoothedIn  = new Float32Array(BIN_COUNT);  // input (gray)
-const smoothedOut = new Float32Array(BIN_COUNT);  // output (white)
-const peakOut     = new Float32Array(BIN_COUNT);  // peak hold for output only
+const smoothedIn      = new Float32Array(BIN_COUNT);  // input (gray)
+const smoothedOut     = new Float32Array(BIN_COUNT);  // output (white, post-crossfader)
+const smoothedEngineA = new Float32Array(BIN_COUNT);  // Engine A pre-crossfader (split mode)
+const smoothedEngineB = new Float32Array(BIN_COUNT);  // Engine B pre-crossfader (split mode)
+const peakOut         = new Float32Array(BIN_COUNT);  // peak hold for combined output
+
+let viewMode = 'Split';   // 'Split' | 'Combined'; synced from native data.viewMode
 
 let inL = 0, inR = 0, outL = 0, outR = 0;
 let inLSmooth = 0, inRSmooth = 0, outLSmooth = 0, outRSmooth = 0;
@@ -139,7 +143,7 @@ function fillCurve(ctx, pts, h) {
     ctx.closePath();
 }
 
-// ─── Main spectrum draw ─────────────────────────────────────────────────────
+// ─── Main spectrum draw — dispatches on viewMode ────────────────────────────
 function drawSpectrum() {
     if (!specCanvas) return;
     const ctx = specCanvas.getContext('2d');
@@ -151,6 +155,15 @@ function drawSpectrum() {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, w, h);
 
+    if (viewMode === 'Combined') {
+        drawSpectrumCombined(ctx, w, h);
+    } else {
+        drawSpectrumSplit(ctx, w, h);
+    }
+}
+
+// ─── Combined view: full-width post-crossfader spectrum ─────────────────────
+function drawSpectrumCombined(ctx, w, h) {
     drawGrid(ctx, w, h);
 
     const inPts  = buildCurvePoints(smoothedIn,  w, h);
@@ -199,7 +212,7 @@ function drawSpectrum() {
         ctx.stroke();
     }
 
-    // ── Crossover frequency line ───────────────────────────────────────
+    // ── Crossover frequency line — tracks the active engine via logical resolver ──
     const xoverState = window.Juce?.getSliderStateLogical?.('phantom_threshold');
     if (xoverState) {
         const xoverHz = xoverState.getScaledValue();
@@ -224,6 +237,107 @@ function drawSpectrum() {
             ctx.restore();
         }
     }
+}
+
+// ─── Split view: side-by-side per-engine panes ─────────────────────────────
+function drawSpectrumSplit(ctx, w, h) {
+    const halfW = Math.floor(w / 2);
+
+    // Draw left half: Engine A
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, halfW, h);
+    ctx.clip();
+    drawOnePane(ctx, 0, halfW, h, 'A');
+    ctx.restore();
+
+    // Draw right half: Engine B
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(halfW, 0, w - halfW, h);
+    ctx.clip();
+    drawOnePane(ctx, halfW, w - halfW, h, 'B');
+    ctx.restore();
+
+    // Center divider
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(halfW + 0.5, 0);
+    ctx.lineTo(halfW + 0.5, h);
+    ctx.stroke();
+
+    // A / B labels (top-left / top-right)
+    const labelFont = Math.max(9, Math.round(h * 0.10)) + 'px monospace';
+    ctx.font = labelFont;
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = 'rgba(74,144,226,0.70)';
+    ctx.textAlign = 'left';
+    ctx.fillText('A', 6, 4);
+    ctx.textAlign = 'right';
+    ctx.fillText('B', w - 6, 4);
+}
+
+function drawOnePane(ctx, xOffset, paneW, h, side /* 'A' | 'B' */) {
+    ctx.save();
+    ctx.translate(xOffset, 0);
+
+    drawGrid(ctx, paneW, h);
+
+    const inPts  = buildCurvePoints(smoothedIn, paneW, h);
+    const eng    = (side === 'B') ? smoothedEngineB : smoothedEngineA;
+    const engPts = eng ? buildCurvePoints(eng, paneW, h) : null;
+
+    // Layer 1: input (gray, faint) — same color as combined mode
+    if (inPts && inPts.length >= 2) {
+        fillCurve(ctx, inPts, h);
+        const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
+        fillGrad.addColorStop(0, 'rgba(160,160,175,0.18)');
+        fillGrad.addColorStop(1, 'rgba(160,160,175,0.04)');
+        ctx.fillStyle = fillGrad;
+        ctx.fill();
+        strokeCurve(ctx, inPts);
+        ctx.strokeStyle = 'rgba(160,160,175,0.45)';
+        ctx.lineWidth = Math.max(1, h * 0.004);
+        ctx.stroke();
+    }
+
+    // Layer 2: this engine's output (white)
+    if (engPts && engPts.length >= 2) {
+        fillCurve(ctx, engPts, h);
+        const grad = ctx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, 'rgba(255,255,255,0.22)');
+        grad.addColorStop(0.5, 'rgba(255,255,255,0.08)');
+        grad.addColorStop(1, 'rgba(255,255,255,0.02)');
+        ctx.fillStyle = grad;
+        ctx.fill();
+        strokeCurve(ctx, engPts);
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.lineWidth = Math.max(1.0, h * 0.005);
+        ctx.stroke();
+    }
+
+    // Per-engine crossover line — reads from a_/b_ APVTS directly (not via
+    // logical resolver) since each pane shows its own engine's threshold.
+    const xoverParam = (side === 'B') ? 'b_phantom_threshold' : 'a_phantom_threshold';
+    const xoverState = window.Juce?.getSliderState?.(xoverParam);
+    if (xoverState) {
+        const xoverHz = xoverState.getScaledValue();
+        if (xoverHz > 20 && xoverHz < 20000) {
+            const xPos = Math.round(freqToX(xoverHz, paneW));
+            ctx.save();
+            ctx.strokeStyle = 'rgba(80,142,215,0.38)';
+            ctx.lineWidth   = 1;
+            ctx.setLineDash([3, 4]);
+            ctx.beginPath();
+            ctx.moveTo(xPos + 0.5, 0);
+            ctx.lineTo(xPos + 0.5, h);
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+
+    ctx.restore();
 }
 
 // ─── Meter drawing ──────────────────────────────────────────────────────────
@@ -260,20 +374,26 @@ function drawMeter(canvas, level, peak, label) {
 }
 
 // ─── Data ingest ─────────────────────────────────────────────────────────────
+function smoothInto(target, src) {
+    if (!src || src.length < BIN_COUNT) return;
+    for (let i = 0; i < BIN_COUNT; i++) {
+        const v = +src[i] || 0;
+        target[i] += (v - target[i]) * (v > target[i] ? SMOOTH_UP : SMOOTH_DN);
+    }
+}
+
 document.addEventListener('spectrum-data', (e) => {
     const data = e.detail;
     if (!data) return;
 
-    // Accept both old flat-array format and new {input, output} object format
-    const inp = Array.isArray(data) ? data : data.input;
-    const out = Array.isArray(data) ? null  : data.output;
+    // Accept both old flat-array format and new object format
+    // (keys: input, output, engineA, engineB, viewMode)
+    const inp     = Array.isArray(data) ? data : data.input;
+    const out     = Array.isArray(data) ? null : data.output;
+    const engA    = Array.isArray(data) ? null : data.engineA;
+    const engB    = Array.isArray(data) ? null : data.engineB;
 
-    if (inp && inp.length >= BIN_COUNT) {
-        for (let i = 0; i < BIN_COUNT; i++) {
-            const v = +inp[i] || 0;
-            smoothedIn[i] += (v - smoothedIn[i]) * (v > smoothedIn[i] ? SMOOTH_UP : SMOOTH_DN);
-        }
-    }
+    smoothInto(smoothedIn, inp);
 
     if (out && out.length >= BIN_COUNT) {
         for (let i = 0; i < BIN_COUNT; i++) {
@@ -282,6 +402,13 @@ document.addEventListener('spectrum-data', (e) => {
             if (smoothedOut[i] > peakOut[i]) peakOut[i] = smoothedOut[i];
             else peakOut[i] = Math.max(0, peakOut[i] - PEAK_DECAY);
         }
+    }
+
+    smoothInto(smoothedEngineA, engA);
+    smoothInto(smoothedEngineB, engB);
+
+    if (!Array.isArray(data) && typeof data.viewMode === 'string') {
+        viewMode = data.viewMode;
     }
 });
 
