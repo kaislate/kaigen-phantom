@@ -22,6 +22,7 @@ add_executable(KaigenPhantomTests
     RoutingTests.cpp
     ModulatorTests.cpp
     ModulationEngineTests.cpp
+    RoutingMutationTests.cpp
     ../Source/Engines/BinauralStage.cpp
     ../Source/Engines/BassExtractor.cpp
     ../Source/Engines/Waveshaper.cpp
