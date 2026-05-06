@@ -1,1 +1,127 @@
-/* Source/WebUI/matrix.css — matrix view styles. Populated in Task 4+. */
+/* Source/WebUI/matrix.css — matrix view styles. */
+
+.modulation-matrix {
+  background: #0a0c10;
+  border-radius: 6px;
+  margin: 0 12px 8px;
+  padding: 12px;
+  color: #c8d8ea;
+  font: 11px/1.3 'Space Grotesk', system-ui, sans-serif;
+}
+
+.mtx-engine-label {
+  font: 700 10px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 3px;
+  margin-bottom: 8px;
+}
+.mtx-engine-a .mtx-engine-label { color: rgba(74, 144, 226, 0.65); }
+.mtx-engine-b .mtx-engine-label { color: rgba(93, 211, 224, 0.65); }
+
+.mtx-engine-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  margin: 16px 0 6px;
+}
+
+.mtx-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.mtx-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.mtx-mod {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(20, 24, 30, 0.5);
+  border-left: 2px solid transparent;
+  border-radius: 3px 0 0 3px;
+}
+.mtx-mod-macro  { border-left-color: #5DD3E0; }
+.mtx-mod-lfo    { border-left-color: #4A90E2; }
+.mtx-mod-random { border-left-color: #6B5DC9; }
+.mtx-mod.is-placeholder { opacity: 0.55; }
+
+.mtx-mod-anim {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.mtx-ring {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: conic-gradient(currentColor calc(var(--v, 0) * 1%), rgba(255,255,255,0.08) 0);
+  position: relative;
+  color: #5DD3E0;
+}
+.mtx-ring::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: #0a0c10;
+}
+
+.mtx-mod-lfo .mtx-mod-anim svg {
+  width: 24px;
+  height: 14px;
+  color: #4A90E2;
+}
+
+.mtx-scatter {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 1px;
+  color: #9990E0;
+}
+.mtx-scatter i {
+  background: currentColor;
+  opacity: 0.3;
+  border-radius: 50%;
+}
+.mtx-scatter i:nth-child(1) { opacity: 0.8; }
+.mtx-scatter i:nth-child(5) { opacity: 0.6; }
+.mtx-scatter i:nth-child(7) { opacity: 0.9; }
+
+.mtx-mod-name {
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  font-size: 9px;
+  line-height: 1;
+}
+.mtx-mod-macro  .mtx-mod-name { color: #5DD3E0; }
+.mtx-mod-lfo    .mtx-mod-name { color: #4A90E2; }
+.mtx-mod-random .mtx-mod-name { color: #9990E0; }
+
+.mtx-mod-val {
+  font: 600 9px/1 monospace;
+  color: rgba(255, 255, 255, 0.55);
+  margin-left: auto;
+}
+.mtx-mod.is-placeholder .mtx-mod-val { font-size: 8px; }
+
+.mtx-cells {
+  display: grid;
+  grid-template-columns: repeat(32, minmax(28px, 1fr));
+  gap: 1px;
+  background: rgba(20, 24, 30, 0.4);
+  min-height: 30px;
+}
