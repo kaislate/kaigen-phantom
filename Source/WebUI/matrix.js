@@ -93,6 +93,12 @@
     catch (e) { console.warn('[matrix] addRouting unavailable', e); }
   }
 
+  let setRoutingDepth = null;
+  if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
+    try { setRoutingDepth = window.Juce.getNativeFunction('modulationSetRoutingDepth'); }
+    catch (e) { console.warn('[matrix] setRoutingDepth unavailable', e); }
+  }
+
   // Default depth applied when adding a routing via click-to-add (Task 7) and
   // the right-click "Add at +50%" popover entry (Task 9). Centralized so the
   // two callsites stay in sync.
@@ -349,6 +355,73 @@
       }
     } catch (e) { console.warn('[matrix] addRouting failed', e); }
     // Re-render is triggered by the modulationStateChanged event from C++.
+  });
+
+  // Delegated pointerdown for drag-to-adjust on active matrix cells.
+  // Vertical drag: 100 px = full -1..+1 depth range. Dead-zone snap to 0
+  // when |depth| < 0.03 (avoids fingertip jitter). pointermove/pointerup
+  // attach to window so the drag continues even if the cursor leaves the
+  // cell bounds. setRoutingDepth is only called on pointerup — never during
+  // the live drag — to avoid spamming the C++ side at pointer-event rate.
+  document.body.addEventListener('pointerdown', (downEv) => {
+    const cell = downEv.target.closest('.mtx-cell');
+    if (!cell) return;
+    if (!cell.closest('#modulation-matrix')) return;
+    if (!cell.classList.contains('is-routed')) return;   // empty cells handled by click
+    if (downEv.button !== 0) return;                      // only left button (right = popover, Task 9)
+
+    downEv.preventDefault();   // suppress default browser drag/text-selection
+    const startY = downEv.clientY;
+    const routing = findRouting(cell.dataset.engine, cell.dataset.modId, cell.dataset.paramId);
+    if (!routing) return;       // race: cell visually routed but state stale
+    const startDepth = Math.max(-1, Math.min(1, routing.depth));
+    let dragged = false;
+
+    const onMove = (moveEv) => {
+      const dy = startY - moveEv.clientY;     // up = positive
+      if (Math.abs(dy) > 3) dragged = true;
+      let next = startDepth + dy / 100;
+      if (Math.abs(next) < 0.03) next = 0;    // dead-zone snap
+      next = Math.max(-1, Math.min(1, next));
+      // Live visual feedback during drag:
+      cell.style.setProperty('--depth-pct', String(Math.round(next * 100)));
+      cell.style.setProperty('--depth-abs', String(Math.abs(next)));
+      cell.classList.toggle('is-negative', next < 0);
+      const num = cell.querySelector('.mtx-cell-depth');
+      if (num) num.textContent = (next > 0 ? '+' : '') + Math.round(next * 100);
+    };
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      if (!dragged) return;                    // no commit on tap-without-move
+      if (!setRoutingDepth) return;
+      const finalDepth = parseInt(cell.style.getPropertyValue('--depth-pct'), 10) / 100;
+      try {
+        const result = setRoutingDepth({
+          source: cell.dataset.modId,
+          param: cell.dataset.paramId,
+          depth: finalDepth,
+        });
+        if (result && typeof result.then === 'function') {
+          result
+            .then(ok => {
+              if (ok === false) {
+                console.warn('[matrix] setRoutingDepth returned false', {
+                  modId: cell.dataset.modId,
+                  paramId: cell.dataset.paramId,
+                  depth: finalDepth,
+                });
+              }
+            })
+            .catch(e => console.warn('[matrix] setRoutingDepth rejected', e));
+        }
+      } catch (e) { console.warn('[matrix] setRoutingDepth failed', e); }
+      // Re-render comes via modulationStateChanged.
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   });
 
   // Subscribe to live state — drives the macro rings and value readouts in
