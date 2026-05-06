@@ -315,6 +315,9 @@
     }
   });
 
-  // Expose so modulation-panel.js can trigger a render on toggle-to-matrix.
-  window.kaigenRenderMatrix = render;
+  // Expose refreshFromState so the SLOTS→MATRIX toggle gets a fresh state pull
+  // every time it opens — protects against staleness when routing changes
+  // happened while the matrix was hidden (emitEventIfBrowserIsVisible is gated
+  // on visibility, so events can be missed).
+  window.kaigenRenderMatrix = refreshFromState;
 })();

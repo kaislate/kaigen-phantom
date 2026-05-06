@@ -193,28 +193,41 @@
 .mtx-cell.is-routed {
   color: #fff;
 }
+/* Routed-cell base — solid background-color; gradient overlay drives direction. */
 .mtx-cell.is-routed.mtx-cell-macro {
-  background: linear-gradient(90deg,
-              rgba(93, 211, 224, calc(0.18 + var(--depth-abs, 0) * 0.27)),
-              rgba(93, 211, 224, calc(0.18 + var(--depth-abs, 0) * 0.27)));
+  background:
+    linear-gradient(90deg, transparent, rgba(93, 211, 224, calc(0.50 * var(--depth-abs, 0)))),
+    rgba(93, 211, 224, calc(0.18 + var(--depth-abs, 0) * 0.20));
   box-shadow: inset 0 0 0 1px rgba(93, 211, 224, 0.55);
 }
 .mtx-cell.is-routed.mtx-cell-macro.is-negative {
-  background: linear-gradient(270deg,
-              rgba(93, 211, 224, calc(0.18 + var(--depth-abs, 0) * 0.27)),
-              rgba(93, 211, 224, calc(0.18 + var(--depth-abs, 0) * 0.27)));
+  background:
+    linear-gradient(270deg, transparent, rgba(93, 211, 224, calc(0.50 * var(--depth-abs, 0)))),
+    rgba(93, 211, 224, calc(0.18 + var(--depth-abs, 0) * 0.20));
 }
+
 .mtx-cell.is-routed.mtx-cell-lfo {
-  background: linear-gradient(90deg,
-              rgba(74, 144, 226, calc(0.18 + var(--depth-abs, 0) * 0.27)),
-              rgba(74, 144, 226, calc(0.18 + var(--depth-abs, 0) * 0.27)));
+  background:
+    linear-gradient(90deg, transparent, rgba(74, 144, 226, calc(0.50 * var(--depth-abs, 0)))),
+    rgba(74, 144, 226, calc(0.18 + var(--depth-abs, 0) * 0.20));
   box-shadow: inset 0 0 0 1px rgba(74, 144, 226, 0.55);
 }
+.mtx-cell.is-routed.mtx-cell-lfo.is-negative {
+  background:
+    linear-gradient(270deg, transparent, rgba(74, 144, 226, calc(0.50 * var(--depth-abs, 0)))),
+    rgba(74, 144, 226, calc(0.18 + var(--depth-abs, 0) * 0.20));
+}
+
 .mtx-cell.is-routed.mtx-cell-random {
-  background: linear-gradient(90deg,
-              rgba(107, 93, 201, calc(0.18 + var(--depth-abs, 0) * 0.27)),
-              rgba(107, 93, 201, calc(0.18 + var(--depth-abs, 0) * 0.27)));
+  background:
+    linear-gradient(90deg, transparent, rgba(107, 93, 201, calc(0.50 * var(--depth-abs, 0)))),
+    rgba(107, 93, 201, calc(0.18 + var(--depth-abs, 0) * 0.20));
   box-shadow: inset 0 0 0 1px rgba(107, 93, 201, 0.55);
+}
+.mtx-cell.is-routed.mtx-cell-random.is-negative {
+  background:
+    linear-gradient(270deg, transparent, rgba(107, 93, 201, calc(0.50 * var(--depth-abs, 0)))),
+    rgba(107, 93, 201, calc(0.18 + var(--depth-abs, 0) * 0.20));
 }
 
 .mtx-cell-depth { z-index: 1; pointer-events: none; }
