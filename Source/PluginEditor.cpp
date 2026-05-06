@@ -612,6 +612,32 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                     : PhantomProcessor::SpectrumViewMode::Split);
                 complete({});
             })
+        // ── Matrix view UI state (mode + per-engine expanded categories) ──
+        .withNativeFunction("matrixGetState",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                const auto s = self.processor.getMatrixView();
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty("mode", s.mode == kaigen::phantom::MatrixMode::Matrix ? "Matrix" : "Slots");
+                obj->setProperty("expandedA", s.expandedA);
+                obj->setProperty("expandedB", s.expandedB);
+                complete(juce::var(obj));
+            })
+        .withNativeFunction("matrixSetState",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1 || ! args[0].isObject()) { complete({}); return; }
+                auto* obj = args[0].getDynamicObject();
+                if (obj == nullptr) { complete({}); return; }
+
+                kaigen::phantom::MatrixViewState s;
+                s.mode = (obj->getProperty("mode").toString() == "Matrix")
+                         ? kaigen::phantom::MatrixMode::Matrix : kaigen::phantom::MatrixMode::Slots;
+                if (obj->hasProperty("expandedA")) s.expandedA = obj->getProperty("expandedA").toString();
+                if (obj->hasProperty("expandedB")) s.expandedB = obj->getProperty("expandedB").toString();
+                self.processor.setMatrixView(s);
+                complete(juce::var(true));
+            })
         // ── Modulation: routing CRUD + macro metadata (PR3b Task 3) ──────
         .withNativeFunction("modulationGetState",
             [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)

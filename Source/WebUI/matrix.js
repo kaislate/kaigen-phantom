@@ -603,4 +603,15 @@
   // happened while the matrix was hidden (emitEventIfBrowserIsVisible is gated
   // on visibility, so events can be missed).
   window.kaigenRenderMatrix = refreshFromState;
+
+  // Persistence accessors for the per-engine expanded-categories Set.
+  // modulation-panel.js owns the C++ matrixGetState/matrixSetState bindings
+  // and uses these to read/write the JS-side state during load + save.
+  window.kaigenGetMatrixExpanded = (engineId) =>
+    Array.from(expandedCats[engineId] || []).join(',');
+  window.kaigenSetMatrixExpanded = (engineId, csv) => {
+    expandedCats[engineId] = new Set(
+      (csv || '').split(',').map(s => s.trim()).filter(Boolean)
+    );
+  };
 })();

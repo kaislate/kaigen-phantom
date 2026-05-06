@@ -30,6 +30,38 @@
       catch (e) { console.warn('[modulation-panel] setEditorHeight unavailable', e); }
     }
 
+    // ── Persist matrix view state across sessions (Task 12) ───────────────
+    // The C++ bindings hand back a Promise (Juce.getNativeFunction wrapper),
+    // so the load is async; the save side fires-and-forgets. Both bindings
+    // are no-ops if unavailable (e.g. running under a host where the
+    // WebView bridge hasn't initialised yet).
+    let matrixGetStateBinding = null;
+    let matrixSetStateBinding = null;
+    if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
+      try { matrixGetStateBinding = window.Juce.getNativeFunction('matrixGetState'); }
+      catch (e) { console.warn('[modulation-panel] matrixGetState unavailable', e); }
+      try { matrixSetStateBinding = window.Juce.getNativeFunction('matrixSetState'); }
+      catch (e) { console.warn('[modulation-panel] matrixSetState unavailable', e); }
+    }
+
+    function saveMatrixState() {
+      if (!matrixSetStateBinding) return;
+      try {
+        const expA = (typeof window.kaigenGetMatrixExpanded === 'function')
+                     ? window.kaigenGetMatrixExpanded('A') : '';
+        const expB = (typeof window.kaigenGetMatrixExpanded === 'function')
+                     ? window.kaigenGetMatrixExpanded('B') : '';
+        matrixSetStateBinding({
+          mode: currentMode === 'matrix' ? 'Matrix' : 'Slots',
+          expandedA: expA,
+          expandedB: expB,
+        });
+      } catch (e) { console.warn('[modulation-panel] matrixSetState failed', e); }
+    }
+    // Exposed so matrix.js's category-header click handler can call it
+    // directly when the user toggles a category open/closed.
+    window.kaigenSaveMatrixState = saveMatrixState;
+
     let currentMode = 'slots';
     function applyMode(mode) {
       currentMode = mode;
@@ -53,6 +85,9 @@
       if (mode === 'matrix' && typeof window.kaigenRenderMatrix === 'function') {
         window.kaigenRenderMatrix();
       }
+      // Persist on every mode change. Category toggles call saveMatrixState
+      // directly via window.kaigenSaveMatrixState (see matrix.js).
+      saveMatrixState();
     }
     if (modeBar) {
       modeBar.querySelectorAll('.mode-btn').forEach(btn => {
@@ -63,6 +98,25 @@
       });
     }
     window.kaigenSetModulationMode = applyMode;
+
+    // Load persisted state on init: restore the per-engine expanded categories
+    // BEFORE switching mode, so the first render in Matrix mode (triggered
+    // by applyMode → kaigenRenderMatrix) reflects the saved expansion.
+    if (matrixGetStateBinding) {
+      try {
+        const result = matrixGetStateBinding();
+        if (result && typeof result.then === 'function') {
+          result.then(s => {
+            if (!s) return;
+            if (typeof window.kaigenSetMatrixExpanded === 'function') {
+              if (s.expandedA != null) window.kaigenSetMatrixExpanded('A', s.expandedA);
+              if (s.expandedB != null) window.kaigenSetMatrixExpanded('B', s.expandedB);
+            }
+            if (s.mode === 'Matrix') applyMode('matrix');
+          }).catch(e => console.warn('[modulation-panel] matrixGetState rejected', e));
+        }
+      } catch (e) { console.warn('[modulation-panel] matrixGetState failed', e); }
+    }
 
     let activeSlot = null;   // string id or null
 

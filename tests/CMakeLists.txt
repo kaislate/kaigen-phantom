@@ -19,6 +19,7 @@ add_executable(KaigenPhantomTests
     DualEngineHostTests.cpp
     EngineFocusTests.cpp
     SpectrumViewModeTests.cpp
+    MatrixViewStatePersistenceTest.cpp
     RoutingTests.cpp
     ModulatorTests.cpp
     ModulationEngineTests.cpp

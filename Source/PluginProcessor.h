@@ -6,6 +6,7 @@
 #include "DualEngineHost.h"
 #include "EngineFocus.h"
 #include "SpectrumViewMode.h"
+#include "MatrixViewState.h"
 #include "Modulation/ModulationEngine.h"
 #include "Modulation/Macro.h"
 
@@ -120,6 +121,12 @@ public:
     SpectrumViewMode getSpectrumViewMode() const noexcept { return spectrumViewMode; }
     void setSpectrumViewMode(SpectrumViewMode m) noexcept { spectrumViewMode = m; }
 
+    // Matrix view state — editor-state, persisted in plugin state.
+    using MatrixViewState = kaigen::phantom::MatrixViewState;
+
+    MatrixViewState getMatrixView() const                      { return matrixView; }
+    void            setMatrixView(const MatrixViewState& s)    { matrixView = s; }
+
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout();
@@ -175,6 +182,10 @@ private:
     EngineFocus engineFocus;
 
     SpectrumViewMode spectrumViewMode { SpectrumViewMode::Split };
+
+    // Matrix view UI state (mode + per-engine expanded categories).
+    // Layout/UI concern only — routing data lives in <ModulationConfig>.
+    kaigen::phantom::MatrixViewState matrixView;
 
     // ─── Modulation engines (PR3a) ────────────────────────────────────────
     // Declared after `apvts` (public, above) so the references they hold
