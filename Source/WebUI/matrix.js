@@ -93,6 +93,11 @@
     catch (e) { console.warn('[matrix] addRouting unavailable', e); }
   }
 
+  // Default depth applied when adding a routing via click-to-add (Task 7) and
+  // the right-click "Add at +50%" popover entry (Task 9). Centralized so the
+  // two callsites stay in sync.
+  const DEFAULT_ADD_DEPTH = 0.5;
+
   let lastState = { engineA: { routings: [] }, engineB: { routings: [] } };
 
   async function pullState() {
@@ -171,22 +176,12 @@
       cell.appendChild(num);
     }
 
-    // Click an empty cell to add a routing at +50% default depth.
-    // Active cells will get drag-to-adjust + right-click in Tasks 8-9; the
-    // is-routed early-exit lets those handlers (added later) own active cells.
-    cell.addEventListener('click', () => {
-      if (cell.classList.contains('is-routed')) return;
-      if (!addRouting) return;
-      try {
-        addRouting({
-          source: modId,
-          param: cell.dataset.paramId,
-          depth: 0.5,
-        });
-      } catch (e) { console.warn('[matrix] addRouting failed', e); }
-      // Re-render is triggered by modulationStateChanged event from C++.
-    });
-
+    // Click handling for cells is delegated on document.body — see the
+    // delegated 'click' listener near the bottom of the IIFE. Adding a
+    // per-cell listener here would scale poorly: ~280 cells × every render
+    // = hundreds of attachments per state mutation. Cells in the routed
+    // state are owned by the pointerdown drag handler (Task 8) and the
+    // right-click popover (Task 9).
     return cell;
   }
 
@@ -321,6 +316,40 @@
   // Pull state once at startup so the first render() (triggered by SLOTS→MATRIX
   // toggle) has data even if the toggle happens before any routing mutation.
   refreshFromState();
+
+  // Delegated click handler for empty matrix cells. Catches clicks anywhere
+  // in the matrix tree, filters to .mtx-cell elements, and adds a routing
+  // when the cell is empty. Cells in the routed state are owned by the
+  // pointerdown drag handler (Task 8) and right-click popover (Task 9).
+  // Delegation here means we attach ONE listener instead of one per cell;
+  // re-renders don't re-bind anything.
+  document.body.addEventListener('click', (ev) => {
+    const cell = ev.target.closest('.mtx-cell');
+    if (!cell) return;
+    if (!cell.closest('#modulation-matrix')) return;  // only matrix cells
+    if (cell.classList.contains('is-routed')) return;
+    if (!addRouting) return;
+    try {
+      const result = addRouting({
+        source: cell.dataset.modId,
+        param: cell.dataset.paramId,
+        depth: DEFAULT_ADD_DEPTH,
+      });
+      if (result && typeof result.then === 'function') {
+        result
+          .then(ok => {
+            if (ok === false) {
+              console.warn('[matrix] addRouting returned false', {
+                modId: cell.dataset.modId,
+                paramId: cell.dataset.paramId,
+              });
+            }
+          })
+          .catch(e => console.warn('[matrix] addRouting rejected', e));
+      }
+    } catch (e) { console.warn('[matrix] addRouting failed', e); }
+    // Re-render is triggered by the modulationStateChanged event from C++.
+  });
 
   // Subscribe to live state — drives the macro rings and value readouts in
   // the matrix's modulator strip. Only updates the matrix when it's visible.
