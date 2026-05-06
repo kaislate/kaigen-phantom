@@ -1,5 +1,7 @@
 # PR 3b: Macro Editor UI Implementation Plan
 
+> **Superseded by PR3b-rev (2026-05-06):** The drawer + per-macro editor described in Tasks 4–6 of this plan was replaced by a Vital/Roar-style matrix view. See `docs/superpowers/specs/2026-05-06-pr3b-rev-matrix-view-design.md` and `docs/superpowers/plans/2026-05-06-pr3b-rev-matrix-view.md`. Tasks 1–3 (C++ framework + native bindings) of this plan are still in effect; their code shipped in PR3a (commit `e4ed112`).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add the bottom modulation panel (11-slot row from the spec), drawer-expansion mechanics, and a working macro editor inside the drawer. Users can directly control macros from the plugin UI (no longer host-automation only), name them ("Motion", "Shape", etc.), add/remove routing destinations via a param-picker dropdown, and adjust per-routing depth. PR3a's hardcoded proof-of-life routing is removed once users can create their own.
