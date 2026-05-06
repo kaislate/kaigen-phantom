@@ -20,11 +20,12 @@
   init();
 
   function init() {
-    const getState   = window.Juce.getNativeFunction('modulationGetState');
-    const addRouting = window.Juce.getNativeFunction('modulationAddRouting');
-    const rmRouting  = window.Juce.getNativeFunction('modulationRemoveRouting');
-    const setDepth   = window.Juce.getNativeFunction('modulationSetRoutingDepth');
-    const setName    = window.Juce.getNativeFunction('modulationSetMacroName');
+    const getState     = window.Juce.getNativeFunction('modulationGetState');
+    const addRouting   = window.Juce.getNativeFunction('modulationAddRouting');
+    const rmRouting    = window.Juce.getNativeFunction('modulationRemoveRouting');
+    const setDepth     = window.Juce.getNativeFunction('modulationSetRoutingDepth');
+    const setName      = window.Juce.getNativeFunction('modulationSetMacroName');
+    const getLiveState = window.Juce.getNativeFunction('modulationGetLiveState');
     if (!getState || !addRouting || !rmRouting || !setDepth || !setName) {
       console.warn('[macro-editor] native bindings missing'); return;
     }
@@ -163,16 +164,56 @@
         right.appendChild(empty);
       } else {
         macroRoutings.forEach(r => {
-          const eligibleEntry = (eng.eligible || []).find(e => e.id === r.param);
-          const displayName = eligibleEntry ? eligibleEntry.name : r.param;
-
           const row = document.createElement('div');
           row.className = 'macro-editor-row';
 
-          const name = document.createElement('span');
-          name.className = 'macro-editor-row-name';
-          name.textContent = displayName;
-          row.appendChild(name);
+          // Param-name select — lets user swap target without delete + re-add.
+          const select = document.createElement('select');
+          select.className = 'macro-editor-row-select';
+
+          // Other routings (excluding this row's) — those params are not selectable
+          // because they're already used by another row.
+          const otherRoutedParams = new Set(
+            macroRoutings.filter(other => other.param !== r.param).map(o => o.param)
+          );
+
+          // Always include the current param FIRST so it's the selected option.
+          const currentEntry = (eng.eligible || []).find(e => e.id === r.param);
+          if (currentEntry) {
+            const opt = document.createElement('option');
+            opt.value = currentEntry.id;
+            opt.textContent = currentEntry.name;
+            opt.selected = true;
+            select.appendChild(opt);
+          } else {
+            // Fall back to raw paramId if eligible list doesn't have it (shouldn't happen).
+            const opt = document.createElement('option');
+            opt.value = r.param;
+            opt.textContent = r.param;
+            opt.selected = true;
+            select.appendChild(opt);
+          }
+
+          // Add the rest of the eligible params (skip current + skip those used by other rows).
+          (eng.eligible || []).forEach(e => {
+            if (e.id === r.param) return;
+            if (otherRoutedParams.has(e.id)) return;
+            const opt = document.createElement('option');
+            opt.value = e.id;
+            opt.textContent = e.name;
+            select.appendChild(opt);
+          });
+
+          select.addEventListener('change', async () => {
+            const newParam = select.value;
+            if (newParam === r.param) return;   // no change
+            // Atomic swap: remove old routing, add new with same depth.
+            await rmRouting({ source: macroId, param: r.param });
+            await addRouting({ source: macroId, param: newParam, depth: r.depth });
+            await render(host, macroId);
+          });
+
+          row.appendChild(select);
 
           const slider = document.createElement('input');
           slider.type = 'range';
@@ -194,6 +235,15 @@
             const v = parseFloat(slider.value);
             valLabel.textContent = (v > 0 ? '+' : '') + Math.round(v * 100) + '%';
           });
+
+          // Live diagnostic — shows base → modulated as the macro sweeps. Temporary.
+          const liveLabel = document.createElement('span');
+          liveLabel.className = 'macro-editor-row-live';
+          liveLabel.textContent = '...';
+          // Tag for the polling loop to find it later.
+          liveLabel.dataset.routingParam = r.param;
+          liveLabel.dataset.routingSource = macroId;
+          row.appendChild(liveLabel);
 
           const removeBtn = document.createElement('button');
           removeBtn.className = 'macro-editor-row-remove';
@@ -259,6 +309,39 @@
       right.appendChild(close);
 
       host.appendChild(right);
+
+      // Start (or keep running) the live poll for diagnostic labels.
+      startLivePolling(host);
+    }
+
+    // Live polling — updates the diagnostic labels at 15fps when the drawer
+    // is open. Cheap; one native binding round-trip per tick.
+    let livePollHandle = null;
+    function startLivePolling(host) {
+      if (livePollHandle) return;
+      if (!getLiveState) return;   // binding not available — skip silently
+      livePollHandle = setInterval(async () => {
+        if (! host.isConnected) {
+          stopLivePolling();
+          return;
+        }
+        try {
+          const live = await getLiveState();
+          if (! live) return;
+          const all = [...(live.engineA || []), ...(live.engineB || [])];
+          host.querySelectorAll('.macro-editor-row-live').forEach(el => {
+            const src = el.dataset.routingSource;
+            const par = el.dataset.routingParam;
+            const row = all.find(x => x.source === src && x.param === par);
+            if (! row) return;
+            const fmt = (x) => (Math.round(x * 100) / 100).toString();
+            el.textContent = `${fmt(row.base)} → ${fmt(row.modulated)} (mod=${fmt(row.modValue)})`;
+          });
+        } catch (e) { /* ignore poll errors */ }
+      }, 67);   // ~15fps
+    }
+    function stopLivePolling() {
+      if (livePollHandle) { clearInterval(livePollHandle); livePollHandle = null; }
     }
 
     // Expose for modulation-panel.js to call.

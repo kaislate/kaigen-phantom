@@ -678,6 +678,43 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
 
                 complete(juce::var(root.get()));
             })
+        .withNativeFunction("modulationGetLiveState", [&self]
+            (const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+        {
+            juce::DynamicObject::Ptr root = new juce::DynamicObject();
+
+            auto buildEngine = [&](kaigen::phantom::ModulationEngine& eng) -> juce::var
+            {
+                juce::Array<juce::var> rows;
+                auto snapshot = eng.getRoutingsSnapshot();
+                for (const auto& r : *snapshot)
+                {
+                    juce::DynamicObject::Ptr rObj = new juce::DynamicObject();
+                    rObj->setProperty("source", r.sourceId);
+                    rObj->setProperty("param",  r.paramId);
+
+                    // Base value from APVTS
+                    float base = 0.0f;
+                    if (auto* p = self.processor.apvts.getRawParameterValue(r.paramId))
+                        base = p->load();
+                    rObj->setProperty("base", base);
+
+                    // Modulated value from the engine
+                    rObj->setProperty("modulated", eng.getModulatedValue(r.paramId, base));
+
+                    // Modulator's live value
+                    auto* m = eng.findModulator(r.sourceId);
+                    rObj->setProperty("modValue", m ? m->getCurrentValue() : 0.0f);
+
+                    rows.add(juce::var(rObj.get()));
+                }
+                return juce::var(rows);
+            };
+
+            root->setProperty("engineA", buildEngine(self.processor.getModulationEngineA()));
+            root->setProperty("engineB", buildEngine(self.processor.getModulationEngineB()));
+            complete(juce::var(root.get()));
+        })
         .withNativeFunction("modulationAddRouting",
             [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
