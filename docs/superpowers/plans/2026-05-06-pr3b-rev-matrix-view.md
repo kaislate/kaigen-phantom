@@ -1114,7 +1114,7 @@ At the top of `matrix.js`'s IIFE, after the `expandedCats` declaration, add:
   function findRouting(engineId, modId, paramId) {
     const eng = engineId === 'A' ? lastState.engineA : lastState.engineB;
     if (!eng || !Array.isArray(eng.routings)) return null;
-    return eng.routings.find(r => r.sourceId === modId && r.paramId === paramId) || null;
+    return eng.routings.find(r => r.source === modId && r.param === paramId) || null;
   }
 ```
 
@@ -1276,11 +1276,9 @@ In `makeEngineBlock`, find the cell creation block. After the line `cell.title =
               if (!addRouting) return;
               try {
                 addRouting({
-                  engine: engineId,
-                  sourceId: mod.id,
-                  paramId,
+                  source: mod.id,
+                  param: paramId,
                   depth: 0.5,
-                  polarityInverted: false,
                 });
               } catch (e) { console.warn('[matrix] addRouting failed', e); }
               // Re-render via the modulationStateChanged event the binding fires.
@@ -1352,9 +1350,8 @@ In `makeEngineBlock`, replace the cell click handler from Task 7 with this expan
                 const finalDepth = parseInt(cell.style.getPropertyValue('--depth-pct'), 10) / 100;
                 try {
                   setRoutingDepth({
-                    engine: engineId,
-                    sourceId: mod.id,
-                    paramId,
+                    source: mod.id,
+                    param: paramId,
                     depth: finalDepth,
                   });
                 } catch (e) { console.warn('[matrix] setRoutingDepth failed', e); }
@@ -1369,11 +1366,9 @@ In `makeEngineBlock`, replace the cell click handler from Task 7 with this expan
               if (!addRouting) return;
               try {
                 addRouting({
-                  engine: engineId,
-                  sourceId: mod.id,
-                  paramId,
+                  source: mod.id,
+                  param: paramId,
                   depth: 0.5,
-                  polarityInverted: false,
                 });
               } catch (e) { console.warn('[matrix] addRouting failed', e); }
             });
@@ -1454,15 +1449,15 @@ Inside the cell-creation block (after the existing `pointerdown` and `click` han
               ev.preventDefault();
               const items = cell.classList.contains('is-routed')
                 ? [
-                    { label: '−100',   onClick: () => setRoutingDepth({ engine: engineId, sourceId: mod.id, paramId, depth: -1 }) },
-                    { label: '0',      onClick: () => setRoutingDepth({ engine: engineId, sourceId: mod.id, paramId, depth: 0 }) },
-                    { label: '+50',    onClick: () => setRoutingDepth({ engine: engineId, sourceId: mod.id, paramId, depth: 0.5 }) },
-                    { label: '+100',   onClick: () => setRoutingDepth({ engine: engineId, sourceId: mod.id, paramId, depth: 1 }) },
-                    { label: 'Remove', danger: true, onClick: () => removeRouting({ engine: engineId, sourceId: mod.id, paramId }) },
+                    { label: '−100',   onClick: () => setRoutingDepth({ source: mod.id, param: paramId, depth: -1 }) },
+                    { label: '0',      onClick: () => setRoutingDepth({ source: mod.id, param: paramId, depth: 0 }) },
+                    { label: '+50',    onClick: () => setRoutingDepth({ source: mod.id, param: paramId, depth: 0.5 }) },
+                    { label: '+100',   onClick: () => setRoutingDepth({ source: mod.id, param: paramId, depth: 1 }) },
+                    { label: 'Remove', danger: true, onClick: () => removeRouting({ source: mod.id, param: paramId }) },
                   ]
                 : [
-                    { label: 'Add at +50', onClick: () => addRouting({ engine: engineId, sourceId: mod.id, paramId, depth: 0.5,  polarityInverted: false }) },
-                    { label: 'Add at −50', onClick: () => addRouting({ engine: engineId, sourceId: mod.id, paramId, depth: -0.5, polarityInverted: false }) },
+                    { label: 'Add at +50', onClick: () => addRouting({ source: mod.id, param: paramId, depth: 0.5  }) },
+                    { label: 'Add at −50', onClick: () => addRouting({ source: mod.id, param: paramId, depth: -0.5 }) },
                   ];
               openPopover(ev.pageX, ev.pageY, items);
             });
@@ -1574,7 +1569,7 @@ Replace `function makeModRow(mod)` with:
         input.maxLength = 16;
         const commit = () => {
           const v = input.value.trim() || mod.label;
-          try { setMacroName({ engine: eng, sourceId: mod.id, name: v }); }
+          try { setMacroName({ source: mod.id, name: v }); }
           catch (e) { console.warn('[matrix] setMacroName failed', e); }
         };
         const cancel = () => render();
@@ -2011,9 +2006,9 @@ In `Source/WebUI/modulation-panel.js`, near the bottom of `init()`, add:
               totalRoutings += eng.routings.length;
               const seen = new Set();
               for (const r of eng.routings) {
-                if (r.sourceId.startsWith('macro') && !seen.has(r.sourceId)) {
+                if (r.source.startsWith('macro') && !seen.has(r.source)) {
                   activeMacros++;
-                  seen.add(r.sourceId);
+                  seen.add(r.source);
                 }
               }
             }
