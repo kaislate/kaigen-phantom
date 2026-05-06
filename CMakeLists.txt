@@ -73,7 +73,6 @@ juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/preset-system.js
     Source/WebUI/morph.js
     Source/WebUI/modulation-panel.js
-    Source/WebUI/macro-editor.js
     Source/WebUI/live-modulation.js
     Source/WebUI/matrix.js
 )

@@ -1,9 +1,9 @@
 // Source/WebUI/modulation-panel.js
 //
-// Bottom modulation panel controller. Tracks which slot (if any) is
-// currently expanded in the drawer. Click handlers on macro slots
-// toggle the drawer + load the macro editor. Other slot types are
-// inert until PR4 (LFO) and PR5 (Random) wire them.
+// Bottom modulation panel controller. Owns the SLOTS/MATRIX mode toggle,
+// matrix view persistence, header counter, and slot live-state rings.
+// Macro slot clicks switch into MATRIX mode and highlight the row;
+// LFO/Random/Morph slots are inert until later PRs.
 
 (function () {
   'use strict';
@@ -16,14 +16,13 @@
 
   function init() {
     const panel  = document.getElementById('modulation-panel');
-    const drawer = document.getElementById('modulation-drawer');
-    if (!panel || !drawer) return;
+    if (!panel) return;
 
     // ── SLOTS / MATRIX mode toggle ────────────────────────────────────────
     const matrix = document.getElementById('modulation-matrix');
     const modeBar = panel.querySelector('.modulation-mode-toggle');
     const BASE_HEIGHT     = 820;
-    const MATRIX_EXPANDED = BASE_HEIGHT + 320;   // matrix needs more vertical room than drawer
+    const MATRIX_EXPANDED = BASE_HEIGHT + 320;   // matrix needs more vertical room than the slot row alone
     let setEditorHeight = null;
     if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
       try { setEditorHeight = window.Juce.getNativeFunction('setEditorHeight'); }
@@ -118,112 +117,9 @@
       } catch (e) { console.warn('[modulation-panel] matrixGetState failed', e); }
     }
 
-    let activeSlot = null;   // string id or null
-
-    // .wrap is overflow:hidden with a fixed 820px height. The drawer's
-    // 160px expansion gets clipped without growing the host window. Use
-    // the existing setEditorHeight native binding (PluginEditor.cpp) to
-    // resize the editor to match. Same pattern as advanced-mode in
-    // phantom.js (which uses 820 → 1020 for its 200px panel).
-    // BASE_HEIGHT and setEditorHeight are already declared above for the
-    // SLOTS/MATRIX mode toggle — reuse them here.
-    const DRAWER_EXPANDED = BASE_HEIGHT + 160;  // matches .modulation-drawer.is-open max-height
-    const DRAWER_TRANSITION_MS = 220;
-    function growEditor()   { if (setEditorHeight) try { setEditorHeight(DRAWER_EXPANDED); } catch (e) {} }
-    function shrinkEditor() {
-      // Shrink only after the CSS transition finishes — otherwise the
-      // window snaps small while the drawer is still mid-collapse and
-      // the bottom row gets clipped.
-      if (!setEditorHeight) return;
-      setTimeout(() => { try { setEditorHeight(BASE_HEIGHT); } catch (e) {} }, DRAWER_TRANSITION_MS + 20);
-    }
-
-    function closeDrawer() {
-      drawer.classList.remove('is-open');
-      drawer.setAttribute('aria-hidden', 'true');
-      drawer.replaceChildren();
-      if (activeSlot) {
-        const prev = panel.querySelector(`.mod-slot[data-slot-id="${activeSlot}"]`);
-        if (prev) prev.classList.remove('is-active');
-      }
-      activeSlot = null;
-      shrinkEditor();
-    }
-
-    function openSlot(slotId, slotType) {
-      // Only macros work in PR3b.
-      if (slotType !== 'macro') return;
-
-      // Toggle: clicking the active slot closes the drawer.
-      if (activeSlot === slotId) {
-        closeDrawer();
-        return;
-      }
-
-      // Auto-switch engine focus to match the macro's scope. Macros 1+2 are
-      // engine A; macros 3+4 are engine B. The user editing macro 3's
-      // routings sees engine B's eligible params, so the surrounding plugin
-      // UI should also be on engine B — otherwise the visible knobs are
-      // from a different engine than the picker is offering.
-      const wantTab = (slotId === 'macro3' || slotId === 'macro4') ? 'B' : 'A';
-      if (window.__kaigenActiveTab !== wantTab) {
-        window.__kaigenActiveTab = wantTab;
-        let engineSetFocus = null;
-        if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
-          try { engineSetFocus = window.Juce.getNativeFunction('engineSetFocus'); }
-          catch (e) { /* binding unavailable; only update JS state */ }
-        }
-        if (engineSetFocus) {
-          try {
-            engineSetFocus({ activeTab: wantTab, linkOn: !!window.__kaigenLinkOn });
-          } catch (e) { console.warn('[modulation-panel] engineSetFocus failed', e); }
-        }
-        if (window.Juce && typeof window.Juce.broadcastKaigenTabChanged === 'function') {
-          window.Juce.broadcastKaigenTabChanged();
-        }
-        // Mirror phantom.js's applyToUI for the visible A | B | LINK buttons
-        // — phantom.js only updates them on its own click handlers, so we
-        // have to keep them in sync ourselves here.
-        const tabA = document.getElementById('engine-tab-a');
-        const tabB = document.getElementById('engine-tab-b');
-        if (tabA && tabB) {
-          tabA.classList.toggle('is-active', wantTab === 'A');
-          tabA.setAttribute('aria-selected', wantTab === 'A' ? 'true' : 'false');
-          tabB.classList.toggle('is-active', wantTab === 'B');
-          tabB.setAttribute('aria-selected', wantTab === 'B' ? 'true' : 'false');
-        }
-      }
-
-      // First-time open (no active slot yet): grow the editor before the
-      // CSS transition starts so the new vertical space is already there
-      // when max-height animates up. Re-opens (different slot) skip the
-      // grow because the editor is already tall enough.
-      const wasClosed = (activeSlot === null);
-
-      // Reassign active highlighting.
-      if (activeSlot) {
-        const prev = panel.querySelector(`.mod-slot[data-slot-id="${activeSlot}"]`);
-        if (prev) prev.classList.remove('is-active');
-      }
-      const next = panel.querySelector(`.mod-slot[data-slot-id="${slotId}"]`);
-      if (next) next.classList.add('is-active');
-      activeSlot = slotId;
-
-      // Render the macro editor into the drawer.
-      drawer.replaceChildren();
-      if (typeof window.kaigenRenderMacroEditor === 'function') {
-        window.kaigenRenderMacroEditor(drawer, slotId);
-      }
-      drawer.classList.add('is-open');
-      drawer.setAttribute('aria-hidden', 'false');
-
-      if (wasClosed) growEditor();
-    }
-
-    // Wire slot click handlers. For macros, hand off to MATRIX mode + briefly
-    // highlight the matching row instead of opening the drawer (Task 13).
-    // The drawer's openSlot() is left intact for now — Task 14 deletes it.
-    // LFO/Random/Morph slots remain inert in this PR.
+    // Wire slot click handlers. For macros, switch to MATRIX mode and
+    // briefly highlight the matching row (Task 13). LFO/Random/Morph
+    // slots remain inert in this PR.
     panel.querySelectorAll('.mod-slot').forEach(btn => {
       if (btn.disabled) return;
       btn.addEventListener('click', () => {
@@ -231,10 +127,10 @@
         const type = btn.getAttribute('data-slot-type');
 
         if (type === 'macro') {
-          // Engine-focus auto-switch (preserved from drawer-era openSlot).
-          // Macros 1+2 are engine A; macros 3+4 are engine B. The user
-          // editing macro 3's routings sees engine B's eligible params, so
-          // the surrounding plugin UI should also be on engine B.
+          // Engine-focus auto-switch. Macros 1+2 are engine A; macros 3+4
+          // are engine B. The user editing macro 3's routings sees engine
+          // B's eligible params, so the surrounding plugin UI should also
+          // be on engine B.
           const wantTab = (id === 'macro3' || id === 'macro4') ? 'B' : 'A';
           if (window.__kaigenActiveTab !== wantTab) {
             window.__kaigenActiveTab = wantTab;
@@ -269,9 +165,6 @@
         // LFO/Random/Morph slots: inert in this PR (PR4/PR5 wire LFO/Random).
       });
     });
-
-    // Expose for macro editor's "close" button.
-    window.kaigenCloseModulationDrawer = closeDrawer;
 
     // Live ring updates for macro + morph slots. Each event carries
     // { macros: { macro1: { value }, ... }, morph_amount: <number> } from the
