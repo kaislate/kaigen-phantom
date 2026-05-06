@@ -101,6 +101,15 @@
         try { setEditorHeight(mode === 'matrix' ? MATRIX_EXPANDED : BASE_HEIGHT); }
         catch (e) {}
       }
+      // Gate the live-modulation poll on matrix mode. SLOTS view doesn't need
+      // the poll because phantom-knobs drive macro display via native APVTS
+      // attachment; pausing the poll prevents allocation churn on the message
+      // thread that was causing visible knob jitter during drags.
+      if (mode === 'matrix') {
+        if (typeof window.kaigenStartLiveModulationPoll === 'function') window.kaigenStartLiveModulationPoll();
+      } else {
+        if (typeof window.kaigenStopLiveModulationPoll === 'function') window.kaigenStopLiveModulationPoll();
+      }
       // Tell the matrix to (re)render now that it's visible.
       if (mode === 'matrix' && typeof window.kaigenRenderMatrix === 'function') {
         window.kaigenRenderMatrix();
