@@ -125,10 +125,13 @@ juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/styles.css
     Source/WebUI/matrix.css
     Source/WebUI/knob.js
-    Source/WebUI/juce-frontend.js
+    Source/WebUI/knob-mini.js
     Source/WebUI/phantom.js
-    Source/WebUI/oscilloscope.js
     Source/WebUI/spectrum.js
+    Source/WebUI/recipe-wheel.js
+    Source/WebUI/oscilloscope.js
+    Source/WebUI/circuit-board.js
+    Source/WebUI/juce-frontend.js
     Source/WebUI/preset-spectrum.js
     Source/WebUI/preset-system.js
     Source/WebUI/morph.js
@@ -139,7 +142,7 @@ juce_add_binary_data(PhantomWebUI SOURCES
 )
 ```
 
-(Keep `macro-editor.js` for now — deletion is Task 14.)
+(Keep `macro-editor.js`, `knob-mini.js`, `recipe-wheel.js`, and `circuit-board.js` — those are still in use. Only `macro-editor.js` is removed in Task 14.)
 
 - [ ] **Step 3: Add SLOTS/MATRIX toggle + matrix container to `index.html`**
 
