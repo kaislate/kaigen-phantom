@@ -231,3 +231,36 @@
 }
 
 .mtx-cell-depth { z-index: 1; pointer-events: none; }
+
+.mtx-popover {
+  position: absolute;
+  background: #15181d;
+  border: 1px solid rgba(93, 211, 224, 0.3);
+  border-radius: 4px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 1000;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  font: 600 10px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 1px;
+}
+.mtx-popover-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 6px 12px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.mtx-popover-btn:hover {
+  background: rgba(93, 211, 224, 0.18);
+  color: #5DD3E0;
+}
+.mtx-popover-btn.is-danger { color: rgba(232, 100, 100, 0.85); }
+.mtx-popover-btn.is-danger:hover {
+  background: rgba(232, 100, 100, 0.18);
+  color: #ff8585;
+}

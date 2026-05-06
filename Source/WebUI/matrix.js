@@ -99,6 +99,12 @@
     catch (e) { console.warn('[matrix] setRoutingDepth unavailable', e); }
   }
 
+  let removeRouting = null;
+  if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
+    try { removeRouting = window.Juce.getNativeFunction('modulationRemoveRouting'); }
+    catch (e) { console.warn('[matrix] removeRouting unavailable', e); }
+  }
+
   // Default depth applied when adding a routing via click-to-add (Task 7) and
   // the right-click "Add at +50%" popover entry (Task 9). Centralized so the
   // two callsites stay in sync.
@@ -422,6 +428,82 @@
 
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+  });
+
+  // ── Popover (right-click cell quick-actions) ──────────────────────────
+  let activePopover = null;
+  function closePopover() {
+    if (activePopover && activePopover.parentNode) activePopover.remove();
+    activePopover = null;
+    document.removeEventListener('click', onDocClickOutside, true);
+  }
+  function onDocClickOutside(ev) {
+    if (activePopover && !activePopover.contains(ev.target)) closePopover();
+  }
+  function openPopover(x, y, items) {
+    closePopover();
+    const pop = document.createElement('div');
+    pop.className = 'mtx-popover';
+    pop.style.left = x + 'px';
+    pop.style.top  = y + 'px';
+    for (const item of items) {
+      const btn = document.createElement('button');
+      btn.className = 'mtx-popover-btn' + (item.danger ? ' is-danger' : '');
+      btn.textContent = item.label;
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        try { item.onClick(); } finally { closePopover(); }
+      });
+      pop.appendChild(btn);
+    }
+    document.body.appendChild(pop);
+    activePopover = pop;
+    // Defer outside-click registration so the contextmenu's own bubbling
+    // click doesn't immediately close the popover we just opened.
+    setTimeout(() => document.addEventListener('click', onDocClickOutside, true), 0);
+  }
+
+  // Delegated contextmenu for cell quick-actions popover.
+  document.body.addEventListener('contextmenu', (ev) => {
+    const cell = ev.target.closest('.mtx-cell');
+    if (!cell) return;
+    if (!cell.closest('#modulation-matrix')) return;
+    ev.preventDefault();   // suppress default browser context menu
+
+    const source = cell.dataset.modId;
+    const param  = cell.dataset.paramId;
+    const isRouted = cell.classList.contains('is-routed');
+
+    // Wrapper: invoke a binding with .then(ok) diagnostic — same shape
+    // as the click and drag handlers.
+    function invoke(fn, name, payload) {
+      if (!fn) return;
+      try {
+        const result = fn(payload);
+        if (result && typeof result.then === 'function') {
+          result
+            .then(ok => {
+              if (ok === false) console.warn(`[matrix] ${name} returned false`, payload);
+            })
+            .catch(e => console.warn(`[matrix] ${name} rejected`, e));
+        }
+      } catch (e) { console.warn(`[matrix] ${name} failed`, e); }
+    }
+
+    const items = isRouted
+      ? [
+          { label: '−100', onClick: () => invoke(setRoutingDepth, 'setRoutingDepth', { source, param, depth: -1 }) },
+          { label: '0',         onClick: () => invoke(setRoutingDepth, 'setRoutingDepth', { source, param, depth: 0 }) },
+          { label: '+50',       onClick: () => invoke(setRoutingDepth, 'setRoutingDepth', { source, param, depth: 0.5 }) },
+          { label: '+100',      onClick: () => invoke(setRoutingDepth, 'setRoutingDepth', { source, param, depth: 1 }) },
+          { label: 'Remove', danger: true, onClick: () => invoke(removeRouting, 'removeRouting', { source, param }) },
+        ]
+      : [
+          { label: 'Add at +50',      onClick: () => invoke(addRouting, 'addRouting', { source, param, depth: 0.5 }) },
+          { label: 'Add at −50', onClick: () => invoke(addRouting, 'addRouting', { source, param, depth: -0.5 }) },
+        ];
+
+    openPopover(ev.pageX, ev.pageY, items);
   });
 
   // Subscribe to live state — drives the macro rings and value readouts in
