@@ -120,60 +120,78 @@
     // Wire slot click handlers. For macros, switch to MATRIX mode and
     // briefly highlight the matching row (Task 13). LFO/Random/Morph
     // slots remain inert in this PR.
-    panel.querySelectorAll('.mod-slot').forEach(btn => {
-      if (btn.disabled) return;
-      btn.addEventListener('click', () => {
-        const id   = btn.getAttribute('data-slot-id');
-        const type = btn.getAttribute('data-slot-type');
+    //
+    // Macro slots are <div> wrappers that host a <phantom-knob> + a
+    // .mod-slot-name-btn label. The knob owns its pointer events for
+    // value drag, so the matrix-handoff click target is the name button
+    // only — clicking the knob must NOT switch to MATRIX mode.
+    function handleSlotClick(slot) {
+      const id   = slot.getAttribute('data-slot-id');
+      const type = slot.getAttribute('data-slot-type');
 
-        if (type === 'macro') {
-          // Engine-focus auto-switch. Macros 1+2 are engine A; macros 3+4
-          // are engine B. The user editing macro 3's routings sees engine
-          // B's eligible params, so the surrounding plugin UI should also
-          // be on engine B.
-          const wantTab = (id === 'macro3' || id === 'macro4') ? 'B' : 'A';
-          if (window.__kaigenActiveTab !== wantTab) {
-            window.__kaigenActiveTab = wantTab;
-            let engineSetFocus = null;
-            if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
-              try { engineSetFocus = window.Juce.getNativeFunction('engineSetFocus'); }
-              catch (e) { /* binding unavailable; only update JS state */ }
-            }
-            if (engineSetFocus) {
-              try {
-                engineSetFocus({ activeTab: wantTab, linkOn: !!window.__kaigenLinkOn });
-              } catch (e) { console.warn('[modulation-panel] engineSetFocus failed', e); }
-            }
-            const tabA = document.getElementById('engine-tab-a');
-            const tabB = document.getElementById('engine-tab-b');
-            if (tabA && tabB) {
-              tabA.classList.toggle('is-active', wantTab === 'A');
-              tabA.setAttribute('aria-selected', wantTab === 'A' ? 'true' : 'false');
-              tabB.classList.toggle('is-active', wantTab === 'B');
-              tabB.setAttribute('aria-selected', wantTab === 'B' ? 'true' : 'false');
-            }
-            if (window.Juce && typeof window.Juce.broadcastKaigenTabChanged === 'function') {
-              window.Juce.broadcastKaigenTabChanged();
-            }
+      if (type === 'macro') {
+        // Engine-focus auto-switch. Macros 1+2 are engine A; macros 3+4
+        // are engine B. The user editing macro 3's routings sees engine
+        // B's eligible params, so the surrounding plugin UI should also
+        // be on engine B.
+        const wantTab = (id === 'macro3' || id === 'macro4') ? 'B' : 'A';
+        if (window.__kaigenActiveTab !== wantTab) {
+          window.__kaigenActiveTab = wantTab;
+          let engineSetFocus = null;
+          if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
+            try { engineSetFocus = window.Juce.getNativeFunction('engineSetFocus'); }
+            catch (e) { /* binding unavailable; only update JS state */ }
           }
-          // Switch to MATRIX mode and highlight this row.
-          applyMode('matrix');
-          if (typeof window.kaigenHighlightMatrixRow === 'function') {
-            window.kaigenHighlightMatrixRow(id);
+          if (engineSetFocus) {
+            try {
+              engineSetFocus({ activeTab: wantTab, linkOn: !!window.__kaigenLinkOn });
+            } catch (e) { console.warn('[modulation-panel] engineSetFocus failed', e); }
+          }
+          const tabA = document.getElementById('engine-tab-a');
+          const tabB = document.getElementById('engine-tab-b');
+          if (tabA && tabB) {
+            tabA.classList.toggle('is-active', wantTab === 'A');
+            tabA.setAttribute('aria-selected', wantTab === 'A' ? 'true' : 'false');
+            tabB.classList.toggle('is-active', wantTab === 'B');
+            tabB.setAttribute('aria-selected', wantTab === 'B' ? 'true' : 'false');
+          }
+          if (window.Juce && typeof window.Juce.broadcastKaigenTabChanged === 'function') {
+            window.Juce.broadcastKaigenTabChanged();
           }
         }
-        // LFO/Random/Morph slots: inert in this PR (PR4/PR5 wire LFO/Random).
-      });
+        // Switch to MATRIX mode and highlight this row.
+        applyMode('matrix');
+        if (typeof window.kaigenHighlightMatrixRow === 'function') {
+          window.kaigenHighlightMatrixRow(id);
+        }
+      }
+      // LFO/Random/Morph slots: inert in this PR (PR4/PR5 wire LFO/Random).
+    }
+
+    panel.querySelectorAll('.mod-slot').forEach(slot => {
+      // <button> slots (LFO/Random/Morph) honor the disabled attribute and
+      // bind directly. <div> slots (macros) can't be disabled but also are
+      // never inert today; their click target is the inner name button so
+      // the phantom-knob keeps full ownership of pointer events.
+      if (slot.disabled) return;
+      const type = slot.getAttribute('data-slot-type');
+      if (type === 'macro') {
+        const nameBtn = slot.querySelector('.mod-slot-name-btn');
+        if (nameBtn) nameBtn.addEventListener('click', () => handleSlotClick(slot));
+      } else {
+        slot.addEventListener('click', () => handleSlotClick(slot));
+      }
     });
 
-    // Live ring updates for macro + morph slots. Each event carries
+    // Live ring updates for the morph slot only. Each event carries
     // { macros: { macro1: { value }, ... }, morph_amount: <number> } from the
-    // C++ modulationGetLiveState binding. Per the spec, only macro and morph
-    // get live rings in this PR; LFO + Random rings are PR4/PR5.
+    // C++ modulationGetLiveState binding. Macro slots own a <phantom-knob>
+    // that handles its own live state via the APVTS-binding system, so the
+    // .mod-slot-ring lookups below are intentionally null for macros and
+    // the listener no-ops on them (see `if (!ring) continue;`).
 
     // Cache ring elements once. The slot DOM is built at HTML parse time and
-    // never recreated, so per-tick querySelectors are wasteful — also
-    // establishes the cache-at-init pattern for matrix-view's many-cell case.
+    // never recreated, so per-tick querySelectors are wasteful.
     const ringEls = {
       macro1: panel.querySelector('.mod-slot[data-slot-id="macro1"] .mod-slot-ring'),
       macro2: panel.querySelector('.mod-slot[data-slot-id="macro2"] .mod-slot-ring'),

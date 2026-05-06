@@ -776,10 +776,10 @@ phantom-knob.mode-inactive{
   padding: 8px 12px;
 }
 
-.modulation-panel.is-matrix-mode .modulation-row,
-.modulation-panel.is-matrix-mode .modulation-row-labels {
-  display: none;
-}
+/* Matrix view "slides down" beneath the slot row rather than replacing it.
+   The slot row stays anchored at the top of the panel and the matrix
+   appears in the editor's newly-allocated bottom region (see the height
+   bump in modulation-panel.js's applyMode → setEditorHeight call). */
 
 .mod-slot {
   display: flex;
@@ -895,15 +895,37 @@ phantom-knob.mode-inactive{
 .mod-slot-scatter i:nth-child(5) { opacity: 0.6; }
 .mod-slot-scatter i:nth-child(7) { opacity: 0.9; }
 
-.mod-slot-name {
+.mod-slot-name,
+.mod-slot-name-btn {
   font: 700 9px/1 'Space Grotesk', sans-serif;
   letter-spacing: 1px;
   color: #6a7a8a;
 }
-.mod-slot-macro .mod-slot-name { color: #5DD3E0; }
+/* The name button replaces the static label inside macro slots. It is the
+   click target for switching to MATRIX view; the surrounding <div> can't
+   own the click because the inner phantom-knob needs full pointer ownership
+   for value drag. */
+.mod-slot-name-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.mod-slot-name-btn:hover { color: #8db9c4; }
+.mod-slot-macro .mod-slot-name,
+.mod-slot-macro .mod-slot-name-btn { color: #5DD3E0; }
 .mod-slot-lfo .mod-slot-name { color: #4A90E2; }
 .mod-slot-random .mod-slot-name { color: #9990E0; }
 .mod-slot-morph .mod-slot-name { color: #EFEFF2; }
+
+/* Macro-slot vertical layout: the small phantom-knob (56px) replaces the
+   36px .mod-slot-dot, so we tighten gap + padding to keep the row visually
+   balanced with the 36px dot of LFO/Random/Morph slots. */
+.mod-slot-macro {
+  gap: 4px;
+  padding: 4px 6px;
+}
 
 /* Engine scope labels — sit below the slot row, span the 5 slots on each
    side. Grid columns mirror the .modulation-row's 11 cells (5 + 1 morph + 5). */

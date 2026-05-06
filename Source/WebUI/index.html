@@ -348,7 +348,6 @@
         <div id="modulation-counter" class="modulation-counter">0 ROUTINGS</div>
       </div>
 
-      <div id="modulation-matrix" class="modulation-matrix" aria-hidden="true"></div>
       <div class="modulation-row" role="tablist">
         <!-- Engine A side -->
         <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo1" disabled
@@ -366,16 +365,16 @@
           <span class="mod-slot-dot"><span class="mod-slot-scatter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span>
           <span class="mod-slot-name">RAND</span>
         </button>
-        <button class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro1"
-                title="Macro 1">
-          <span class="mod-slot-dot"><span class="mod-slot-ring" style="--v: 0;"></span></span>
-          <span class="mod-slot-name">MAC 1</span>
-        </button>
-        <button class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro2"
-                title="Macro 2">
-          <span class="mod-slot-dot"><span class="mod-slot-ring" style="--v: 0;"></span></span>
-          <span class="mod-slot-name">MAC 2</span>
-        </button>
+        <div class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro1"
+             title="Macro 1">
+          <phantom-knob data-param="macro1" size="small" default-value="0"></phantom-knob>
+          <button class="mod-slot-name-btn" data-slot-id="macro1" data-slot-type="macro">MAC 1</button>
+        </div>
+        <div class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro2"
+             title="Macro 2">
+          <phantom-knob data-param="macro2" size="small" default-value="0"></phantom-knob>
+          <button class="mod-slot-name-btn" data-slot-id="macro2" data-slot-type="macro">MAC 2</button>
+        </div>
 
         <!-- Center morph slot (placeholder; existing morph slider is the canonical control) -->
         <button class="mod-slot mod-slot-morph" data-slot-type="morph" data-slot-id="morph"
@@ -385,16 +384,16 @@
         </button>
 
         <!-- Engine B side -->
-        <button class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro3"
-                title="Macro 3">
-          <span class="mod-slot-dot"><span class="mod-slot-ring" style="--v: 0;"></span></span>
-          <span class="mod-slot-name">MAC 3</span>
-        </button>
-        <button class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro4"
-                title="Macro 4">
-          <span class="mod-slot-dot"><span class="mod-slot-ring" style="--v: 0;"></span></span>
-          <span class="mod-slot-name">MAC 4</span>
-        </button>
+        <div class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro3"
+             title="Macro 3">
+          <phantom-knob data-param="macro3" size="small" default-value="0"></phantom-knob>
+          <button class="mod-slot-name-btn" data-slot-id="macro3" data-slot-type="macro">MAC 3</button>
+        </div>
+        <div class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro4"
+             title="Macro 4">
+          <phantom-knob data-param="macro4" size="small" default-value="0"></phantom-knob>
+          <button class="mod-slot-name-btn" data-slot-id="macro4" data-slot-type="macro">MAC 4</button>
+        </div>
         <button class="mod-slot mod-slot-random" data-slot-type="random" data-slot-id="randomB" disabled
                 title="Random B (PR5)" aria-disabled="true">
           <span class="mod-slot-dot"><span class="mod-slot-scatter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span>
@@ -419,6 +418,10 @@
         <span class="mod-engine-label-spacer"></span>
         <span class="mod-engine-label mod-engine-label-b">ENGINE B</span>
       </div>
+
+      <!-- Matrix view: appears below the slot row when MATRIX mode is active,
+           so the panel "slides down" rather than displacing the slots upward. -->
+      <div id="modulation-matrix" class="modulation-matrix" aria-hidden="true"></div>
     </div>
   </div>
 <div id="settings-overlay" class="settings-overlay hidden">

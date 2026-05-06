@@ -74,10 +74,15 @@
     .map(m => m.id);
 
   // Cache the per-render live targets — populated by render() after each
-  // DOM rebuild. The kaigen:live-state listener fires at 15 Hz; per-tick
+  // DOM rebuild. The kaigen:live-state listener fires at 10 Hz; per-tick
   // querySelector is wasteful and contradicts the pattern established
   // in modulation-panel.js (see commit 8728003).
-  let liveEls = { rings: {}, vals: {} };
+  //
+  // routedCells caches the .mtx-cell.is-routed nodes so the listener can
+  // iterate them without a per-tick querySelectorAll. Cache invalidation
+  // is automatic — render() runs after every modulationStateChanged, which
+  // is the only event that can change the routed-cell set.
+  let liveEls = { rings: {}, vals: {}, routedCells: [] };
 
   // Cache the modulation-state binding once. The full state is pulled lazily
   // and refreshed on every modulationStateChanged event from the C++ side.
@@ -356,11 +361,14 @@
     root.appendChild(makeEngineBlock('B'));
 
     // Refresh the live-target cache after the DOM rebuild.
-    liveEls = { rings: {}, vals: {} };
+    liveEls = { rings: {}, vals: {}, routedCells: [] };
     for (const id of MACRO_IDS) {
       liveEls.rings[id] = root.querySelector(`.mtx-mod[data-mod-id="${id}"] .mtx-ring`);
       liveEls.vals[id]  = root.querySelector(`.mtx-mod[data-mod-id="${id}"] .mtx-mod-val`);
     }
+    // Cache routed cells so the 10 Hz live-state tick doesn't run a
+    // querySelectorAll over the whole matrix on every fire.
+    liveEls.routedCells = Array.from(root.querySelectorAll('.mtx-cell.is-routed'));
 
     // Restore scroll position so a routing edit doesn't reset the user's view.
     root.scrollTop = savedScrollTop;
@@ -588,7 +596,9 @@
 
     // Update per-cell live-modulating glow. Only macros are wired today;
     // LFO + Random rows have no live data until PR4/PR5.
-    root.querySelectorAll('.mtx-cell.is-routed').forEach(cell => {
+    // Iterate the cached node list (populated in render()) instead of
+    // running querySelectorAll on every 10 Hz tick.
+    for (const cell of liveEls.routedCells) {
       const modId = cell.dataset.modId;
       const live = (macros[modId] && typeof macros[modId].value === 'number') ? macros[modId].value : 0;
       const depthRaw = cell.style.getPropertyValue('--depth-pct');
@@ -596,7 +606,7 @@
       const contribution = Math.abs(live * depth);
       cell.classList.toggle('is-modulating', contribution > 0.05);
       cell.style.setProperty('--mod-pulse', String(contribution));
-    });
+    }
   });
 
   // Expose refreshFromState so the SLOTS→MATRIX toggle gets a fresh state pull
