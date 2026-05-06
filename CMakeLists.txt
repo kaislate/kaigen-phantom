@@ -62,10 +62,13 @@ juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/styles.css
     Source/WebUI/matrix.css
     Source/WebUI/knob.js
-    Source/WebUI/juce-frontend.js
+    Source/WebUI/knob-mini.js
     Source/WebUI/phantom.js
-    Source/WebUI/oscilloscope.js
     Source/WebUI/spectrum.js
+    Source/WebUI/recipe-wheel.js
+    Source/WebUI/oscilloscope.js
+    Source/WebUI/circuit-board.js
+    Source/WebUI/juce-frontend.js
     Source/WebUI/preset-spectrum.js
     Source/WebUI/preset-system.js
     Source/WebUI/morph.js
