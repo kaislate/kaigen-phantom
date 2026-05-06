@@ -22,6 +22,7 @@
 
     const POLL_MS = 1000 / 15;
     let timer = null;
+    let dead = false;
 
     async function tick() {
       try {
@@ -31,11 +32,12 @@
         // Binding gone (editor teardown). Stop polling silently.
         clearInterval(timer);
         timer = null;
+        dead = true;
       }
     }
 
     function start() {
-      if (timer) return;
+      if (timer || dead) return;
       timer = setInterval(tick, POLL_MS);
     }
     function stop() {

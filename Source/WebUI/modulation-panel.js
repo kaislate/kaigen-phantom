@@ -142,19 +142,30 @@
     // { macros: { macro1: { value }, ... }, morph_amount: <number> } from the
     // C++ modulationGetLiveState binding. Per the spec, only macro and morph
     // get live rings in this PR; LFO + Random rings are PR4/PR5.
+
+    // Cache ring elements once. The slot DOM is built at HTML parse time and
+    // never recreated, so per-tick querySelectors are wasteful — also
+    // establishes the cache-at-init pattern for matrix-view's many-cell case.
+    const ringEls = {
+      macro1: panel.querySelector('.mod-slot[data-slot-id="macro1"] .mod-slot-ring'),
+      macro2: panel.querySelector('.mod-slot[data-slot-id="macro2"] .mod-slot-ring'),
+      macro3: panel.querySelector('.mod-slot[data-slot-id="macro3"] .mod-slot-ring'),
+      macro4: panel.querySelector('.mod-slot[data-slot-id="macro4"] .mod-slot-ring'),
+      morph:  panel.querySelector('.mod-slot[data-slot-id="morph"]  .mod-slot-ring'),
+    };
+
     document.body.addEventListener('kaigen:live-state', (ev) => {
       const detail = ev.detail || {};
       const macros = detail.macros || {};
       for (const id of ['macro1', 'macro2', 'macro3', 'macro4']) {
-        const slot = panel.querySelector(`.mod-slot[data-slot-id="${id}"] .mod-slot-ring`);
-        if (!slot) continue;
+        const ring = ringEls[id];
+        if (!ring) continue;
         const v = (macros[id] && typeof macros[id].value === 'number') ? macros[id].value : 0;
-        slot.style.setProperty('--v', String(Math.max(0, Math.min(1, v)) * 100));
+        ring.style.setProperty('--v', String(Math.max(0, Math.min(1, v)) * 100));
       }
-      const morphSlot = panel.querySelector('.mod-slot[data-slot-id="morph"] .mod-slot-ring');
-      if (morphSlot) {
+      if (ringEls.morph) {
         const m = (typeof detail.morph_amount === 'number') ? detail.morph_amount : 0;
-        morphSlot.style.setProperty('--v', String(Math.max(0, Math.min(1, m)) * 100));
+        ringEls.morph.style.setProperty('--v', String(Math.max(0, Math.min(1, m)) * 100));
       }
     });
   }
