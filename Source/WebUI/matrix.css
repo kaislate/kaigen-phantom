@@ -119,9 +119,60 @@
 .mtx-mod.is-placeholder .mtx-mod-val { font-size: 8px; }
 
 .mtx-cells {
-  display: grid;
-  grid-template-columns: repeat(32, minmax(28px, 1fr));
+  display: flex;
   gap: 1px;
   background: rgba(20, 24, 30, 0.4);
   min-height: 30px;
+  overflow: hidden;
+}
+
+.mtx-header-row .mtx-cells {
+  background: transparent;
+  min-height: auto;
+}
+
+.mtx-cat-header {
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  font: 700 8px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.4);
+}
+.mtx-cat-header:hover { color: #fff; background: rgba(255, 255, 255, 0.07); }
+.mtx-cat-header.is-open {
+  background: rgba(93, 211, 224, 0.10);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.mtx-col-header {
+  padding: 4px 6px;
+  font: 600 8px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+  white-space: nowrap;
+  flex: 1 1 36px;
+  min-width: 36px;
+}
+
+.mtx-cat-spacer {
+  width: calc(8px + 6ch + 18px);   /* approx category-header width; match by feel */
+  flex-shrink: 0;
+}
+
+.mtx-cell {
+  flex: 1 1 36px;
+  min-width: 36px;
+  height: 30px;
+  background: rgba(20, 24, 30, 0.6);
+  cursor: pointer;
+  position: relative;
+}
+.mtx-cell:hover {
+  background: rgba(40, 46, 56, 0.7);
 }

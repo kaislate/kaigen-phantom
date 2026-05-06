@@ -21,6 +21,54 @@
     ],
   };
 
+  // Continuous-parameter destinations grouped by category. Choice/bool params
+  // (mode, ghost_mode, env_source, midi_trigger_enabled, etc.) are excluded
+  // because they're not modulation-eligible. The label is a 5–6 char abbreviation
+  // shown in the column header; the tooltip shows the full prefixed param ID.
+  const DEST_GROUPS = [
+    { id: 'GHOST',    label: 'GHOST',    leaves: [
+      ['ghost', 'GHOST'], ['phantom_threshold', 'PHTHR'],
+      ['phantom_strength', 'PSTR'], ['output_gain', 'OUT'],
+    ]},
+    { id: 'RECIPE',   label: 'RECIPE',   leaves: [
+      ['recipe_h2', 'H2'], ['recipe_h3', 'H3'], ['recipe_h4', 'H4'], ['recipe_h5', 'H5'],
+      ['recipe_h6', 'H6'], ['recipe_h7', 'H7'], ['recipe_h8', 'H8'],
+      ['harmonic_saturation', 'HSAT'],
+    ]},
+    { id: 'SHAPE',    label: 'SHAPE',    leaves: [
+      ['synth_step', 'STEP'], ['synth_duty', 'DUTY'], ['synth_skip', 'SKIP'],
+    ]},
+    { id: 'ENVELOPE', label: 'ENV',      leaves: [
+      ['env_attack_ms', 'ATK'], ['env_release_ms', 'REL'],
+    ]},
+    { id: 'FILTER',   label: 'FILTER',   leaves: [
+      ['synth_lpf_hz', 'LPF'], ['synth_hpf_hz', 'HPF'],
+    ]},
+    { id: 'RESYN',    label: 'RESYN',    leaves: [
+      ['synth_wavelet_length', 'WVLEN'], ['synth_gate_threshold', 'GATE'],
+      ['synth_h1', 'H1'], ['synth_sub', 'SUB'],
+    ]},
+    { id: 'PITCH',    label: 'PITCH',    leaves: [
+      ['synth_min_samples', 'MINSP'], ['synth_max_samples', 'MAXSP'],
+      ['tracking_speed', 'TRACK'], ['punch_amount', 'PUNCH'],
+      ['synth_boost_threshold', 'BTHR'], ['synth_boost_amount', 'BAMT'],
+    ]},
+    { id: 'STEREO',   label: 'STEREO',   leaves: [
+      ['binaural_width', 'BIN'], ['stereo_width', 'WIDTH'],
+    ]},
+    { id: 'MIDI',     label: 'MIDI',     leaves: [
+      ['midi_gate_release', 'MGTRL'],
+    ]},
+  ];
+
+  // UI state: which categories are expanded per engine. Persisted via
+  // matrixGetState/matrixSetState bindings (Task 12). Default-expanded:
+  // GHOST and RECIPE only.
+  const expandedCats = {
+    A: new Set(['GHOST', 'RECIPE']),
+    B: new Set(['GHOST', 'RECIPE']),
+  };
+
   // Derived from MODULATORS so adding a 5th macro in the future doesn't
   // require updating a parallel hardcoded list. Computed once at IIFE init.
   const MACRO_IDS = [...MODULATORS.A, ...MODULATORS.B]
@@ -63,6 +111,47 @@
     return row;
   }
 
+  function makeColumnHeaderRow(engineId) {
+    const headerRow = document.createElement('div');
+    headerRow.className = 'mtx-row mtx-header-row';
+    const empty = document.createElement('div');
+    empty.className = 'mtx-mod mtx-mod-placeholder';
+    empty.style.background = 'transparent';
+    empty.style.borderLeft = 'none';
+    headerRow.appendChild(empty);
+
+    const headerCells = document.createElement('div');
+    headerCells.className = 'mtx-cells mtx-header-cells';
+    for (const group of DEST_GROUPS) {
+      const isOpen = expandedCats[engineId].has(group.id);
+      const groupHeader = document.createElement('div');
+      groupHeader.className = 'mtx-cat-header' + (isOpen ? ' is-open' : '');
+      groupHeader.dataset.engine = engineId;
+      groupHeader.dataset.cat = group.id;
+      groupHeader.textContent = group.label + (isOpen ? ' ▾' : ' ▸');
+      groupHeader.title = isOpen ? `Collapse ${group.label}` : `Expand ${group.label}`;
+      groupHeader.addEventListener('click', () => {
+        if (expandedCats[engineId].has(group.id)) expandedCats[engineId].delete(group.id);
+        else expandedCats[engineId].add(group.id);
+        render();
+        if (typeof window.kaigenSaveMatrixState === 'function') window.kaigenSaveMatrixState();
+      });
+      headerCells.appendChild(groupHeader);
+
+      if (isOpen) {
+        for (const [leaf, label] of group.leaves) {
+          const colHeader = document.createElement('div');
+          colHeader.className = 'mtx-col-header';
+          colHeader.textContent = label;
+          colHeader.title = (engineId === 'A' ? 'a_' : 'b_') + leaf;
+          headerCells.appendChild(colHeader);
+        }
+      }
+    }
+    headerRow.appendChild(headerCells);
+    return headerRow;
+  }
+
   function makeEngineBlock(engineId) {
     const block = document.createElement('section');
     block.className = `mtx-engine mtx-engine-${engineId.toLowerCase()}`;
@@ -76,15 +165,34 @@
     grid.className = 'mtx-grid';
     block.appendChild(grid);
 
+    grid.appendChild(makeColumnHeaderRow(engineId));
+
     for (const mod of MODULATORS[engineId]) {
       const row = document.createElement('div');
       row.className = 'mtx-row';
       row.appendChild(makeModRow(mod));
-      // Cell area placeholder — populated in later tasks.
+
       const cells = document.createElement('div');
       cells.className = 'mtx-cells';
       cells.dataset.engine = engineId;
       cells.dataset.modId = mod.id;
+      for (const group of DEST_GROUPS) {
+        const isOpen = expandedCats[engineId].has(group.id);
+        const groupSpacer = document.createElement('div');
+        groupSpacer.className = 'mtx-cat-spacer';
+        cells.appendChild(groupSpacer);
+        if (isOpen) {
+          for (const [leaf, _label] of group.leaves) {
+            const cell = document.createElement('div');
+            cell.className = 'mtx-cell';
+            cell.dataset.engine = engineId;
+            cell.dataset.modId = mod.id;
+            cell.dataset.paramId = (engineId === 'A' ? 'a_' : 'b_') + leaf;
+            cell.title = cell.dataset.paramId;
+            cells.appendChild(cell);
+          }
+        }
+      }
       row.appendChild(cells);
       grid.appendChild(row);
     }
