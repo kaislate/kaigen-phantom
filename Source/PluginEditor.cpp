@@ -762,6 +762,8 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 auto& eng = isA ? self.processor.getModulationEngineA()
                                : self.processor.getModulationEngineB();
                 const bool ok = eng.addRouting(r);
+                if (ok)
+                    self.webView.emitEventIfBrowserIsVisible("modulationStateChanged", juce::var{});
                 complete(juce::var(ok));
             })
         .withNativeFunction("modulationRemoveRouting",
@@ -776,6 +778,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 auto& eng = isA ? self.processor.getModulationEngineA()
                                : self.processor.getModulationEngineB();
                 eng.removeRouting(src, pid);
+                self.webView.emitEventIfBrowserIsVisible("modulationStateChanged", juce::var{});
                 complete({});
             })
         .withNativeFunction("modulationSetRoutingDepth",
@@ -792,6 +795,8 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 auto& eng = isA ? self.processor.getModulationEngineA()
                                : self.processor.getModulationEngineB();
                 const bool ok = eng.setRoutingDepth(src, pid, depth);
+                if (ok)
+                    self.webView.emitEventIfBrowserIsVisible("modulationStateChanged", juce::var{});
                 complete(juce::var(ok));
             })
         .withNativeFunction("modulationSetMacroName",

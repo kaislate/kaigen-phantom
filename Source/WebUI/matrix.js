@@ -79,6 +79,34 @@
   // in modulation-panel.js (see commit 8728003).
   let liveEls = { rings: {}, vals: {} };
 
+  // Cache the modulation-state binding once. The full state is pulled lazily
+  // and refreshed on every modulationStateChanged event from the C++ side.
+  let getState = null;
+  if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
+    try { getState = window.Juce.getNativeFunction('modulationGetState'); }
+    catch (e) { console.warn('[matrix] modulationGetState unavailable', e); }
+  }
+
+  let lastState = { engineA: { routings: [] }, engineB: { routings: [] } };
+
+  async function pullState() {
+    if (!getState) return;
+    try {
+      const s = await getState();
+      if (s && typeof s === 'object') lastState = s;
+    } catch (e) {
+      console.warn('[matrix] getState failed', e);
+    }
+  }
+
+  // Routings serialized by C++ use { source, param, depth, invert } — match
+  // the property names exactly (see PluginEditor.cpp modulationGetState).
+  function findRouting(engineId, modId, paramId) {
+    const eng = engineId === 'A' ? lastState.engineA : lastState.engineB;
+    if (!eng || !Array.isArray(eng.routings)) return null;
+    return eng.routings.find(r => r.source === modId && r.param === paramId) || null;
+  }
+
   function makeModRow(mod) {
     const row = document.createElement('div');
     row.className = `mtx-mod mtx-mod-${mod.type}`;
@@ -110,12 +138,33 @@
   }
 
   function makeCell(engineId, modId, leaf) {
+    const paramId = (engineId === 'A' ? 'a_' : 'b_') + leaf;
+    const routing = findRouting(engineId, modId, paramId);
     const cell = document.createElement('div');
-    cell.className = 'mtx-cell';
-    cell.dataset.engine = engineId;
-    cell.dataset.modId = modId;
-    cell.dataset.paramId = (engineId === 'A' ? 'a_' : 'b_') + leaf;
-    cell.title = cell.dataset.paramId;
+
+    // Determine cell type for color from MODULATORS table.
+    const eng = MODULATORS[engineId] || [];
+    const modDef = eng.find(m => m.id === modId);
+    const modType = modDef ? modDef.type : 'macro';
+    cell.className = `mtx-cell mtx-cell-${modType}`;
+
+    cell.dataset.engine  = engineId;
+    cell.dataset.modId   = modId;
+    cell.dataset.paramId = paramId;
+    cell.title = paramId;
+
+    if (routing) {
+      const d = Math.max(-1, Math.min(1, routing.depth));
+      cell.classList.add('is-routed');
+      if (d < 0) cell.classList.add('is-negative');
+      cell.style.setProperty('--depth-pct', String(Math.round(d * 100)));
+      cell.style.setProperty('--depth-abs', String(Math.abs(d)));
+      const num = document.createElement('span');
+      num.className = 'mtx-cell-depth';
+      num.textContent = (d > 0 ? '+' : '') + Math.round(d * 100);
+      cell.appendChild(num);
+    }
+
     return cell;
   }
 
@@ -223,6 +272,33 @@
       liveEls.vals[id]  = root.querySelector(`.mtx-mod[data-mod-id="${id}"] .mtx-mod-val`);
     }
   }
+
+  // Pull state, then re-render. Used on init and on modulationStateChanged.
+  async function refreshFromState() {
+    await pullState();
+    const root = document.getElementById('modulation-matrix');
+    if (root && root.classList.contains('is-open')) {
+      render();
+    }
+  }
+
+  // The C++ bindings dispatch this CustomEvent after every Add/Remove/SetDepth
+  // (via emitEventIfBrowserIsVisible → backend listener below). JS-side
+  // mutations may also dispatch the document.body CustomEvent directly.
+  document.body.addEventListener('modulationStateChanged', () => { refreshFromState(); });
+  if (window.__JUCE__ && window.__JUCE__.backend
+      && typeof window.__JUCE__.backend.addEventListener === 'function') {
+    try {
+      window.__JUCE__.backend.addEventListener('modulationStateChanged',
+        () => { refreshFromState(); });
+    } catch (e) {
+      console.warn('[matrix] backend addEventListener failed', e);
+    }
+  }
+
+  // Pull state once at startup so the first render() (triggered by SLOTS→MATRIX
+  // toggle) has data even if the toggle happens before any routing mutation.
+  refreshFromState();
 
   // Subscribe to live state — drives the macro rings and value readouts in
   // the matrix's modulator strip. Only updates the matrix when it's visible.
