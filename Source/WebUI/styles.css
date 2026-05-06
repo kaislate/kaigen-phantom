@@ -734,7 +734,7 @@ phantom-knob.mode-inactive{
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 .modulation-drawer.is-open {
-  max-height: 220px;
+  max-height: 160px;   /* matches macro editor content; no dead space below */
 }
 
 .modulation-row {
@@ -751,25 +751,37 @@ phantom-knob.mode-inactive{
   justify-content: center;
   gap: 6px;
   padding: 10px 6px;
-  background: rgba(31, 36, 44, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
+  background: transparent;        /* no rounded-rectangle button surround */
+  border: 1px solid transparent;
+  border-radius: 0;
   cursor: pointer;
   user-select: none;
-  transition: background 120ms, border-color 120ms;
+  transition: background 120ms;
 }
 .mod-slot[disabled] {
   cursor: not-allowed;
   opacity: 0.45;
 }
 .mod-slot:not([disabled]):hover {
-  background: rgba(40, 46, 56, 0.7);
+  background: rgba(255, 255, 255, 0.03);   /* very subtle hover */
 }
 .mod-slot.is-active {
-  background: rgba(40, 60, 84, 0.6);
-  border-color: rgba(93, 211, 224, 0.55);
-  box-shadow: 0 0 8px rgba(93, 211, 224, 0.3);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
 }
+/* Active highlight moves to the dot itself — glow + slight scale rather
+   than an outlined surrounding rectangle. Per-type glow color is set via
+   the --slot-active-glow custom property below so each modulator type
+   keeps its identity color. */
+.mod-slot.is-active .mod-slot-dot {
+  box-shadow: 0 0 14px var(--slot-active-glow, rgba(93, 211, 224, 0.7));
+  transform: scale(1.05);
+}
+.mod-slot.is-active.mod-slot-macro  { --slot-active-glow: rgba(93, 211, 224, 0.7); }
+.mod-slot.is-active.mod-slot-lfo    { --slot-active-glow: rgba(74, 144, 226, 0.7); }
+.mod-slot.is-active.mod-slot-random { --slot-active-glow: rgba(107, 93, 201, 0.7); }
+.mod-slot.is-active.mod-slot-morph  { --slot-active-glow: rgba(239, 239, 242, 0.7); }
 
 .mod-slot-dot {
   width: 36px; height: 36px;
@@ -777,7 +789,7 @@ phantom-knob.mode-inactive{
   background: radial-gradient(circle, #444 30%, #1f242c 70%);
   border: 2px solid #555;
   box-shadow: 0 0 0 transparent;
-  transition: box-shadow 120ms;
+  transition: box-shadow 120ms, transform 120ms;
 }
 .mod-slot-macro .mod-slot-dot {
   background: radial-gradient(circle, #5DD3E0 30%, #1f242c 70%);
@@ -807,6 +819,26 @@ phantom-knob.mode-inactive{
 .mod-slot-lfo .mod-slot-name { color: #4A90E2; }
 .mod-slot-random .mod-slot-name { color: #9990E0; }
 .mod-slot-morph .mod-slot-name { color: #EFEFF2; }
+
+/* Engine scope labels — sit below the slot row, span the 5 slots on each
+   side. Grid columns mirror the .modulation-row's 11 cells (5 + 1 morph + 5). */
+.modulation-row-labels {
+  display: grid;
+  grid-template-columns: 5fr 1fr 5fr;
+  padding: 0 12px 6px;
+  align-items: center;
+}
+.mod-engine-label {
+  font: 600 9px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 3px;
+  color: rgba(255, 255, 255, 0.30);
+  text-align: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  padding-top: 4px;
+}
+.mod-engine-label-spacer {
+  /* empty middle column above the morph slot */
+}
 
 /* ═══ MACRO EDITOR (drawer content) ═══ */
 .modulation-drawer {

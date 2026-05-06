@@ -68,6 +68,9 @@
         console.warn('[macro-editor] no slider state for', paramId);
         return;
       }
+      console.log('[macro-editor] bound knob for', paramId,
+                  'state ok:', !!state,
+                  'has setNormalisedValue:', typeof state.setNormalisedValue);
 
       // Detach any previous binding for this macro (re-render path).
       const prev = _knobListeners.get(paramId);
@@ -95,6 +98,7 @@
 
       // UI → host (drag)
       knob.addEventListener('knob-change', (e) => {
+        console.log('[macro-editor]', paramId, 'knob-change event:', e.detail);
         state.sliderDragStarted();
         state.setNormalisedValue(e.detail.value);
         state.sliderDragEnded();
@@ -121,6 +125,7 @@
 
       const knob = document.createElement('phantom-knob');
       knob.setAttribute('data-param', macroId);   // global APVTS param; getSliderState short-circuits
+      knob.setAttribute('size', 'large');         // 114px tier — renders the SVG at expected size
       knob.classList.add('macro-editor-knob');
       left.appendChild(knob);
 

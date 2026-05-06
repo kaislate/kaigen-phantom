@@ -22,12 +22,12 @@
     let activeSlot = null;   // string id or null
 
     // .wrap is overflow:hidden with a fixed 820px height. The drawer's
-    // 220px expansion gets clipped without growing the host window. Use
+    // 160px expansion gets clipped without growing the host window. Use
     // the existing setEditorHeight native binding (PluginEditor.cpp) to
     // resize the editor to match. Same pattern as advanced-mode in
     // phantom.js (which uses 820 → 1020 for its 200px panel).
     const BASE_HEIGHT     = 820;
-    const DRAWER_EXPANDED = BASE_HEIGHT + 220;  // matches .modulation-drawer.is-open max-height
+    const DRAWER_EXPANDED = BASE_HEIGHT + 160;  // matches .modulation-drawer.is-open max-height
     const DRAWER_TRANSITION_MS = 220;
     let setEditorHeight = null;
     if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
@@ -63,6 +63,40 @@
       if (activeSlot === slotId) {
         closeDrawer();
         return;
+      }
+
+      // Auto-switch engine focus to match the macro's scope. Macros 1+2 are
+      // engine A; macros 3+4 are engine B. The user editing macro 3's
+      // routings sees engine B's eligible params, so the surrounding plugin
+      // UI should also be on engine B — otherwise the visible knobs are
+      // from a different engine than the picker is offering.
+      const wantTab = (slotId === 'macro3' || slotId === 'macro4') ? 'B' : 'A';
+      if (window.__kaigenActiveTab !== wantTab) {
+        window.__kaigenActiveTab = wantTab;
+        let engineSetFocus = null;
+        if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
+          try { engineSetFocus = window.Juce.getNativeFunction('engineSetFocus'); }
+          catch (e) { /* binding unavailable; only update JS state */ }
+        }
+        if (engineSetFocus) {
+          try {
+            engineSetFocus({ activeTab: wantTab, linkOn: !!window.__kaigenLinkOn });
+          } catch (e) { console.warn('[modulation-panel] engineSetFocus failed', e); }
+        }
+        if (window.Juce && typeof window.Juce.broadcastKaigenTabChanged === 'function') {
+          window.Juce.broadcastKaigenTabChanged();
+        }
+        // Mirror phantom.js's applyToUI for the visible A | B | LINK buttons
+        // — phantom.js only updates them on its own click handlers, so we
+        // have to keep them in sync ourselves here.
+        const tabA = document.getElementById('engine-tab-a');
+        const tabB = document.getElementById('engine-tab-b');
+        if (tabA && tabB) {
+          tabA.classList.toggle('is-active', wantTab === 'A');
+          tabA.setAttribute('aria-selected', wantTab === 'A' ? 'true' : 'false');
+          tabB.classList.toggle('is-active', wantTab === 'B');
+          tabB.setAttribute('aria-selected', wantTab === 'B' ? 'true' : 'false');
+        }
       }
 
       // First-time open (no active slot yet): grow the editor before the
