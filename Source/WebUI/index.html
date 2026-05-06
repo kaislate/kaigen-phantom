@@ -418,12 +418,13 @@
         <span class="mod-engine-label-spacer"></span>
         <span class="mod-engine-label mod-engine-label-b">ENGINE B</span>
       </div>
-
-      <!-- Matrix view: appears below the slot row when MATRIX mode is active,
-           so the panel "slides down" rather than displacing the slots upward. -->
-      <div id="modulation-matrix" class="modulation-matrix" aria-hidden="true"></div>
     </div>
   </div>
+
+  <!-- Matrix view: lives OUTSIDE .wrap as a sibling sub-panel so the editor
+       grows downward when MATRIX mode is active. The wrap stays fixed at
+       820px; this matrix container occupies the new space below it. -->
+  <div id="modulation-matrix" class="modulation-matrix" aria-hidden="true"></div>
 <div id="settings-overlay" class="settings-overlay hidden">
   <div class="settings-backdrop"></div>
   <div class="settings-panel">

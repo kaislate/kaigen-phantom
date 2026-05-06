@@ -20,8 +20,10 @@ input, textarea, [contenteditable="true"] {
 *:focus { outline: none; }
 
 body{
-  background:#AEAFB1;margin:0;overflow:hidden;
-  width:1300px;height:820px;
+  background:#0a0c10;margin:0;overflow:hidden;
+  width:1300px;
+  display:flex;
+  flex-direction:column;
   font-family:'Space Grotesk',sans-serif;
   color:rgba(0,0,0,0.70);
 }
