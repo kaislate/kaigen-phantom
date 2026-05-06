@@ -346,7 +346,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         .withNativeFunction("setEditorHeight",
             [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
-                const int height = args.size() > 0 ? (int) args[0] : 820;
+                const int height = args.size() > 0 ? (int) args[0] : 970;
                 const int clamped = juce::jlimit(400, 2000, height);
                 juce::MessageManager::callAsync([weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), clamped]
                 {
@@ -864,7 +864,11 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
     setMouseClickGrabsKeyboardFocus(false);
     webView.setWantsKeyboardFocus(false);
     webView.setMouseClickGrabsKeyboardFocus(false);
-    setSize(1300, 820);
+    // Initial editor height = wrap (820) + always-visible modulation panel
+    // (150) = 970. Matches BASE_HEIGHT in modulation-panel.js. The JS still
+    // calls setEditorHeight(970) on load as a belt-and-braces fallback;
+    // setting it here prevents a brief flicker before that JS fires.
+    setSize(1300, 970);
     addAndMakeVisible(webView);
 
     juce::MessageManager::callAsync([this]()

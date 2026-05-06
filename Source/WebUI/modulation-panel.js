@@ -21,12 +21,33 @@
     // ── SLOTS / MATRIX mode toggle ────────────────────────────────────────
     const matrix = document.getElementById('modulation-matrix');
     const modeBar = panel.querySelector('.modulation-mode-toggle');
-    const BASE_HEIGHT     = 820;
-    const MATRIX_EXPANDED = BASE_HEIGHT + 320;   // matrix needs more vertical room than the slot row alone
+    // .wrap stays a fixed 820px containing all the original editor content.
+    // The modulation panel is a ~150px sub-panel sibling below the wrap and
+    // is ALWAYS visible (the slots row is the default UI). The matrix is a
+    // 320px sub-panel below the modulation panel, only visible when the
+    // user toggles MATRIX mode. The total editor height is therefore:
+    //   slots-mode  = wrap (820) + panel (150)            = 970
+    //   matrix-mode = wrap (820) + panel (150) + matrix (320) = 1290
+    const WRAP_HEIGHT     = 820;
+    const PANEL_HEIGHT    = 150;
+    const MATRIX_HEIGHT   = 320;
+    const BASE_HEIGHT     = WRAP_HEIGHT + PANEL_HEIGHT;     // 970 — slots-mode total
+    const MATRIX_EXPANDED = BASE_HEIGHT + MATRIX_HEIGHT;    // 1290 — matrix-mode total
     let setEditorHeight = null;
     if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
       try { setEditorHeight = window.Juce.getNativeFunction('setEditorHeight'); }
       catch (e) { console.warn('[modulation-panel] setEditorHeight unavailable', e); }
+    }
+
+    // Set the initial editor height to BASE_HEIGHT (970) so the always-
+    // visible modulation panel is on-screen the moment the editor opens —
+    // without this, the editor would launch at the C++ default (820, just
+    // the wrap) and the modulation panel would render below the window
+    // until the user toggled MATRIX mode and triggered the first
+    // setEditorHeight call.
+    if (setEditorHeight) {
+      try { setEditorHeight(BASE_HEIGHT); }
+      catch (e) {}
     }
 
     // ── Persist matrix view state across sessions (Task 12) ───────────────

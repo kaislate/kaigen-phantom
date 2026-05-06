@@ -335,95 +335,99 @@
       </div>
     </div>
 
-    <!-- Bottom modulation panel (PR3b: macros only; LFO/Random slots are
-         placeholders until PR4/5). Drawer slides up above this row when
-         a slot is clicked. -->
-    <div id="modulation-panel" class="modulation-panel" aria-label="Modulation panel">
+  </div>
 
-      <div class="modulation-mode-bar">
-        <div class="modulation-mode-toggle" role="tablist" aria-label="Modulation view mode">
-          <button class="mode-btn is-active" data-mode="slots"  role="tab" aria-selected="true">SLOTS</button>
-          <button class="mode-btn"           data-mode="matrix" role="tab" aria-selected="false">MATRIX</button>
-        </div>
-        <div id="modulation-counter" class="modulation-counter">0 ROUTINGS</div>
+  <!-- Bottom modulation panel (PR3b: macros only; LFO/Random slots are
+       placeholders until PR4/5). Lives OUTSIDE .wrap as a sibling sub-panel
+       so the editor grows downward to accommodate it — keeping .wrap fixed
+       at 820px means the original editor content (knobs, spectrum,
+       oscilloscope, filters) is no longer truncated by overflow:hidden. -->
+  <div id="modulation-panel" class="modulation-panel" aria-label="Modulation panel">
+
+    <div class="modulation-mode-bar">
+      <div class="modulation-mode-toggle" role="tablist" aria-label="Modulation view mode">
+        <button class="mode-btn is-active" data-mode="slots"  role="tab" aria-selected="true">SLOTS</button>
+        <button class="mode-btn"           data-mode="matrix" role="tab" aria-selected="false">MATRIX</button>
+      </div>
+      <div id="modulation-counter" class="modulation-counter">0 ROUTINGS</div>
+    </div>
+
+    <div class="modulation-row" role="tablist">
+      <!-- Engine A side -->
+      <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo1" disabled
+              title="LFO 1 (PR4)" aria-disabled="true">
+        <span class="mod-slot-dot"><svg class="mod-slot-lfo-svg" viewBox="0 0 24 14" preserveAspectRatio="none"><path d="M0,7 Q3,0 6,7 T12,7 T18,7 T24,7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
+        <span class="mod-slot-name">LFO 1</span>
+      </button>
+      <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo2" disabled
+              title="LFO 2 (PR4)" aria-disabled="true">
+        <span class="mod-slot-dot"><svg class="mod-slot-lfo-svg" viewBox="0 0 24 14" preserveAspectRatio="none"><path d="M0,7 Q3,0 6,7 T12,7 T18,7 T24,7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
+        <span class="mod-slot-name">LFO 2</span>
+      </button>
+      <button class="mod-slot mod-slot-random" data-slot-type="random" data-slot-id="randomA" disabled
+              title="Random A (PR5)" aria-disabled="true">
+        <span class="mod-slot-dot"><span class="mod-slot-scatter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span>
+        <span class="mod-slot-name">RAND</span>
+      </button>
+      <div class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro1"
+           title="Macro 1">
+        <phantom-knob data-param="macro1" size="small" default-value="0"></phantom-knob>
+        <button class="mod-slot-name-btn" data-slot-id="macro1" data-slot-type="macro">MAC 1</button>
+      </div>
+      <div class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro2"
+           title="Macro 2">
+        <phantom-knob data-param="macro2" size="small" default-value="0"></phantom-knob>
+        <button class="mod-slot-name-btn" data-slot-id="macro2" data-slot-type="macro">MAC 2</button>
       </div>
 
-      <div class="modulation-row" role="tablist">
-        <!-- Engine A side -->
-        <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo1" disabled
-                title="LFO 1 (PR4)" aria-disabled="true">
-          <span class="mod-slot-dot"><svg class="mod-slot-lfo-svg" viewBox="0 0 24 14" preserveAspectRatio="none"><path d="M0,7 Q3,0 6,7 T12,7 T18,7 T24,7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
-          <span class="mod-slot-name">LFO 1</span>
-        </button>
-        <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo2" disabled
-                title="LFO 2 (PR4)" aria-disabled="true">
-          <span class="mod-slot-dot"><svg class="mod-slot-lfo-svg" viewBox="0 0 24 14" preserveAspectRatio="none"><path d="M0,7 Q3,0 6,7 T12,7 T18,7 T24,7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
-          <span class="mod-slot-name">LFO 2</span>
-        </button>
-        <button class="mod-slot mod-slot-random" data-slot-type="random" data-slot-id="randomA" disabled
-                title="Random A (PR5)" aria-disabled="true">
-          <span class="mod-slot-dot"><span class="mod-slot-scatter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span>
-          <span class="mod-slot-name">RAND</span>
-        </button>
-        <div class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro1"
-             title="Macro 1">
-          <phantom-knob data-param="macro1" size="small" default-value="0"></phantom-knob>
-          <button class="mod-slot-name-btn" data-slot-id="macro1" data-slot-type="macro">MAC 1</button>
-        </div>
-        <div class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro2"
-             title="Macro 2">
-          <phantom-knob data-param="macro2" size="small" default-value="0"></phantom-knob>
-          <button class="mod-slot-name-btn" data-slot-id="macro2" data-slot-type="macro">MAC 2</button>
-        </div>
+      <!-- Center morph slot (placeholder; existing morph slider is the canonical control) -->
+      <button class="mod-slot mod-slot-morph" data-slot-type="morph" data-slot-id="morph"
+              title="Morph (use existing slider)" aria-disabled="true" disabled>
+        <span class="mod-slot-dot"><span class="mod-slot-ring" style="--v: 0;"></span></span>
+        <span class="mod-slot-name">MORPH</span>
+      </button>
 
-        <!-- Center morph slot (placeholder; existing morph slider is the canonical control) -->
-        <button class="mod-slot mod-slot-morph" data-slot-type="morph" data-slot-id="morph"
-                title="Morph (use existing slider)" aria-disabled="true" disabled>
-          <span class="mod-slot-dot"><span class="mod-slot-ring" style="--v: 0;"></span></span>
-          <span class="mod-slot-name">MORPH</span>
-        </button>
-
-        <!-- Engine B side -->
-        <div class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro3"
-             title="Macro 3">
-          <phantom-knob data-param="macro3" size="small" default-value="0"></phantom-knob>
-          <button class="mod-slot-name-btn" data-slot-id="macro3" data-slot-type="macro">MAC 3</button>
-        </div>
-        <div class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro4"
-             title="Macro 4">
-          <phantom-knob data-param="macro4" size="small" default-value="0"></phantom-knob>
-          <button class="mod-slot-name-btn" data-slot-id="macro4" data-slot-type="macro">MAC 4</button>
-        </div>
-        <button class="mod-slot mod-slot-random" data-slot-type="random" data-slot-id="randomB" disabled
-                title="Random B (PR5)" aria-disabled="true">
-          <span class="mod-slot-dot"><span class="mod-slot-scatter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span>
-          <span class="mod-slot-name">RAND</span>
-        </button>
-        <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo3" disabled
-                title="LFO 3 (PR4)" aria-disabled="true">
-          <span class="mod-slot-dot"><svg class="mod-slot-lfo-svg" viewBox="0 0 24 14" preserveAspectRatio="none"><path d="M0,7 Q3,0 6,7 T12,7 T18,7 T24,7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
-          <span class="mod-slot-name">LFO 3</span>
-        </button>
-        <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo4" disabled
-                title="LFO 4 (PR4)" aria-disabled="true">
-          <span class="mod-slot-dot"><svg class="mod-slot-lfo-svg" viewBox="0 0 24 14" preserveAspectRatio="none"><path d="M0,7 Q3,0 6,7 T12,7 T18,7 T24,7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
-          <span class="mod-slot-name">LFO 4</span>
-        </button>
+      <!-- Engine B side -->
+      <div class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro3"
+           title="Macro 3">
+        <phantom-knob data-param="macro3" size="small" default-value="0"></phantom-knob>
+        <button class="mod-slot-name-btn" data-slot-id="macro3" data-slot-type="macro">MAC 3</button>
       </div>
-
-      <!-- Engine scope labels: clarifies that slots 1-5 modulate engine A
-           and slots 7-11 modulate engine B (slot 6 is the morph placeholder). -->
-      <div class="modulation-row-labels">
-        <span class="mod-engine-label mod-engine-label-a">ENGINE A</span>
-        <span class="mod-engine-label-spacer"></span>
-        <span class="mod-engine-label mod-engine-label-b">ENGINE B</span>
+      <div class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro4"
+           title="Macro 4">
+        <phantom-knob data-param="macro4" size="small" default-value="0"></phantom-knob>
+        <button class="mod-slot-name-btn" data-slot-id="macro4" data-slot-type="macro">MAC 4</button>
       </div>
+      <button class="mod-slot mod-slot-random" data-slot-type="random" data-slot-id="randomB" disabled
+              title="Random B (PR5)" aria-disabled="true">
+        <span class="mod-slot-dot"><span class="mod-slot-scatter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span>
+        <span class="mod-slot-name">RAND</span>
+      </button>
+      <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo3" disabled
+              title="LFO 3 (PR4)" aria-disabled="true">
+        <span class="mod-slot-dot"><svg class="mod-slot-lfo-svg" viewBox="0 0 24 14" preserveAspectRatio="none"><path d="M0,7 Q3,0 6,7 T12,7 T18,7 T24,7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
+        <span class="mod-slot-name">LFO 3</span>
+      </button>
+      <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo4" disabled
+              title="LFO 4 (PR4)" aria-disabled="true">
+        <span class="mod-slot-dot"><svg class="mod-slot-lfo-svg" viewBox="0 0 24 14" preserveAspectRatio="none"><path d="M0,7 Q3,0 6,7 T12,7 T18,7 T24,7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
+        <span class="mod-slot-name">LFO 4</span>
+      </button>
+    </div>
+
+    <!-- Engine scope labels: clarifies that slots 1-5 modulate engine A
+         and slots 7-11 modulate engine B (slot 6 is the morph placeholder). -->
+    <div class="modulation-row-labels">
+      <span class="mod-engine-label mod-engine-label-a">ENGINE A</span>
+      <span class="mod-engine-label-spacer"></span>
+      <span class="mod-engine-label mod-engine-label-b">ENGINE B</span>
     </div>
   </div>
 
   <!-- Matrix view: lives OUTSIDE .wrap as a sibling sub-panel so the editor
        grows downward when MATRIX mode is active. The wrap stays fixed at
-       820px; this matrix container occupies the new space below it. -->
+       820px; this matrix container occupies the new space below the always-
+       visible modulation panel. -->
   <div id="modulation-matrix" class="modulation-matrix" aria-hidden="true"></div>
 <div id="settings-overlay" class="settings-overlay hidden">
   <div class="settings-backdrop"></div>

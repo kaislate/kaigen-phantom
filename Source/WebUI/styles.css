@@ -721,9 +721,17 @@ phantom-knob.mode-inactive{
     min-width: 40px; text-align: right;
 }
 
-/* ═══ BOTTOM MODULATION PANEL (PR3b) ═══ */
+/* ═══ BOTTOM MODULATION PANEL (PR3b) ═══
+   Lives as a direct child of <body> (sibling of .wrap, not inside it) so the
+   editor's main 820px wrap can keep its overflow:hidden without truncating
+   the original knobs/spectrum/oscilloscope content. The body is a flex
+   column; this panel sits below the wrap. flex-shrink:0 prevents the panel
+   from being squashed when the matrix sub-panel below it is open. */
 .modulation-panel {
   position: relative;
+  width: 1300px;
+  box-sizing: border-box;
+  flex-shrink: 0;
   background: rgba(14, 17, 22, 0.95);
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
