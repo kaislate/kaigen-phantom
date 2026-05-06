@@ -827,6 +827,8 @@ phantom-knob.mode-inactive{
 .mod-slot.is-active.mod-slot-morph  { --slot-active-glow: rgba(239, 239, 242, 0.7); }
 
 .mod-slot-dot {
+  position: relative;
+  overflow: hidden;
   width: 36px; height: 36px;
   border-radius: 50%;
   background: radial-gradient(circle, #444 30%, #1f242c 70%);
@@ -852,6 +854,52 @@ phantom-knob.mode-inactive{
   border: 2px solid #EFEFF2;
   box-shadow: 0 0 8px rgba(239, 239, 242, 0.5);
 }
+
+/* Conic-gradient ring driven by --v (0–100). Used by macro + morph slots. */
+.mod-slot-ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: conic-gradient(currentColor calc(var(--v, 0) * 1%), rgba(255,255,255,0.08) 0);
+}
+.mod-slot-ring::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: #0a0c10;
+}
+
+.mod-slot-macro .mod-slot-ring { color: #5DD3E0; }
+.mod-slot-morph .mod-slot-ring { color: #EFEFF2; }
+
+/* LFO mini-waveform placeholder (greyed until PR4 wires live data). */
+.mod-slot-lfo-svg {
+  width: 24px;
+  height: 14px;
+  position: absolute;
+  inset: 50% 50%;
+  transform: translate(-50%, -50%);
+  color: #4A90E2;
+}
+
+/* Random scatter placeholder (greyed until PR5 wires live data). */
+.mod-slot-scatter {
+  position: absolute;
+  inset: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 1px;
+}
+.mod-slot-scatter i {
+  background: #6B5DC9;
+  opacity: 0.3;
+  border-radius: 50%;
+}
+.mod-slot-scatter i:nth-child(1) { opacity: 0.8; }
+.mod-slot-scatter i:nth-child(5) { opacity: 0.6; }
+.mod-slot-scatter i:nth-child(7) { opacity: 0.9; }
 
 .mod-slot-name {
   font: 700 9px/1 'Space Grotesk', sans-serif;

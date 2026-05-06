@@ -713,6 +713,34 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
 
             root->setProperty("engineA", buildEngine(self.processor.getModulationEngineA()));
             root->setProperty("engineB", buildEngine(self.processor.getModulationEngineB()));
+
+            // Per-macro live values (used by the slot-view conic rings in
+            // live-modulation.js / modulation-panel.js). Keyed by macro id;
+            // each entry has { value } so future per-macro fields can be
+            // added without breaking subscribers. Macros 1-2 live on engine
+            // A, 3-4 on engine B.
+            juce::DynamicObject::Ptr macrosObj = new juce::DynamicObject();
+            auto addMacro = [&](kaigen::phantom::ModulationEngine& eng, const juce::String& id)
+            {
+                if (auto* m = eng.findModulator(id))
+                {
+                    juce::DynamicObject::Ptr mObj = new juce::DynamicObject();
+                    mObj->setProperty("value", m->getCurrentValue());
+                    macrosObj->setProperty(id, juce::var(mObj.get()));
+                }
+            };
+            addMacro(self.processor.getModulationEngineA(), "macro1");
+            addMacro(self.processor.getModulationEngineA(), "macro2");
+            addMacro(self.processor.getModulationEngineB(), "macro3");
+            addMacro(self.processor.getModulationEngineB(), "macro4");
+            root->setProperty("macros", juce::var(macrosObj.get()));
+
+            // Morph amount (RT-safe atomic load from APVTS).
+            float morphAmt = 0.0f;
+            if (auto* p = self.processor.apvts.getRawParameterValue("morph_amount"))
+                morphAmt = p->load();
+            root->setProperty("morph_amount", morphAmt);
+
             complete(juce::var(root.get()));
         })
         .withNativeFunction("modulationAddRouting",

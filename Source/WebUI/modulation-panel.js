@@ -137,5 +137,25 @@
 
     // Expose for macro editor's "close" button.
     window.kaigenCloseModulationDrawer = closeDrawer;
+
+    // Live ring updates for macro + morph slots. Each event carries
+    // { macros: { macro1: { value }, ... }, morph_amount: <number> } from the
+    // C++ modulationGetLiveState binding. Per the spec, only macro and morph
+    // get live rings in this PR; LFO + Random rings are PR4/PR5.
+    document.body.addEventListener('kaigen:live-state', (ev) => {
+      const detail = ev.detail || {};
+      const macros = detail.macros || {};
+      for (const id of ['macro1', 'macro2', 'macro3', 'macro4']) {
+        const slot = panel.querySelector(`.mod-slot[data-slot-id="${id}"] .mod-slot-ring`);
+        if (!slot) continue;
+        const v = (macros[id] && typeof macros[id].value === 'number') ? macros[id].value : 0;
+        slot.style.setProperty('--v', String(Math.max(0, Math.min(1, v)) * 100));
+      }
+      const morphSlot = panel.querySelector('.mod-slot[data-slot-id="morph"] .mod-slot-ring');
+      if (morphSlot) {
+        const m = (typeof detail.morph_amount === 'number') ? detail.morph_amount : 0;
+        morphSlot.style.setProperty('--v', String(Math.max(0, Math.min(1, m)) * 100));
+      }
+    });
   }
 })();
