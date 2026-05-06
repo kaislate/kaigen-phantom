@@ -575,6 +575,8 @@
     const root = document.getElementById('modulation-matrix');
     if (!root || !root.classList.contains('is-open')) return;
     const macros = (ev.detail && ev.detail.macros) || {};
+
+    // Update modulator-strip rings + value readouts (Tasks 4+).
     for (const id of MACRO_IDS) {
       const ring = liveEls.rings[id];
       const val  = liveEls.vals[id];
@@ -582,6 +584,18 @@
       if (ring) ring.style.setProperty('--v', String(Math.max(0, Math.min(1, v)) * 100));
       if (val)  val.textContent = v.toFixed(2);
     }
+
+    // Update per-cell live-modulating glow. Only macros are wired today;
+    // LFO + Random rows have no live data until PR4/PR5.
+    root.querySelectorAll('.mtx-cell.is-routed').forEach(cell => {
+      const modId = cell.dataset.modId;
+      const live = (macros[modId] && typeof macros[modId].value === 'number') ? macros[modId].value : 0;
+      const depthRaw = cell.style.getPropertyValue('--depth-pct');
+      const depth = depthRaw ? parseInt(depthRaw, 10) / 100 : 0;
+      const contribution = Math.abs(live * depth);
+      cell.classList.toggle('is-modulating', contribution > 0.05);
+      cell.style.setProperty('--mod-pulse', String(contribution));
+    });
   });
 
   // Expose refreshFromState so the SLOTS→MATRIX toggle gets a fresh state pull
