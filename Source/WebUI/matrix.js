@@ -56,14 +56,12 @@
     { id: 'STEREO',   label: 'STEREO',   leaves: [
       ['binaural_width', 'BIN'], ['stereo_width', 'WIDTH'],
     ]},
-    { id: 'MIDI',     label: 'MIDI',     leaves: [
-      ['midi_gate_release', 'MGTRL'],
-    ]},
   ];
 
   // UI state: which categories are expanded per engine. Persisted via
   // matrixGetState/matrixSetState bindings (Task 12). Default-expanded:
-  // GHOST and RECIPE only.
+  // GHOST and RECIPE only. Set ordering is irrelevant — rendering iterates
+  // DEST_GROUPS in canonical order and queries set membership.
   const expandedCats = {
     A: new Set(['GHOST', 'RECIPE']),
     B: new Set(['GHOST', 'RECIPE']),
@@ -111,13 +109,21 @@
     return row;
   }
 
+  function makeCell(engineId, modId, leaf) {
+    const cell = document.createElement('div');
+    cell.className = 'mtx-cell';
+    cell.dataset.engine = engineId;
+    cell.dataset.modId = modId;
+    cell.dataset.paramId = (engineId === 'A' ? 'a_' : 'b_') + leaf;
+    cell.title = cell.dataset.paramId;
+    return cell;
+  }
+
   function makeColumnHeaderRow(engineId) {
     const headerRow = document.createElement('div');
     headerRow.className = 'mtx-row mtx-header-row';
     const empty = document.createElement('div');
-    empty.className = 'mtx-mod mtx-mod-placeholder';
-    empty.style.background = 'transparent';
-    empty.style.borderLeft = 'none';
+    empty.className = 'mtx-mod mtx-mod-headercell';
     headerRow.appendChild(empty);
 
     const headerCells = document.createElement('div');
@@ -182,14 +188,8 @@
         groupSpacer.className = 'mtx-cat-spacer';
         cells.appendChild(groupSpacer);
         if (isOpen) {
-          for (const [leaf, _label] of group.leaves) {
-            const cell = document.createElement('div');
-            cell.className = 'mtx-cell';
-            cell.dataset.engine = engineId;
-            cell.dataset.modId = mod.id;
-            cell.dataset.paramId = (engineId === 'A' ? 'a_' : 'b_') + leaf;
-            cell.title = cell.dataset.paramId;
-            cells.appendChild(cell);
+          for (const [leaf] of group.leaves) {
+            cells.appendChild(makeCell(engineId, mod.id, leaf));
           }
         }
       }

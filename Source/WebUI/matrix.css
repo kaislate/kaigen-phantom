@@ -51,6 +51,11 @@
 .mtx-mod-random { border-left-color: #6B5DC9; }
 .mtx-mod.is-placeholder { opacity: 0.55; }
 
+.mtx-mod-headercell {
+  background: transparent;
+  border-left: none;
+}
+
 .mtx-mod-anim {
   width: 28px;
   height: 28px;
@@ -141,6 +146,7 @@
   user-select: none;
   white-space: nowrap;
   flex-shrink: 0;
+  min-width: 80px;
   border-right: 1px solid rgba(0, 0, 0, 0.4);
 }
 .mtx-cat-header:hover { color: #fff; background: rgba(255, 255, 255, 0.07); }
@@ -161,7 +167,7 @@
 }
 
 .mtx-cat-spacer {
-  width: calc(8px + 6ch + 18px);   /* approx category-header width; match by feel */
+  width: 80px;        /* matches .mtx-cat-header min-width — keeps columns aligned */
   flex-shrink: 0;
 }
 
