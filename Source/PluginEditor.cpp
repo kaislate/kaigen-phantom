@@ -839,7 +839,10 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                                : self.processor.getModulationEngineB();
                 auto* m = eng.findModulator(sourceId);
                 if (auto* macro = dynamic_cast<kaigen::phantom::Macro*>(m))
+                {
                     macro->setName(name);
+                    self.webView.emitEventIfBrowserIsVisible("modulationStateChanged", juce::var{});
+                }
                 complete({});
             })
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });

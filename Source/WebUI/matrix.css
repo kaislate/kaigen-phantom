@@ -7,6 +7,8 @@
   padding: 12px;
   color: #c8d8ea;
   font: 11px/1.3 'Space Grotesk', system-ui, sans-serif;
+  max-height: 360px;     /* matches MATRIX_EXPANDED window grow (320px) plus header */
+  overflow-y: auto;
 }
 
 .mtx-engine-label {

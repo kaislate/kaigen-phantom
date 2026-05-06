@@ -191,11 +191,8 @@
                 .catch(e => console.warn('[matrix] setMacroName rejected', e));
             }
           } catch (e) { console.warn('[matrix] setMacroName failed', e); }
-          // The C++ binding doesn't currently emit modulationStateChanged for
-          // name changes. Force a refresh so the matrix re-renders with the
-          // new name. (If a future C++ change adds the emit, this becomes
-          // a no-op double-call — refreshFromState is idempotent.)
-          refreshFromState();
+          // The C++ binding emits modulationStateChanged after a successful
+          // setName, so the existing listener will trigger refreshFromState.
         };
         const cancel = () => {
           if (committed) return;
@@ -346,6 +343,7 @@
       console.warn('[matrix] #modulation-matrix not in DOM — render skipped');
       return;
     }
+    const savedScrollTop = root.scrollTop;
     // NOTE: replaceChildren() wipes the entire matrix subtree. Cell click
     // handlers added in Task 7+ MUST be re-attached on each render — either
     // by re-binding inside makeEngineBlock, or by switching to delegated
@@ -363,6 +361,9 @@
       liveEls.rings[id] = root.querySelector(`.mtx-mod[data-mod-id="${id}"] .mtx-ring`);
       liveEls.vals[id]  = root.querySelector(`.mtx-mod[data-mod-id="${id}"] .mtx-mod-val`);
     }
+
+    // Restore scroll position so a routing edit doesn't reset the user's view.
+    root.scrollTop = savedScrollTop;
   }
 
   // Pull state, then re-render. Used on init and on modulationStateChanged.
