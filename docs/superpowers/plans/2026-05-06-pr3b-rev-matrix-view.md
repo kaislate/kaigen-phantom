@@ -38,7 +38,7 @@
 
 ### Column abbreviation table (used by Tasks 5 and 6)
 
-The matrix shows ~32 destination columns per engine. To keep cells readable, full param names are abbreviated to 5–6 chars:
+The matrix shows ~31 destination columns per engine. To keep cells readable, full param names are abbreviated to 5–6 chars:
 
 | Category | Param ID leaf | Column label | Group order |
 |----------|---------------|--------------|-------------|
@@ -73,7 +73,6 @@ The matrix shows ~32 destination columns per engine. To keep cells readable, ful
 | PITCH | synth_boost_amount | BAMT | 29 |
 | STEREO | binaural_width | BIN | 30 |
 | STEREO | stereo_width | WIDTH | 31 |
-| MIDI | midi_gate_release | MGTRL | 32 |
 
 Hover tooltip shows the full prefixed param ID (e.g. `a_phantom_threshold`).
 
@@ -849,7 +848,7 @@ git commit -m "feat: matrix-view modulator-row strip (10 rows + live macro rings
 
 ## Task 5: Render destination columns with category groups
 
-Replaces the 32-column placeholder grid with 9 category groups, each header expandable. Default state: all collapsed except GHOST and RECIPE (showing the most-likely-modulated params). Cells are still empty visuals; no routings rendered yet.
+Replaces the 32-column placeholder grid with 8 category groups, each header expandable. Default state: all collapsed except GHOST and RECIPE (showing the most-likely-modulated params). Cells are still empty visuals; no routings rendered yet.
 
 **Files:**
 - Modify: `Source/WebUI/matrix.js`
@@ -894,9 +893,6 @@ In `Source/WebUI/matrix.js`, immediately after the `MODULATORS` constant, add:
     ]},
     { id: 'STEREO',   label: 'STEREO',   leaves: [
       ['binaural_width', 'BIN'], ['stereo_width', 'WIDTH'],
-    ]},
-    { id: 'MIDI',     label: 'MIDI',     leaves: [
-      ['midi_gate_release', 'MGTRL'],
     ]},
   ];
 
@@ -1075,7 +1071,7 @@ The `.mtx-cat-spacer` width is a hand-tuned value — adjust during implementati
 - [ ] **Step 4: Build and verify**
 
 Run: `build.bat`
-Expected: build succeeds. Open Standalone, click MATRIX. Each engine block shows a header row with 9 category labels (`GHOST ▾`, `RECIPE ▾`, `SHAPE ▸`, `ENV ▸`, ...). GHOST and RECIPE are expanded showing their column abbreviations (GHOST, PHTHR, PSTR, OUT, H2, H3, ...). Modulator rows below have empty cells under expanded categories, blank space under collapsed categories. Click `SHAPE ▸` → expands inline showing STEP, DUTY, SKIP columns. Click again → collapses.
+Expected: build succeeds. Open Standalone, click MATRIX. Each engine block shows a header row with 8 category labels (`GHOST ▾`, `RECIPE ▾`, `SHAPE ▸`, `ENV ▸`, ...). GHOST and RECIPE are expanded showing their column abbreviations (GHOST, PHTHR, PSTR, OUT, H2, H3, ...). Modulator rows below have empty cells under expanded categories, blank space under collapsed categories. Click `SHAPE ▸` → expands inline showing STEP, DUTY, SKIP columns. Click again → collapses.
 
 - [ ] **Step 5: Commit**
 
@@ -2200,7 +2196,7 @@ Walks the smoke checklist from the spec end-to-end. Catches any regression in th
 
 In Live (or Reaper, or any DAW with macro automation):
 
-1. Insert Kaigen Phantom on a bass track. Switch to MATRIX mode. Verify both engine blocks render with all 9 categories collapsed except GHOST + RECIPE.
+1. Insert Kaigen Phantom on a bass track. Switch to MATRIX mode. Verify both engine blocks render with all 8 categories collapsed except GHOST + RECIPE.
 2. Click empty Engine A / Macro 1 / GHOST cell. Cell shows `+50` with teal gradient.
 3. Drag the cell upward — value crosses to `+100`. Drag down through `0` — gradient flips, cell shows `-25` then `-100`.
 4. Right-click the cell → popover. Click `0` → cell value snaps to `0` (still active, since `0` is a valid depth and the routing exists). Click `Remove` → cell becomes empty.
@@ -2240,7 +2236,7 @@ Re-read `docs/superpowers/specs/2026-05-06-pr3b-rev-matrix-view-design.md` end-t
 - **Two sibling views (SLOTS / MATRIX) toggled by segmented control** → Task 1 (markup) + Task 3 (handler).
 - **SLOTS view live macro/morph rings** → Task 2.
 - **Matrix view modulator-row strip with name + animation + value readout** → Task 4 + Task 10 (name editor) + Task 11 (live).
-- **Destination columns grouped into 9 expandable categories** → Task 5.
+- **Destination columns grouped into 8 expandable categories** → Task 5.
 - **Cells with bipolar gradient fill + numeric depth + modulator color** → Task 6.
 - **Click empty cell → AddRouting at +50%** → Task 7.
 - **Drag active cell vertically → SetRoutingDepth** → Task 8.
