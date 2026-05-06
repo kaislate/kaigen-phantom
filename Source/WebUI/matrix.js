@@ -21,6 +21,18 @@
     ],
   };
 
+  // Derived from MODULATORS so adding a 5th macro in the future doesn't
+  // require updating a parallel hardcoded list. Computed once at IIFE init.
+  const MACRO_IDS = [...MODULATORS.A, ...MODULATORS.B]
+    .filter(m => m.type === 'macro')
+    .map(m => m.id);
+
+  // Cache the per-render live targets — populated by render() after each
+  // DOM rebuild. The kaigen:live-state listener fires at 15 Hz; per-tick
+  // querySelector is wasteful and contradicts the pattern established
+  // in modulation-panel.js (see commit 8728003).
+  let liveEls = { rings: {}, vals: {} };
+
   function makeModRow(mod) {
     const row = document.createElement('div');
     row.className = `mtx-mod mtx-mod-${mod.type}`;
@@ -81,13 +93,27 @@
 
   function render() {
     const root = document.getElementById('modulation-matrix');
-    if (!root) return;
+    if (!root) {
+      console.warn('[matrix] #modulation-matrix not in DOM — render skipped');
+      return;
+    }
+    // NOTE: replaceChildren() wipes the entire matrix subtree. Cell click
+    // handlers added in Task 7+ MUST be re-attached on each render — either
+    // by re-binding inside makeEngineBlock, or by switching to delegated
+    // listeners on #modulation-matrix that survive re-renders.
     root.replaceChildren();
     root.appendChild(makeEngineBlock('A'));
     const divider = document.createElement('div');
     divider.className = 'mtx-engine-divider';
     root.appendChild(divider);
     root.appendChild(makeEngineBlock('B'));
+
+    // Refresh the live-target cache after the DOM rebuild.
+    liveEls = { rings: {}, vals: {} };
+    for (const id of MACRO_IDS) {
+      liveEls.rings[id] = root.querySelector(`.mtx-mod[data-mod-id="${id}"] .mtx-ring`);
+      liveEls.vals[id]  = root.querySelector(`.mtx-mod[data-mod-id="${id}"] .mtx-mod-val`);
+    }
   }
 
   // Subscribe to live state — drives the macro rings and value readouts in
@@ -96,9 +122,9 @@
     const root = document.getElementById('modulation-matrix');
     if (!root || !root.classList.contains('is-open')) return;
     const macros = (ev.detail && ev.detail.macros) || {};
-    for (const id of ['macro1', 'macro2', 'macro3', 'macro4']) {
-      const ring = root.querySelector(`.mtx-mod[data-mod-id="${id}"] .mtx-ring`);
-      const val  = root.querySelector(`.mtx-mod[data-mod-id="${id}"] .mtx-mod-val`);
+    for (const id of MACRO_IDS) {
+      const ring = liveEls.rings[id];
+      const val  = liveEls.vals[id];
       const v = (macros[id] && typeof macros[id].value === 'number') ? macros[id].value : 0;
       if (ring) ring.style.setProperty('--v', String(Math.max(0, Math.min(1, v)) * 100));
       if (val)  val.textContent = v.toFixed(2);
