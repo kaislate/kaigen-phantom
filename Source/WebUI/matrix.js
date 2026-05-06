@@ -604,6 +604,20 @@
   // on visibility, so events can be missed).
   window.kaigenRenderMatrix = refreshFromState;
 
+  // Briefly highlight a modulator row by id (e.g. 'macro2'). Used by the
+  // slot-click → matrix-mode handoff (Task 13) to draw the user's eye to
+  // the modulator they just clicked. Safe to call even if the matrix isn't
+  // currently rendered — falls through silently.
+  window.kaigenHighlightMatrixRow = (modId) => {
+    const root = document.getElementById('modulation-matrix');
+    if (!root) return;
+    const target = root.querySelector(`.mtx-mod[data-mod-id="${modId}"]`);
+    if (!target) return;
+    target.classList.add('is-highlighted');
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setTimeout(() => target.classList.remove('is-highlighted'), 1500);
+  };
+
   // Persistence accessors for the per-engine expanded-categories Set.
   // modulation-panel.js owns the C++ matrixGetState/matrixSetState bindings
   // and uses these to read/write the JS-side state during load + save.

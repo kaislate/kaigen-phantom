@@ -220,13 +220,53 @@
       if (wasClosed) growEditor();
     }
 
-    // Wire slot click handlers.
+    // Wire slot click handlers. For macros, hand off to MATRIX mode + briefly
+    // highlight the matching row instead of opening the drawer (Task 13).
+    // The drawer's openSlot() is left intact for now — Task 14 deletes it.
+    // LFO/Random/Morph slots remain inert in this PR.
     panel.querySelectorAll('.mod-slot').forEach(btn => {
       if (btn.disabled) return;
       btn.addEventListener('click', () => {
         const id   = btn.getAttribute('data-slot-id');
         const type = btn.getAttribute('data-slot-type');
-        openSlot(id, type);
+
+        if (type === 'macro') {
+          // Engine-focus auto-switch (preserved from drawer-era openSlot).
+          // Macros 1+2 are engine A; macros 3+4 are engine B. The user
+          // editing macro 3's routings sees engine B's eligible params, so
+          // the surrounding plugin UI should also be on engine B.
+          const wantTab = (id === 'macro3' || id === 'macro4') ? 'B' : 'A';
+          if (window.__kaigenActiveTab !== wantTab) {
+            window.__kaigenActiveTab = wantTab;
+            let engineSetFocus = null;
+            if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
+              try { engineSetFocus = window.Juce.getNativeFunction('engineSetFocus'); }
+              catch (e) { /* binding unavailable; only update JS state */ }
+            }
+            if (engineSetFocus) {
+              try {
+                engineSetFocus({ activeTab: wantTab, linkOn: !!window.__kaigenLinkOn });
+              } catch (e) { console.warn('[modulation-panel] engineSetFocus failed', e); }
+            }
+            const tabA = document.getElementById('engine-tab-a');
+            const tabB = document.getElementById('engine-tab-b');
+            if (tabA && tabB) {
+              tabA.classList.toggle('is-active', wantTab === 'A');
+              tabA.setAttribute('aria-selected', wantTab === 'A' ? 'true' : 'false');
+              tabB.classList.toggle('is-active', wantTab === 'B');
+              tabB.setAttribute('aria-selected', wantTab === 'B' ? 'true' : 'false');
+            }
+            if (window.Juce && typeof window.Juce.broadcastKaigenTabChanged === 'function') {
+              window.Juce.broadcastKaigenTabChanged();
+            }
+          }
+          // Switch to MATRIX mode and highlight this row.
+          applyMode('matrix');
+          if (typeof window.kaigenHighlightMatrixRow === 'function') {
+            window.kaigenHighlightMatrixRow(id);
+          }
+        }
+        // LFO/Random/Morph slots: inert in this PR (PR4/PR5 wire LFO/Random).
       });
     });
 
@@ -263,5 +303,51 @@
         ringEls.morph.style.setProperty('--v', String(Math.max(0, Math.min(1, m)) * 100));
       }
     });
+
+    // ── Header counter (routings + active macros) ─────────────────────────
+    let modulationGetStateBinding = null;
+    if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
+      try { modulationGetStateBinding = window.Juce.getNativeFunction('modulationGetState'); }
+      catch (e) { console.warn('[modulation-panel] modulationGetState unavailable for counter', e); }
+    }
+
+    async function updateCounter() {
+      const counter = document.getElementById('modulation-counter');
+      if (!counter) return;
+      if (!modulationGetStateBinding) {
+        counter.textContent = '— ROUTINGS';
+        return;
+      }
+      let totalRoutings = 0;
+      let activeMacros = 0;
+      try {
+        const s = await modulationGetStateBinding();
+        if (s) {
+          for (const engId of ['engineA', 'engineB']) {
+            const eng = s[engId];
+            if (eng && Array.isArray(eng.routings)) {
+              totalRoutings += eng.routings.length;
+              const seenMacros = new Set();
+              for (const r of eng.routings) {
+                if (r.source && r.source.startsWith('macro') && !seenMacros.has(r.source)) {
+                  activeMacros++;
+                  seenMacros.add(r.source);
+                }
+              }
+            }
+          }
+        }
+      } catch (e) { console.warn('[modulation-panel] updateCounter failed', e); }
+      counter.textContent = `${totalRoutings} ROUTING${totalRoutings === 1 ? '' : 'S'}` +
+                            (activeMacros > 0 ? ` · ${activeMacros} MACRO${activeMacros === 1 ? '' : 'S'} ACTIVE` : '');
+    }
+    document.body.addEventListener('modulationStateChanged', updateCounter);
+    // Some platforms route C++→JS events through __JUCE__.backend instead of
+    // CustomEvent on document.body; subscribe to both for parity with matrix.js.
+    if (window.__JUCE__ && window.__JUCE__.backend && typeof window.__JUCE__.backend.addEventListener === 'function') {
+      try { window.__JUCE__.backend.addEventListener('modulationStateChanged', updateCounter); }
+      catch (e) {}
+    }
+    updateCounter();
   }
 })();

@@ -289,3 +289,12 @@
 .mtx-cell.is-routed.mtx-cell-macro.is-modulating { --mod-color: rgba(93, 211, 224, 0.85); }
 .mtx-cell.is-routed.mtx-cell-lfo.is-modulating   { --mod-color: rgba(74, 144, 226, 0.85); }
 .mtx-cell.is-routed.mtx-cell-random.is-modulating { --mod-color: rgba(107, 93, 201, 0.85); }
+
+@keyframes mtx-row-highlight {
+  0%   { box-shadow: inset 0 0 0 2px rgba(93, 211, 224, 0); }
+  20%  { box-shadow: inset 0 0 0 2px rgba(93, 211, 224, 0.85); }
+  100% { box-shadow: inset 0 0 0 2px rgba(93, 211, 224, 0); }
+}
+.mtx-mod.is-highlighted {
+  animation: mtx-row-highlight 1.5s ease-out;
+}
