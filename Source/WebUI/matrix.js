@@ -87,6 +87,12 @@
     catch (e) { console.warn('[matrix] modulationGetState unavailable', e); }
   }
 
+  let addRouting = null;
+  if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
+    try { addRouting = window.Juce.getNativeFunction('modulationAddRouting'); }
+    catch (e) { console.warn('[matrix] addRouting unavailable', e); }
+  }
+
   let lastState = { engineA: { routings: [] }, engineB: { routings: [] } };
 
   async function pullState() {
@@ -164,6 +170,22 @@
       num.textContent = (d > 0 ? '+' : '') + Math.round(d * 100);
       cell.appendChild(num);
     }
+
+    // Click an empty cell to add a routing at +50% default depth.
+    // Active cells will get drag-to-adjust + right-click in Tasks 8-9; the
+    // is-routed early-exit lets those handlers (added later) own active cells.
+    cell.addEventListener('click', () => {
+      if (cell.classList.contains('is-routed')) return;
+      if (!addRouting) return;
+      try {
+        addRouting({
+          source: modId,
+          param: cell.dataset.paramId,
+          depth: 0.5,
+        });
+      } catch (e) { console.warn('[matrix] addRouting failed', e); }
+      // Re-render is triggered by modulationStateChanged event from C++.
+    });
 
     return cell;
   }
