@@ -19,6 +19,49 @@
     const drawer = document.getElementById('modulation-drawer');
     if (!panel || !drawer) return;
 
+    // ── SLOTS / MATRIX mode toggle ────────────────────────────────────────
+    const matrix = document.getElementById('modulation-matrix');
+    const modeBar = panel.querySelector('.modulation-mode-toggle');
+    const BASE_HEIGHT     = 820;
+    const MATRIX_EXPANDED = BASE_HEIGHT + 320;   // matrix needs more vertical room than drawer
+    let setEditorHeight = null;
+    try { setEditorHeight = window.Juce.getNativeFunction('setEditorHeight'); }
+    catch (e) {}
+
+    let currentMode = 'slots';
+    function applyMode(mode) {
+      currentMode = mode;
+      panel.classList.toggle('is-matrix-mode', mode === 'matrix');
+      if (matrix) {
+        matrix.classList.toggle('is-open', mode === 'matrix');
+        matrix.setAttribute('aria-hidden', mode === 'matrix' ? 'false' : 'true');
+      }
+      if (modeBar) {
+        modeBar.querySelectorAll('.mode-btn').forEach(b => {
+          const active = b.getAttribute('data-mode') === mode;
+          b.classList.toggle('is-active', active);
+          b.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+      }
+      if (setEditorHeight) {
+        try { setEditorHeight(mode === 'matrix' ? MATRIX_EXPANDED : BASE_HEIGHT); }
+        catch (e) {}
+      }
+      // Tell the matrix to (re)render now that it's visible.
+      if (mode === 'matrix' && typeof window.kaigenRenderMatrix === 'function') {
+        window.kaigenRenderMatrix();
+      }
+    }
+    if (modeBar) {
+      modeBar.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const m = btn.getAttribute('data-mode');
+          if (m === 'slots' || m === 'matrix') applyMode(m);
+        });
+      });
+    }
+    window.kaigenSetModulationMode = applyMode;
+
     let activeSlot = null;   // string id or null
 
     // .wrap is overflow:hidden with a fixed 820px height. The drawer's
@@ -26,14 +69,10 @@
     // the existing setEditorHeight native binding (PluginEditor.cpp) to
     // resize the editor to match. Same pattern as advanced-mode in
     // phantom.js (which uses 820 → 1020 for its 200px panel).
-    const BASE_HEIGHT     = 820;
+    // BASE_HEIGHT and setEditorHeight are already declared above for the
+    // SLOTS/MATRIX mode toggle — reuse them here.
     const DRAWER_EXPANDED = BASE_HEIGHT + 160;  // matches .modulation-drawer.is-open max-height
     const DRAWER_TRANSITION_MS = 220;
-    let setEditorHeight = null;
-    if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
-      try { setEditorHeight = window.Juce.getNativeFunction('setEditorHeight'); }
-      catch (e) { console.warn('[modulation-panel] setEditorHeight unavailable', e); }
-    }
     function growEditor()   { if (setEditorHeight) try { setEditorHeight(DRAWER_EXPANDED); } catch (e) {} }
     function shrinkEditor() {
       // Shrink only after the CSS transition finishes — otherwise the

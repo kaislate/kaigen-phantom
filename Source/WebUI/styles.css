@@ -787,6 +787,12 @@ phantom-knob.mode-inactive{
   padding: 8px 12px;
 }
 
+.modulation-panel.is-matrix-mode .modulation-row,
+.modulation-panel.is-matrix-mode .modulation-row-labels,
+.modulation-panel.is-matrix-mode .modulation-drawer {
+  display: none;
+}
+
 .mod-slot {
   display: flex;
   flex-direction: column;
