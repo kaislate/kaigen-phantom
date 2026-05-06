@@ -5,6 +5,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/matrix.css">
 </head>
 <body>
   <div style="position:fixed;top:2px;right:2px;z-index:99999;background:#0a0;color:#fff;font:bold 10px monospace;padding:2px 6px;border-radius:3px">DSP-11</div>
@@ -338,66 +339,77 @@
          placeholders until PR4/5). Drawer slides up above this row when
          a slot is clicked. -->
     <div id="modulation-panel" class="modulation-panel" aria-label="Modulation panel">
+
+      <div class="modulation-mode-bar">
+        <div class="modulation-mode-toggle" role="tablist" aria-label="Modulation view mode">
+          <button class="mode-btn is-active" data-mode="slots"  role="tab" aria-selected="true">SLOTS</button>
+          <button class="mode-btn"           data-mode="matrix" role="tab" aria-selected="false">MATRIX</button>
+        </div>
+        <div id="modulation-counter" class="modulation-counter">0 ROUTINGS</div>
+      </div>
+
       <div id="modulation-drawer" class="modulation-drawer" aria-hidden="true"></div>
+
+      <div id="modulation-matrix" class="modulation-matrix" aria-hidden="true"></div>
       <div class="modulation-row" role="tablist">
         <!-- Engine A side -->
         <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo1" disabled
                 title="LFO 1 (PR4)" aria-disabled="true">
-          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-dot"><svg class="mod-slot-lfo-svg" viewBox="0 0 24 14" preserveAspectRatio="none"><path d="M0,7 Q3,0 6,7 T12,7 T18,7 T24,7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
           <span class="mod-slot-name">LFO 1</span>
         </button>
         <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo2" disabled
                 title="LFO 2 (PR4)" aria-disabled="true">
-          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-dot"><svg class="mod-slot-lfo-svg" viewBox="0 0 24 14" preserveAspectRatio="none"><path d="M0,7 Q3,0 6,7 T12,7 T18,7 T24,7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
           <span class="mod-slot-name">LFO 2</span>
         </button>
         <button class="mod-slot mod-slot-random" data-slot-type="random" data-slot-id="randomA" disabled
                 title="Random A (PR5)" aria-disabled="true">
-          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-dot"><span class="mod-slot-scatter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span>
           <span class="mod-slot-name">RAND</span>
         </button>
         <button class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro1"
                 title="Macro 1">
-          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-dot"><span class="mod-slot-ring" style="--v: 0;"></span></span>
           <span class="mod-slot-name">MAC 1</span>
         </button>
         <button class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro2"
                 title="Macro 2">
-          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-dot"><span class="mod-slot-ring" style="--v: 0;"></span></span>
           <span class="mod-slot-name">MAC 2</span>
         </button>
 
         <!-- Center morph slot (placeholder; existing morph slider is the canonical control) -->
         <button class="mod-slot mod-slot-morph" data-slot-type="morph" data-slot-id="morph"
                 title="Morph (use existing slider)" aria-disabled="true" disabled>
-          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-dot"><span class="mod-slot-ring" style="--v: 0;"></span></span>
           <span class="mod-slot-name">MORPH</span>
         </button>
 
         <!-- Engine B side -->
         <button class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro3"
                 title="Macro 3">
-          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-dot"><span class="mod-slot-ring" style="--v: 0;"></span></span>
           <span class="mod-slot-name">MAC 3</span>
         </button>
         <button class="mod-slot mod-slot-macro" data-slot-type="macro" data-slot-id="macro4"
                 title="Macro 4">
-          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-dot"><span class="mod-slot-ring" style="--v: 0;"></span></span>
           <span class="mod-slot-name">MAC 4</span>
         </button>
         <button class="mod-slot mod-slot-random" data-slot-type="random" data-slot-id="randomB" disabled
                 title="Random B (PR5)" aria-disabled="true">
-          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-dot"><span class="mod-slot-scatter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span>
           <span class="mod-slot-name">RAND</span>
         </button>
         <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo3" disabled
                 title="LFO 3 (PR4)" aria-disabled="true">
-          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-dot"><svg class="mod-slot-lfo-svg" viewBox="0 0 24 14" preserveAspectRatio="none"><path d="M0,7 Q3,0 6,7 T12,7 T18,7 T24,7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
           <span class="mod-slot-name">LFO 3</span>
         </button>
         <button class="mod-slot mod-slot-lfo" data-slot-type="lfo" data-slot-id="lfo4" disabled
                 title="LFO 4 (PR4)" aria-disabled="true">
-          <span class="mod-slot-dot"></span>
+          <span class="mod-slot-dot"><svg class="mod-slot-lfo-svg" viewBox="0 0 24 14" preserveAspectRatio="none"><path d="M0,7 Q3,0 6,7 T12,7 T18,7 T24,7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
           <span class="mod-slot-name">LFO 4</span>
         </button>
       </div>
@@ -453,8 +465,10 @@
 <script src="/knob.js"></script>
 <script src="/knob-mini.js"></script>
 <script src="/juce-frontend.js"></script>
+<script src="/live-modulation.js"></script>
 <script src="/modulation-panel.js"></script>
 <script src="/macro-editor.js"></script>
+<script src="/matrix.js"></script>
 <script src="/phantom.js"></script>
 <script src="/preset-spectrum.js"></script>
 <script src="/preset-system.js"></script>

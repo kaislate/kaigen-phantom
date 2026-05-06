@@ -726,6 +726,49 @@ phantom-knob.mode-inactive{
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.modulation-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px 0;
+}
+.modulation-mode-toggle {
+  display: inline-flex;
+  gap: 2px;
+  background: rgba(20, 24, 30, 0.5);
+  padding: 2px;
+  border-radius: 4px;
+}
+.mode-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font: 600 9px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 1.5px;
+  padding: 5px 12px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.mode-btn:hover { color: rgba(255, 255, 255, 0.65); }
+.mode-btn.is-active {
+  background: rgba(93, 211, 224, 0.18);
+  color: #5DD3E0;
+  box-shadow: 0 0 6px rgba(93, 211, 224, 0.25);
+}
+.modulation-counter {
+  font: 600 9px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.modulation-matrix {
+  display: none;
+  padding: 8px 12px 12px;
+}
+.modulation-matrix.is-open {
+  display: block;
+}
+
 .modulation-drawer {
   overflow: hidden;
   max-height: 0;
