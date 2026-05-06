@@ -105,6 +105,12 @@
     catch (e) { console.warn('[matrix] removeRouting unavailable', e); }
   }
 
+  let setMacroName = null;
+  if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
+    try { setMacroName = window.Juce.getNativeFunction('modulationSetMacroName'); }
+    catch (e) { console.warn('[matrix] setMacroName unavailable', e); }
+  }
+
   // Default depth applied when adding a routing via click-to-add (Task 7) and
   // the right-click "Add at +50%" popover entry (Task 9). Centralized so the
   // two callsites stay in sync.
@@ -146,9 +152,66 @@
       anim.innerHTML = '<span class="mtx-scatter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>';
     }
 
+    // Determine which engine this modulator lives in. macro1/2 + lfo1/2 + randomA → A, others → B.
+    const engineForMod = (() => {
+      for (const eng of ['A', 'B']) {
+        if (MODULATORS[eng].some(m => m.id === mod.id)) return eng;
+      }
+      return 'A';
+    })();
+
+    // Read current name from state if available (modulators[].name); fall back to mod.label.
+    const stateMods = (engineForMod === 'A' ? lastState.engineA : lastState.engineB).modulators || [];
+    const stateMod = stateMods.find(m => m.id === mod.id);
+    const currentName = (stateMod && typeof stateMod.name === 'string' && stateMod.name) ? stateMod.name : mod.label;
+
     const name = document.createElement('div');
     name.className = 'mtx-mod-name';
-    name.textContent = mod.label;
+    name.textContent = currentName;
+
+    if (mod.type === 'macro' && setMacroName) {
+      name.style.cursor = 'text';
+      name.addEventListener('click', (ev) => {
+        ev.stopPropagation();   // don't trigger the matrix's own delegated handlers
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = name.textContent;
+        input.className = 'mtx-mod-name-input';
+        input.maxLength = 16;
+        let committed = false;
+        const commit = () => {
+          if (committed) return;
+          committed = true;
+          const v = input.value.trim() || mod.label;
+          try {
+            const result = setMacroName({ source: mod.id, name: v });
+            if (result && typeof result.then === 'function') {
+              result
+                .then(ok => { if (ok === false) console.warn('[matrix] setMacroName returned false', { source: mod.id, name: v }); })
+                .catch(e => console.warn('[matrix] setMacroName rejected', e));
+            }
+          } catch (e) { console.warn('[matrix] setMacroName failed', e); }
+          // The C++ binding doesn't currently emit modulationStateChanged for
+          // name changes. Force a refresh so the matrix re-renders with the
+          // new name. (If a future C++ change adds the emit, this becomes
+          // a no-op double-call — refreshFromState is idempotent.)
+          refreshFromState();
+        };
+        const cancel = () => {
+          if (committed) return;
+          committed = true;
+          render();   // re-render restores the original label
+        };
+        input.addEventListener('keydown', (kev) => {
+          if (kev.key === 'Enter')  { kev.preventDefault(); commit(); }
+          if (kev.key === 'Escape') { kev.preventDefault(); cancel(); }
+        });
+        input.addEventListener('blur', () => commit());
+        name.replaceWith(input);
+        input.focus();
+        input.select();
+      });
+    }
 
     const val = document.createElement('div');
     val.className = 'mtx-mod-val';
