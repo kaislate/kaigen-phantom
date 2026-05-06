@@ -25,8 +25,10 @@
     const BASE_HEIGHT     = 820;
     const MATRIX_EXPANDED = BASE_HEIGHT + 320;   // matrix needs more vertical room than drawer
     let setEditorHeight = null;
-    try { setEditorHeight = window.Juce.getNativeFunction('setEditorHeight'); }
-    catch (e) {}
+    if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
+      try { setEditorHeight = window.Juce.getNativeFunction('setEditorHeight'); }
+      catch (e) { console.warn('[modulation-panel] setEditorHeight unavailable', e); }
+    }
 
     let currentMode = 'slots';
     function applyMode(mode) {
