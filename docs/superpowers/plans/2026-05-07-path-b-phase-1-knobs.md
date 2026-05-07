@@ -288,7 +288,7 @@ private:
 // Source/UI/widgets/PhantomKnob.cpp
 #include "PhantomKnob.h"
 #include "../Theme.h"
-#include "BinaryData.h"
+#include "PhantomNativeAssets.h"
 
 namespace kaigen::phantom
 {
@@ -312,16 +312,16 @@ namespace
         switch (size)
         {
             case PhantomKnob::Size::Large:
-                data = BinaryData::knob_large_svg;
-                dataSize = BinaryData::knob_large_svgSize;
+                data = PhantomNativeAssets::knob_large_svg;
+                dataSize = PhantomNativeAssets::knob_large_svgSize;
                 break;
             case PhantomKnob::Size::Medium:
-                data = BinaryData::knob_medium_svg;
-                dataSize = BinaryData::knob_medium_svgSize;
+                data = PhantomNativeAssets::knob_medium_svg;
+                dataSize = PhantomNativeAssets::knob_medium_svgSize;
                 break;
             case PhantomKnob::Size::Small:
-                data = BinaryData::knob_small_svg;
-                dataSize = BinaryData::knob_small_svgSize;
+                data = PhantomNativeAssets::knob_small_svg;
+                dataSize = PhantomNativeAssets::knob_small_svgSize;
                 break;
         }
         if (data == nullptr) return nullptr;
@@ -349,12 +349,13 @@ PhantomKnob::PhantomKnob(juce::AudioProcessorValueTreeState& apvts,
 {
     slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     slider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
-    slider.setRange(0.0, 1.0, 0.0);
     slider.addListener(this);
     addChildComponent(slider);  // hidden — we forward events manually
 
     if (auto* param = apvts.getParameter(paramID))
         attachment = std::make_unique<juce::SliderParameterAttachment>(*param, slider);
+    else
+        jassertfalse;  // unknown paramID: typo or stale reference
 
     bodyDrawable.reset(loadKnobSvg(size));
 
@@ -393,7 +394,8 @@ void PhantomKnob::paint(juce::Graphics& g)
     // Indicator line — drawn from center outward at the current value's angle.
     const auto centre = bodyArea.getCentre();
     const float radius = bodyArea.getWidth() * 0.42f;
-    const float angle = normalizedToAngle((float) slider.getValue());
+    const float n = (float) slider.getNormalisableRange().convertTo0to1(slider.getValue());
+    const float angle = normalizedToAngle(n);
     const float endX = centre.x + radius * std::sin(angle);
     const float endY = centre.y - radius * std::cos(angle);
     g.setColour(Theme::steelBlue);
@@ -456,9 +458,9 @@ cmake -S . -B build
 cmake --build build --config Debug --target KaigenPhantom_Standalone
 ```
 
-Expected: build succeeds. The `BinaryData::knob_medium_svg` symbol is available because the `PhantomNativeAssets` target produced it from Task 1.
+Expected: build succeeds. The `PhantomNativeAssets::knob_medium_svg` symbol is available because the `PhantomNativeAssets` target produced it from Task 1.
 
-If you get a linker error about `BinaryData::knob_medium_svg` not being found: the `target_link_libraries` step from Task 1 wasn't done correctly. Re-check that `PhantomNativeAssets` is linked to `KaigenPhantom`.
+If you get a linker error about `PhantomNativeAssets::knob_medium_svg` not being found: the `target_link_libraries` step from Task 1 wasn't done correctly. Re-check that `PhantomNativeAssets` is linked to `KaigenPhantom`.
 
 - [ ] **Step 5: Commit**
 
@@ -776,7 +778,7 @@ private:
 // Source/UI/widgets/PhantomMiniKnob.cpp
 #include "PhantomMiniKnob.h"
 #include "../Theme.h"
-#include "BinaryData.h"
+#include "PhantomNativeAssets.h"
 
 namespace kaigen::phantom
 {
@@ -807,7 +809,7 @@ PhantomMiniKnob::PhantomMiniKnob(juce::AudioProcessorValueTreeState& apvts,
     if (auto* param = apvts.getParameter(paramID))
         attachment = std::make_unique<juce::SliderParameterAttachment>(*param, slider);
 
-    bodyDrawable = juce::Drawable::createFromImageData(BinaryData::knob_mini_svg, BinaryData::knob_mini_svgSize);
+    bodyDrawable = juce::Drawable::createFromImageData(PhantomNativeAssets::knob_mini_svg, PhantomNativeAssets::knob_mini_svgSize);
 
     const int labelHeight = label.isNotEmpty() ? 11 : 0;
     setSize(kBodySize + 6, kBodySize + labelHeight + 2);
@@ -1433,14 +1435,14 @@ private:
 // Source/UI/widgets/LinkButton.cpp
 #include "LinkButton.h"
 #include "../Theme.h"
-#include "BinaryData.h"
+#include "PhantomNativeAssets.h"
 
 namespace kaigen::phantom
 {
 
 LinkButton::LinkButton()
 {
-    icon = juce::Drawable::createFromImageData(BinaryData::link_icon_svg, BinaryData::link_icon_svgSize);
+    icon = juce::Drawable::createFromImageData(PhantomNativeAssets::link_icon_svg, PhantomNativeAssets::link_icon_svgSize);
     setSize(28, 28);
 }
 
