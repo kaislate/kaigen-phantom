@@ -46,6 +46,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/widgets/PhantomKnob.cpp
     Source/UI/widgets/PhantomMiniKnob.cpp
     Source/UI/widgets/ToggleGroup.cpp
+    Source/UI/widgets/LinkButton.cpp
     Source/UI/panels/RightPanel.cpp
     Source/Engines/BinauralStage.cpp
     Source/Engines/BassExtractor.cpp
