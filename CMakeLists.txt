@@ -42,6 +42,7 @@ juce_generate_juce_header(KaigenPhantom)
 target_sources(KaigenPhantom PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
+    Source/UI/NativePluginEditor.cpp
     Source/Engines/BinauralStage.cpp
     Source/Engines/BassExtractor.cpp
     Source/Engines/ZeroCrossingSynth.cpp
