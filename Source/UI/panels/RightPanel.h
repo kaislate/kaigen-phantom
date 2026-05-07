@@ -33,6 +33,10 @@ private:
     PhantomKnob inGainKnob;
     PhantomKnob outGainKnob;
 
+    // Levels section auto-gain toggle
+    juce::TextButton autoGainButton { "Auto" };
+    std::unique_ptr<juce::ButtonParameterAttachment> autoGainAttachment;
+
     // Advanced panel — 14 mini knobs, all per-engine 'a_' prefix.
     std::array<std::unique_ptr<PhantomMiniKnob>, 14> miniKnobs;
 

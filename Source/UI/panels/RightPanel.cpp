@@ -31,6 +31,13 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a)
     addAndMakeVisible(inGainKnob);
     addAndMakeVisible(outGainKnob);
 
+    autoGainButton.setClickingTogglesState(true);
+    addAndMakeVisible(autoGainButton);
+    if (auto* param = apvts.getParameter("input_gain_auto"))
+        autoGainAttachment = std::make_unique<juce::ButtonParameterAttachment>(*param, autoGainButton);
+    else
+        jassertfalse;  // unknown paramID: typo or stale reference
+
     {
         static constexpr struct { const char* paramID; const char* label; } miniDefs[] = {
             { "a_synth_duty",            "Push"      },
@@ -111,6 +118,9 @@ void RightPanel::resized()
         mk->setBounds(miniRow.removeFromLeft(miniWidth));
         miniRow.removeFromLeft(miniGap);
     }
+
+    // Auto button — positioned next to the "Levels" section header (which sits at x=420 in paint()).
+    autoGainButton.setBounds(580, 6, 40, 18);
 }
 
 } // namespace kaigen::phantom
