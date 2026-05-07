@@ -7,6 +7,7 @@
 #include "EngineFocus.h"
 #include "SpectrumViewMode.h"
 #include "MatrixViewState.h"
+#include "EditorViewState.h"
 #include "Modulation/ModulationEngine.h"
 #include "Modulation/Macro.h"
 
@@ -129,6 +130,13 @@ public:
     MatrixViewState getMatrixView() const                      { return matrixView; }
     void            setMatrixView(const MatrixViewState& s)    { matrixView = s; }
 
+    // Editor view state — which editor (native vs WebView) the user prefers.
+    // Editor-state, persisted in plugin state.
+    using EditorViewState = kaigen::phantom::EditorViewState;
+
+    EditorViewState getEditorView() const                      { return editorView; }
+    void            setEditorView(const EditorViewState& s)    { editorView = s; }
+
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout();
@@ -195,6 +203,11 @@ private:
     // Matrix view UI state (mode + per-engine expanded categories).
     // Layout/UI concern only — routing data lives in <ModulationConfig>.
     kaigen::phantom::MatrixViewState matrixView;
+
+    // Editor view state (native vs WebView preference).
+    // Editor preference, not preset state — persisted alongside other view
+    // states in the <PluginState> wrapper.
+    kaigen::phantom::EditorViewState editorView;
 
     // ─── Modulation engines (PR3a) ────────────────────────────────────────
     // Declared after `apvts` (public, above) so the references they hold

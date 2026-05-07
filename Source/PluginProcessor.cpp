@@ -508,6 +508,7 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
     kaigen::phantom::writeEngineFocusToTree(wrapper, engineFocus);
     kaigen::phantom::writeSpectrumViewModeToTree(wrapper, spectrumViewMode);
     kaigen::phantom::writeMatrixViewToTree(wrapper, matrixView);
+    kaigen::phantom::writeEditorViewToTree(wrapper, editorView);
 
     // <ModulationConfig> — per-engine modulator + routing tables. Preset-side
     // persistence (within an APVTS-state child or sibling) lands in PR3b; for
@@ -561,6 +562,9 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
 
         if (wrapper.getChildWithName("MatrixView").isValid())
             matrixView = kaigen::phantom::readMatrixViewFromTree(wrapper);
+
+        if (wrapper.getChildWithName("EditorView").isValid())
+            editorView = kaigen::phantom::readEditorViewFromTree(wrapper);
 
         // <ModulationConfig> — restore per-engine modulators + routings. The
         // ValueTree contains one <Engine> child per engine, each tagged with
