@@ -44,6 +44,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/PluginEditor.cpp
     Source/UI/NativePluginEditor.cpp
     Source/UI/widgets/PhantomKnob.cpp
+    Source/UI/widgets/PhantomMiniKnob.cpp
     Source/UI/panels/RightPanel.cpp
     Source/Engines/BinauralStage.cpp
     Source/Engines/BassExtractor.cpp
