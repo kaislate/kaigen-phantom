@@ -671,3 +671,28 @@ if (binauralModeSelectAdv) {
 })();
 
 })();
+
+// ── Dev toggle: shift+click the PHANTOM logo to switch to native UI ────
+// Path B development aid. Sends a setUseNativeEditor binding call; the
+// change takes effect on next plugin window reopen. Removed when Path B
+// cuts over (Phase 6).
+(function setupNativeUIToggle() {
+    const logo = document.getElementById('phantom-logo');
+    if (!logo) return;
+    if (typeof window.Juce === 'undefined' || typeof window.Juce.getNativeFunction !== 'function') return;
+
+    let setUseNativeEditor = null;
+    try { setUseNativeEditor = window.Juce.getNativeFunction('setUseNativeEditor'); }
+    catch (e) { console.warn('[phantom] setUseNativeEditor binding unavailable', e); return; }
+    if (!setUseNativeEditor) return;
+
+    logo.addEventListener('click', (ev) => {
+        if (!ev.shiftKey) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        try {
+            setUseNativeEditor(true);
+            alert('Native UI enabled. Close and reopen the plugin window to see it.');
+        } catch (e) { console.warn('[phantom] setUseNativeEditor failed', e); }
+    });
+})();

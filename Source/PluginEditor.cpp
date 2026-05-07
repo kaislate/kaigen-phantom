@@ -665,6 +665,18 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 self.processor.setMatrixView(s);
                 complete(juce::var(true));
             })
+        .withNativeFunction("setUseNativeEditor",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1) { complete({}); return; }
+                const bool useNative = (bool) args[0];
+                auto state = self.processor.getEditorView();
+                state.useNativeEditor = useNative;
+                self.processor.setEditorView(state);
+                // Mark plugin state dirty so the host saves the new flag.
+                self.processor.updateHostDisplay();
+                complete(juce::var(true));
+            })
         // ── Modulation: routing CRUD + macro metadata (PR3b Task 3) ──────
         .withNativeFunction("modulationGetState",
             [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
