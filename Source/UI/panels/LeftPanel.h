@@ -4,6 +4,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "../widgets/PhantomKnob.h"
 #include "../widgets/ToggleGroup.h"
+#include "../widgets/LinkButton.h"
 
 namespace kaigen::phantom
 {
@@ -27,6 +28,12 @@ private:
     PhantomKnob crossoverKnob;
     PhantomKnob strengthKnob;
     ToggleGroup ghostModeToggle;
+
+    // Filter section
+    PhantomKnob lpfKnob;
+    PhantomKnob hpfKnob;
+    LinkButton  filterLinkBtn;
+    ToggleGroup filterSlopeToggle;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LeftPanel)
 };
