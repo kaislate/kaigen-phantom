@@ -6,6 +6,8 @@
 #include "../widgets/PhantomKnob.h"
 #include "../widgets/PhantomMiniKnob.h"
 #include "../widgets/IOMeter.h"
+#include "../visualizers/Oscilloscope.h"
+#include "../visualizers/Spectrum.h"
 
 class PhantomProcessor;
 
@@ -46,6 +48,10 @@ private:
 
     // Advanced panel — 14 mini knobs, all per-engine 'a_' prefix.
     std::array<std::unique_ptr<PhantomMiniKnob>, 14> miniKnobs;
+
+    // Visualizers (below Advanced row)
+    Oscilloscope oscilloscope;
+    Spectrum spectrum;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RightPanel)
 };

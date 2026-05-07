@@ -25,7 +25,9 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
       inGainKnob    (apvts, "input_gain",            PhantomKnob::Size::Medium, "In"),
       outGainKnob   (apvts, "a_output_gain",         PhantomKnob::Size::Medium, "Out"),
       inMeter       (p.peakInL),
-      outMeter      (p.peakOutL)
+      outMeter      (p.peakOutL),
+      oscilloscope  (p),
+      spectrum      (p)
 {
     addAndMakeVisible(saturationKnob);
     addAndMakeVisible(shapeKnob);
@@ -36,6 +38,9 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
 
     addAndMakeVisible(inMeter);
     addAndMakeVisible(outMeter);
+
+    addAndMakeVisible(oscilloscope);
+    addAndMakeVisible(spectrum);
 
     autoGainButton.setClickingTogglesState(true);
     addAndMakeVisible(autoGainButton);
@@ -127,6 +132,13 @@ void RightPanel::resized()
         mk->setBounds(miniRow.removeFromLeft(miniWidth));
         miniRow.removeFromLeft(miniGap);
     }
+
+    // Visualizers below Advanced row.
+    area.removeFromTop(12);
+    auto vizArea = area.reduced(12, 0);
+    oscilloscope.setBounds(vizArea.removeFromTop(120));
+    vizArea.removeFromTop(8);
+    spectrum    .setBounds(vizArea.removeFromTop(280));
 
     // Auto button — positioned next to the "Levels" section header (which sits at x=420 in paint()).
     autoGainButton.setBounds(580, 6, 40, 18);
