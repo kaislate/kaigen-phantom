@@ -19,10 +19,17 @@ public:
 private:
     juce::AudioProcessorValueTreeState& apvts;
 
-    // Harmonic Engine section (Task 4): per-engine 'a_' prefix.
+    // Harmonic Engine section
     PhantomKnob saturationKnob;
     PhantomKnob shapeKnob;
     PhantomKnob skipKnob;
+
+    // Stereo section
+    PhantomKnob widthKnob;
+
+    // Levels section
+    PhantomKnob inGainKnob;
+    PhantomKnob outGainKnob;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RightPanel)
 };

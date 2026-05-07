@@ -19,11 +19,17 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a)
     : apvts(a),
       saturationKnob(apvts, "a_harmonic_saturation", PhantomKnob::Size::Medium, "Saturation"),
       shapeKnob     (apvts, "a_synth_step",          PhantomKnob::Size::Medium, "Shape"),
-      skipKnob      (apvts, "a_synth_skip",          PhantomKnob::Size::Medium, "Skip")
+      skipKnob      (apvts, "a_synth_skip",          PhantomKnob::Size::Medium, "Skip"),
+      widthKnob     (apvts, "a_stereo_width",        PhantomKnob::Size::Medium, "Width"),
+      inGainKnob    (apvts, "input_gain",            PhantomKnob::Size::Medium, "In"),
+      outGainKnob   (apvts, "a_output_gain",         PhantomKnob::Size::Medium, "Out")
 {
     addAndMakeVisible(saturationKnob);
     addAndMakeVisible(shapeKnob);
     addAndMakeVisible(skipKnob);
+    addAndMakeVisible(widthKnob);
+    addAndMakeVisible(inGainKnob);
+    addAndMakeVisible(outGainKnob);
 }
 
 RightPanel::~RightPanel() = default;
@@ -32,26 +38,41 @@ void RightPanel::paint(juce::Graphics& g)
 {
     g.fillAll(Theme::panelBg);
 
-    // Section header above the knob row.
-    auto sectionHeader = juce::Rectangle<int>(12, 8, 200, 16);
-    drawSectionHeader(g, sectionHeader, "Harmonic Engine");
+    drawSectionHeader(g, juce::Rectangle<int>(12,   8, 200, 16), "Harmonic Engine");
+    drawSectionHeader(g, juce::Rectangle<int>(310,  8, 100, 16), "Stereo");
+    drawSectionHeader(g, juce::Rectangle<int>(420,  8, 200, 16), "Levels");
 }
 
 void RightPanel::resized()
 {
     auto area = getLocalBounds();
-    area.removeFromTop(28);  // space for section header
+    area.removeFromTop(28);
 
-    // Three medium knobs in a row at the top.
     auto knobRow = area.removeFromTop(80).reduced(12, 0);
     const int knobWidth = 80;
+    const int gap       = 8;
+    const int sectionGap = 24;
+
     auto layoutKnob = [&](PhantomKnob& k) {
         k.setBounds(knobRow.removeFromLeft(knobWidth));
-        knobRow.removeFromLeft(8);
+        knobRow.removeFromLeft(gap);
     };
+
+    // Harmonic Engine
     layoutKnob(saturationKnob);
     layoutKnob(shapeKnob);
     layoutKnob(skipKnob);
+
+    knobRow.removeFromLeft(sectionGap);
+
+    // Stereo
+    layoutKnob(widthKnob);
+
+    knobRow.removeFromLeft(sectionGap);
+
+    // Levels
+    layoutKnob(inGainKnob);
+    layoutKnob(outGainKnob);
 }
 
 } // namespace kaigen::phantom
