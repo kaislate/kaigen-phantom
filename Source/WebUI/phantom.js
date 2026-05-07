@@ -341,11 +341,6 @@ const getPitch = getNativeFunction("getPitchInfo");
 // reduces WebView2 IPC + per-engine FFT pressure during playback. Two-instance
 // message-thread saturation testing showed the prior 30 Hz rate drove ~60
 // FFT(8192) computations/sec/instance on the message thread.
-// Foreground gating: when the C++ editor isn't the OS foreground window
-// (the user is interacting with a different plugin instance), each of these
-// native bindings short-circuits to `{inactive:true}`. We forward that flag
-// through so spectrum.js / peak / pitch handlers no-op and the canvases hold
-// their last frame instead of decaying toward zero.
 async function pollData() {
   try {
     const [bins, peaks, p] = await Promise.all([
@@ -354,23 +349,21 @@ async function pollData() {
       getPitch(),
     ]);
 
-    if (!bins  || !bins.inactive)  document.dispatchEvent(new CustomEvent("spectrum-data", { detail: bins }));
-    if (!peaks || !peaks.inactive) document.dispatchEvent(new CustomEvent("peak-data",     { detail: peaks }));
+    document.dispatchEvent(new CustomEvent("spectrum-data", { detail: bins }));
+    document.dispatchEvent(new CustomEvent("peak-data", { detail: peaks }));
 
-    if (!p || !p.inactive) {
-      const pitchDisplay = document.getElementById("pitchDisplay");
-      const presetDisplay = document.getElementById("presetDisplay");
+    const pitchDisplay = document.getElementById("pitchDisplay");
+    const presetDisplay = document.getElementById("presetDisplay");
 
-      if (pitchDisplay) {
-        pitchDisplay.textContent =
-          p && p.hz > 0 ? `${p.note} \u00B7 ${Math.round(p.hz)}Hz` : "---";
-      }
-      if (presetDisplay && p && p.preset) {
-        presetDisplay.textContent = p.preset;
-      }
-
-      document.dispatchEvent(new CustomEvent("pitch-data", { detail: p }));
+    if (pitchDisplay) {
+      pitchDisplay.textContent =
+        p && p.hz > 0 ? `${p.note} \u00B7 ${Math.round(p.hz)}Hz` : "---";
     }
+    if (presetDisplay && p && p.preset) {
+      presetDisplay.textContent = p.preset;
+    }
+
+    document.dispatchEvent(new CustomEvent("pitch-data", { detail: p }));
   } catch (err) {
     console.error("pollData failed:", err);
   }

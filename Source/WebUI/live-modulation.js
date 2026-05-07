@@ -46,11 +46,6 @@
     async function tick() {
       try {
         const state = await getLiveState();
-        // C++ short-circuits to `{inactive:true}` when this editor's
-        // top-level window isn't the OS foreground. Skip dispatching so
-        // matrix-cell glow + macro rings hold their last frame on the
-        // backgrounded instance instead of resetting to zero.
-        if (state && state.inactive) return;
         document.body.dispatchEvent(new CustomEvent('kaigen:live-state', { detail: state }));
       } catch (e) {
         // Binding gone (editor teardown). Stop polling silently.
