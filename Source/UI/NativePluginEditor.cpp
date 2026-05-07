@@ -31,13 +31,14 @@ namespace
 
 NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
                                        juce::AudioProcessorValueTreeState& a)
-    : juce::AudioProcessorEditor(&p), processor(p), apvts(a), rightPanel(a)
+    : juce::AudioProcessorEditor(&p), processor(p), apvts(a), rightPanel(a), leftPanel(a)
 {
     setSize(editorWidth, editorHeight);
 
     backToWebViewButton.addListener(this);
     addAndMakeVisible(backToWebViewButton);
     addAndMakeVisible(rightPanel);
+    addAndMakeVisible(leftPanel);
 }
 
 NativePluginEditor::~NativePluginEditor()
@@ -59,10 +60,7 @@ void NativePluginEditor::paint(juce::Graphics& g)
     auto modPanel = area.removeFromBottom(modPanelHeight);
     drawLabeledPanel(g, modPanel, "ModulationPanel (mode bar + slot row + engine labels)");
 
-    // MainArea split into LeftPanel + (RightPanel — real Component, no wireframe needed).
-    auto leftPanel = area.removeFromLeft(leftPanelWidth);
-    drawLabeledPanel(g, leftPanel, "LeftPanel (recipe wheel + ghost + filter)");
-    // RightPanel is a real Component now; the area we'd draw it in is occupied by the child.
+    // LeftPanel and RightPanel are real Components now -- no wireframe rectangles.
 }
 
 void NativePluginEditor::resized()
@@ -73,7 +71,9 @@ void NativePluginEditor::resized()
     auto area = getLocalBounds();
     area.removeFromTop(topBarHeight);
     area.removeFromBottom(modPanelHeight);
-    area.removeFromLeft(leftPanelWidth);
+
+    auto leftBounds = area.removeFromLeft(leftPanelWidth);
+    leftPanel.setBounds(leftBounds);
     rightPanel.setBounds(area);
 }
 

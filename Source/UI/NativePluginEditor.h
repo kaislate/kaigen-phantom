@@ -2,6 +2,7 @@
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "panels/LeftPanel.h"
 #include "panels/RightPanel.h"
 
 class PhantomProcessor;
@@ -26,6 +27,7 @@ private:
     juce::AudioProcessorValueTreeState& apvts;
     juce::TextButton backToWebViewButton { "<- WebView2" };
     RightPanel rightPanel;
+    LeftPanel leftPanel;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NativePluginEditor)
 };
