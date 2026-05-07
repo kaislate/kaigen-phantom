@@ -196,7 +196,10 @@
             <phantom-knob data-param="ghost" size="large" label="Amount" default-value="1.0"></phantom-knob>
             <div class="ghost-crossover-col">
               <span class="toggle-group ghost-mode-toggle"><button class="tog active" data-gmode="0">Replace</button><button class="tog" data-gmode="1">Combine</button><button class="tog" data-gmode="2">Phantom Only</button></span>
-              <phantom-knob data-param="phantom_threshold" size="medium" label="Crossover" default-value="0.462"></phantom-knob>
+              <div class="ghost-crossover-knobs">
+                <phantom-knob data-param="phantom_threshold" size="medium" label="Crossover" default-value="0.462"></phantom-knob>
+                <phantom-knob data-param="phantom_strength" size="medium" label="Strength" default-value="0.8"></phantom-knob>
+              </div>
             </div>
           </div>
         </div>
@@ -240,23 +243,24 @@
           <div class="candy-inner panel-harmonic">
             <div class="el">Harmonic Engine</div>
             <div class="knob-row">
-              <phantom-knob data-param="harmonic_saturation" size="large" label="Saturation" default-value="0"></phantom-knob>
-              <phantom-knob data-param="phantom_strength" size="medium" label="Strength" default-value="0.8"></phantom-knob>
-              <phantom-knob data-param="synth_step" size="large" label="Shape" default-value="0" data-oled="waveform"></phantom-knob>
+              <phantom-knob data-param="harmonic_saturation" size="medium" label="Saturation" default-value="0"></phantom-knob>
+              <phantom-knob data-param="synth_step" size="medium" label="Shape" default-value="0" data-oled="waveform"></phantom-knob>
               <phantom-knob data-param="synth_skip" size="medium" label="Skip" default-value="0"></phantom-knob>
             </div>
           </div>
           <div class="candy-inner panel-stereo">
             <div class="el">Stereo</div>
             <div class="knob-row">
-              <phantom-knob data-param="stereo_width" size="large" label="Width" default-value="0.5"></phantom-knob>
+              <phantom-knob data-param="stereo_width" size="medium" label="Width" default-value="0.5"></phantom-knob>
             </div>
           </div>
-          <div class="candy-inner panel-output">
-            <div class="el">Output <span class="toggle-group"><button class="tog" id="auto-gain-btn" data-param="input_gain_auto">Auto</button></span></div>
-            <div class="knob-row">
+          <div class="candy-inner panel-output panel-levels">
+            <div class="el">Levels <span class="toggle-group"><button class="tog" id="auto-gain-btn" data-param="input_gain_auto">Auto</button></span></div>
+            <div class="knob-row levels-row">
+              <canvas id="meterIn" class="io-meter levels-meter"></canvas>
               <phantom-knob data-param="input_gain" size="medium" label="In" default-value="0.333" id="input-gain-knob"></phantom-knob>
-              <phantom-knob data-param="output_gain" size="large" label="Out" default-value="0.667"></phantom-knob>
+              <phantom-knob data-param="output_gain" size="medium" label="Out" default-value="0.667"></phantom-knob>
+              <canvas id="meterOut" class="io-meter levels-meter"></canvas>
             </div>
           </div>
         </div>
@@ -320,7 +324,6 @@
             </div>
           </div>
           <div class="spectrum-row">
-            <canvas id="meterIn" class="io-meter"></canvas>
             <div class="spectrum-wrap">
               <canvas id="spectrumCanvas"></canvas>
               <button type="button" id="spectrum-mode-toggle" class="spectrum-mode-toggle"
@@ -329,7 +332,6 @@
                 <span class="lbl-combined">COMBINED</span>
               </button>
             </div>
-            <canvas id="meterOut" class="io-meter"></canvas>
           </div>
         </div>
       </div>
@@ -337,11 +339,16 @@
 
   </div>
 
+  <!-- Matrix view: lives OUTSIDE .wrap as a sibling sub-panel. In MATRIX
+       mode, .wrap is hidden via body.is-matrix-active and this matrix
+       container takes its place at the same 820px footprint, so the
+       editor's total height (1300x970) never changes. -->
+  <div id="modulation-matrix" class="modulation-matrix" aria-hidden="true"></div>
+
   <!-- Bottom modulation panel (PR3b: macros only; LFO/Random slots are
        placeholders until PR4/5). Lives OUTSIDE .wrap as a sibling sub-panel
-       so the editor grows downward to accommodate it — keeping .wrap fixed
-       at 820px means the original editor content (knobs, spectrum,
-       oscilloscope, filters) is no longer truncated by overflow:hidden. -->
+       and is ALWAYS visible at the bottom of the editor in both SLOTS and
+       MATRIX modes. -->
   <div id="modulation-panel" class="modulation-panel" aria-label="Modulation panel">
 
     <div class="modulation-mode-bar">
@@ -424,11 +431,6 @@
     </div>
   </div>
 
-  <!-- Matrix view: lives OUTSIDE .wrap as a sibling sub-panel so the editor
-       grows downward when MATRIX mode is active. The wrap stays fixed at
-       820px; this matrix container occupies the new space below the always-
-       visible modulation panel. -->
-  <div id="modulation-matrix" class="modulation-matrix" aria-hidden="true"></div>
 <div id="settings-overlay" class="settings-overlay hidden">
   <div class="settings-backdrop"></div>
   <div class="settings-panel">

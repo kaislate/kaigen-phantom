@@ -21,18 +21,14 @@
     // ── SLOTS / MATRIX mode toggle ────────────────────────────────────────
     const matrix = document.getElementById('modulation-matrix');
     const modeBar = panel.querySelector('.modulation-mode-toggle');
-    // .wrap stays a fixed 820px containing all the original editor content.
-    // The modulation panel is a ~150px sub-panel sibling below the wrap and
-    // is ALWAYS visible (the slots row is the default UI). The matrix is a
-    // 320px sub-panel below the modulation panel, only visible when the
-    // user toggles MATRIX mode. The total editor height is therefore:
-    //   slots-mode  = wrap (820) + panel (150)            = 970
-    //   matrix-mode = wrap (820) + panel (150) + matrix (320) = 1290
+    // Option A: editor is ALWAYS 1300×970 — wrap (820) + panel (150). In
+    // SLOTS mode the wrap is shown and the matrix is hidden; in MATRIX
+    // mode the wrap is hidden (body.is-matrix-active) and the matrix
+    // takes its place at the same 820px footprint. The modulation panel
+    // is always visible at the bottom. No editor resize, no scrolling.
     const WRAP_HEIGHT     = 820;
     const PANEL_HEIGHT    = 150;
-    const MATRIX_HEIGHT   = 320;
-    const BASE_HEIGHT     = WRAP_HEIGHT + PANEL_HEIGHT;     // 970 — slots-mode total
-    const MATRIX_EXPANDED = BASE_HEIGHT + MATRIX_HEIGHT;    // 1290 — matrix-mode total
+    const BASE_HEIGHT     = WRAP_HEIGHT + PANEL_HEIGHT;     // 970 — fixed editor height
     let setEditorHeight = null;
     if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
       try { setEditorHeight = window.Juce.getNativeFunction('setEditorHeight'); }
@@ -86,6 +82,10 @@
     function applyMode(mode) {
       currentMode = mode;
       panel.classList.toggle('is-matrix-mode', mode === 'matrix');
+      // Option A: matrix replaces wrap. Toggle a body class so CSS can hide
+      // the wrap when matrix is active. Editor height stays fixed; no
+      // setEditorHeight call here.
+      document.body.classList.toggle('is-matrix-active', mode === 'matrix');
       if (matrix) {
         matrix.classList.toggle('is-open', mode === 'matrix');
         matrix.setAttribute('aria-hidden', mode === 'matrix' ? 'false' : 'true');
@@ -96,10 +96,6 @@
           b.classList.toggle('is-active', active);
           b.setAttribute('aria-selected', active ? 'true' : 'false');
         });
-      }
-      if (setEditorHeight) {
-        try { setEditorHeight(mode === 'matrix' ? MATRIX_EXPANDED : BASE_HEIGHT); }
-        catch (e) {}
       }
       // Gate the live-modulation poll on matrix mode. SLOTS view doesn't need
       // the poll because phantom-knobs drive macro display via native APVTS

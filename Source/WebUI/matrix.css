@@ -3,6 +3,7 @@
 .modulation-matrix {
   display: none;
   width: 1300px;            /* match body/wrap width */
+  height: 820px;            /* matches .wrap exactly — matrix replaces wrap */
   background: #0a0c10;
   border-radius: 0;          /* sub-panel butts up against the wrap above */
   margin: 0;
@@ -10,8 +11,7 @@
   color: #c8d8ea;
   font: 11px/1.3 'Space Grotesk', system-ui, sans-serif;
   box-sizing: border-box;
-  max-height: 320px;
-  overflow-y: auto;
+  overflow: hidden;          /* no scrolling — editor never exceeds 970px total */
 }
 .modulation-matrix.is-open {
   display: block;
