@@ -79,9 +79,12 @@ public:
     void process(juce::AudioBuffer<float>& buffer, const juce::AudioBuffer<float>* sidechain = nullptr);
 
     // ─── Oscilloscope capture (written by audio thread) ──────────────────
+    // Atomic floats with relaxed ordering: audio thread stores, editor binding
+    // loads. relaxed is sufficient — visualisation tolerates eventual
+    // consistency and no other observable state depends on these samples.
     static constexpr int kOscBufSize = 2048;
-    std::array<float, kOscBufSize> oscSynthBuf {};   // phantom harmonics (ch 0, envelope-scaled)
-    std::atomic<int>               oscSynthWrPos { 0 };
+    std::array<std::atomic<float>, kOscBufSize> oscSynthBuf {};   // phantom harmonics (ch 0, envelope-scaled)
+    std::atomic<int>                            oscSynthWrPos { 0 };
 
 private:
     BassExtractor     bassExtractor;

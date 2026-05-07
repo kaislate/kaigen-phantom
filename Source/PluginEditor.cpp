@@ -348,11 +348,16 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 self.oscSynthArr.ensureStorageAllocated(PhantomEngine::kOscBufSize);
                 self.oscOutArr  .ensureStorageAllocated(PhantomEngine::kOscBufSize);
 
+                // Relaxed atomic loads — the audio thread is concurrently
+                // doing relaxed stores into these slots. Tearing on the
+                // float scalar would have been UB with plain float[]; with
+                // std::atomic<float> the race is well-defined and codegen
+                // is identical (single mov on x86/ARM).
                 for (int i = 0; i < PhantomEngine::kOscBufSize; ++i)
                 {
-                    self.oscInArr   .add((double) self.processor.oscInputBuf [(size_t) i]);
-                    self.oscSynthArr.add((double) engine.oscSynthBuf         [(size_t) i]);
-                    self.oscOutArr  .add((double) self.processor.oscOutputBuf[(size_t) i]);
+                    self.oscInArr   .add((double) self.processor.oscInputBuf [(size_t) i].load(std::memory_order_relaxed));
+                    self.oscSynthArr.add((double) engine.oscSynthBuf         [(size_t) i].load(std::memory_order_relaxed));
+                    self.oscOutArr  .add((double) self.processor.oscOutputBuf[(size_t) i].load(std::memory_order_relaxed));
                 }
                 auto* obj = new juce::DynamicObject();
                 obj->setProperty("input",       self.oscInArr);

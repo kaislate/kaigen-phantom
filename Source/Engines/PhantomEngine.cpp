@@ -407,7 +407,7 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
             // Oscilloscope capture (left channel only)
             if (ch == 0)
             {
-                oscSynthBuf[(size_t) oscWp] = phantomOut;
+                oscSynthBuf[(size_t) oscWp].store(phantomOut, std::memory_order_relaxed);
                 oscWp = (oscWp + 1) & (kOscBufSize - 1);
             }
 

@@ -200,7 +200,7 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             pL = juce::jmax(pL, std::abs(inL[i]));
             pR = juce::jmax(pR, std::abs(inR[i]));
 
-            oscInputBuf[(size_t) oscInWp] = inL[i];
+            oscInputBuf[(size_t) oscInWp].store(inL[i], std::memory_order_relaxed);
             oscInWp = (oscInWp + 1) & (kOscBufSize - 1);
 
             fftBuffer[(size_t) fftWritePos++] = inL[i];
@@ -393,7 +393,7 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             pL = juce::jmax(pL, std::abs(outL[i]));
             pR = juce::jmax(pR, std::abs(outR[i]));
 
-            oscOutputBuf[(size_t) oscOutWp] = outL[i];
+            oscOutputBuf[(size_t) oscOutWp].store(outL[i], std::memory_order_relaxed);
             oscOutWp = (oscOutWp + 1) & (kOscBufSize - 1);
 
             fftOutputBuffer[(size_t) fftOutputWritePos++] = outL[i];

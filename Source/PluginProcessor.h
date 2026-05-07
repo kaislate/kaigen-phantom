@@ -79,12 +79,17 @@ public:
     std::array<std::atomic<float>, kSpectrumBins> engineASpectrum {};
     std::array<std::atomic<float>, kSpectrumBins> engineBSpectrum {};
 
-    // Oscilloscope ring buffers (written by audio thread, read by editor)
+    // Oscilloscope ring buffers. Audio thread does relaxed atomic stores;
+    // editor binding does relaxed atomic loads. Plain float[] would tear
+    // only theoretically on x86/ARM, but std::atomic<float> with relaxed
+    // ordering makes the data race well-defined at zero cost in codegen
+    // (still a single mov on these platforms) — same pattern the spectrum
+    // arrays already use above.
     static constexpr int kOscBufSize = PhantomEngine::kOscBufSize;
-    std::array<float, kOscBufSize> oscInputBuf  {};
-    std::array<float, kOscBufSize> oscOutputBuf {};
-    std::atomic<int>               oscInputWrPos  { 0 };
-    std::atomic<int>               oscOutputWrPos { 0 };
+    std::array<std::atomic<float>, kOscBufSize> oscInputBuf  {};
+    std::array<std::atomic<float>, kOscBufSize> oscOutputBuf {};
+    std::atomic<int>                            oscInputWrPos  { 0 };
+    std::atomic<int>                            oscOutputWrPos { 0 };
 
     // Dual-engine host: owns A + B engine instances and the morph crossfader.
     // PR1 always shows engine A in the editor; PR2 introduces tab switching.
