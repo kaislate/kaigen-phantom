@@ -79,7 +79,11 @@ juce_add_binary_data(PhantomWebUI SOURCES
 )
 
 juce_add_binary_data(PhantomNativeAssets SOURCES
+    Source/Assets/svg/knob_large.svg
     Source/Assets/svg/knob_medium.svg
+    Source/Assets/svg/knob_small.svg
+    Source/Assets/svg/knob_mini.svg
+    Source/Assets/svg/link_icon.svg
 )
 
 # Factory presets (optional, for Phase 2 implementation)
