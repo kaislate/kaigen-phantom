@@ -35,7 +35,25 @@ public:
         void timerCallback() override;
     };
     FocusRescanTimer focusRescanTimer;
+
+    // Polls foreground-window state at 2 Hz and updates isEditorActive.
+    // When the editor's top-level parent isn't the OS foreground window, the
+    // visualization native bindings short-circuit so a backgrounded second
+    // instance doesn't compete with the interactive one for message-thread
+    // bandwidth or for marshalling allocations.
+    struct ForegroundPollTimer : juce::Timer
+    {
+        PhantomEditor* owner = nullptr;
+        void timerCallback() override;
+    };
+    ForegroundPollTimer foregroundPollTimer;
 #endif
+
+    // True when this editor's top-level window is the OS foreground window
+    // (or when we can't tell, fail-open). Read by the visualization native
+    // bindings on the message thread; written by the foreground-poll timer.
+    // Atomic so the relaxed reads in hot bindings stay branchless.
+    std::atomic<bool> isEditorActive { true };
 
 private:
     std::optional<juce::WebBrowserComponent::Resource> getResource(const juce::String& url);

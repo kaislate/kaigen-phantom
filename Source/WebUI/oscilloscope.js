@@ -231,6 +231,11 @@ function draw() {
 document.addEventListener('osc-data', (e) => {
     const d = e.detail;
     if (!d) return;
+    // C++ side returned an idle payload because this editor isn't the OS
+    // foreground window. Skip ingest entirely — the last-rendered frame will
+    // stay frozen on screen, which is the desired behavior for a backgrounded
+    // instance.
+    if (d.inactive) return;
 
     if (d.input  && d.input.length  >= OSC_BUF_SIZE)
         for (let i = 0; i < OSC_BUF_SIZE; i++) inBuf[i]  = +d.input[i]  || 0;

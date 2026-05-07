@@ -107,6 +107,44 @@ void PhantomEditor::FocusRescanTimer::timerCallback()
         installOnChromeWindows((HWND) peer->getNativeHandle(), 0);
 }
 
+// Returns true when our editor's top-level window owns OS foreground.
+// In Standalone, our top-level IS the standalone host window, so when the
+// app has focus this is true. In a VST3 host, the top-level is the host's
+// plugin-window frame; if the user clicked another instance's frame, the
+// foreground check flips false here and the visualization bindings idle.
+//
+// Fail-open semantics: anything we can't determine (no peer, no HWND, no
+// foreground window reported by the OS) returns true. We'd rather waste a
+// little CPU than blank a UI the user is actively looking at.
+static bool checkEditorForegroundActive(juce::Component* comp)
+{
+    if (comp == nullptr) return true;
+    auto* peer = comp->getPeer();
+    if (peer == nullptr) return true;
+
+    HWND hwnd = (HWND) peer->getNativeHandle();
+    if (hwnd == nullptr) return true;
+
+    HWND fg = GetForegroundWindow();
+    if (fg == nullptr) return true; // no foreground at all (e.g., locked screen) — fail open
+
+    HWND topLevel = GetAncestor(hwnd, GA_ROOT);
+    if (topLevel == nullptr) topLevel = hwnd;
+
+    // Active when the OS foreground IS our top-level, or sits inside it
+    // (e.g., a child popup of the host's plugin window).
+    if (fg == topLevel) return true;
+    if (IsChild(topLevel, fg)) return true;
+    return false;
+}
+
+void PhantomEditor::ForegroundPollTimer::timerCallback()
+{
+    if (owner == nullptr) return;
+    const bool active = checkEditorForegroundActive(owner);
+    owner->isEditorActive.store(active, std::memory_order_relaxed);
+}
+
 void PhantomEditor::parentHierarchyChanged()
 {
     // WebView2 creates its HWNDs asynchronously, and some Chromium helper
@@ -123,6 +161,19 @@ void PhantomEditor::parentHierarchyChanged()
     focusRescanTimer.owner = this;
     if (!focusRescanTimer.isTimerRunning())
         focusRescanTimer.startTimer(4000);
+
+    // Foreground-active poll. 2 Hz is plenty: when the user clicks instance B
+    // we accept up to ~500ms before A's visualizations idle, which is well
+    // below the threshold where it would feel like A is still "competing"
+    // with B's interactive frame. Cost is tiny — a single GetForegroundWindow
+    // + GetAncestor per tick — so adding it doesn't undo the savings it
+    // unlocks.
+    foregroundPollTimer.owner = this;
+    if (!foregroundPollTimer.isTimerRunning())
+        foregroundPollTimer.startTimer(500);
+    // Sample once now so the first poll cycle of the visualization bindings
+    // doesn't briefly spin under the wrong assumption.
+    isEditorActive.store(checkEditorForegroundActive(this), std::memory_order_relaxed);
 
     // Also do a few quick passes during startup to catch windows before
     // the first real scan tick.
@@ -243,10 +294,34 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
     options = options.withOptionsFrom(self.midiGateReleaseRelayB);
 
     // ── Native functions for real-time data ──────────────────────────
+    //
+    // Foreground-gate helper: when our editor isn't the OS foreground window
+    // (e.g., the user clicked into another plugin instance), every
+    // visualization binding short-circuits to a tiny payload `{inactive:true}`
+    // that the JS handlers no-op on. The cost difference per call is large —
+    // for getOscilloscopeData it's a 3×2048 float marshal vs. one bool — and
+    // since these run at 5–15 Hz/instance, gating the backgrounded instance
+    // frees the message thread for the foreground one.
+    //
+    // The atomic load is relaxed because we don't care about strict ordering
+    // relative to anything else; a missed flip only delays the gate by one
+    // tick (~67 ms at 15 Hz), which is invisible.
+    auto makeInactiveResponse = []() -> juce::var
+    {
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty("inactive", true);
+        return juce::var(obj);
+    };
+
     options = options
         .withNativeFunction("getSpectrumData",
-            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            [&self, makeInactiveResponse](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
+                if (! self.isEditorActive.load(std::memory_order_relaxed))
+                {
+                    complete(makeInactiveResponse());
+                    return;
+                }
                 // Reuse member Arrays across calls. clearQuick() drops elements
                 // without releasing the backing buffer, and ensureStorageAllocated
                 // sizes it on first use so subsequent fills don't realloc.
@@ -298,8 +373,13 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 complete(juce::var(obj));
             })
         .withNativeFunction("getPeakLevels",
-            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            [&self, makeInactiveResponse](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
+                if (! self.isEditorActive.load(std::memory_order_relaxed))
+                {
+                    complete(makeInactiveResponse());
+                    return;
+                }
                 auto* obj = new juce::DynamicObject();
                 obj->setProperty("inL",  (double) self.processor.peakInL .load(std::memory_order_relaxed));
                 obj->setProperty("inR",  (double) self.processor.peakInR .load(std::memory_order_relaxed));
@@ -308,8 +388,13 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 complete(juce::var(obj));
             })
         .withNativeFunction("getPitchInfo",
-            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            [&self, makeInactiveResponse](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
+                if (! self.isEditorActive.load(std::memory_order_relaxed))
+                {
+                    complete(makeInactiveResponse());
+                    return;
+                }
                 auto* obj = new juce::DynamicObject();
                 const float hz = self.processor.currentPitch.load(std::memory_order_relaxed);
                 obj->setProperty("hz", (double) hz);
@@ -331,8 +416,13 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                 complete(juce::var(obj));
             })
         .withNativeFunction("getOscilloscopeData",
-            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            [&self, makeInactiveResponse](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
+                if (! self.isEditorActive.load(std::memory_order_relaxed))
+                {
+                    complete(makeInactiveResponse());
+                    return;
+                }
                 auto& engine = self.processor.getActiveEngine();
 
                 // Reuse member Arrays across calls. clearQuick() drops elements
@@ -731,9 +821,14 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
 
                 complete(juce::var(root.get()));
             })
-        .withNativeFunction("modulationGetLiveState", [&self]
+        .withNativeFunction("modulationGetLiveState", [&self, makeInactiveResponse]
             (const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
         {
+            if (! self.isEditorActive.load(std::memory_order_relaxed))
+            {
+                complete(makeInactiveResponse());
+                return;
+            }
             juce::DynamicObject::Ptr root = new juce::DynamicObject();
 
             auto buildEngine = [&](kaigen::phantom::ModulationEngine& eng) -> juce::var
