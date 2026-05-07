@@ -71,16 +71,13 @@ public:
     std::array<float, kSpectrumBins> spectrumOutputData {}; // output (post-engine)
     std::atomic<bool> spectrumReady { false };
 
-    /** Selector for computeEngineSpectrum: which engine ring buffer to read. */
-    enum class SpectrumEngineId { A, B };
-
-    /** UI-thread helper. Reads the most recent kFftSize samples from the
-     *  per-engine FFT ring buffer (populated in processBlock — see Task 3),
-     *  applies the same Hann window + FFT + log-binning pipeline as the
-     *  input/output spectra, and writes binned magnitudes (range 0..1) to
-     *  `dst`. Called from the WebView native binding on the message thread. */
-    void computeEngineSpectrum(SpectrumEngineId which,
-                               std::array<float, kSpectrumBins>& dst) const;
+    // Per-engine spectra, computed on the audio thread (mirrors the input/output
+    // pipeline). The native binding reads these as atomic snapshots — no FFT,
+    // no allocation on the message thread. memory_order_relaxed is sufficient:
+    // spectrum visualization tolerates eventual consistency, and the publish
+    // timestamp doesn't gate any other observable state.
+    std::array<std::atomic<float>, kSpectrumBins> engineASpectrum {};
+    std::array<std::atomic<float>, kSpectrumBins> engineBSpectrum {};
 
     // Oscilloscope ring buffers (written by audio thread, read by editor)
     static constexpr int kOscBufSize = PhantomEngine::kOscBufSize;
@@ -149,8 +146,8 @@ private:
     static constexpr int kFftOrder = 13;
     static constexpr int kFftSize  = 1 << kFftOrder;
     // Ring-buffer mask for the per-engine FFT capture rings. Single source of
-    // truth; used at both the producer (processBlock) and consumer
-    // (computeEngineSpectrum) call sites.
+    // truth; used at both ring-write (producer) and FFT-read (consumer)
+    // sites — both running on the audio thread in processBlock.
     static constexpr int kEngineRingMask = (kFftSize * 2) - 1;
     juce::dsp::FFT spectrumFFT { kFftOrder };
     std::array<float, kFftSize * 2> fftBuffer {};       // input (pre-engine)
@@ -161,20 +158,27 @@ private:
     // Per-engine output FFT capture (split-mode spectrum view).
     // Same size as the existing input fftBuffer; populated from
     // dualEngineHost.getEngineAOutput()/getEngineBOutput() in processBlock
-    // after dualEngineHost.process(...) returns. Read by the WebView
-    // native binding (see Task 4) on the message thread, hence atomic
-    // write positions for the producer-side ring buffer.
+    // after dualEngineHost.process(...) returns, then transformed in-place
+    // on the audio thread on the same kFftSize cadence as input/output.
+    // Atomic write positions are kept for symmetry with the existing
+    // pattern; only the audio thread mutates them.
     std::array<float, kFftSize * 2> fftBufferEngineA {};
     std::array<float, kFftSize * 2> fftBufferEngineB {};
     std::atomic<int> fftWritePosEngineA { 0 };
     std::atomic<int> fftWritePosEngineB { 0 };
 
-    // Scratch buffer used by computeEngineSpectrum() (UI/message thread).
-    // Mutable because the method is logically const (it does not change
-    // observable state — it only reads the ring buffer and writes to the
-    // caller-provided destination), but the FFT in-place transform needs
-    // writable storage.
-    mutable std::array<float, kFftSize * 2> spectrumEngineScratch {};
+    // Per-engine FFT scratch buffers (audio thread). Populated by copying the
+    // most recent kFftSize samples from the per-engine ring buffer, then
+    // Hann-windowed and FFT'd in place. Pre-allocated here so the audio
+    // thread never heap-allocates.
+    std::array<float, kFftSize * 2> fftScratchEngineA {};
+    std::array<float, kFftSize * 2> fftScratchEngineB {};
+
+    // Sub-rate cadence: count samples since last per-engine FFT and run when
+    // we've accumulated kFftSize new samples. Matches the input/output
+    // cadence (one FFT per kFftSize samples ≈ 5.86 Hz at 48k).
+    int samplesSinceEngineFftA = 0;
+    int samplesSinceEngineFftB = 0;
 
     // Editor focus: which tab the UI is on + whether LINK is active.
     // Editor preference, not preset state — stored alongside APVTS in the

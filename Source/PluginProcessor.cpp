@@ -82,6 +82,12 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
     fftBufferEngineB.fill(0.0f);
     fftWritePosEngineA.store(0, std::memory_order_relaxed);
     fftWritePosEngineB.store(0, std::memory_order_relaxed);
+    fftScratchEngineA.fill(0.0f);
+    fftScratchEngineB.fill(0.0f);
+    samplesSinceEngineFftA = 0;
+    samplesSinceEngineFftB = 0;
+    for (auto& a : engineASpectrum) a.store(0.0f, std::memory_order_relaxed);
+    for (auto& a : engineBSpectrum) a.store(0.0f, std::memory_order_relaxed);
 }
 
 void PhantomProcessor::releaseResources() {}
@@ -277,11 +283,15 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     // input, and crossfades into `buffer` (in place).
     dualEngineHost.process(buffer, sidechainPtr);
 
-    // ── Per-engine FFT capture (split-mode spectrum view) ────────────
+    // ── Per-engine FFT capture + transform (split-mode spectrum view) ──
     // aScratch / bScratch hold each engine's post-process / pre-crossfader
     // output. They're valid until the next dualEngineHost.process() call,
     // i.e. until the next processBlock — so capture them now into the two
-    // ring buffers consumed by the native binding on the UI thread.
+    // ring buffers, then run the FFT on the audio thread on the same
+    // sub-rate cadence as the input/output FFTs (one transform per
+    // kFftSize samples accumulated). The bin magnitudes are published into
+    // atomic snapshot arrays the WebView native binding reads as plain
+    // atomic loads — no FFT, no allocation on the message thread.
     {
         const auto& aOut = dualEngineHost.getEngineAOutput();
         const auto& bOut = dualEngineHost.getEngineBOutput();
@@ -302,6 +312,68 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             }
             fftWritePosEngineA.store(posA, std::memory_order_relaxed);
             fftWritePosEngineB.store(posB, std::memory_order_relaxed);
+
+            samplesSinceEngineFftA += n;
+            samplesSinceEngineFftB += n;
+
+            // Shared log-bin parameters — reused for both engines below.
+            const float srHz       = (float) sampleRate;
+            const float fftSizeF   = (float) kFftSize;
+            const int   maxBin     = kFftSize / 2 - 1;
+            const float logMin     = std::log10(30.0f);
+            const float logMax     = std::log10(16000.0f);
+            const float normalizer = 2.0f / (float) (kFftSize / 2);
+
+            // Helper: run Hann-windowed FFT + log-binning on `ring` starting
+            // from the most-recent kFftSize samples ending at `wrPos`,
+            // writing magnitudes into `dst`. Scratch is the per-engine
+            // pre-allocated FFT buffer (size kFftSize * 2).
+            auto runEngineFft = [&](const std::array<float, kFftSize * 2>& ring,
+                                    int wrPos,
+                                    std::array<float, kFftSize * 2>& scratch,
+                                    std::array<std::atomic<float>, kSpectrumBins>& dst)
+            {
+                int readPos = (wrPos - kFftSize) & kEngineRingMask;
+                for (int k = 0; k < kFftSize; ++k)
+                {
+                    const float w = 0.5f * (1.0f - std::cos(
+                        juce::MathConstants<float>::twoPi * k / (float)(kFftSize - 1)));
+                    scratch[(size_t) k] = ring[(size_t) readPos] * w;
+                    readPos = (readPos + 1) & kEngineRingMask;
+                }
+                for (int k = kFftSize; k < kFftSize * 2; ++k)
+                    scratch[(size_t) k] = 0.0f;
+
+                spectrumFFT.performFrequencyOnlyForwardTransform(scratch.data());
+
+                for (int b = 0; b < kSpectrumBins; ++b)
+                {
+                    const float fLow  = std::pow(10.0f, logMin + (logMax - logMin) *  b      / kSpectrumBins);
+                    const float fHigh = std::pow(10.0f, logMin + (logMax - logMin) * (b + 1) / kSpectrumBins);
+                    const int binLow  = juce::jmax(1,      (int) std::floor(fLow  * fftSizeF / srHz));
+                    const int binHigh = juce::jmin(maxBin, (int) std::ceil (fHigh * fftSizeF / srHz));
+
+                    float mag = 0.0f;
+                    for (int k = binLow; k <= binHigh; ++k)
+                        mag = juce::jmax(mag, scratch[(size_t) k]);
+
+                    const float normMag = mag * normalizer;
+                    const float dB      = juce::Decibels::gainToDecibels(normMag, -96.0f);
+                    dst[(size_t) b].store(juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f),
+                                          std::memory_order_relaxed);
+                }
+            };
+
+            if (samplesSinceEngineFftA >= kFftSize)
+            {
+                samplesSinceEngineFftA = 0;
+                runEngineFft(fftBufferEngineA, posA, fftScratchEngineA, engineASpectrum);
+            }
+            if (samplesSinceEngineFftB >= kFftSize)
+            {
+                samplesSinceEngineFftB = 0;
+                runEngineFft(fftBufferEngineB, posB, fftScratchEngineB, engineBSpectrum);
+            }
         }
     }
 
@@ -370,61 +442,6 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         oscOutputWrPos.store(oscOutWp, std::memory_order_relaxed);
         peakOutL.store(pL, std::memory_order_relaxed);
         peakOutR.store(pR, std::memory_order_relaxed);
-    }
-}
-
-void PhantomProcessor::computeEngineSpectrum(SpectrumEngineId which,
-                                             std::array<float, kSpectrumBins>& dst) const
-{
-    // Source ring buffer + atomic write position for the requested engine.
-    const auto& ring   = (which == SpectrumEngineId::A) ? fftBufferEngineA   : fftBufferEngineB;
-    const int   wrPos  = ((which == SpectrumEngineId::A) ? fftWritePosEngineA
-                                                         : fftWritePosEngineB).load(std::memory_order_acquire);
-
-    // Copy the most recent kFftSize samples from the ring into the scratch
-    // FFT buffer (size = kFftSize * 2; second half zero-padded for the FFT).
-    int readPos = (wrPos - kFftSize) & kEngineRingMask;
-    for (int k = 0; k < kFftSize; ++k)
-    {
-        spectrumEngineScratch[(size_t) k] = ring[(size_t) readPos];
-        readPos = (readPos + 1) & kEngineRingMask;
-    }
-
-    // Hann window — same coefficients as the input/output FFT in processBlock.
-    for (int k = 0; k < kFftSize; ++k)
-    {
-        const float w = 0.5f * (1.0f - std::cos(
-            juce::MathConstants<float>::twoPi * k / (float)(kFftSize - 1)));
-        spectrumEngineScratch[(size_t) k] *= w;
-    }
-    for (int k = kFftSize; k < kFftSize * 2; ++k)
-        spectrumEngineScratch[(size_t) k] = 0.0f;
-
-    spectrumFFT.performFrequencyOnlyForwardTransform(spectrumEngineScratch.data());
-
-    // Log-frequency binning — identical to spectrumData / spectrumOutputData.
-    const float sr         = (float) sampleRate;
-    const float fftSizeF   = (float) kFftSize;
-    const int   maxBin     = kFftSize / 2 - 1;
-    const float logMin     = std::log10(30.0f);
-    const float logMax     = std::log10(16000.0f);
-    const float normalizer = 2.0f / (float) (kFftSize / 2);
-
-    for (int b = 0; b < kSpectrumBins; ++b)
-    {
-        const float fLow  = std::pow(10.0f, logMin + (logMax - logMin) *  b      / kSpectrumBins);
-        const float fHigh = std::pow(10.0f, logMin + (logMax - logMin) * (b + 1) / kSpectrumBins);
-
-        const int binLow  = juce::jmax(1,      (int) std::floor(fLow  * fftSizeF / sr));
-        const int binHigh = juce::jmin(maxBin, (int) std::ceil (fHigh * fftSizeF / sr));
-
-        float mag = 0.0f;
-        for (int k = binLow; k <= binHigh; ++k)
-            mag = juce::jmax(mag, spectrumEngineScratch[(size_t) k]);
-
-        const float normMag = mag * normalizer;
-        const float dB      = juce::Decibels::gainToDecibels(normMag, -96.0f);
-        dst[(size_t) b]     = juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f);
     }
 }
 

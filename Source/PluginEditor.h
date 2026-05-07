@@ -172,5 +172,11 @@ private:
     // next call's clearQuick() does not affect data already marshalled to JS.
     juce::Array<juce::var> oscInArr, oscSynthArr, oscOutArr;
 
+    // ── Spectrum marshalling buffers ──────────────────────────────────
+    // Reused across getSpectrumData() bridge calls (same trick as above).
+    // input/output bins exist in every call; engineA/engineB only fill in
+    // Split mode but the storage is preallocated to avoid first-call alloc.
+    juce::Array<juce::var> specInArr, specOutArr, specEngineAArr, specEngineBArr;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomEditor)
 };

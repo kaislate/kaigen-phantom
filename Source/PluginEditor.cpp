@@ -247,47 +247,49 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         .withNativeFunction("getSpectrumData",
             [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
-                juce::Array<juce::var> inputBins, outputBins;
+                // Reuse member Arrays across calls. clearQuick() drops elements
+                // without releasing the backing buffer, and ensureStorageAllocated
+                // sizes it on first use so subsequent fills don't realloc.
+                self.specInArr .clearQuick();
+                self.specOutArr.clearQuick();
+                self.specInArr .ensureStorageAllocated(PhantomProcessor::kSpectrumBins);
+                self.specOutArr.ensureStorageAllocated(PhantomProcessor::kSpectrumBins);
+
                 for (int i = 0; i < PhantomProcessor::kSpectrumBins; ++i)
                 {
-                    inputBins .add(self.processor.spectrumData      [(size_t) i]);
-                    outputBins.add(self.processor.spectrumOutputData[(size_t) i]);
+                    self.specInArr .add(self.processor.spectrumData      [(size_t) i]);
+                    self.specOutArr.add(self.processor.spectrumOutputData[(size_t) i]);
                 }
 
                 auto* obj = new juce::DynamicObject();
-                obj->setProperty("input",   inputBins);
-                obj->setProperty("output",  outputBins);
+                obj->setProperty("input",   self.specInArr);
+                obj->setProperty("output",  self.specOutArr);
 
-                // Per-engine spectra are only consumed by the JS Split-mode
-                // renderer. Skip the two FFTs (one per engine, kFftSize=8192)
-                // when the user is in Combined mode — saves significant CPU at
-                // the ~30Hz UI poll cadence. The viewMode key still travels
-                // unconditionally so JS knows which renderer to dispatch to.
+                // Per-engine spectra are produced on the audio thread (atomic
+                // snapshot) so the binding cost is just kSpectrumBins atomic
+                // loads per engine. Skip the two arrays in Combined mode: JS
+                // doesn't render them, and skipping shaves the marshalling
+                // copy at the WebView boundary.
                 const bool needPerEngine =
                     self.processor.getSpectrumViewMode() == PhantomProcessor::SpectrumViewMode::Split;
 
                 if (needPerEngine)
                 {
-                    // Per-engine spectra — computed UI-side from the ring buffers
-                    // populated in processBlock (Task 3). Same Hann window + FFT +
-                    // log-binning pipeline as input/output, on the engine's mono
-                    // channel-0 output.
-                    std::array<float, PhantomProcessor::kSpectrumBins> engineABins {};
-                    std::array<float, PhantomProcessor::kSpectrumBins> engineBBins {};
-                    self.processor.computeEngineSpectrum(
-                        PhantomProcessor::SpectrumEngineId::A, engineABins);
-                    self.processor.computeEngineSpectrum(
-                        PhantomProcessor::SpectrumEngineId::B, engineBBins);
+                    self.specEngineAArr.clearQuick();
+                    self.specEngineBArr.clearQuick();
+                    self.specEngineAArr.ensureStorageAllocated(PhantomProcessor::kSpectrumBins);
+                    self.specEngineBArr.ensureStorageAllocated(PhantomProcessor::kSpectrumBins);
 
-                    juce::Array<juce::var> engineAArr, engineBArr;
                     for (int i = 0; i < PhantomProcessor::kSpectrumBins; ++i)
                     {
-                        engineAArr.add(engineABins[(size_t) i]);
-                        engineBArr.add(engineBBins[(size_t) i]);
+                        self.specEngineAArr.add(
+                            (double) self.processor.engineASpectrum[(size_t) i].load(std::memory_order_relaxed));
+                        self.specEngineBArr.add(
+                            (double) self.processor.engineBSpectrum[(size_t) i].load(std::memory_order_relaxed));
                     }
 
-                    obj->setProperty("engineA", engineAArr);
-                    obj->setProperty("engineB", engineBArr);
+                    obj->setProperty("engineA", self.specEngineAArr);
+                    obj->setProperty("engineB", self.specEngineBArr);
                 }
 
                 obj->setProperty("viewMode",
