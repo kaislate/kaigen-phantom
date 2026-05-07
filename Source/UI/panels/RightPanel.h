@@ -1,8 +1,10 @@
 // Source/UI/panels/RightPanel.h
 #pragma once
+#include <array>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "../widgets/PhantomKnob.h"
+#include "../widgets/PhantomMiniKnob.h"
 
 namespace kaigen::phantom
 {
@@ -30,6 +32,9 @@ private:
     // Levels section
     PhantomKnob inGainKnob;
     PhantomKnob outGainKnob;
+
+    // Advanced panel — 14 mini knobs, all per-engine 'a_' prefix.
+    std::array<std::unique_ptr<PhantomMiniKnob>, 14> miniKnobs;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RightPanel)
 };

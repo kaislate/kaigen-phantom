@@ -30,6 +30,32 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a)
     addAndMakeVisible(widthKnob);
     addAndMakeVisible(inGainKnob);
     addAndMakeVisible(outGainKnob);
+
+    {
+        static constexpr struct { const char* paramID; const char* label; } miniDefs[] = {
+            { "a_synth_duty",            "Push"      },
+            { "a_synth_h1",              "H1"        },
+            { "a_synth_sub",             "Sub"       },
+            { "a_synth_wavelet_length",  "Length"    },
+            { "a_synth_gate_threshold",  "Gate"      },
+            { "a_synth_min_samples",     "Min"       },
+            { "a_synth_max_samples",     "Max"       },
+            { "a_tracking_speed",        "Track"     },
+            { "a_punch_amount",          "Amount"    },
+            { "a_synth_boost_threshold", "Threshold" },
+            { "a_synth_boost_amount",    "Boost"     },
+            { "a_env_attack_ms",         "Attack"    },
+            { "a_env_release_ms",        "Release"   },
+            { "a_binaural_width",        "Width"     },
+        };
+        static_assert(sizeof(miniDefs) / sizeof(miniDefs[0]) == 14, "14 mini knobs expected");
+
+        for (size_t i = 0; i < miniKnobs.size(); ++i)
+        {
+            miniKnobs[i] = std::make_unique<PhantomMiniKnob>(apvts, miniDefs[i].paramID, miniDefs[i].label);
+            addAndMakeVisible(*miniKnobs[i]);
+        }
+    }
 }
 
 RightPanel::~RightPanel() = default;
@@ -41,6 +67,7 @@ void RightPanel::paint(juce::Graphics& g)
     drawSectionHeader(g, juce::Rectangle<int>(12,   8, 200, 16), "Harmonic Engine");
     drawSectionHeader(g, juce::Rectangle<int>(310,  8, 100, 16), "Stereo");
     drawSectionHeader(g, juce::Rectangle<int>(420,  8, 200, 16), "Levels");
+    drawSectionHeader(g, juce::Rectangle<int>(12, 130, 200, 16), "Advanced");
 }
 
 void RightPanel::resized()
@@ -73,6 +100,17 @@ void RightPanel::resized()
     // Levels
     layoutKnob(inGainKnob);
     layoutKnob(outGainKnob);
+
+    // Advanced mini-knob row
+    area.removeFromTop(20);
+    auto miniRow = area.removeFromTop(60).reduced(12, 0);
+    const int miniWidth = 36;
+    const int miniGap = 4;
+    for (auto& mk : miniKnobs)
+    {
+        mk->setBounds(miniRow.removeFromLeft(miniWidth));
+        miniRow.removeFromLeft(miniGap);
+    }
 }
 
 } // namespace kaigen::phantom
