@@ -141,8 +141,20 @@ document.querySelectorAll("phantom-knob[data-param], phantom-mini-knob[data-para
   const paramName = el.dataset.param;
   const state = getSliderStateLogical(paramName);
 
+  // Track local drag state so we can ignore the relay's echo for our own
+  // writes. With two plugin instances open, the message thread saturates
+  // and the round-trip echo can arrive several pointermoves late carrying
+  // stale values — without this guard, the echo overwrites el.value mid-drag
+  // and the knob rubber-bands.
+  let userIsDragging = false;
+  let lastSentValue = NaN;
+
   function updateKnob() {
-    el.value = state.getNormalisedValue();
+    if (!userIsDragging) {
+      el.value = state.getNormalisedValue();
+    }
+    // displayValue still updates either way — the readout reflects the
+    // host's authoritative value even mid-drag.
     el.displayValue = formatDisplayValue(state);
   }
 
@@ -150,10 +162,24 @@ document.querySelectorAll("phantom-knob[data-param], phantom-mini-knob[data-para
   state.valueChangedEvent.addListener(updateKnob);
   state.propertiesChangedEvent.addListener(updateKnob);
 
-  // Listen for user interaction on the knob
-  el.addEventListener("knob-change", (e) => {
+  // Drag begins: open the gesture and gate echo writes to el.value.
+  el.addEventListener("knob-pointerdown", () => {
+    userIsDragging = true;
+    lastSentValue = NaN;
     state.sliderDragStarted();
+  });
+
+  // Per-pointermove writes — coalesced so identical consecutive values
+  // don't generate redundant IPC across the bridge.
+  el.addEventListener("knob-change", (e) => {
+    if (e.detail.value === lastSentValue) return;
+    lastSentValue = e.detail.value;
     state.setNormalisedValue(e.detail.value);
+  });
+
+  // Drag ends: close the gesture and reopen the echo gate.
+  el.addEventListener("knob-pointerup", () => {
+    userIsDragging = false;
     state.sliderDragEnded();
   });
 
