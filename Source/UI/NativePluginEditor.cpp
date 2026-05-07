@@ -31,7 +31,7 @@ namespace
 
 NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
                                        juce::AudioProcessorValueTreeState& a)
-    : juce::AudioProcessorEditor(&p), processor(p), apvts(a), rightPanel(a), leftPanel(a)
+    : juce::AudioProcessorEditor(&p), processor(p), apvts(a), rightPanel(a, p), leftPanel(a)
 {
     setSize(editorWidth, editorHeight);
 

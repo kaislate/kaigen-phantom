@@ -1,6 +1,7 @@
 // Source/UI/panels/RightPanel.cpp
 #include "RightPanel.h"
 #include "../Theme.h"
+#include "../../PluginProcessor.h"
 
 namespace kaigen::phantom
 {
@@ -15,14 +16,16 @@ namespace
     }
 }
 
-RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a)
+RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& p)
     : apvts(a),
       saturationKnob(apvts, "a_harmonic_saturation", PhantomKnob::Size::Medium, "Saturation"),
       shapeKnob     (apvts, "a_synth_step",          PhantomKnob::Size::Medium, "Shape"),
       skipKnob      (apvts, "a_synth_skip",          PhantomKnob::Size::Medium, "Skip"),
       widthKnob     (apvts, "a_stereo_width",        PhantomKnob::Size::Medium, "Width"),
       inGainKnob    (apvts, "input_gain",            PhantomKnob::Size::Medium, "In"),
-      outGainKnob   (apvts, "a_output_gain",         PhantomKnob::Size::Medium, "Out")
+      outGainKnob   (apvts, "a_output_gain",         PhantomKnob::Size::Medium, "Out"),
+      inMeter       (p.peakInL),
+      outMeter      (p.peakOutL)
 {
     addAndMakeVisible(saturationKnob);
     addAndMakeVisible(shapeKnob);
@@ -30,6 +33,9 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a)
     addAndMakeVisible(widthKnob);
     addAndMakeVisible(inGainKnob);
     addAndMakeVisible(outGainKnob);
+
+    addAndMakeVisible(inMeter);
+    addAndMakeVisible(outMeter);
 
     autoGainButton.setClickingTogglesState(true);
     addAndMakeVisible(autoGainButton);
@@ -104,9 +110,12 @@ void RightPanel::resized()
 
     knobRow.removeFromLeft(sectionGap);
 
-    // Levels
+    // Levels: meter, In knob, Out knob, meter
+    inMeter.setBounds(knobRow.removeFromLeft(14));
+    knobRow.removeFromLeft(6);
     layoutKnob(inGainKnob);
     layoutKnob(outGainKnob);
+    outMeter.setBounds(knobRow.removeFromLeft(14));
 
     // Advanced mini-knob row
     area.removeFromTop(20);

@@ -5,6 +5,9 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "../widgets/PhantomKnob.h"
 #include "../widgets/PhantomMiniKnob.h"
+#include "../widgets/IOMeter.h"
+
+class PhantomProcessor;
 
 namespace kaigen::phantom
 {
@@ -12,7 +15,7 @@ namespace kaigen::phantom
 class RightPanel : public juce::Component
 {
 public:
-    explicit RightPanel(juce::AudioProcessorValueTreeState& apvts);
+    RightPanel(juce::AudioProcessorValueTreeState& apvts, PhantomProcessor& processor);
     ~RightPanel() override;
 
     void paint(juce::Graphics& g) override;
@@ -36,6 +39,10 @@ private:
     // Levels section auto-gain toggle
     juce::TextButton autoGainButton { "Auto" };
     std::unique_ptr<juce::ButtonParameterAttachment> autoGainAttachment;
+
+    // Levels section meters (flanking In/Out knobs)
+    IOMeter inMeter;
+    IOMeter outMeter;
 
     // Advanced panel — 14 mini knobs, all per-engine 'a_' prefix.
     std::array<std::unique_ptr<PhantomMiniKnob>, 14> miniKnobs;
