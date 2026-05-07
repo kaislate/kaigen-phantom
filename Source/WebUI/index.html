@@ -339,10 +339,10 @@
 
   </div>
 
-  <!-- Matrix view: lives OUTSIDE .wrap as a sibling sub-panel. In MATRIX
-       mode, .wrap is hidden via body.is-matrix-active and this matrix
-       container takes its place at the same 820px footprint, so the
-       editor's total height (1300x970) never changes. -->
+  <!-- Matrix view: lives OUTSIDE .wrap as a sibling sub-panel and is layered
+       absolutely over the wrap's 820px slot when MATRIX is active (see
+       matrix.css). Wrap stays in flow underneath; matrix fades in/out via
+       opacity + visibility so the open/close animation is symmetric. -->
   <div id="modulation-matrix" class="modulation-matrix" aria-hidden="true"></div>
 
   <!-- Bottom modulation panel (PR3b: macros only; LFO/Random slots are

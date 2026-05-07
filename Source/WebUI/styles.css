@@ -26,6 +26,9 @@ body{
   flex-direction:column;
   font-family:'Space Grotesk',sans-serif;
   color:rgba(0,0,0,0.70);
+  /* Anchor for the absolutely-positioned matrix overlay (matrix.css). The
+     matrix layers over the wrap's 820px slot rather than replacing it. */
+  position:relative;
 }
 
 .hidden,
@@ -774,9 +777,9 @@ phantom-knob.mode-inactive{
 }
 .mode-btn:hover { color: rgba(255, 255, 255, 0.65); }
 .mode-btn.is-active {
-  background: rgba(93, 211, 224, 0.18);
-  color: #5DD3E0;
-  box-shadow: 0 0 6px rgba(93, 211, 224, 0.25);
+  background: rgba(74, 144, 226, 0.20);
+  color: #4A90E2;
+  box-shadow: 0 0 6px rgba(74, 144, 226, 0.30);
 }
 .modulation-counter {
   font: 600 9px/1 'Space Grotesk', sans-serif;
@@ -784,15 +787,30 @@ phantom-knob.mode-inactive{
   color: rgba(255, 255, 255, 0.35);
 }
 
-/* When MATRIX mode is active, hide the wrap so the matrix can occupy its
-   space (Option A: matrix replaces wrap, editor stays fixed at 1300x970). */
-body.is-matrix-active .wrap { display: none; }
+/* Matrix overlays the wrap (see matrix.css: position:absolute over body's
+   first 820px slot). The wrap stays in flow underneath; no display:none
+   rule needed, which lets the matrix fade in/out cleanly on toggle. */
 
 .modulation-row {
   display: grid;
   grid-template-columns: repeat(11, 1fr);
   gap: 6px;
   padding: 8px 12px;
+  /* Slot-row collapse animation: the row + labels shrink to 0px when the
+     SLOTS toggle is off (panel.is-slots-collapsed). max-height is set
+     generously above the natural ~120px content height so the open state
+     is unconstrained. */
+  overflow: hidden;
+  max-height: 200px;
+  opacity: 1;
+  transition: max-height 220ms ease-out, opacity 220ms ease-out, padding 220ms ease-out;
+}
+.modulation-panel.is-slots-collapsed .modulation-row,
+.modulation-panel.is-slots-collapsed .modulation-row-labels {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 /* Matrix view "slides down" beneath the slot row rather than replacing it.
@@ -953,6 +971,12 @@ body.is-matrix-active .wrap { display: none; }
   grid-template-columns: 5fr 1fr 5fr;
   padding: 0 12px 6px;
   align-items: center;
+  /* Match the .modulation-row collapse animation so the engine labels fade
+     out together when SLOTS is toggled off. */
+  overflow: hidden;
+  max-height: 200px;
+  opacity: 1;
+  transition: max-height 220ms ease-out, opacity 220ms ease-out, padding 220ms ease-out;
 }
 .mod-engine-label {
   font: 600 9px/1 'Space Grotesk', sans-serif;

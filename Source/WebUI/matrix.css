@@ -1,20 +1,35 @@
 /* Source/WebUI/matrix.css — matrix view styles. */
 
 .modulation-matrix {
-  display: none;
-  width: 1300px;            /* match body/wrap width */
-  height: 820px;            /* matches .wrap exactly — matrix replaces wrap */
+  display: block;            /* always present in DOM; opacity/visibility gate */
+  width: 1300px;             /* match body/wrap width */
+  height: 820px;             /* matches .wrap exactly — overlays wrap */
   background: #0a0c10;
-  border-radius: 0;          /* sub-panel butts up against the wrap above */
+  border-radius: 0;
   margin: 0;
   padding: 12px;
   color: #c8d8ea;
   font: 11px/1.3 'Space Grotesk', system-ui, sans-serif;
   box-sizing: border-box;
-  overflow: hidden;          /* no scrolling — editor never exceeds 970px total */
+  overflow: hidden;
+  /* Layered absolutely over the wrap (body has position:relative). When
+     closed the matrix is invisible + non-interactive; when open it fades in
+     and slides down 8px → 0px. visibility delays its hide until the fade
+     completes, but applies instantly on show so it's interactive at once. */
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: opacity 240ms ease-out, transform 240ms ease-out, visibility 0s 240ms;
 }
 .modulation-matrix.is-open {
-  display: block;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: opacity 240ms ease-out, transform 240ms ease-out, visibility 0s;
 }
 
 .mtx-engine-label {

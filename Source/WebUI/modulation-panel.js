@@ -21,28 +21,34 @@
     // ── SLOTS / MATRIX mode toggle ────────────────────────────────────────
     const matrix = document.getElementById('modulation-matrix');
     const modeBar = panel.querySelector('.modulation-mode-toggle');
-    // Option A: editor is ALWAYS 1300×970 — wrap (820) + panel (150). In
-    // SLOTS mode the wrap is shown and the matrix is hidden; in MATRIX
-    // mode the wrap is hidden (body.is-matrix-active) and the matrix
-    // takes its place at the same 820px footprint. The modulation panel
-    // is always visible at the bottom. No editor resize, no scrolling.
-    const WRAP_HEIGHT     = 820;
-    const PANEL_HEIGHT    = 150;
-    const BASE_HEIGHT     = WRAP_HEIGHT + PANEL_HEIGHT;     // 970 — fixed editor height
+    // Independent toggles: SLOTS controls slot-row visibility, MATRIX
+    // controls matrix overlay visibility. Both can be on/off independently.
+    // Wrap stays in flow at 820px; matrix is layered absolutely on top.
+    // Panel height = mode-bar (28px) + slot row (120px when slots on, else 0).
+    const WRAP_HEIGHT          = 820;
+    const SLOTS_HEIGHT         = 120;        // slot row + engine labels combined
+    const PANEL_HEADER_HEIGHT  = 28;         // mode-bar (always visible)
     let setEditorHeight = null;
     if (window.Juce && typeof window.Juce.getNativeFunction === 'function') {
       try { setEditorHeight = window.Juce.getNativeFunction('setEditorHeight'); }
       catch (e) { console.warn('[modulation-panel] setEditorHeight unavailable', e); }
     }
 
-    // Set the initial editor height to BASE_HEIGHT (970) so the always-
-    // visible modulation panel is on-screen the moment the editor opens —
-    // without this, the editor would launch at the C++ default (820, just
-    // the wrap) and the modulation panel would render below the window
-    // until the user toggled MATRIX mode and triggered the first
-    // setEditorHeight call.
+    function panelHeight() {
+      return PANEL_HEADER_HEIGHT + (slotsVisible ? SLOTS_HEIGHT : 0);
+    }
+    function editorHeight() {
+      // Matrix overlays the wrap, so it doesn't add height — only slots-row
+      // visibility affects the total editor footprint.
+      return WRAP_HEIGHT + panelHeight();
+    }
+
+    // Set the initial editor height so the always-visible modulation panel
+    // is on-screen the moment the editor opens — without this, the editor
+    // would launch at the C++ default (820, just the wrap) and the panel
+    // would render below the window until first interaction.
     if (setEditorHeight) {
-      try { setEditorHeight(BASE_HEIGHT); }
+      try { setEditorHeight(WRAP_HEIGHT + PANEL_HEADER_HEIGHT + SLOTS_HEIGHT); }
       catch (e) {}
     }
 
@@ -78,51 +84,84 @@
     // directly when the user toggles a category open/closed.
     window.kaigenSaveMatrixState = saveMatrixState;
 
-    let currentMode = 'slots';
-    function applyMode(mode) {
-      currentMode = mode;
-      panel.classList.toggle('is-matrix-mode', mode === 'matrix');
-      // Option A: matrix replaces wrap. Toggle a body class so CSS can hide
-      // the wrap when matrix is active. Editor height stays fixed; no
-      // setEditorHeight call here.
-      document.body.classList.toggle('is-matrix-active', mode === 'matrix');
+    // currentMode is kept for persistence compatibility (Matrix/Slots) and
+    // governs whether the matrix overlay is open. slotsVisible is the new
+    // independent axis that hides/shows the slot row.
+    let currentMode   = 'slots';
+    let slotsVisible  = true;
+
+    function applyMatrixState() {
+      // Matrix toggles independently of slot-row visibility. The body class
+      // is kept for any legacy CSS hooks; the wrap stays in flow and the
+      // matrix is layered absolutely on top via matrix.css.
+      document.body.classList.toggle('is-matrix-active', currentMode === 'matrix');
+      panel.classList.toggle('is-matrix-mode', currentMode === 'matrix');
       if (matrix) {
-        matrix.classList.toggle('is-open', mode === 'matrix');
-        matrix.setAttribute('aria-hidden', mode === 'matrix' ? 'false' : 'true');
+        matrix.classList.toggle('is-open', currentMode === 'matrix');
+        matrix.setAttribute('aria-hidden', currentMode === 'matrix' ? 'false' : 'true');
       }
       if (modeBar) {
-        modeBar.querySelectorAll('.mode-btn').forEach(b => {
-          const active = b.getAttribute('data-mode') === mode;
-          b.classList.toggle('is-active', active);
-          b.setAttribute('aria-selected', active ? 'true' : 'false');
-        });
+        const matrixBtn = modeBar.querySelector('.mode-btn[data-mode="matrix"]');
+        if (matrixBtn) {
+          matrixBtn.classList.toggle('is-active', currentMode === 'matrix');
+          matrixBtn.setAttribute('aria-selected', currentMode === 'matrix' ? 'true' : 'false');
+        }
       }
-      // Gate the live-modulation poll on matrix mode. SLOTS view doesn't need
-      // the poll because phantom-knobs drive macro display via native APVTS
-      // attachment; pausing the poll prevents allocation churn on the message
-      // thread that was causing visible knob jitter during drags.
-      if (mode === 'matrix') {
+      // Gate the live-modulation poll on matrix visibility. Pausing the
+      // poll when matrix is closed prevents allocation churn on the
+      // message thread that was causing visible knob jitter during drags.
+      if (currentMode === 'matrix') {
         if (typeof window.kaigenStartLiveModulationPoll === 'function') window.kaigenStartLiveModulationPoll();
       } else {
         if (typeof window.kaigenStopLiveModulationPoll === 'function') window.kaigenStopLiveModulationPoll();
       }
-      // Tell the matrix to (re)render now that it's visible.
-      if (mode === 'matrix' && typeof window.kaigenRenderMatrix === 'function') {
+      if (currentMode === 'matrix' && typeof window.kaigenRenderMatrix === 'function') {
         window.kaigenRenderMatrix();
       }
-      // Persist on every mode change. Category toggles call saveMatrixState
-      // directly via window.kaigenSaveMatrixState (see matrix.js).
+    }
+
+    function applySlotsState() {
+      panel.classList.toggle('is-slots-collapsed', !slotsVisible);
+      if (modeBar) {
+        const slotsBtn = modeBar.querySelector('.mode-btn[data-mode="slots"]');
+        if (slotsBtn) {
+          slotsBtn.classList.toggle('is-active', slotsVisible);
+          slotsBtn.setAttribute('aria-selected', slotsVisible ? 'true' : 'false');
+        }
+      }
+      // Resize the editor to match the new panel height so the host window
+      // shrinks when slots collapse (848 collapsed, 968 expanded).
+      if (setEditorHeight) {
+        try { setEditorHeight(editorHeight()); }
+        catch (e) {}
+      }
+    }
+
+    function applyMode(mode) {
+      // Backwards-compatible entry point used by persistence + slot-handoff.
+      // Now means: set matrix visibility based on `mode`.
+      currentMode = mode;
+      applyMatrixState();
       saveMatrixState();
     }
+
+    function toggleSlots() {
+      slotsVisible = !slotsVisible;
+      applySlotsState();
+    }
+
     if (modeBar) {
-      modeBar.querySelectorAll('.mode-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const m = btn.getAttribute('data-mode');
-          if (m === 'slots' || m === 'matrix') applyMode(m);
-        });
-      });
+      const slotsBtn  = modeBar.querySelector('.mode-btn[data-mode="slots"]');
+      const matrixBtn = modeBar.querySelector('.mode-btn[data-mode="matrix"]');
+      if (slotsBtn)  slotsBtn .addEventListener('click', toggleSlots);
+      if (matrixBtn) matrixBtn.addEventListener('click', () => applyMode(currentMode === 'matrix' ? 'slots' : 'matrix'));
     }
     window.kaigenSetModulationMode = applyMode;
+
+    // Apply initial state once so button highlights and editor height match
+    // the defaults (slots on, matrix off) before any persistence load runs.
+    applyMatrixState();
+    applySlotsState();
 
     // Load persisted state on init: restore the per-engine expanded categories
     // BEFORE switching mode, so the first render in Matrix mode (triggered
