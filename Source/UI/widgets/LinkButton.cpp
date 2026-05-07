@@ -10,6 +10,10 @@ LinkButton::LinkButton()
 {
     icon = juce::Drawable::createFromImageData(PhantomNativeAssets::link_icon_svg,
                                                 PhantomNativeAssets::link_icon_svgSize);
+    if (icon != nullptr)
+    {
+        icon->replaceColour(juce::Colours::black, Theme::textSecondary);
+    }
     setSize(28, 28);
 }
 
@@ -20,6 +24,14 @@ void LinkButton::setLinked(bool shouldBeLinked)
     if (linked != shouldBeLinked)
     {
         linked = shouldBeLinked;
+        // Re-load + re-tint the icon for the new state.
+        icon = juce::Drawable::createFromImageData(PhantomNativeAssets::link_icon_svg,
+                                                    PhantomNativeAssets::link_icon_svgSize);
+        if (icon != nullptr)
+        {
+            icon->replaceColour(juce::Colours::black,
+                                linked ? Theme::steelBlue : Theme::textSecondary);
+        }
         if (onLinkChanged) onLinkChanged(linked);
         repaint();
     }
@@ -35,11 +47,6 @@ void LinkButton::paint(juce::Graphics& g)
 
     if (icon != nullptr)
     {
-        // Icon tint follows linked state.
-        // The SVG uses stroke="currentColor" -- replaceColour swaps any explicit black.
-        // For the stroke="currentColor" case, JUCE's Drawable resolves currentColor to
-        // the foreground; we set that with g.setColour() before drawing.
-        g.setColour(linked ? Theme::steelBlue : Theme::textSecondary);
         icon->setTransformToFit(bounds.reduced(4.0f), juce::RectanglePlacement::centred);
         icon->draw(g, 1.0f);
     }
