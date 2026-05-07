@@ -31,12 +31,13 @@ namespace
 
 NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
                                        juce::AudioProcessorValueTreeState& a)
-    : juce::AudioProcessorEditor(&p), processor(p), apvts(a)
+    : juce::AudioProcessorEditor(&p), processor(p), apvts(a), rightPanel(a)
 {
     setSize(editorWidth, editorHeight);
 
     backToWebViewButton.addListener(this);
     addAndMakeVisible(backToWebViewButton);
+    addAndMakeVisible(rightPanel);
 }
 
 NativePluginEditor::~NativePluginEditor()
@@ -58,16 +59,22 @@ void NativePluginEditor::paint(juce::Graphics& g)
     auto modPanel = area.removeFromBottom(modPanelHeight);
     drawLabeledPanel(g, modPanel, "ModulationPanel (mode bar + slot row + engine labels)");
 
-    // MainArea split into LeftPanel + RightPanel.
+    // MainArea split into LeftPanel + (RightPanel — real Component, no wireframe needed).
     auto leftPanel = area.removeFromLeft(leftPanelWidth);
     drawLabeledPanel(g, leftPanel, "LeftPanel (recipe wheel + ghost + filter)");
-    drawLabeledPanel(g, area, "RightPanel (harmonic engine + stereo + levels + visualizers)");
+    // RightPanel is a real Component now; the area we'd draw it in is occupied by the child.
 }
 
 void NativePluginEditor::resized()
 {
     // Corner escape-hatch button -- dev-only, removed in Phase 6.
     backToWebViewButton.setBounds(getWidth() - 110, 10, 100, 26);
+
+    auto area = getLocalBounds();
+    area.removeFromTop(topBarHeight);
+    area.removeFromBottom(modPanelHeight);
+    area.removeFromLeft(leftPanelWidth);
+    rightPanel.setBounds(area);
 }
 
 void NativePluginEditor::buttonClicked(juce::Button* b)
