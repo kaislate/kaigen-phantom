@@ -309,9 +309,12 @@ const getPeaks = getNativeFunction("getPeakLevels");
 const getPitch = getNativeFunction("getPitchInfo");
 
 // Backpressured polling: wait for all three bridge calls to resolve before
-// scheduling the next frame. Additionally throttled to ~30 fps — meters and
-// spectrum smoothing look identical at 30 vs 60, and halving bridge traffic
-// significantly reduces WebView2 IPC allocation pressure during playback.
+// scheduling the next frame. Additionally throttled to ~15 fps — meters and
+// spectrum smoothing look identical at 15 vs 60 thanks to client-side
+// smoothing in spectrum.js, and quartering bridge traffic substantially
+// reduces WebView2 IPC + per-engine FFT pressure during playback. Two-instance
+// message-thread saturation testing showed the prior 30 Hz rate drove ~60
+// FFT(8192) computations/sec/instance on the message thread.
 async function pollData() {
   try {
     const [bins, peaks, p] = await Promise.all([
@@ -338,8 +341,11 @@ async function pollData() {
   } catch (err) {
     console.error("pollData failed:", err);
   }
-  // Throttle to ~30 fps: skip every other rAF tick before the next poll.
-  requestAnimationFrame(() => requestAnimationFrame(pollData));
+  // Throttle to ~15 fps: skip 3 rAF ticks before the next poll.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(pollData))));
 }
 
 pollData();

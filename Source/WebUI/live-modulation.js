@@ -5,9 +5,13 @@
 // the matrix view (per-cell live-modulating glow) subscribe to this single
 // source rather than each running their own poll.
 //
-// 10 Hz (was 15 Hz) is still smooth enough for ring fill + cell pulse
-// animations and saves ~33% of polling load — see commit message for
-// "fix(matrix): macro knobs, slide-down layout, lower poll rate + cell cache".
+// 5 Hz (was 10 Hz, originally 15 Hz) is still smooth enough for ring fill +
+// cell pulse animations. The two-instance message-thread saturation work
+// pushed it from 10 → 5 because modulationGetLiveState was contending with
+// WebSliderRelay drag traffic and oscilloscope marshalling. 5 Hz is the floor
+// where ring animations still feel "live"; if it visibly hurts the matrix
+// glow/pulse, bump back up to 10. See "fix(matrix): macro knobs, slide-down
+// layout, lower poll rate + cell cache" for the original 15 → 10 reasoning.
 //
 // Externally gated: callers must invoke kaigenStartLiveModulationPoll() to
 // arm the timer. The poll is dormant until then. modulation-panel.js
@@ -33,7 +37,7 @@
     catch (e) { console.warn('[live-modulation] binding unavailable', e); return; }
     if (!getLiveState) return;
 
-    const POLL_MS = 1000 / 10;
+    const POLL_MS = 1000 / 5;
     let timer = null;
     let dead = false;
     let enabled = false;

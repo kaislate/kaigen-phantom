@@ -113,9 +113,16 @@ void PhantomEditor::parentHierarchyChanged()
     // windows appear only after the user interacts with the UI (e.g., after
     // first mouse-down on a canvas). We rescan on a long-running timer so
     // those windows also get the focus subclass installed.
+    //
+    // Tick rate is 4000 ms (was 1000 ms). The startup quick-passes below
+    // (50/200/500 ms) cover the initial WebView2 HWND creation, so this
+    // timer's only ongoing job is catching late helper windows that appear
+    // after user interaction — which doesn't need second-level granularity.
+    // EnumChildWindows on the message thread at 1 Hz/instance was a measured
+    // contributor to two-instance message-thread saturation.
     focusRescanTimer.owner = this;
     if (!focusRescanTimer.isTimerRunning())
-        focusRescanTimer.startTimer(1000);
+        focusRescanTimer.startTimer(4000);
 
     // Also do a few quick passes during startup to catch windows before
     // the first real scan tick.
@@ -325,17 +332,30 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
             [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
                 auto& engine = self.processor.getActiveEngine();
-                juce::Array<juce::var> inArr, synthArr, outArr;
+
+                // Reuse member Arrays across calls. clearQuick() drops elements
+                // without releasing the backing buffer, and ensureStorageAllocated
+                // sizes it on first use so subsequent fills don't realloc.
+                // setProperty() copies the Array into the var's RefCountedArray,
+                // so the next call's clearQuick() does not clobber data already
+                // marshalled to JS — see juce_Variant.cpp:418/524.
+                self.oscInArr   .clearQuick();
+                self.oscSynthArr.clearQuick();
+                self.oscOutArr  .clearQuick();
+                self.oscInArr   .ensureStorageAllocated(PhantomEngine::kOscBufSize);
+                self.oscSynthArr.ensureStorageAllocated(PhantomEngine::kOscBufSize);
+                self.oscOutArr  .ensureStorageAllocated(PhantomEngine::kOscBufSize);
+
                 for (int i = 0; i < PhantomEngine::kOscBufSize; ++i)
                 {
-                    inArr  .add((double) self.processor.oscInputBuf [(size_t) i]);
-                    synthArr.add((double) engine.oscSynthBuf[(size_t) i]);
-                    outArr .add((double) self.processor.oscOutputBuf[(size_t) i]);
+                    self.oscInArr   .add((double) self.processor.oscInputBuf [(size_t) i]);
+                    self.oscSynthArr.add((double) engine.oscSynthBuf         [(size_t) i]);
+                    self.oscOutArr  .add((double) self.processor.oscOutputBuf[(size_t) i]);
                 }
                 auto* obj = new juce::DynamicObject();
-                obj->setProperty("input",       inArr);
-                obj->setProperty("synth",       synthArr);
-                obj->setProperty("output",      outArr);
+                obj->setProperty("input",       self.oscInArr);
+                obj->setProperty("synth",       self.oscSynthArr);
+                obj->setProperty("output",      self.oscOutArr);
                 obj->setProperty("inputWrPos",  (int) self.processor.oscInputWrPos .load(std::memory_order_relaxed));
                 obj->setProperty("synthWrPos",  (int) engine.oscSynthWrPos.load(std::memory_order_relaxed));
                 obj->setProperty("outputWrPos", (int) self.processor.oscOutputWrPos.load(std::memory_order_relaxed));

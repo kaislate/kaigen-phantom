@@ -164,5 +164,13 @@ private:
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          midiGateReleaseAttachmentA;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          midiGateReleaseAttachmentB;
 
+    // ── Oscilloscope marshalling buffers ──────────────────────────────
+    // Reused across getOscilloscopeData() bridge calls to avoid 3×2048 fresh
+    // juce::var allocations at the poll rate (which was a measured contributor
+    // to two-instance message-thread saturation). setProperty() on a
+    // DynamicObject performs a copy of the Array's juce::var elements, so the
+    // next call's clearQuick() does not affect data already marshalled to JS.
+    juce::Array<juce::var> oscInArr, oscSynthArr, oscOutArr;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomEditor)
 };
