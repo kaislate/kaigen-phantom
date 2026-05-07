@@ -47,6 +47,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/widgets/PhantomMiniKnob.cpp
     Source/UI/widgets/ToggleGroup.cpp
     Source/UI/widgets/LinkButton.cpp
+    Source/UI/widgets/IOMeter.cpp
     Source/UI/panels/RightPanel.cpp
     Source/UI/panels/LeftPanel.cpp
     Source/Engines/BinauralStage.cpp
