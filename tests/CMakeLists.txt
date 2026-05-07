@@ -17,6 +17,7 @@ add_executable(KaigenPhantomTests
     PresetMigrationTests.cpp
     MorphCrossfaderTests.cpp
     DualEngineHostTests.cpp
+    EditorViewStateTests.cpp
     EngineFocusTests.cpp
     SpectrumViewModeTests.cpp
     MatrixViewStatePersistenceTest.cpp
