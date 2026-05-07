@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "UI/NativePluginEditor.h"
 #include "PresetMigration.h"
 #include "EngineFocus.h"
 #include "Modulation/Routing.h"
@@ -479,6 +480,8 @@ void PhantomProcessor::parameterChanged(const juce::String& parameterID, float n
 
 juce::AudioProcessorEditor* PhantomProcessor::createEditor()
 {
+    if (editorView.useNativeEditor)
+        return new kaigen::phantom::NativePluginEditor(*this, apvts);
     return new PhantomEditor(*this);
 }
 
