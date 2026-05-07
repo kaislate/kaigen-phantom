@@ -55,20 +55,6 @@ public:
     // Atomic so the relaxed reads in hot bindings stay branchless.
     std::atomic<bool> isEditorActive { true };
 
-    // Per-binding "skip" counters used to trickle visualization updates at
-    // ~1 Hz when the editor is inactive (instead of fully freezing). Each
-    // gated binding increments its counter on entry; when the counter hits
-    // its threshold (= poll-rate-in-Hz), the counter resets and that one call
-    // falls through to do the full work, producing a slow tick the user can
-    // see. Touched only from the message thread inside the binding lambdas
-    // and from the foreground-poll timer's active-edge reset, so plain int
-    // is sufficient (no atomicity needed).
-    int spectrumInactiveSkipCount { 0 };  // poll 15 Hz → skip 14, run 1 → ~1 Hz
-    int peakInactiveSkipCount     { 0 };  // poll 15 Hz → ~1 Hz
-    int pitchInactiveSkipCount    { 0 };  // poll 15 Hz → ~1 Hz
-    int oscInactiveSkipCount      { 0 };  // poll 5 Hz  → ~1 Hz
-    int modLiveInactiveSkipCount  { 0 };  // poll 5 Hz  → ~1 Hz
-
 private:
     std::optional<juce::WebBrowserComponent::Resource> getResource(const juce::String& url);
     static juce::WebBrowserComponent::Options buildWebViewOptions(PhantomEditor&);

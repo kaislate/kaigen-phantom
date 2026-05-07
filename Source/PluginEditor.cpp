@@ -141,25 +141,8 @@ static bool checkEditorForegroundActive(juce::Component* comp)
 void PhantomEditor::ForegroundPollTimer::timerCallback()
 {
     if (owner == nullptr) return;
-    const bool wasActive = owner->isEditorActive.load(std::memory_order_relaxed);
-    const bool nowActive = checkEditorForegroundActive(owner);
-
-    // On the inactive→active edge, zero the skip counters so the freshly-
-    // active editor doesn't carry stale state from the previous inactive
-    // period (which could otherwise produce a one-frame delay or, worse,
-    // a single skipped real frame at the moment the user clicks back in).
-    // Both reads/writes are on the message thread (this timer + the binding
-    // lambdas run there), so plain int access is safe.
-    if (nowActive && ! wasActive)
-    {
-        owner->spectrumInactiveSkipCount = 0;
-        owner->peakInactiveSkipCount     = 0;
-        owner->pitchInactiveSkipCount    = 0;
-        owner->oscInactiveSkipCount      = 0;
-        owner->modLiveInactiveSkipCount  = 0;
-    }
-
-    owner->isEditorActive.store(nowActive, std::memory_order_relaxed);
+    const bool active = checkEditorForegroundActive(owner);
+    owner->isEditorActive.store(active, std::memory_order_relaxed);
 }
 
 void PhantomEditor::parentHierarchyChanged()
@@ -334,18 +317,10 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         .withNativeFunction("getSpectrumData",
             [&self, makeInactiveResponse](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
-                // Trickle: when inactive, return a real frame every Nth call so
-                // the JS visualizer ticks at ~1 Hz instead of freezing. Poll
-                // rate here is 15 Hz, so skip 14 then let one through ⇒ 1 Hz.
                 if (! self.isEditorActive.load(std::memory_order_relaxed))
                 {
-                    if (++self.spectrumInactiveSkipCount < 15)
-                    {
-                        complete(makeInactiveResponse());
-                        return;
-                    }
-                    self.spectrumInactiveSkipCount = 0;
-                    // Fall through to the full work below.
+                    complete(makeInactiveResponse());
+                    return;
                 }
                 // Reuse member Arrays across calls. clearQuick() drops elements
                 // without releasing the backing buffer, and ensureStorageAllocated
@@ -400,16 +375,10 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         .withNativeFunction("getPeakLevels",
             [&self, makeInactiveResponse](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
-                // Trickle: 15 Hz poll → 1-in-15 frames go through ⇒ ~1 Hz tick
-                // when inactive (vs. dead-still meters).
                 if (! self.isEditorActive.load(std::memory_order_relaxed))
                 {
-                    if (++self.peakInactiveSkipCount < 15)
-                    {
-                        complete(makeInactiveResponse());
-                        return;
-                    }
-                    self.peakInactiveSkipCount = 0;
+                    complete(makeInactiveResponse());
+                    return;
                 }
                 auto* obj = new juce::DynamicObject();
                 obj->setProperty("inL",  (double) self.processor.peakInL .load(std::memory_order_relaxed));
@@ -421,15 +390,10 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         .withNativeFunction("getPitchInfo",
             [&self, makeInactiveResponse](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
-                // Trickle: 15 Hz poll → ~1 Hz tick when inactive.
                 if (! self.isEditorActive.load(std::memory_order_relaxed))
                 {
-                    if (++self.pitchInactiveSkipCount < 15)
-                    {
-                        complete(makeInactiveResponse());
-                        return;
-                    }
-                    self.pitchInactiveSkipCount = 0;
+                    complete(makeInactiveResponse());
+                    return;
                 }
                 auto* obj = new juce::DynamicObject();
                 const float hz = self.processor.currentPitch.load(std::memory_order_relaxed);
@@ -454,16 +418,10 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         .withNativeFunction("getOscilloscopeData",
             [&self, makeInactiveResponse](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
-                // Trickle: poll rate is 5 Hz here, so skip 4 then let one
-                // through ⇒ ~1 Hz scope tick when inactive.
                 if (! self.isEditorActive.load(std::memory_order_relaxed))
                 {
-                    if (++self.oscInactiveSkipCount < 5)
-                    {
-                        complete(makeInactiveResponse());
-                        return;
-                    }
-                    self.oscInactiveSkipCount = 0;
+                    complete(makeInactiveResponse());
+                    return;
                 }
                 auto& engine = self.processor.getActiveEngine();
 
@@ -866,16 +824,10 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         .withNativeFunction("modulationGetLiveState", [&self, makeInactiveResponse]
             (const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
         {
-            // Trickle: 5 Hz poll → ~1 Hz tick when inactive (mod indicators
-            // still wiggle so the UI doesn't look frozen).
             if (! self.isEditorActive.load(std::memory_order_relaxed))
             {
-                if (++self.modLiveInactiveSkipCount < 5)
-                {
-                    complete(makeInactiveResponse());
-                    return;
-                }
-                self.modLiveInactiveSkipCount = 0;
+                complete(makeInactiveResponse());
+                return;
             }
             juce::DynamicObject::Ptr root = new juce::DynamicObject();
 
