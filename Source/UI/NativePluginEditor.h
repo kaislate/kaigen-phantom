@@ -1,16 +1,15 @@
 // Source/UI/NativePluginEditor.h
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_gui_basics/juce_gui_basics.h>
 
-class PhantomProcessor;  // forward declaration
+class PhantomProcessor;
 
 namespace kaigen::phantom
 {
 
-/** Native (non-WebView2) plugin editor for the Phantom plugin.
- *  Phase 0: blank wireframe placeholder. Phase 1+ progressively populates
- *  with native widgets (knobs, visualizers, matrix view, etc.). */
-class NativePluginEditor : public juce::AudioProcessorEditor
+class NativePluginEditor : public juce::AudioProcessorEditor,
+                           private juce::Button::Listener
 {
 public:
     NativePluginEditor(PhantomProcessor& processor, juce::AudioProcessorValueTreeState& apvts);
@@ -20,8 +19,11 @@ public:
     void resized() override;
 
 private:
+    void buttonClicked(juce::Button* b) override;
+
     PhantomProcessor& processor;
     juce::AudioProcessorValueTreeState& apvts;
+    juce::TextButton backToWebViewButton { "<- WebView2" };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NativePluginEditor)
 };
