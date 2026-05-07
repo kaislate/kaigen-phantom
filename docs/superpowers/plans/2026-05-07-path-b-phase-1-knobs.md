@@ -802,12 +802,13 @@ PhantomMiniKnob::PhantomMiniKnob(juce::AudioProcessorValueTreeState& apvts,
 {
     slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     slider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
-    slider.setRange(0.0, 1.0, 0.0);
     slider.addListener(this);
     addChildComponent(slider);
 
     if (auto* param = apvts.getParameter(paramID))
         attachment = std::make_unique<juce::SliderParameterAttachment>(*param, slider);
+    else
+        jassertfalse;  // unknown paramID: typo or stale reference
 
     bodyDrawable = juce::Drawable::createFromImageData(PhantomNativeAssets::knob_mini_svg, PhantomNativeAssets::knob_mini_svgSize);
 
@@ -835,7 +836,8 @@ void PhantomMiniKnob::paint(juce::Graphics& g)
 
     const auto centre = bodyArea.getCentre();
     const float radius = bodyArea.getWidth() * 0.40f;
-    const float angle = normalizedToAngle((float) slider.getValue());
+    const float n = (float) slider.getNormalisableRange().convertTo0to1(slider.getValue());
+    const float angle = normalizedToAngle(n);
     const float endX = centre.x + radius * std::sin(angle);
     const float endY = centre.y - radius * std::cos(angle);
     g.setColour(Theme::steelBlue);
