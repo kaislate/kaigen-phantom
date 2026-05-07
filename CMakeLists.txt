@@ -43,6 +43,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/UI/NativePluginEditor.cpp
+    Source/UI/widgets/PhantomKnob.cpp
     Source/Engines/BinauralStage.cpp
     Source/Engines/BassExtractor.cpp
     Source/Engines/ZeroCrossingSynth.cpp
@@ -78,12 +79,15 @@ juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/matrix.js
 )
 
-juce_add_binary_data(PhantomNativeAssets SOURCES
-    Source/Assets/svg/knob_large.svg
-    Source/Assets/svg/knob_medium.svg
-    Source/Assets/svg/knob_small.svg
-    Source/Assets/svg/knob_mini.svg
-    Source/Assets/svg/link_icon.svg
+juce_add_binary_data(PhantomNativeAssets
+    HEADER_NAME PhantomNativeAssets.h
+    NAMESPACE   PhantomNativeAssets
+    SOURCES
+        Source/Assets/svg/knob_large.svg
+        Source/Assets/svg/knob_medium.svg
+        Source/Assets/svg/knob_small.svg
+        Source/Assets/svg/knob_mini.svg
+        Source/Assets/svg/link_icon.svg
 )
 
 # Factory presets (optional, for Phase 2 implementation)
