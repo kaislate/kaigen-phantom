@@ -78,6 +78,10 @@ juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/matrix.js
 )
 
+juce_add_binary_data(PhantomNativeAssets SOURCES
+    Source/Assets/svg/knob_medium.svg
+)
+
 # Factory presets (optional, for Phase 2 implementation)
 # set(FACTORY_PRESETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Source/FactoryPresets")
 # file(GLOB FACTORY_PRESET_FILES "${FACTORY_PRESETS_DIR}/*.fxp")
@@ -112,6 +116,7 @@ target_link_libraries(KaigenPhantom
         juce::juce_gui_extra
         juce::juce_dsp
         PhantomWebUI
+        PhantomNativeAssets
         "${CMAKE_BINARY_DIR}/webview2/build/native/x64/WebView2LoaderStatic.lib"
     PUBLIC
         juce::juce_recommended_config_flags
