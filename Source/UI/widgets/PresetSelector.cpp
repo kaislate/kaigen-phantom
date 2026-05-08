@@ -63,8 +63,8 @@ void PresetSelector::prevPreset()
     if (idx < 0) idx = 0;
     else idx = (idx == 0) ? (int) flat.size() - 1 : idx - 1;
     const auto& [pack, name] = flat[(size_t) idx];
-    if (processor.getPresetManager().loadPreset(apvts, name, pack))
-        setCurrentPreset(name, pack);
+    processor.getPresetManager().loadPreset(apvts, name, pack);
+    setCurrentPreset(name, pack);
 }
 
 void PresetSelector::nextPreset()
@@ -75,8 +75,8 @@ void PresetSelector::nextPreset()
     if (idx < 0) idx = 0;
     else idx = (idx + 1) % (int) flat.size();
     const auto& [pack, name] = flat[(size_t) idx];
-    if (processor.getPresetManager().loadPreset(apvts, name, pack))
-        setCurrentPreset(name, pack);
+    processor.getPresetManager().loadPreset(apvts, name, pack);
+    setCurrentPreset(name, pack);
 }
 
 void PresetSelector::saveDialog()
