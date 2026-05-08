@@ -18,11 +18,14 @@ MatrixCell::~MatrixCell() = default;
 
 void MatrixCell::setLiveContribution(float v)
 {
-    if (std::abs(v - liveContribution) > 0.01f)
-    {
-        liveContribution = v;
+    const bool wasActive = liveContribution > 0.05f;
+    const bool nowActive = v > 0.05f;
+    const bool valueMoved = std::abs(v - liveContribution) > 0.01f;
+    liveContribution = v;
+    // Repaint on any meaningful change OR while modulating, so the breathing
+    // pulse animation in paint() actually advances frame-by-frame.
+    if (valueMoved || wasActive || nowActive)
         repaint();
-    }
 }
 
 float MatrixCell::currentDepth() const
@@ -89,8 +92,20 @@ void MatrixCell::paint(juce::Graphics& g)
 
         if (liveContribution > 0.05f)
         {
-            g.setColour(accent.withAlpha(0.4f * juce::jmin(1.0f, liveContribution)));
-            g.drawRoundedRectangle(bounds.reduced(1.0f), 2.0f, 1.5f);
+            // Breathing pulse — 700ms cycle, matching the WebView2 mtx-cell-pulse animation.
+            const double now    = juce::Time::getMillisecondCounterHiRes();
+            const float  phase  = (float) std::fmod(now, 700.0) / 700.0f;       // 0..1
+            const float  breath = 0.5f + 0.5f * std::sin(phase * juce::MathConstants<float>::twoPi);
+            const float  contrib = juce::jmin(1.0f, liveContribution);
+            const float  pulse  = contrib * (0.45f + 0.55f * breath);
+
+            // Brighten the cell fill so the eye catches the activity even on small cells.
+            g.setColour(accent.brighter(0.3f).withAlpha(pulse * 0.4f));
+            g.fillRect(bounds.reduced(1.0f));
+
+            // Inner ring + outer halo for the visible "glow".
+            g.setColour(accent.brighter(0.6f).withAlpha(juce::jmin(1.0f, pulse * 1.4f)));
+            g.drawRoundedRectangle(bounds.reduced(1.5f), 2.0f, 2.0f);
         }
     }
 
