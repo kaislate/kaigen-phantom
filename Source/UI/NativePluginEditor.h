@@ -4,6 +4,8 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "panels/LeftPanel.h"
 #include "panels/RightPanel.h"
+#include "panels/TopBar.h"
+#include "panels/PresetBrowser.h"
 
 class PhantomProcessor;
 
@@ -28,6 +30,8 @@ private:
     juce::TextButton backToWebViewButton { "<- WebView2" };
     RightPanel rightPanel;
     LeftPanel leftPanel;
+    TopBar topBar;
+    PresetBrowser presetBrowser;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NativePluginEditor)
 };

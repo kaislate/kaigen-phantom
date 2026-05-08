@@ -31,7 +31,8 @@ namespace
 
 NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
                                        juce::AudioProcessorValueTreeState& a)
-    : juce::AudioProcessorEditor(&p), processor(p), apvts(a), rightPanel(a, p), leftPanel(a)
+    : juce::AudioProcessorEditor(&p), processor(p), apvts(a),
+      rightPanel(a, p), leftPanel(a), topBar(p, a), presetBrowser(p, a)
 {
     setSize(editorWidth, editorHeight);
 
@@ -39,6 +40,23 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
     addAndMakeVisible(backToWebViewButton);
     addAndMakeVisible(rightPanel);
     addAndMakeVisible(leftPanel);
+    addAndMakeVisible(topBar);
+
+    // Browser is added but starts hidden; clicked-to-show by Browse button.
+    addAndMakeVisible(presetBrowser);
+    presetBrowser.setVisible(false);
+    presetBrowser.toFront(false);  // ensure it's painted on top of other panels
+
+    // Wire PresetSelector callbacks via TopBar.
+    topBar.getPresetSelector().onBrowseRequested = [this]
+    {
+        presetBrowser.setVisible(true);
+        presetBrowser.toFront(false);
+    };
+    presetBrowser.onPresetSelected = [this](juce::String name, juce::String pack)
+    {
+        topBar.getPresetSelector().setCurrentPreset(name, pack);
+    };
 }
 
 NativePluginEditor::~NativePluginEditor()
@@ -52,15 +70,14 @@ void NativePluginEditor::paint(juce::Graphics& g)
 
     auto area = getLocalBounds();
 
-    // TopBar across the very top.
-    auto topBar = area.removeFromTop(topBarHeight);
-    drawLabeledPanel(g, topBar, "TopBar (preset selector + advanced toggle)");
+    // TopBar is a real Component now; skip the wireframe rect for it.
+    area.removeFromTop(topBarHeight);
 
-    // ModulationPanel across the very bottom.
+    // ModulationPanel still wireframe (Phase 5).
     auto modPanel = area.removeFromBottom(modPanelHeight);
     drawLabeledPanel(g, modPanel, "ModulationPanel (mode bar + slot row + engine labels)");
 
-    // LeftPanel and RightPanel are real Components now -- no wireframe rectangles.
+    // LeftPanel and RightPanel are real Components; no wireframes for them.
 }
 
 void NativePluginEditor::resized()
@@ -69,12 +86,18 @@ void NativePluginEditor::resized()
     backToWebViewButton.setBounds(getWidth() - 110, 10, 100, 26);
 
     auto area = getLocalBounds();
-    area.removeFromTop(topBarHeight);
+
+    auto topBarArea = area.removeFromTop(topBarHeight);
+    topBar.setBounds(topBarArea);
+
     area.removeFromBottom(modPanelHeight);
 
     auto leftBounds = area.removeFromLeft(leftPanelWidth);
     leftPanel.setBounds(leftBounds);
     rightPanel.setBounds(area);
+
+    // PresetBrowser overlays the entire editor when visible.
+    presetBrowser.setBounds(getLocalBounds());
 }
 
 void NativePluginEditor::buttonClicked(juce::Button* b)
