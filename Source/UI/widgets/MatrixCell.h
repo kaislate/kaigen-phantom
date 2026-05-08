@@ -35,17 +35,29 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void mouseDown(const juce::MouseEvent& e) override;
+    void mouseDrag(const juce::MouseEvent& e) override;
 
 private:
     /** Read current routing depth from ModulationEngine. Returns 0 if no
      *  routing exists. */
     float currentDepth() const;
 
+    /** Show right-click popover with quick-set + remove options. */
+    void showPopover();
+
     PhantomProcessor& processor;
     juce::String sourceId;
     juce::String paramId;
     ModSlot::Type type;
     float liveContribution { 0.0f };
+
+    float dragStartDepth { 0.0f };
+    int   dragStartY     { 0 };
+    bool  dragArmed      { false };  // set by left-click on a routed cell
+
+    static constexpr float kRoutedThreshold = 0.001f;  // |depth| below this == effectively unrouted
+    static constexpr float kDragPxPerUnit   = 100.0f;  // 100 logical px = full ±1.0 sweep
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MatrixCell)
 };

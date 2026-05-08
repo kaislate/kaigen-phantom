@@ -43,7 +43,7 @@ void MatrixCell::paint(juce::Graphics& g)
 {
     const auto bounds = getLocalBounds().toFloat();
     const float depth = currentDepth();
-    const bool routed = (std::abs(depth) > 0.001f);
+    const bool routed = (std::abs(depth) > kRoutedThreshold);
 
     // Background.
     g.setColour(routed ? Theme::matrixBg.brighter(0.10f) : Theme::matrixBg);
@@ -100,6 +100,104 @@ void MatrixCell::paint(juce::Graphics& g)
 
 void MatrixCell::resized()
 {
+}
+
+void MatrixCell::mouseDown(const juce::MouseEvent& e)
+{
+    dragArmed = false;
+
+    if (e.mods.isPopupMenu())
+    {
+        showPopover();
+        return;
+    }
+
+    const float existing = currentDepth();
+    auto& engine = paramId.startsWith("a_")
+        ? processor.getModulationEngineA()
+        : processor.getModulationEngineB();
+
+    if (std::abs(existing) < kRoutedThreshold)
+    {
+        // Empty cell — add routing at +0.5.
+        engine.addRouting({sourceId, paramId, 0.5f, false});
+        repaint();
+    }
+    else
+    {
+        // Existing cell — arm drag.
+        dragStartDepth = existing;
+        dragStartY     = e.y;
+        dragArmed      = true;
+    }
+}
+
+void MatrixCell::mouseDrag(const juce::MouseEvent& e)
+{
+    // Only react to drags that started on a routed cell with the left button.
+    // Without dragArmed, a right-click followed by a drag would slam the cell
+    // using uninitialised dragStart* state.
+    if (! dragArmed) return;
+
+    // Vertical drag: kDragPxPerUnit logical pixels = full -1..+1 sweep.
+    const int   dy       = dragStartY - e.y;  // up = positive
+    const float newDepth = juce::jlimit(-1.0f, 1.0f,
+                                         dragStartDepth + (float) dy / kDragPxPerUnit);
+
+    auto& engine = paramId.startsWith("a_")
+        ? processor.getModulationEngineA()
+        : processor.getModulationEngineB();
+    if (! engine.setRoutingDepth(sourceId, paramId, newDepth))
+        dragArmed = false;  // routing was removed concurrently — stop dragging
+    repaint();
+}
+
+void MatrixCell::showPopover()
+{
+    juce::PopupMenu menu;
+
+    const float existing = currentDepth();
+    const bool routed = (std::abs(existing) > kRoutedThreshold);
+
+    if (routed)
+    {
+        menu.addItem(1, "Set -100%");
+        menu.addItem(2, "Set 0%");
+        menu.addItem(3, "Set +50%");
+        menu.addItem(4, "Set +100%");
+        menu.addSeparator();
+        menu.addItem(5, "Remove");
+    }
+    else
+    {
+        menu.addItem(10, "Add at +50%");
+        menu.addItem(11, "Add at -50%");
+    }
+
+    // SafePointer guards against the cell being destroyed while the menu is open.
+    juce::Component::SafePointer<MatrixCell> safeThis(this);
+    menu.showMenuAsync(juce::PopupMenu::Options{}.withTargetComponent(this),
+        [safeThis](int result) {
+            auto* self = safeThis.getComponent();
+            if (self == nullptr) return;
+
+            auto& engine = self->paramId.startsWith("a_")
+                ? self->processor.getModulationEngineA()
+                : self->processor.getModulationEngineB();
+
+            switch (result)
+            {
+                case 1:  engine.setRoutingDepth(self->sourceId, self->paramId, -1.0f); break;
+                case 2:  engine.setRoutingDepth(self->sourceId, self->paramId,  0.0f); break;
+                case 3:  engine.setRoutingDepth(self->sourceId, self->paramId,  0.5f); break;
+                case 4:  engine.setRoutingDepth(self->sourceId, self->paramId,  1.0f); break;
+                case 5:  engine.removeRouting (self->sourceId, self->paramId);         break;
+                case 10: engine.addRouting({self->sourceId, self->paramId,  0.5f, false}); break;
+                case 11: engine.addRouting({self->sourceId, self->paramId, -0.5f, false}); break;
+                default: break;
+            }
+            self->repaint();
+        });
 }
 
 } // namespace kaigen::phantom
