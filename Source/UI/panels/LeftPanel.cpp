@@ -40,9 +40,40 @@ LeftPanel::LeftPanel(juce::AudioProcessorValueTreeState& a)
     addAndMakeVisible(hpfKnob);
     addAndMakeVisible(filterLinkBtn);
     addAndMakeVisible(filterSlopeToggle);
+
+    // Filter LinkButton wiring: when linked, dragging LPF mirrors HPF and vice versa.
+    // Listener installs unconditionally; the listener body checks isLinked() before acting.
+    lpfKnob.getSlider().addListener(this);
+    hpfKnob.getSlider().addListener(this);
 }
 
-LeftPanel::~LeftPanel() = default;
+LeftPanel::~LeftPanel()
+{
+    lpfKnob.getSlider().removeListener(this);
+    hpfKnob.getSlider().removeListener(this);
+}
+
+void LeftPanel::sliderValueChanged(juce::Slider* s)
+{
+    if (filterLinkUpdating) return;       // guard against recursion
+    if (! filterLinkBtn.isLinked()) return;
+
+    juce::ScopedValueSetter<bool> guard(filterLinkUpdating, true);
+
+    // Mirror by NORMALIZED position (their Hz ranges differ).
+    if (s == &lpfKnob.getSlider())
+    {
+        const auto n = lpfKnob.getSlider().getNormalisableRange().convertTo0to1(lpfKnob.getSlider().getValue());
+        const auto target = hpfKnob.getSlider().getNormalisableRange().convertFrom0to1(n);
+        hpfKnob.getSlider().setValue(target, juce::sendNotificationSync);
+    }
+    else if (s == &hpfKnob.getSlider())
+    {
+        const auto n = hpfKnob.getSlider().getNormalisableRange().convertTo0to1(hpfKnob.getSlider().getValue());
+        const auto target = lpfKnob.getSlider().getNormalisableRange().convertFrom0to1(n);
+        lpfKnob.getSlider().setValue(target, juce::sendNotificationSync);
+    }
+}
 
 void LeftPanel::paint(juce::Graphics& g)
 {

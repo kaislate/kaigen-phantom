@@ -10,7 +10,7 @@
 namespace kaigen::phantom
 {
 
-class LeftPanel : public juce::Component
+class LeftPanel : public juce::Component, private juce::Slider::Listener
 {
 public:
     explicit LeftPanel(juce::AudioProcessorValueTreeState& apvts);
@@ -20,6 +20,10 @@ public:
     void resized() override;
 
 private:
+    void sliderValueChanged(juce::Slider* s) override;
+
+    bool filterLinkUpdating { false };  // recursion guard
+
     juce::AudioProcessorValueTreeState& apvts;
 
     // Recipe wheel

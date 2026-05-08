@@ -21,6 +21,8 @@ public:
                 const juce::String& label = {});
     ~PhantomKnob() override;
 
+    juce::Slider& getSlider() noexcept { return slider; }
+
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
