@@ -36,6 +36,28 @@ ModulationPanel::ModulationPanel(PhantomProcessor& p, juce::AudioProcessorValueT
     counterLabel.setJustificationType(juce::Justification::centredRight);
     counterLabel.setText("0 ROUTINGS", juce::dontSendNotification);
     addAndMakeVisible(counterLabel);
+
+    // Slot row: 11 slots in WebView2 order.
+    struct SlotDef { ModSlot::Type type; const char* slotId; const char* paramID; const char* label; const char* placeholder; };
+    const SlotDef defs[] = {
+        { ModSlot::Type::Lfo,    "lfo1",    "",             "LFO 1", "PR4" },
+        { ModSlot::Type::Lfo,    "lfo2",    "",             "LFO 2", "PR4" },
+        { ModSlot::Type::Random, "randomA", "",             "RAND",  "PR5" },
+        { ModSlot::Type::Macro,  "macro1",  "macro1",       "MAC 1", "" },
+        { ModSlot::Type::Macro,  "macro2",  "macro2",       "MAC 2", "" },
+        { ModSlot::Type::Morph,  "morph",   "morph_amount", "MORPH", "" },
+        { ModSlot::Type::Macro,  "macro3",  "macro3",       "MAC 3", "" },
+        { ModSlot::Type::Macro,  "macro4",  "macro4",       "MAC 4", "" },
+        { ModSlot::Type::Random, "randomB", "",             "RAND",  "PR5" },
+        { ModSlot::Type::Lfo,    "lfo3",    "",             "LFO 3", "PR4" },
+        { ModSlot::Type::Lfo,    "lfo4",    "",             "LFO 4", "PR4" },
+    };
+    for (const auto& def : defs)
+    {
+        auto* slot = new ModSlot(apvts, def.type, def.slotId, def.paramID, def.label, def.placeholder);
+        addAndMakeVisible(*slot);
+        slots.add(slot);
+    }
 }
 
 ModulationPanel::~ModulationPanel() = default;
@@ -62,8 +84,14 @@ void ModulationPanel::resized()
     slotsButton .setBounds(modeBar.removeFromLeft(64));
     modeBar.removeFromLeft(4);
     matrixButton.setBounds(modeBar.removeFromLeft(64));
-
     counterLabel.setBounds(modeBar.removeFromRight(140));
+
+    // Slot row below mode bar — 11 slots evenly distributed.
+    auto slotRow = area.reduced(12, 4);
+    if (slots.isEmpty()) return;
+    const int slotW = slotRow.getWidth() / slots.size();
+    for (auto* slot : slots)
+        slot->setBounds(slotRow.removeFromLeft(slotW));
 }
 
 } // namespace kaigen::phantom

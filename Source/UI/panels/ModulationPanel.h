@@ -3,6 +3,7 @@
 #include <functional>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "../widgets/ModSlot.h"
 
 class PhantomProcessor;
 
@@ -28,6 +29,10 @@ public:
     /** Update the routing counter (called by NativePluginEditor on state change). */
     void setRoutingCount(int count);
 
+    /** Allows external code (NativePluginEditor) to install onSlotClicked
+     *  handlers on each slot. */
+    juce::OwnedArray<ModSlot>& getSlots() noexcept { return slots; }
+
     void paint(juce::Graphics& g) override;
     void resized() override;
 
@@ -39,6 +44,8 @@ private:
     juce::TextButton matrixButton { "MATRIX" };
     juce::Label      counterLabel;
     bool matrixActive { false };
+
+    juce::OwnedArray<ModSlot> slots;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ModulationPanel)
 };
