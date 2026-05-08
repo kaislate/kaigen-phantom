@@ -37,14 +37,30 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
     matrixView.setVisible(false);
     matrixView.toFront(false);
 
+    // Single source of truth for persisting matrix mode + re-laying out.
+    auto persistMatrixMode = [this](bool active) {
+        auto state = processor.getMatrixView();
+        state.mode = active ? kaigen::phantom::MatrixMode::Matrix
+                            : kaigen::phantom::MatrixMode::Slots;
+        processor.setMatrixView(state);
+        processor.updateHostDisplay();
+    };
+
     // Wire ModulationPanel's MATRIX toggle to show/hide matrixView.
     // Mutual exclusion: opening matrix dismisses the preset browser if open.
-    modulationPanel.onMatrixToggle = [this](bool active) {
+    modulationPanel.onMatrixToggle = [this, persistMatrixMode](bool active) {
         if (active && presetBrowser.isVisible())
             presetBrowser.setVisible(false);
         matrixView.setVisible(active);
         if (active) matrixView.toFront(false);
         resized();  // Slot row collapses → bottom panel shrinks → re-layout left/right panels.
+        persistMatrixMode(active);
+    };
+
+    // Click-outside-the-card dismiss → persist Slots mode.
+    matrixView.onDismissed = [this, persistMatrixMode] {
+        resized();
+        persistMatrixMode(false);
     };
 
     // Browser is added but starts hidden; clicked-to-show by Browse button.
@@ -53,13 +69,15 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
     presetBrowser.toFront(false);  // ensure it's painted on top of other panels
 
     // Wire PresetSelector callbacks via TopBar.
-    topBar.getPresetSelector().onBrowseRequested = [this]
+    topBar.getPresetSelector().onBrowseRequested = [this, persistMatrixMode]
     {
         // Mutual exclusion: opening the browser dismisses matrix if open.
-        // (ModulationPanel mode-bar state catches up the next time the user
-        // clicks SLOTS — Task 7 will add a proper setMatrixActive(bool) hook.)
         if (matrixView.isVisible())
+        {
             matrixView.setVisible(false);
+            resized();
+            persistMatrixMode(false);
+        }
         presetBrowser.setVisible(true);
         presetBrowser.toFront(false);
     };
@@ -67,6 +85,29 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
     {
         topBar.getPresetSelector().setCurrentPreset(name, pack);
     };
+
+    // Slot-click → matrix handoff: clicking a macro slot opens the matrix view.
+    for (auto* slot : modulationPanel.getSlots())
+    {
+        slot->onSlotClicked = [this, persistMatrixMode](juce::String slotId) {
+            if (! slotId.startsWith("macro")) return;
+            if (matrixView.isVisible()) return;
+            if (presetBrowser.isVisible()) presetBrowser.setVisible(false);
+            matrixView.setVisible(true);
+            matrixView.toFront(false);
+            resized();
+            persistMatrixMode(true);
+        };
+    }
+
+    // Restore persisted matrix mode.
+    const auto persisted = processor.getMatrixView();
+    if (persisted.mode == kaigen::phantom::MatrixMode::Matrix)
+    {
+        matrixView.setVisible(true);
+        matrixView.toFront(false);
+        resized();
+    }
 }
 
 NativePluginEditor::~NativePluginEditor()

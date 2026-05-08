@@ -31,6 +31,7 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void mouseDown(const juce::MouseEvent& e) override;
 
 private:
     PhantomProcessor& processor;
@@ -38,6 +39,11 @@ private:
     juce::String modId;
     juce::String label;
     juce::String valueText { "0.00" };
+
+    std::unique_ptr<juce::TextEditor> nameEditor;
+
+    void commitNameEdit();
+    void cancelNameEdit();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MatrixModRow)
 };

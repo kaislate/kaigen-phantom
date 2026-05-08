@@ -1,6 +1,10 @@
 // Source/UI/widgets/MatrixModRow.cpp
 #include "MatrixModRow.h"
 #include "../Theme.h"
+#include "../../PluginProcessor.h"
+#include "../../Modulation/ModulationEngine.h"
+#include "../../Modulation/Modulator.h"
+#include "../../Modulation/Macro.h"
 
 namespace kaigen::phantom
 {
@@ -58,7 +62,49 @@ void MatrixModRow::paint(juce::Graphics& g)
 
 void MatrixModRow::resized()
 {
-    // No children for now.
+    // No children for now (nameEditor positioned in mouseDown).
+}
+
+void MatrixModRow::mouseDown(const juce::MouseEvent&)
+{
+    if (type != ModSlot::Type::Macro) return;
+    if (nameEditor != nullptr) return;
+
+    nameEditor = std::make_unique<juce::TextEditor>();
+    nameEditor->setText(label);
+    nameEditor->setBounds(getLocalBounds().withTrimmedLeft(20).withWidth(100));
+    nameEditor->onReturnKey = [this] { commitNameEdit(); };
+    nameEditor->onEscapeKey = [this] { cancelNameEdit(); };
+    nameEditor->onFocusLost = [this] { commitNameEdit(); };
+    addAndMakeVisible(*nameEditor);
+    nameEditor->grabKeyboardFocus();
+    nameEditor->selectAll();
+}
+
+void MatrixModRow::commitNameEdit()
+{
+    if (nameEditor == nullptr) return;
+    const auto newName = nameEditor->getText().trim();
+    if (newName.isNotEmpty())
+    {
+        // Macros 1-2 belong to engine A; 3-4 to engine B.
+        auto& engine = (modId == "macro1" || modId == "macro2")
+            ? processor.getModulationEngineA()
+            : processor.getModulationEngineB();
+        if (auto* mod = engine.findModulator(modId))
+        {
+            if (auto* macro = dynamic_cast<Macro*>(mod))
+                macro->setName(newName);
+        }
+        label = newName;
+    }
+    nameEditor.reset();
+    repaint();
+}
+
+void MatrixModRow::cancelNameEdit()
+{
+    nameEditor.reset();
 }
 
 } // namespace kaigen::phantom

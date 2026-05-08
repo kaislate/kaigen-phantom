@@ -1,5 +1,6 @@
 // Source/UI/panels/MatrixView.h
 #pragma once
+#include <functional>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "../widgets/MatrixModRow.h"
@@ -14,12 +15,15 @@ namespace kaigen::phantom
  *  when active. Houses ModulatorStrip (left) + DestinationGrid (right).
  *
  *  Toggled visible/hidden by ModulationPanel's MATRIX button. */
-class MatrixView : public juce::Component
+class MatrixView : public juce::Component, private juce::Timer
 {
 public:
     MatrixView(PhantomProcessor& processor,
                juce::AudioProcessorValueTreeState& apvts);
     ~MatrixView() override;
+
+    /** Fired when the user dismisses the matrix by clicking outside the card. */
+    std::function<void()> onDismissed;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -37,6 +41,8 @@ private:
     static constexpr int kCardMargin     = 30;
     static constexpr int kTitleBarHeight = 40;
     static constexpr int kStripWidth     = 160;
+
+    void timerCallback() override;
 
     juce::OwnedArray<MatrixModRow> modRows;
 

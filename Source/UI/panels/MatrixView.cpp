@@ -1,6 +1,10 @@
 // Source/UI/panels/MatrixView.cpp
 #include "MatrixView.h"
 #include "../Theme.h"
+#include "../../PluginProcessor.h"
+#include "../../Modulation/ModulationEngine.h"
+#include "../../Modulation/Modulator.h"
+#include "../../Modulation/Macro.h"
 
 namespace
 {
@@ -42,7 +46,23 @@ MatrixView::MatrixView(PhantomProcessor& p, juce::AudioProcessorValueTreeState& 
     };
     for (const auto& def : defs)
     {
-        auto* row = new MatrixModRow(processor, def.type, def.modId, def.label);
+        // For macros, prefer the live (possibly user-renamed) name from the engine.
+        juce::String label = def.label;
+        if (def.type == ModSlot::Type::Macro)
+        {
+            const juce::String idStr (def.modId);
+            auto& engine = (idStr == "macro1" || idStr == "macro2")
+                ? processor.getModulationEngineA()
+                : processor.getModulationEngineB();
+            if (auto* m = engine.findModulator(idStr))
+                if (auto* macro = dynamic_cast<Macro*>(m))
+                {
+                    const auto liveName = macro->getName().trim();
+                    if (liveName.isNotEmpty()) label = liveName;
+                }
+        }
+
+        auto* row = new MatrixModRow(processor, def.type, def.modId, label);
         addAndMakeVisible(*row);
         modRows.add(row);
     }
@@ -75,9 +95,14 @@ MatrixView::MatrixView(PhantomProcessor& p, juce::AudioProcessorValueTreeState& 
                 cells.add(cell);
             }
     }
+
+    startTimerHz(10);
 }
 
-MatrixView::~MatrixView() = default;
+MatrixView::~MatrixView()
+{
+    stopTimer();
+}
 
 juce::Rectangle<int> MatrixView::getCardBounds() const noexcept
 {
@@ -90,6 +115,49 @@ juce::Rectangle<int> MatrixView::getCardBounds() const noexcept
 void MatrixView::visibilityChanged()
 {
     if (isVisible()) repaint();
+}
+
+void MatrixView::timerCallback()
+{
+    if (! isVisible()) return;
+
+    // For each cell, compute contribution = modValue * |depth| and update.
+    for (auto* cell : cells)
+    {
+        const auto& sourceId = cell->getSourceId();
+        const auto& paramId  = cell->getParamId();
+
+        auto& engine = paramId.startsWith("a_")
+            ? processor.getModulationEngineA()
+            : processor.getModulationEngineB();
+
+        float modValue = 0.0f;
+        if (auto* mod = engine.findModulator(sourceId))
+            modValue = mod->getCurrentValue();
+
+        float depth = 0.0f;
+        if (auto snap = engine.getRoutingsSnapshot())
+            for (const auto& r : *snap)
+                if (r.sourceId == sourceId && r.paramId == paramId)
+                {
+                    depth = r.depth;
+                    break;
+                }
+
+        cell->setLiveContribution(modValue * std::abs(depth));
+    }
+
+    // Update modRow value readouts (only for macros).
+    for (auto* row : modRows)
+    {
+        const auto& modId = row->getModId();
+        if (! modId.startsWith("macro")) continue;
+        auto& engine = (modId == "macro1" || modId == "macro2")
+            ? processor.getModulationEngineA()
+            : processor.getModulationEngineB();
+        if (auto* mod = engine.findModulator(modId))
+            row->setValueText(juce::String(mod->getCurrentValue(), 2));
+    }
 }
 
 void MatrixView::paint(juce::Graphics& g)
@@ -179,9 +247,12 @@ void MatrixView::resized()
 
 void MatrixView::mouseDown(const juce::MouseEvent& e)
 {
-    // Click outside the card → dismiss.
+    // Click outside the card → dismiss + notify owner so persistence stays in sync.
     if (! getCardBounds().contains(e.getPosition()))
+    {
         setVisible(false);
+        if (onDismissed) onDismissed();
+    }
 }
 
 } // namespace kaigen::phantom
