@@ -21,7 +21,7 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
                                        juce::AudioProcessorValueTreeState& a)
     : juce::AudioProcessorEditor(&p), processor(p), apvts(a),
       rightPanel(a, p), leftPanel(a), topBar(p, a), presetBrowser(p, a),
-      modulationPanel(p, a)
+      modulationPanel(p, a), matrixView(p, a)
 {
     setSize(editorWidth, editorHeight);
 
@@ -33,6 +33,19 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
 
     addAndMakeVisible(modulationPanel);
 
+    addAndMakeVisible(matrixView);
+    matrixView.setVisible(false);
+    matrixView.toFront(false);
+
+    // Wire ModulationPanel's MATRIX toggle to show/hide matrixView.
+    // Mutual exclusion: opening matrix dismisses the preset browser if open.
+    modulationPanel.onMatrixToggle = [this](bool active) {
+        if (active && presetBrowser.isVisible())
+            presetBrowser.setVisible(false);
+        matrixView.setVisible(active);
+        if (active) matrixView.toFront(false);
+    };
+
     // Browser is added but starts hidden; clicked-to-show by Browse button.
     addAndMakeVisible(presetBrowser);
     presetBrowser.setVisible(false);
@@ -41,6 +54,11 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
     // Wire PresetSelector callbacks via TopBar.
     topBar.getPresetSelector().onBrowseRequested = [this]
     {
+        // Mutual exclusion: opening the browser dismisses matrix if open.
+        // (ModulationPanel mode-bar state catches up the next time the user
+        // clicks SLOTS — Task 7 will add a proper setMatrixActive(bool) hook.)
+        if (matrixView.isVisible())
+            matrixView.setVisible(false);
         presetBrowser.setVisible(true);
         presetBrowser.toFront(false);
     };
@@ -84,6 +102,7 @@ void NativePluginEditor::resized()
 
     // PresetBrowser overlays the entire editor when visible.
     presetBrowser.setBounds(getLocalBounds());
+    matrixView.setBounds(getLocalBounds());
 }
 
 void NativePluginEditor::buttonClicked(juce::Button* b)

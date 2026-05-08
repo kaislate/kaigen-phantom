@@ -7,6 +7,7 @@
 #include "panels/TopBar.h"
 #include "panels/PresetBrowser.h"
 #include "panels/ModulationPanel.h"
+#include "panels/MatrixView.h"
 
 class PhantomProcessor;
 
@@ -34,6 +35,7 @@ private:
     TopBar topBar;
     PresetBrowser presetBrowser;
     ModulationPanel modulationPanel;
+    MatrixView matrixView;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NativePluginEditor)
 };
