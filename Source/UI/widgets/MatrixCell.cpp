@@ -119,17 +119,18 @@ void MatrixCell::mouseDown(const juce::MouseEvent& e)
 
     if (std::abs(existing) < kRoutedThreshold)
     {
-        // Empty cell — add routing at +0.5.
+        // Empty cell — add routing at +0.5 AND arm drag so the same gesture
+        // can sweep the depth without releasing.
         engine.addRouting({sourceId, paramId, 0.5f, false});
+        dragStartDepth = 0.5f;
         repaint();
     }
     else
     {
-        // Existing cell — arm drag.
         dragStartDepth = existing;
-        dragStartY     = e.y;
-        dragArmed      = true;
     }
+    dragStartY = e.y;
+    dragArmed  = true;
 }
 
 void MatrixCell::mouseDrag(const juce::MouseEvent& e)
