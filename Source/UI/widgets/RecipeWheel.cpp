@@ -60,21 +60,39 @@ int RecipeWheel::hitTestSpoke(juce::Point<float> p) const
     const auto centre = bounds.getCentre();
     const float r = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f;
     const float outerR = r * kOuterRadiusFrac;
+    const float innerR = r * kInnerRadiusFrac;
 
+    const float dx = p.x - centre.x;
+    const float dy = p.y - centre.y;
+    const float dist = std::sqrt(dx * dx + dy * dy);
+
+    // Click must be in the donut between inner and outer radii (with a small
+    // margin past the outer ring to make the hit area generous).
+    constexpr float kHitMarginPx = 14.0f;
+    if (dist < innerR) return -1;
+    if (dist > outerR + kHitMarginPx) return -1;
+
+    // Angle from center, with 0 = up (matching spokeAngleRadians).
+    // atan2(dx, -dy) gives angle clockwise from straight up: 0 at top,
+    // PI/2 at right, PI at bottom, -PI/2 at left.
+    float clickAngle = std::atan2(dx, -dy);
+    if (clickAngle < 0.0f) clickAngle += juce::MathConstants<float>::twoPi;
+
+    // Each spoke owns an angular slice of width (2*PI / kSpokes). Find the
+    // spoke whose angle is closest.
+    const float spokeStep = juce::MathConstants<float>::twoPi / (float) kSpokes;
     int best = -1;
-    float bestDistSq = kHitTestRadiusPx * kHitTestRadiusPx;
+    float bestDelta = spokeStep * 0.5f;  // half a slice — angular tolerance
     for (int i = 0; i < kSpokes; ++i)
     {
-        const float a = spokeAngleRadians(i);
-        // Spoke head sits at outerR (regardless of current value, for hit testing).
-        const float hx = centre.x + outerR * std::sin(a);
-        const float hy = centre.y - outerR * std::cos(a);
-        const float dx = p.x - hx;
-        const float dy = p.y - hy;
-        const float d2 = dx * dx + dy * dy;
-        if (d2 < bestDistSq)
+        const float a = spokeAngleRadians(i);  // 0..2PI
+        // Angular distance, wrapped to [0, PI]
+        float delta = std::abs(clickAngle - a);
+        if (delta > juce::MathConstants<float>::pi)
+            delta = juce::MathConstants<float>::twoPi - delta;
+        if (delta < bestDelta)
         {
-            bestDistSq = d2;
+            bestDelta = delta;
             best = i;
         }
     }
