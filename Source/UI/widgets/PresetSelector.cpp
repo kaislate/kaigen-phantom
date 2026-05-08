@@ -100,7 +100,7 @@ void PresetSelector::saveDialog()
             if (saved.isNotEmpty())
                 setCurrentPreset(saved, "User");
         }),
-        true);
+        false);  // unique_ptr in callback owns the deletion
 }
 
 void PresetSelector::paint(juce::Graphics& g)
