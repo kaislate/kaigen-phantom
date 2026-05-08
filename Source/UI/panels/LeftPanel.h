@@ -5,6 +5,7 @@
 #include "../widgets/PhantomKnob.h"
 #include "../widgets/ToggleGroup.h"
 #include "../widgets/LinkButton.h"
+#include "../widgets/RecipeWheel.h"
 
 namespace kaigen::phantom
 {
@@ -21,7 +22,8 @@ public:
 private:
     juce::AudioProcessorValueTreeState& apvts;
 
-    // Recipe wheel area is a placeholder rectangle until Phase 3.
+    // Recipe wheel
+    RecipeWheel recipeWheel;
 
     // Ghost section
     PhantomKnob ghostAmountKnob;
