@@ -44,6 +44,7 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
             presetBrowser.setVisible(false);
         matrixView.setVisible(active);
         if (active) matrixView.toFront(false);
+        resized();  // Slot row collapses → bottom panel shrinks → re-layout left/right panels.
     };
 
     // Browser is added but starts hidden; clicked-to-show by Browse button.
@@ -93,7 +94,10 @@ void NativePluginEditor::resized()
     auto topBarArea = area.removeFromTop(topBarHeight);
     topBar.setBounds(topBarArea);
 
-    auto modPanelArea = area.removeFromBottom(modPanelHeight);
+    const int currentModPanelHeight = modulationPanel.isMatrixActive()
+        ? ModulationPanel::kCollapsedHeight
+        : modPanelHeight;
+    auto modPanelArea = area.removeFromBottom(currentModPanelHeight);
     modulationPanel.setBounds(modPanelArea);
 
     auto leftBounds = area.removeFromLeft(leftPanelWidth);

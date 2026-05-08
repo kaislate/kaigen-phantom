@@ -86,9 +86,14 @@ void ModulationPanel::resized()
     matrixButton.setBounds(modeBar.removeFromLeft(64));
     counterLabel.setBounds(modeBar.removeFromRight(140));
 
-    // Slot row below mode bar — 11 slots evenly distributed.
+    // Slot row collapses when MATRIX mode is active.
+    const bool slotRowVisible = ! matrixActive;
+    for (auto* slot : slots)
+        slot->setVisible(slotRowVisible);
+
+    if (! slotRowVisible || slots.isEmpty()) return;
+
     auto slotRow = area.reduced(12, 4);
-    if (slots.isEmpty()) return;
     const int slotW = slotRow.getWidth() / slots.size();
     for (auto* slot : slots)
         slot->setBounds(slotRow.removeFromLeft(slotW));

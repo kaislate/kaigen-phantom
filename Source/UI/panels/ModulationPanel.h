@@ -26,6 +26,12 @@ public:
     /** Fires when the user clicks MATRIX. Boolean argument: new active state. */
     std::function<void(bool)> onMatrixToggle;
 
+    /** True if MATRIX mode is active (slot row collapsed, mode bar only). */
+    bool isMatrixActive() const noexcept { return matrixActive; }
+
+    /** Mode-bar-only height when slot row is collapsed (matrix mode). */
+    static constexpr int kCollapsedHeight = 38;
+
     /** Update the routing counter (called by NativePluginEditor on state change). */
     void setRoutingCount(int count);
 
