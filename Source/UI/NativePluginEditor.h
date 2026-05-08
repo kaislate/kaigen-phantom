@@ -6,6 +6,7 @@
 #include "panels/RightPanel.h"
 #include "panels/TopBar.h"
 #include "panels/PresetBrowser.h"
+#include "panels/ModulationPanel.h"
 
 class PhantomProcessor;
 
@@ -32,6 +33,7 @@ private:
     LeftPanel leftPanel;
     TopBar topBar;
     PresetBrowser presetBrowser;
+    ModulationPanel modulationPanel;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NativePluginEditor)
 };

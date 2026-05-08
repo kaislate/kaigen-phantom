@@ -15,24 +15,13 @@ namespace
     constexpr int modPanelHeight      = 150;
     constexpr int leftPanelWidth      = 420;
 
-    void drawLabeledPanel(juce::Graphics& g,
-                          juce::Rectangle<int> bounds,
-                          const juce::String& label)
-    {
-        g.setColour(Theme::panelBg);
-        g.fillRect(bounds);
-        g.setColour(Theme::panelBorder);
-        g.drawRect(bounds, 1);
-        g.setColour(Theme::textSecondary);
-        g.setFont(juce::Font("Space Grotesk", 14.0f, juce::Font::bold));
-        g.drawText(label, bounds, juce::Justification::centred, false);
-    }
 }
 
 NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
                                        juce::AudioProcessorValueTreeState& a)
     : juce::AudioProcessorEditor(&p), processor(p), apvts(a),
-      rightPanel(a, p), leftPanel(a), topBar(p, a), presetBrowser(p, a)
+      rightPanel(a, p), leftPanel(a), topBar(p, a), presetBrowser(p, a),
+      modulationPanel(p, a)
 {
     setSize(editorWidth, editorHeight);
 
@@ -41,6 +30,8 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
     addAndMakeVisible(rightPanel);
     addAndMakeVisible(leftPanel);
     addAndMakeVisible(topBar);
+
+    addAndMakeVisible(modulationPanel);
 
     // Browser is added but starts hidden; clicked-to-show by Browse button.
     addAndMakeVisible(presetBrowser);
@@ -67,17 +58,11 @@ NativePluginEditor::~NativePluginEditor()
 void NativePluginEditor::paint(juce::Graphics& g)
 {
     g.fillAll(Theme::deepBg);
-
     auto area = getLocalBounds();
-
-    // TopBar is a real Component now; skip the wireframe rect for it.
     area.removeFromTop(topBarHeight);
-
-    // ModulationPanel still wireframe (Phase 5).
-    auto modPanel = area.removeFromBottom(modPanelHeight);
-    drawLabeledPanel(g, modPanel, "ModulationPanel (mode bar + slot row + engine labels)");
-
-    // LeftPanel and RightPanel are real Components; no wireframes for them.
+    area.removeFromBottom(modPanelHeight);
+    // LeftPanel and RightPanel are real Components — no wireframes.
+    // ModulationPanel is now real too.
 }
 
 void NativePluginEditor::resized()
@@ -90,7 +75,8 @@ void NativePluginEditor::resized()
     auto topBarArea = area.removeFromTop(topBarHeight);
     topBar.setBounds(topBarArea);
 
-    area.removeFromBottom(modPanelHeight);
+    auto modPanelArea = area.removeFromBottom(modPanelHeight);
+    modulationPanel.setBounds(modPanelArea);
 
     auto leftBounds = area.removeFromLeft(leftPanelWidth);
     leftPanel.setBounds(leftBounds);
