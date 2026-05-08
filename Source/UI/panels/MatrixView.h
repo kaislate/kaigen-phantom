@@ -2,6 +2,7 @@
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "../widgets/MatrixModRow.h"
 
 class PhantomProcessor;
 
@@ -30,7 +31,11 @@ private:
     PhantomProcessor& processor;
     juce::AudioProcessorValueTreeState& apvts;
 
-    static constexpr int kCardMargin = 30;
+    static constexpr int kCardMargin     = 30;
+    static constexpr int kTitleBarHeight = 40;
+    static constexpr int kStripWidth     = 160;
+
+    juce::OwnedArray<MatrixModRow> modRows;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MatrixView)
 };
