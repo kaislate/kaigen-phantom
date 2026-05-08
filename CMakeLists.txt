@@ -55,6 +55,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/panels/RightPanel.cpp
     Source/UI/panels/LeftPanel.cpp
     Source/UI/panels/PresetBrowser.cpp
+    Source/UI/panels/TopBar.cpp
     Source/Engines/BinauralStage.cpp
     Source/Engines/BassExtractor.cpp
     Source/Engines/ZeroCrossingSynth.cpp
