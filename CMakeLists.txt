@@ -48,6 +48,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/widgets/ToggleGroup.cpp
     Source/UI/widgets/LinkButton.cpp
     Source/UI/widgets/IOMeter.cpp
+    Source/UI/widgets/RecipeWheel.cpp
     Source/UI/visualizers/Oscilloscope.cpp
     Source/UI/visualizers/Spectrum.cpp
     Source/UI/panels/RightPanel.cpp
