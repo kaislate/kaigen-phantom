@@ -52,6 +52,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/widgets/PresetSelector.cpp
     Source/UI/widgets/ModSlot.cpp
     Source/UI/widgets/MatrixModRow.cpp
+    Source/UI/widgets/MatrixCell.cpp
     Source/UI/visualizers/Oscilloscope.cpp
     Source/UI/visualizers/Spectrum.cpp
     Source/UI/panels/RightPanel.cpp

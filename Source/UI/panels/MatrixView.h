@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "../widgets/MatrixModRow.h"
+#include "../widgets/MatrixCell.h"
 
 class PhantomProcessor;
 
@@ -25,6 +26,8 @@ public:
     void mouseDown(const juce::MouseEvent& e) override;
     void visibilityChanged() override;
 
+    struct CategoryGroup { juce::String label; std::vector<std::pair<juce::String, juce::String>> leaves; };
+
 private:
     juce::Rectangle<int> getCardBounds() const noexcept;
 
@@ -36,6 +39,9 @@ private:
     static constexpr int kStripWidth     = 160;
 
     juce::OwnedArray<MatrixModRow> modRows;
+
+    juce::OwnedArray<MatrixCell> cells;
+    std::vector<CategoryGroup> categories;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MatrixView)
 };
