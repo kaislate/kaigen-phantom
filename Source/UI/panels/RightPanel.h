@@ -49,6 +49,10 @@ private:
     // Advanced panel — 14 mini knobs, all per-engine 'a_' prefix.
     std::array<std::unique_ptr<PhantomMiniKnob>, 14> miniKnobs;
 
+    // Advanced section collapse toggle (instant, no animation).
+    juce::TextButton advancedToggle { "Advanced (-)" };
+    bool advancedExpanded { true };
+
     // Visualizers (below Advanced row)
     Oscilloscope oscilloscope;
     Spectrum spectrum;

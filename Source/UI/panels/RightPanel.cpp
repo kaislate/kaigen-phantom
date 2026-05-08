@@ -74,6 +74,17 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
             addAndMakeVisible(*miniKnobs[i]);
         }
     }
+
+    advancedToggle.setClickingTogglesState(false);
+    advancedToggle.onClick = [this] {
+        advancedExpanded = !advancedExpanded;
+        advancedToggle.setButtonText(advancedExpanded ? "Advanced (-)" : "Advanced (+)");
+        for (auto& mk : miniKnobs)
+            mk->setVisible(advancedExpanded);
+        resized();  // recompute visualizer bounds based on new state
+        repaint();
+    };
+    addAndMakeVisible(advancedToggle);
 }
 
 RightPanel::~RightPanel() = default;
@@ -85,7 +96,6 @@ void RightPanel::paint(juce::Graphics& g)
     drawSectionHeader(g, juce::Rectangle<int>(12,   8, 200, 16), "Harmonic Engine");
     drawSectionHeader(g, juce::Rectangle<int>(310,  8, 100, 16), "Stereo");
     drawSectionHeader(g, juce::Rectangle<int>(420,  8, 200, 16), "Levels");
-    drawSectionHeader(g, juce::Rectangle<int>(12, 130, 200, 16), "Advanced");
 }
 
 void RightPanel::resized()
@@ -122,15 +132,26 @@ void RightPanel::resized()
     layoutKnob(outGainKnob);
     outMeter.setBounds(knobRow.removeFromLeft(14));
 
-    // Advanced mini-knob row
-    area.removeFromTop(20);
-    auto miniRow = area.removeFromTop(60).reduced(12, 0);
-    const int miniWidth = 36;
-    const int miniGap = 4;
-    for (auto& mk : miniKnobs)
+    // Advanced section: toggle button (replaces section header).
+    area.removeFromTop(8);
+    advancedToggle.setBounds(12, 130, 100, 18);
+
+    if (advancedExpanded)
     {
-        mk->setBounds(miniRow.removeFromLeft(miniWidth));
-        miniRow.removeFromLeft(miniGap);
+        area.removeFromTop(20);  // space below toggle
+        auto miniRow = area.removeFromTop(60).reduced(12, 0);
+        const int miniWidth = 36;
+        const int miniGap = 4;
+        for (auto& mk : miniKnobs)
+        {
+            mk->setBounds(miniRow.removeFromLeft(miniWidth));
+            miniRow.removeFromLeft(miniGap);
+        }
+    }
+    else
+    {
+        // Collapsed: skip mini-row's vertical space; visualizers shift up.
+        area.removeFromTop(8);
     }
 
     // Visualizers below Advanced row.
