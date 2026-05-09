@@ -3,16 +3,15 @@
 #include <functional>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "PhantomKnob.h"
 
 namespace kaigen::phantom
 {
 
 /** Single slot in the modulation panel's slot row.
  *  Variants:
- *    - macro: contains a PhantomKnob bound to macroN APVTS param
- *    - morph: PhantomKnob bound to morph_amount
- *    - lfo / random: static placeholder (greyed text label)
+ *    - macro: slot-dot (teal) with value ring; drag-to-set-value via hidden Slider
+ *    - morph: slot-dot (white) with value ring; drag-to-set-value via hidden Slider
+ *    - lfo / random: static placeholder dot (faint, PR4/PR5 text)
  *
  *  Click anywhere on the slot fires onSlotClicked(slotId) — Task 7 wires
  *  this to the slot→matrix handoff. */
@@ -46,6 +45,7 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
+    void mouseDrag(const juce::MouseEvent& e) override;
 
 private:
     Type type;
@@ -53,7 +53,16 @@ private:
     juce::String label;
     juce::String placeholder;
 
-    std::unique_ptr<PhantomKnob> knob;  // only for macro/morph
+    // For macro/morph slots: a hidden Slider that hosts the APVTS attachment.
+    // The slot-dot's mouseDown/mouseDrag forwards to this Slider, which
+    // updates the param. Visual is fully custom (paint draws the dot + ring).
+    std::unique_ptr<juce::Slider> hiddenSlider;
+    std::unique_ptr<juce::SliderParameterAttachment> attachment;
+
+    // Drag state — vertical-drag-to-set-value for macro/morph slots.
+    bool dragArmed { false };
+    float dragStartValue { 0.0f };
+    int dragStartY { 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ModSlot)
 };

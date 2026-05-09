@@ -70,8 +70,10 @@ void ModulationPanel::setRoutingCount(int count)
 
 void ModulationPanel::paint(juce::Graphics& g)
 {
-    g.fillAll(Theme::panelBg);
-    g.setColour(Theme::panelBorder);
+    g.fillAll(Theme::modPanelBg);
+
+    // Top border hairline.
+    g.setColour(Theme::modPanelBorder);
     g.drawHorizontalLine(0, 0.0f, (float) getWidth());
 }
 

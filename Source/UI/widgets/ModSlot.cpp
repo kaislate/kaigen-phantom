@@ -13,11 +13,15 @@ ModSlot::ModSlot(juce::AudioProcessorValueTreeState& apvts,
                  const juce::String& ph)
     : type(t), slotId(sId), label(lbl), placeholder(ph)
 {
-    if (type == Type::Macro || type == Type::Morph)
+    if ((type == Type::Macro || type == Type::Morph) && paramID.isNotEmpty())
     {
-        knob = std::make_unique<PhantomKnob>(apvts, paramID, PhantomKnob::Size::Small,
-                                              juce::String{});  // no label on knob; we draw our own
-        addAndMakeVisible(*knob);
+        if (auto* p = apvts.getParameter(paramID))
+        {
+            hiddenSlider = std::make_unique<juce::Slider>();
+            hiddenSlider->setRange(0.0, 1.0);
+            attachment = std::make_unique<juce::SliderParameterAttachment>(*p, *hiddenSlider, nullptr);
+            hiddenSlider->onValueChange = [this] { repaint(); };
+        }
     }
 }
 
@@ -26,52 +30,134 @@ ModSlot::~ModSlot() = default;
 void ModSlot::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds();
+    auto labelArea = bounds.removeFromBottom(14);
+    auto dotArea   = bounds.reduced(2);
 
-    // Type-color accent used for label tint and placeholder dot.
-    // (Macro/Morph slots paint via the embedded PhantomKnob child.)
-    juce::Colour accent;
+    // Pick type-colors.
+    juce::Colour fillColour, borderColour, glowColour;
+    bool hasValueRing = false;
+    bool isPlaceholder = (type == Type::Lfo || type == Type::Random) && hiddenSlider == nullptr;
     switch (type)
     {
-        case Type::Macro:  accent = Theme::macroTeal;    break;
-        case Type::Morph:  accent = Theme::morphWhite;   break;
-        case Type::Lfo:    accent = Theme::lfoBlue;      break;
-        case Type::Random: accent = Theme::randomPurple; break;
+        case Type::Macro:
+            fillColour   = Theme::macroTeal;
+            borderColour = Theme::macroTeal;
+            glowColour   = Theme::macroTeal.withAlpha(0.5f);
+            hasValueRing = true;
+            break;
+        case Type::Morph:
+            fillColour   = Theme::morphWhite;
+            borderColour = Theme::morphWhite;
+            glowColour   = Theme::morphWhite.withAlpha(0.5f);
+            hasValueRing = true;
+            break;
+        case Type::Lfo:
+            fillColour   = Theme::lfoBlue;
+            borderColour = Theme::lfoBlue;
+            glowColour   = Theme::lfoBlue.withAlpha(0.5f);
+            break;
+        case Type::Random:
+            fillColour   = Theme::randomPurple;
+            borderColour = Theme::randomPurple;
+            glowColour   = Theme::randomPurple.withAlpha(0.5f);
+            break;
     }
 
-    // Label below the slot's interactive area.
-    auto labelArea = bounds.removeFromBottom(14);
-    g.setColour(accent.withAlpha(type == Type::Lfo || type == Type::Random ? 0.5f : 0.85f));
-    g.setFont(juce::FontOptions("Space Grotesk", 9.0f, juce::Font::bold));
-    g.drawText(label, labelArea.toFloat(), juce::Justification::centred, false);
+    // Fit a 36x36 dot centered in the dot area (or smaller if bounds are tight).
+    const float dotDiameter = juce::jmin(36.0f, (float) juce::jmin(dotArea.getWidth(), dotArea.getHeight() - 2));
+    const auto dotCentre = juce::Point<float> { (float) dotArea.getCentreX(), (float) dotArea.getCentreY() };
+    const auto dotRect = juce::Rectangle<float>(dotDiameter, dotDiameter).withCentre(dotCentre);
 
-    // For LFO/Random placeholders: draw a greyed "PR4" / "PR5" stub.
-    if (type == Type::Lfo || type == Type::Random)
+    // Optional value ring (macro/morph) — draw BEHIND the dot.
+    if (hasValueRing && hiddenSlider != nullptr)
     {
-        g.setColour(Theme::textDim);
-        g.setFont(juce::FontOptions("Space Grotesk", 8.0f, juce::Font::plain));
-        const auto stub = placeholder.isEmpty() ? juce::String("--") : placeholder;
-        g.drawText(stub, bounds.toFloat(), juce::Justification::centred, false);
+        const float ringRadius    = dotDiameter * 0.5f + 4.0f;
+        const float ringThickness = 2.0f;
 
-        // Type-color dot indicator.
-        g.setColour(accent.withAlpha(0.4f));
-        const float dotR = 4.0f;
-        const auto centre = bounds.getCentre().toFloat();
-        g.fillEllipse(centre.x - dotR, centre.y + 8.0f, dotR * 2.0f, dotR * 2.0f);
+        // Background track (faint white).
+        const float ringStartAngle = -juce::MathConstants<float>::pi * 0.75f;   // ~ -135°
+        const float ringEndAngle   =  juce::MathConstants<float>::pi * 0.75f;   // ~ +135°  (270° sweep)
+        juce::Path bgArc;
+        bgArc.addCentredArc(dotCentre.x, dotCentre.y, ringRadius, ringRadius, 0.0f,
+                             ringStartAngle, ringEndAngle, true);
+        g.setColour(Theme::ringTrack);
+        g.strokePath(bgArc, juce::PathStrokeType(ringThickness));
+
+        // Foreground active arc.
+        const float val       = (float) hiddenSlider->getValue();   // 0..1
+        const float fgEndAngle = ringStartAngle + val * (ringEndAngle - ringStartAngle);
+        juce::Path fgArc;
+        fgArc.addCentredArc(dotCentre.x, dotCentre.y, ringRadius, ringRadius, 0.0f,
+                             ringStartAngle, fgEndAngle, true);
+        g.setColour(fillColour);
+        g.strokePath(fgArc, juce::PathStrokeType(ringThickness));
     }
+
+    if (isPlaceholder)
+    {
+        // Faint dot for LFO/Random placeholders (PR4/PR5).
+        g.setColour(fillColour.withAlpha(0.40f));
+        g.fillEllipse(dotRect);
+        g.setColour(borderColour.withAlpha(0.70f));
+        g.drawEllipse(dotRect, 2.0f);
+        // Stub label inside the dot.
+        if (placeholder.isNotEmpty())
+        {
+            g.setColour(juce::Colour(0x66ffffff));
+            g.setFont(juce::FontOptions("Space Grotesk", 7.0f, juce::Font::bold));
+            g.drawText(placeholder, dotRect, juce::Justification::centred, false);
+        }
+    }
+    else
+    {
+        // Active radial gradient body — type-color at center, dark slot-dot inner at edge.
+        juce::ColourGradient body(fillColour, dotCentre,
+                                   Theme::slotDotInner,
+                                   juce::Point<float>(dotCentre.x + dotDiameter * 0.5f,
+                                                       dotCentre.y + dotDiameter * 0.5f),
+                                   true);
+        body.addColour(0.30, fillColour);       // sharp edge at 30%
+        body.addColour(0.70, Theme::slotDotInner);
+        g.setGradientFill(body);
+        g.fillEllipse(dotRect);
+
+        // Border ring + glow.
+        g.setColour(glowColour);
+        g.drawEllipse(dotRect.expanded(1.0f), 2.0f);  // outer glow
+        g.setColour(borderColour);
+        g.drawEllipse(dotRect, 2.0f);
+    }
+
+    // Label below the dot.
+    g.setFont(juce::FontOptions("Space Grotesk", 9.0f, juce::Font::bold));
+    g.setColour(fillColour.withAlpha(isPlaceholder ? 0.65f : 1.0f));
+    g.drawText(label, labelArea, juce::Justification::centred, false);
 }
 
 void ModSlot::resized()
 {
-    auto bounds = getLocalBounds();
-    bounds.removeFromBottom(14);  // reserve label area
-
-    if (knob != nullptr)
-        knob->setBounds(bounds);
+    // No children to lay out — hiddenSlider is not added as a visible component.
 }
 
-void ModSlot::mouseDown(const juce::MouseEvent&)
+void ModSlot::mouseDown(const juce::MouseEvent& e)
 {
-    if (onSlotClicked) onSlotClicked(slotId);
+    if (onSlotClicked) onSlotClicked(slotId);   // existing callback — preserve it
+
+    if (hiddenSlider != nullptr)
+    {
+        dragArmed      = true;
+        dragStartValue = (float) hiddenSlider->getValue();
+        dragStartY     = e.y;
+    }
+}
+
+void ModSlot::mouseDrag(const juce::MouseEvent& e)
+{
+    if (! dragArmed || hiddenSlider == nullptr) return;
+    // 100 px vertical = full 0..1 range.
+    const int   dy       = dragStartY - e.y;   // up = positive
+    const float newValue = juce::jlimit(0.0f, 1.0f, dragStartValue + (float) dy / 100.0f);
+    hiddenSlider->setValue(newValue, juce::sendNotificationSync);
 }
 
 } // namespace kaigen::phantom
