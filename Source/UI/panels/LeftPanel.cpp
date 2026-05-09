@@ -94,6 +94,31 @@ void LeftPanel::paint(juce::Graphics& g)
     // Section header labels (etched text, established in Task 3).
     drawSectionHeader(g, juce::Rectangle<int>(ghostCardBounds.getX() + 4, ghostCardBounds.getY() + 6, 200, 16), "Ghost");
     drawSectionHeader(g, juce::Rectangle<int>(filterCardBounds.getX() + 4, filterCardBounds.getY() + 6, 200, 16), "Filter");
+
+    // ── H2..H8 spoke labels (etched in the silver around the wheel) ───
+    // The wheel component is square at the top of the panel; we paint the
+    // labels in the silver area just outside the wheel's circumference.
+    if (! recipeWheel.getBounds().isEmpty())
+    {
+        const auto wb = recipeWheel.getBounds().toFloat();
+        const auto wcentre = wb.getCentre();
+        const float wRadius = juce::jmin(wb.getWidth(), wb.getHeight()) * 0.5f - 4.0f;
+        const float labelR  = wRadius + 14.0f;       // just outside the dark wheel
+        const auto labelFont = juce::Font(juce::FontOptions("Courier New", 9.0f, juce::Font::bold))
+                                    .withExtraKerningFactor(0.05f);
+        for (int i = 0; i < 7; ++i)
+        {
+            // Spoke 0 points up (-π/2), 7 spokes evenly spaced.
+            const float a = (float) i * juce::MathConstants<float>::twoPi / 7.0f
+                                - juce::MathConstants<float>::halfPi;
+            const float lx = wcentre.x + labelR * std::cos(a);
+            const float ly = wcentre.y + labelR * std::sin(a);
+            const juce::String hText = "H" + juce::String(i + 2);
+            const juce::Rectangle<int> labelBounds((int) lx - 14, (int) ly - 8, 28, 14);
+            Theme::drawEtchedText(g, hText, labelBounds, juce::Justification::centred,
+                                   labelFont, Theme::textOnLightLabel);
+        }
+    }
 }
 
 void LeftPanel::resized()
