@@ -97,31 +97,50 @@ void LeftPanel::resized()
 {
     recipeWheel.setBounds(8, 8, getWidth() - 16, 360);
 
-    constexpr int ghostY = 400;
-    ghostAmountKnob.setBounds(12,  ghostY, 90, 100);
-    crossoverKnob  .setBounds(110, ghostY, 80, 100);
-    strengthKnob   .setBounds(200, ghostY, 80, 100);
-    ghostModeToggle.setBounds(12, ghostY + 110, 270, 26);
+    const int panelW = getWidth();
 
-    constexpr int filterY = 574;
-    lpfKnob.setBounds          (12,  filterY,       80, 100);
-    filterLinkBtn.setBounds    (98,  filterY + 30,  28, 28);
-    hpfKnob.setBounds          (130, filterY,       80, 100);
-    filterSlopeToggle.setBounds(12,  filterY + 110, 200, 26);
+    // Knob component natural sizes (body + shadow padding × 2).
+    //   Large:  114 + 32*2 = 178
+    //   Medium:  88 + 24*2 = 136
+    constexpr int kLarge  = 178;
+    constexpr int kMedium = 136;
 
-    // Compute inset card bounds from the section layouts above.
-    // Ghost card: from header row (30px above ghostY) to bottom of toggle (ghostY+110+26) + 8px padding.
+    // ── Ghost section ──────────────────────────────────────────────────
+    // Large + Medium + Medium = 178 + 136 + 136 = 450; panel is 420.
+    // We allow controlled overlap so shadow halos blend together.
+    constexpr int ghostY  = 386;   // y of knob component top
+    const int ghostTotal  = kLarge + kMedium + kMedium;
+    const int ghostOverlap = (ghostTotal - panelW + 16) / 2;  // split overlap
+    int gx = 8;
+    ghostAmountKnob.setBounds(gx, ghostY, kLarge, kLarge);
+    gx += kLarge - ghostOverlap;
+    crossoverKnob.setBounds(gx, ghostY, kMedium, kMedium);
+    gx += kMedium - ghostOverlap;
+    strengthKnob.setBounds(gx, ghostY, kMedium, kMedium);
+
+    ghostModeToggle.setBounds(12, ghostY + kLarge + 4, panelW - 24, 26);
+
+    // ── Filter section ─────────────────────────────────────────────────
+    // Medium + 40px link gap + Medium = 312; centered in 420.
+    constexpr int filterY = 600;
+    const int filterTotal = kMedium + 40 + kMedium;
+    int fx = (panelW - filterTotal) / 2;
+    lpfKnob.setBounds(fx, filterY, kMedium, kMedium);
+    filterLinkBtn.setBounds(fx + kMedium + 6, filterY + (kMedium - 28) / 2, 28, 28);
+    hpfKnob.setBounds(fx + kMedium + 40, filterY, kMedium, kMedium);
+
+    filterSlopeToggle.setBounds(12, filterY + kMedium + 4, 220, 26);
+
+    // ── Card bounds (header sits ~24 px above knob top) ────────────────
     constexpr int cardPadX = 8;
-    const int panelW       = getWidth();
-
-    const int ghostCardTop    = ghostY - 30;            // header label sits ~24px above the knobs
-    const int ghostCardBottom = ghostY + 110 + 26 + 8;  // bottom of ghostModeToggle + padding
+    const int ghostCardTop    = ghostY - 24;
+    const int ghostCardBottom = ghostY + kLarge + 4 + 26 + 8;
     ghostCardBounds = juce::Rectangle<int>(cardPadX, ghostCardTop,
                                            panelW - cardPadX * 2,
                                            ghostCardBottom - ghostCardTop);
 
-    const int filterCardTop    = filterY - 30;
-    const int filterCardBottom = filterY + 110 + 26 + 8;
+    const int filterCardTop    = filterY - 24;
+    const int filterCardBottom = filterY + kMedium + 4 + 26 + 8;
     filterCardBounds = juce::Rectangle<int>(cardPadX, filterCardTop,
                                              panelW - cardPadX * 2,
                                              filterCardBottom - filterCardTop);

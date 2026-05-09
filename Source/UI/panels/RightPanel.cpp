@@ -116,84 +116,101 @@ void RightPanel::paint(juce::Graphics& g)
 void RightPanel::resized()
 {
     auto area = getLocalBounds();
-    area.removeFromTop(28);
 
-    // knobRowFull is the full 80px-tall strip used by all top-row sections.
-    const int knobRowTop    = 28;
-    const int knobRowHeight = 80;
-    auto knobRow = area.removeFromTop(knobRowHeight).reduced(12, 0);
-    const int knobWidth  = 80;
-    const int gap        = 8;
-    const int sectionGap = 24;
-    const int cardPadY   = 6;    // card extends slightly above/below the knob row
-    const int cardTop    = knobRowTop - cardPadY;
-    const int cardHeight = knobRowHeight + cardPadY * 2;
+    // Knob component natural size (body 88 + shadow padding 24*2 = 136).
+    constexpr int kMedium = 136;
 
-    auto layoutKnob = [&](PhantomKnob& k) {
-        k.setBounds(knobRow.removeFromLeft(knobWidth));
-        knobRow.removeFromLeft(gap);
-    };
+    // Top row Y: pushed down so the knob's 32-px shadow halo isn't clipped
+    // by the panel's top edge.
+    constexpr int knobRowTop    = 36;
+    constexpr int knobRowHeight = kMedium;
+    constexpr int knobOverlap   = 24;   // adjacent knobs overlap their shadow halos
+    constexpr int sectionGap    = 16;
+    constexpr int cardPadY      = 4;
+    const int cardTop = knobRowTop - 24;   // card top above the header label
+    const int cardHeight = knobRowHeight + 24 + cardPadY * 2;
 
-    // --- Harmonic Engine ---
-    const int harmonicCardX = knobRow.getX() - 4;  // slight inward padding from reduced edge
-    layoutKnob(saturationKnob);
-    layoutKnob(shapeKnob);
-    layoutKnob(skipKnob);
-    // after 3 knobs: 3*(80+8)-8 = 232px consumed, knobRow.getX() is at harmonicCardX+232
-    const int harmonicCardRight = knobRow.getX() - gap + 4;
+    int x = 12;
+
+    // --- Harmonic Engine: 3 medium knobs ---
+    const int harmonicCardX = x - 4;
+    saturationKnob.setBounds(x, knobRowTop, kMedium, kMedium);
+    x += kMedium - knobOverlap;
+    shapeKnob     .setBounds(x, knobRowTop, kMedium, kMedium);
+    x += kMedium - knobOverlap;
+    skipKnob      .setBounds(x, knobRowTop, kMedium, kMedium);
+    x += kMedium;
+    const int harmonicCardRight = x + 4;
     harmonicCardBounds = juce::Rectangle<int>(harmonicCardX, cardTop,
                                               harmonicCardRight - harmonicCardX, cardHeight);
 
-    knobRow.removeFromLeft(sectionGap);
+    x += sectionGap;
 
-    // --- Stereo ---
-    const int stereoCardX = knobRow.getX() - 4;
-    layoutKnob(widthKnob);
-    const int stereoCardRight = knobRow.getX() - gap + 4;
+    // --- Stereo: 1 medium knob ---
+    const int stereoCardX = x - 4;
+    widthKnob.setBounds(x, knobRowTop, kMedium, kMedium);
+    x += kMedium;
+    const int stereoCardRight = x + 4;
     stereoCardBounds = juce::Rectangle<int>(stereoCardX, cardTop,
                                              stereoCardRight - stereoCardX, cardHeight);
 
-    knobRow.removeFromLeft(sectionGap);
+    x += sectionGap;
 
-    // --- Levels ---
-    const int levelsCardX = knobRow.getX() - 4;
-    inMeter.setBounds(knobRow.removeFromLeft(14));
-    knobRow.removeFromLeft(6);
-    layoutKnob(inGainKnob);
-    layoutKnob(outGainKnob);
-    outMeter.setBounds(knobRow.removeFromLeft(14));
-    const int levelsCardRight = knobRow.getX() + 4;
+    // --- Levels: meter + 2 medium knobs + meter ---
+    const int levelsCardX = x - 4;
+    inMeter.setBounds(x, knobRowTop + (kMedium - 90) / 2, 14, 90);
+    x += 14 + 6;
+    inGainKnob .setBounds(x, knobRowTop, kMedium, kMedium);
+    x += kMedium - knobOverlap;
+    outGainKnob.setBounds(x, knobRowTop, kMedium, kMedium);
+    x += kMedium + 6;
+    outMeter.setBounds(x, knobRowTop + (kMedium - 90) / 2, 14, 90);
+    x += 14;
+    const int levelsCardRight = x + 4;
     levelsCardBounds = juce::Rectangle<int>(levelsCardX, cardTop,
                                              levelsCardRight - levelsCardX, cardHeight);
 
-    // --- Advanced section: toggle button + optional mini knob row ---
-    // Toggle sits at the START of the advanced row, leaving room for the
-    // larger (48 px) mini knobs to the right.
-    area.removeFromTop(8);
-    advancedToggle.setBounds(12, 132, 110, 22);
+    // Reserve area below the top knob row for advanced + visualizers.
+    area.removeFromTop(knobRowTop + knobRowHeight + cardPadY);
 
-    const int advancedCardTop = 128;
+    // --- Advanced section: toggle button + optional mini knob row ---
+    // Top row ends at knobRowTop + knobRowHeight (= 36 + 136 = 172). Advanced
+    // toggle sits a short gap below.
+    constexpr int advancedToggleY = 188;
+    constexpr int advancedToggleH = 22;
+    advancedToggle.setBounds(12, advancedToggleY, 110, advancedToggleH);
+
+    const int advancedCardTop = advancedToggleY - 4;
     int advancedCardBottom    = 0;
 
     if (advancedExpanded)
     {
-        area.removeFromTop(28);  // space below toggle
-        auto miniRow = area.removeFromTop(78).reduced(12, 0);
-        miniRow.removeFromLeft(124);  // skip past the toggle button area
-        const int miniWidth = 60;     // 48 px body + ~12 px slack
-        const int miniGap   = 2;
+        // Mini knobs spread evenly across the available width to the right of
+        // the toggle. Component natural size: 48 body + 17 px shadow pad each
+        // side + 11 label = 82 wide × 93 tall.
+        constexpr int miniRowY = advancedToggleY + advancedToggleH + 8;
+        constexpr int miniW    = 82;
+        constexpr int miniH    = 93;
+        const int rowLeft  = 12 + 110 + 12;   // toggle right edge + gap
+        const int rowRight = getWidth() - 12;
+        const int rowAvail = rowRight - rowLeft;
+        const int n = (int) miniKnobs.size();
+        // Evenly distribute: give each knob `slotW` of horizontal space, allow
+        // overlap if total > rowAvail.
+        const int slotW = (n > 0) ? rowAvail / n : miniW;
+        int mx = rowLeft;
         for (auto& mk : miniKnobs)
         {
-            mk->setBounds(miniRow.removeFromLeft(miniWidth));
-            miniRow.removeFromLeft(miniGap);
+            mk->setBounds(mx, miniRowY, miniW, miniH);
+            mx += slotW;
         }
-        advancedCardBottom = 132 + 22 + 28 + 78 + 6;
+        advancedCardBottom = miniRowY + miniH + 6;
     }
     else
     {
-        area.removeFromTop(8);
-        advancedCardBottom = 132 + 22 + 8 + 4;
+        advancedCardBottom = advancedToggleY + advancedToggleH + 8;
     }
+    area.removeFromTop(advancedCardBottom - knobRowTop - knobRowHeight - cardPadY);
 
     advancedCardBounds = juce::Rectangle<int>(8, advancedCardTop,
                                                getWidth() - 16,
