@@ -249,21 +249,39 @@ void RecipeWheel::paint(juce::Graphics& g)
     const auto hubBounds = juce::Rectangle<float>(hubRadius * 2.0f, hubRadius * 2.0f)
                                 .withCentre(centre);
 
-    // Black body.
+    // Outer subtle drop-shadow ring (separates the hub from the silver mount).
+    {
+        juce::DropShadow hubShadow { juce::Colour(0x66000000), 6, juce::Point<int>(0, 1) };
+        juce::Path circlePath; circlePath.addEllipse(hubBounds.expanded(2.0f));
+        hubShadow.drawForPath(g, circlePath);
+    }
+
+    // Concentric bezel layers — outer dark gap, silver bezel, inner dark gap, hub body.
+    g.setColour(juce::Colour(0x33000000));                   // outer dark gap (CSS: 0 0 0 5px rgba(0,0,0,0.18))
+    g.fillEllipse(hubBounds.expanded(5.0f));
+
+    // Silver bezel ring — full opaque so it reads clearly.
+    juce::ColourGradient bezelGrad(juce::Colour(0xffD8DADC),
+                                     hubBounds.getCentreX() - hubRadius,
+                                     hubBounds.getCentreY() - hubRadius,
+                                     juce::Colour(0xff848688),
+                                     hubBounds.getCentreX() + hubRadius,
+                                     hubBounds.getCentreY() + hubRadius,
+                                     false);
+    g.setGradientFill(bezelGrad);
+    g.fillEllipse(hubBounds.expanded(3.5f));
+
+    // Inner dark gap (CSS: 0 0 0 2px rgba(0,0,0,0.55)).
+    g.setColour(juce::Colour(0x8C000000));
+    g.fillEllipse(hubBounds.expanded(2.0f));
+
+    // Black hub body.
     g.setColour(juce::Colour(0xff000000));
     g.fillEllipse(hubBounds);
 
-    // Hard inner shadow approximation — darkened inner edge ring.
+    // Hard inset shadow on top + left of hub body for the OLED depth illusion.
     g.setColour(juce::Colour(0xCC000000));
-    g.drawEllipse(hubBounds.reduced(2.0f), 3.0f);
-
-    // Concentric bezel rings (silver ring with inner+outer dark gaps).
-    g.setColour(juce::Colour(0x55000000));    // inner gap
-    g.drawEllipse(hubBounds.expanded(0.5f), 1.0f);
-    g.setColour(juce::Colour(0x8DB4B6BA));   // 55% rgba(180,182,186) silver bezel
-    g.drawEllipse(hubBounds.expanded(2.0f), 2.0f);
-    g.setColour(juce::Colour(0x18000000));    // outer gap
-    g.drawEllipse(hubBounds.expanded(4.0f), 1.5f);
+    g.drawEllipse(hubBounds.reduced(1.0f), 2.5f);
 }
 
 void RecipeWheel::resized()

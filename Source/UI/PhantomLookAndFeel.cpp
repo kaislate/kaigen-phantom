@@ -125,6 +125,46 @@ void PhantomLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& b
     const float corner = juce::jmin(bounds.getHeight() * 0.5f, 16.0f);
 
     const bool isOn = b.getToggleState() || shouldDrawButtonAsDown;
+    const bool isHeaderRaised = b.getProperties().getWithDefault("phantom-style", "")
+                                    == juce::var("header-raised");
+
+    if (isHeaderRaised)
+    {
+        // Raised neumorphic pill — silver-tinted body with offset highlights/shadows.
+        // CSS reference: .hdr-btn — inset 1.5px 1.5px 4px rgba(0,0,0,0.14) +
+        //                inset -1.5px -1.5px 3px rgba(255,255,255,0.48) + outer 1px drop shadow.
+        if (shouldDrawButtonAsDown)
+        {
+            // Pressed: tinted active.
+            g.setColour(juce::Colour(0x33000000));
+            g.fillRoundedRectangle(bounds, corner);
+        }
+        else
+        {
+            // Body fill — slightly lighter than the silver panel so the pill reads as raised.
+            juce::ColourGradient body(juce::Colour(0xffD8DADC), bounds.getX(), bounds.getY(),
+                                        juce::Colour(0xffB6B8BA), bounds.getX(), bounds.getBottom(),
+                                        false);
+            g.setGradientFill(body);
+            g.fillRoundedRectangle(bounds, corner);
+        }
+
+        // Top-left bright highlight (shows the pill is raised).
+        g.setColour(juce::Colour(0xa0FFFFFF));
+        g.drawLine(bounds.getX() + corner * 0.5f, bounds.getY() + 0.5f,
+                    bounds.getRight() - corner * 0.5f, bounds.getY() + 0.5f, 0.7f);
+
+        // Bottom-right soft shadow.
+        g.setColour(juce::Colour(0x33000000));
+        g.drawRoundedRectangle(bounds.reduced(0.25f), corner, 0.7f);
+
+        if (shouldDrawButtonAsHighlighted && ! shouldDrawButtonAsDown)
+        {
+            g.setColour(juce::Colour(0x18FFFFFF));
+            g.fillRoundedRectangle(bounds, corner);
+        }
+        return;
+    }
 
     if (isOn)
     {
@@ -170,8 +210,15 @@ void PhantomLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& b,
                                           bool shouldDrawButtonAsDown)
 {
     const bool isOn = b.getToggleState() || shouldDrawButtonAsDown;
-    const auto colour = isOn ? b.findColour(juce::TextButton::textColourOnId)
-                              : b.findColour(juce::TextButton::textColourOffId);
+    const bool isHeaderRaised = b.getProperties().getWithDefault("phantom-style", "")
+                                    == juce::var("header-raised");
+
+    juce::Colour colour;
+    if (isHeaderRaised)
+        colour = Theme::textOnLightActive;   // ~62% black, readable on the silver pill
+    else
+        colour = isOn ? b.findColour(juce::TextButton::textColourOnId)
+                      : b.findColour(juce::TextButton::textColourOffId);
 
     juce::Font font(juce::FontOptions("Space Grotesk", juce::jmin(13.0f, b.getHeight() * 0.50f),
                                         juce::Font::bold));

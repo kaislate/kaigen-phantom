@@ -19,7 +19,7 @@ void TopBar::paint(juce::Graphics& g)
 
     // PHANTOM logo — left side, vertically centred.
     {
-        const auto logoBounds = juce::Rectangle<int>(16, 0, 160, getHeight());
+        const auto logoBounds = juce::Rectangle<int>(16, 0, 240, getHeight());
         const auto font = juce::Font(juce::FontOptions("Space Grotesk", 22.0f, juce::Font::plain))
                               .withExtraKerningFactor(0.45f);
         // Bright white shadow below (72% white, CSS: 0 1px 0 rgba(255,255,255,0.72))

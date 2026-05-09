@@ -44,6 +44,11 @@ PresetSelector::PresetSelector(PhantomProcessor& p, juce::AudioProcessorValueTre
     addAndMakeVisible(nextButton);
     addAndMakeVisible(browseButton);
     addAndMakeVisible(saveButton);
+
+    // Tag header buttons so PhantomLookAndFeel paints them as raised neumorphic pills
+    // (instead of the default recessed-toggle pill).
+    for (auto* b : { &prevButton, &nextButton, &browseButton, &saveButton })
+        b->getProperties().set("phantom-style", "header-raised");
 }
 
 PresetSelector::~PresetSelector() = default;

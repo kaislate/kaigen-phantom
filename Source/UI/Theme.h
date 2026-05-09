@@ -34,7 +34,7 @@ namespace kaigen::phantom::Theme
 
     // ── Engraved (dark on light) text ────────────────────────────────────
     inline const juce::Colour textOnLightBody     { 0xb3000000 };  // 70% black
-    inline const juce::Colour textOnLightLabel    { 0x38000000 };  // 22% black — section labels
+    inline const juce::Colour textOnLightLabel    { 0x66000000 };  // 40% black — section labels (stronger than CSS 22% for readability on JUCE silver)
     inline const juce::Colour textOnLightActive   { 0x9e000000 };  // 62% black — active toggle
     inline const juce::Colour textOnLightInactive { 0x47000000 };  // 28% black
     inline const juce::Colour textShadowEtch      { 0x80ffffff };  // 50% white — etched
