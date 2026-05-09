@@ -59,36 +59,33 @@ void PhantomMiniKnob::paint(juce::Graphics& g)
     const float oledR  = radius - kInset;
     const float arcR   = oledR - 3.0f;
 
-    // ── Layer 1: neumorphic raised body — radial gradient only (no blur shadow) ─
+    // ── Layer 1: neumorphic raised body (DropShadow + transparent-stop gradient) ─
     {
-        // No DropShadow — JUCE's software blur fringes cyan on Windows.
-        // Radial gradient alone provides the convex depth illusion.
+        juce::Path circle;
+        circle.addEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre));
 
-        // Soft halo just outside the body (clipped at component bounds).
-        {
-            const float haloR = radius * 1.15f;
-            juce::ColourGradient halo(
-                juce::Colour(0x66FFFFFF),
-                centre.x - radius * 0.20f, centre.y - radius * 0.30f,
-                juce::Colour(0x00FFFFFF),
-                centre.x + haloR, centre.y + haloR,
-                true);
-            g.setGradientFill(halo);
-            g.fillEllipse(juce::Rectangle<float>(haloR * 2, haloR * 2).withCentre(centre));
-        }
+        // CSS small-knob shadow recipe per knob.js (offsets 2/3, 3/5; blurs 10/17).
+        juce::DropShadow brB { juce::Colour(0x24000000), 17, juce::Point<int>(3, 5) };
+        brB.drawForPath(g, circle);
+        juce::DropShadow brA { juce::Colour(0x4D000000), 10, juce::Point<int>(2, 3) };
+        brA.drawForPath(g, circle);
+        juce::DropShadow tlB { juce::Colour(0x4DFFFFFF), 17, juce::Point<int>(-3, -5) };
+        tlB.drawForPath(g, circle);
+        juce::DropShadow tlA { juce::Colour(0xa8FFFFFF), 10, juce::Point<int>(-2, -3) };
+        tlA.drawForPath(g, circle);
 
-        // Radial gradient body — peak off-centre top-left, fades to panel-tone
-        // at the boundary. Same recipe as PhantomKnob.
+        // Transparent-stop radial gradient — bezel shows through at outer edge
+        // so there's no hard knob boundary (icy-redesign breakthrough).
         const juce::Point<float> gradOrigin {
             centre.x - radius * 0.30f,
             centre.y - radius * 0.40f
         };
-        juce::ColourGradient body(juce::Colour(0xffE2E3E5), gradOrigin,
-                                    juce::Colour(0xffA9AAAC),
+        juce::ColourGradient body(juce::Colour(0x3DFFFFFF), gradOrigin,   // rgba(255,255,255,0.24)
+                                    juce::Colour(0x12000000),              // rgba(0,0,0,0.07)
                                     { centre.x + radius, centre.y + radius },
                                     true);
-        body.addColour(0.30, juce::Colour(0xffCFD0D2));
-        body.addColour(0.65, juce::Colour(0xffB1B2B4));
+        body.addColour(0.22, juce::Colour(0x1FFFFFFF));   // rgba(255,255,255,0.12)
+        body.addColour(0.60, juce::Colour(0x05000000));   // rgba(0,0,0,0.02)
         g.setGradientFill(body);
         g.fillEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre));
     }

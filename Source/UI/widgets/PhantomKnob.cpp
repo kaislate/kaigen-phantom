@@ -151,37 +151,54 @@ void PhantomKnob::resized()
 
 void PhantomKnob::paintBody(juce::Graphics& g, juce::Point<float> centre, float radius)
 {
-    // ── Soft halo just outside the knob ──────────────────────────────────
-    // From specs/2026-04-16-knob-icy-redesign-design.md: a halo behind the knob
-    // gives the soft "spot" illusion. We paint it within the component bounds
-    // (clipped at edges); the parent panel's silver gradient handles the rest.
+    juce::Path circle;
+    circle.addEllipse(juce::Rectangle<float>(radius * 2.0f, radius * 2.0f).withCentre(centre));
+
+    // CSS box-shadow recipe per knob.js — drives the volcano-slope illusion.
+    // A faint cyan tint can appear from JUCE's software-blur on Windows; that
+    // is the LANDED visual per docs/thoughts-2026-04-17.md ("the user-validated
+    // look") and we DO NOT iterate on it. See docs/native-knob-recipe.md.
+    struct ShadowParams { int ox, oy, blurA, ox2, oy2, blurB; };
+    const ShadowParams sp = [&]() -> ShadowParams {
+        switch (sizeVariant)
+        {
+            case Size::Large:  return {  4,  5, 18,  7,  9, 32 };
+            case Size::Small:  return {  2,  3, 10,  3,  5, 17 };
+            default:           return {  3,  4, 14,  5,  7, 24 };
+        }
+    }();
+
+    // BR shadows (drawn first, behind TL highlights). Black blurs render cleanly.
     {
-        const float haloR = radius * 1.15f;
-        juce::ColourGradient halo(
-            juce::Colour(0x66FFFFFF),                            // 40% white at center
-            centre.x - radius * 0.20f, centre.y - radius * 0.30f, // halo peak slightly top-left
-            juce::Colour(0x00FFFFFF),                            // transparent at outer
-            centre.x + haloR, centre.y + haloR,
-            true);
-        g.setGradientFill(halo);
-        g.fillEllipse(juce::Rectangle<float>(haloR * 2, haloR * 2).withCentre(centre));
+        juce::DropShadow brB { juce::Colour(0x29000000), sp.blurB, { sp.ox2, sp.oy2 } };
+        brB.drawForPath(g, circle);
+        juce::DropShadow brA { juce::Colour(0x57000000), sp.blurA, { sp.ox, sp.oy } };
+        brA.drawForPath(g, circle);
+    }
+    // TL highlights — alpha values from CSS (rgba(255,255,255,0.34) and 0.70).
+    {
+        juce::DropShadow tlB { juce::Colour(0x57FFFFFF), sp.blurB, { -sp.ox2, -sp.oy2 } };
+        tlB.drawForPath(g, circle);
+        juce::DropShadow tlA { juce::Colour(0xb3FFFFFF), sp.blurA, { -sp.ox, -sp.oy } };
+        tlA.drawForPath(g, circle);
     }
 
-    // ── Knob body — radial gradient peaking off-centre top-left ──────────
-    // CSS spec: radial-gradient(circle at 35% 30%, white-24% → black-7%).
-    // The gradient peak at top-left mimics light catching the convex slope.
-    // Final stop near bezel color (#A9AAAC) so there's no hard boundary edge.
+    // ── Knob body — TRANSPARENT-stop radial gradient ─────────────────────
+    // KEY TRICK from the icy-redesign breakthrough (thoughts-2026-04-17.md):
+    // the gradient stops are RGBA with low alpha so the panel SHOWS THROUGH.
+    // At the outer edge we're 7% black (= 93% panel visible) — no hard
+    // contrast edge means no visible knob boundary.
     const juce::Point<float> gradOrigin {
-        centre.x - radius * 0.30f,    // 35% from left of bounds
+        centre.x - radius * 0.30f,    // 35% from left
         centre.y - radius * 0.40f     // 30% from top
     };
     juce::ColourGradient body(
-        juce::Colour(0xffE2E3E5), gradOrigin,                   // bright catch-light at TL
-        juce::Colour(0xffA9AAAC),                                // panel-tone at the BR edge
+        juce::Colour(0x3DFFFFFF), gradOrigin,       // rgba(255,255,255,0.24) at 0%
+        juce::Colour(0x12000000),                   // rgba(0,0,0,0.07) at 100% — bezel shows through
         { centre.x + radius, centre.y + radius },
         true);
-    body.addColour(0.30, juce::Colour(0xffCFD0D2));             // mid-bright
-    body.addColour(0.65, juce::Colour(0xffB1B2B4));             // mid-dark approaching panel
+    body.addColour(0.22, juce::Colour(0x1FFFFFFF)); // rgba(255,255,255,0.12) at 22%
+    body.addColour(0.60, juce::Colour(0x05000000)); // rgba(0,0,0,0.02) at 60%
     g.setGradientFill(body);
     g.fillEllipse(juce::Rectangle<float>(radius * 2.0f, radius * 2.0f).withCentre(centre));
 }
