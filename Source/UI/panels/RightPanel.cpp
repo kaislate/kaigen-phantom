@@ -167,30 +167,32 @@ void RightPanel::resized()
                                              levelsCardRight - levelsCardX, cardHeight);
 
     // --- Advanced section: toggle button + optional mini knob row ---
+    // Toggle sits at the START of the advanced row, leaving room for the
+    // larger (48 px) mini knobs to the right.
     area.removeFromTop(8);
-    advancedToggle.setBounds(12, 130, 100, 18);
+    advancedToggle.setBounds(12, 132, 110, 22);
 
     const int advancedCardTop = 128;
     int advancedCardBottom    = 0;
 
     if (advancedExpanded)
     {
-        area.removeFromTop(20);  // space below toggle
-        auto miniRow = area.removeFromTop(60).reduced(12, 0);
-        const int miniWidth = 36;
-        const int miniGap = 4;
+        area.removeFromTop(28);  // space below toggle
+        auto miniRow = area.removeFromTop(78).reduced(12, 0);
+        miniRow.removeFromLeft(124);  // skip past the toggle button area
+        const int miniWidth = 60;     // 48 px body + ~12 px slack
+        const int miniGap   = 2;
         for (auto& mk : miniKnobs)
         {
             mk->setBounds(miniRow.removeFromLeft(miniWidth));
             miniRow.removeFromLeft(miniGap);
         }
-        advancedCardBottom = 130 + 18 + 20 + 60 + 6;  // toggle + space + miniRow + padding
+        advancedCardBottom = 132 + 22 + 28 + 78 + 6;
     }
     else
     {
-        // Collapsed: skip mini-row's vertical space; visualizers shift up.
         area.removeFromTop(8);
-        advancedCardBottom = 130 + 18 + 8 + 4;  // toggle + collapsed space + padding
+        advancedCardBottom = 132 + 22 + 8 + 4;
     }
 
     advancedCardBounds = juce::Rectangle<int>(8, advancedCardTop,

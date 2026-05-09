@@ -2,6 +2,7 @@
 // Faithful canvas port of Source/WebUI/knob.js _render() / _ensureScaffold().
 // Source of truth: knob.js (SVG, not Canvas2D).
 #include "PhantomKnob.h"
+#include "KnobValueFormat.h"
 
 namespace kaigen::phantom
 {
@@ -370,14 +371,7 @@ void PhantomKnob::paintValueText(juce::Graphics& g, juce::Point<float> centre,
 
 juce::String PhantomKnob::formatValue()
 {
-    // Prefer the parameter's own getText() formatter (set in createAndAddParameter
-    // with units like "Hz", "dB", "%"). Fallback: 2-decimal numeric.
-    if (param != nullptr)
-    {
-        const auto t = param->getCurrentValueAsText();
-        if (t.isNotEmpty()) return t;
-    }
-    return juce::String(slider.getValue(), 2);
+    return formatKnobValue(param, slider.getValue());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

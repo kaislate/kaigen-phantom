@@ -1,5 +1,6 @@
 // Source/UI/widgets/PhantomMiniKnob.cpp
 #include "PhantomMiniKnob.h"
+#include "KnobValueFormat.h"
 #include "../Theme.h"
 
 namespace kaigen::phantom
@@ -7,8 +8,8 @@ namespace kaigen::phantom
 
 namespace
 {
-    constexpr int   kBodySize        = 36;   // diameter of the knob body
-    constexpr float kInset           = 2.5f;
+    constexpr int   kBodySize        = 48;   // diameter of the knob body (was 36 — too small)
+    constexpr float kInset           = 3.0f;
     constexpr float kArcStartRad     = 2.356194f;          // 135°
     constexpr float kArcSweepRad     = 4.712389f;          // 270°
 }
@@ -43,12 +44,7 @@ PhantomMiniKnob::~PhantomMiniKnob() = default;
 
 juce::String PhantomMiniKnob::formatValue()
 {
-    if (param != nullptr)
-    {
-        const auto t = param->getCurrentValueAsText();
-        if (t.isNotEmpty()) return t;
-    }
-    return juce::String(slider.getValue(), 2);
+    return formatKnobValue(param, slider.getValue());
 }
 
 void PhantomMiniKnob::paint(juce::Graphics& g)
@@ -142,7 +138,7 @@ void PhantomMiniKnob::paint(juce::Graphics& g)
         const auto text = formatValue();
         const float maxW = oledR * 1.7f;
 
-        float fontPx = isDragging ? 9.0f : 7.0f;
+        float fontPx = isDragging ? 11.0f : 8.5f;
         juce::Font font(juce::FontOptions("Courier New", fontPx, juce::Font::bold));
         while (fontPx > 5.0f && (float) juce::GlyphArrangement::getStringWidthInt(font, text) > maxW)
         {
