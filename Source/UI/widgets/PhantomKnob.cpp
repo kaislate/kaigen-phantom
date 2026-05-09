@@ -151,25 +151,37 @@ void PhantomKnob::resized()
 
 void PhantomKnob::paintBody(juce::Graphics& g, juce::Point<float> centre, float radius)
 {
-    // No DropShadow — JUCE's software blur on Windows produces cyan color
-    // fringing on white-blur-on-silver (regardless of alpha or radius).
-    // Convex depth comes from the radial gradient body alone. CSS-style
-    // soft halos are deferred until a non-blur shadow approach is available.
+    // ── Soft halo just outside the knob ──────────────────────────────────
+    // From specs/2026-04-16-knob-icy-redesign-design.md: a halo behind the knob
+    // gives the soft "spot" illusion. We paint it within the component bounds
+    // (clipped at edges); the parent panel's silver gradient handles the rest.
+    {
+        const float haloR = radius * 1.15f;
+        juce::ColourGradient halo(
+            juce::Colour(0x66FFFFFF),                            // 40% white at center
+            centre.x - radius * 0.20f, centre.y - radius * 0.30f, // halo peak slightly top-left
+            juce::Colour(0x00FFFFFF),                            // transparent at outer
+            centre.x + haloR, centre.y + haloR,
+            true);
+        g.setGradientFill(halo);
+        g.fillEllipse(juce::Rectangle<float>(haloR * 2, haloR * 2).withCentre(centre));
+    }
 
-    // Radial gradient body — "circle at 35% 30%" in a sz×sz viewport.
-    // 35% from left = centre.x - radius*0.30  (since centre is at 50%)
-    // 30% from top  = centre.y - radius*0.40
+    // ── Knob body — radial gradient peaking off-centre top-left ──────────
+    // CSS spec: radial-gradient(circle at 35% 30%, white-24% → black-7%).
+    // The gradient peak at top-left mimics light catching the convex slope.
+    // Final stop near bezel color (#A9AAAC) so there's no hard boundary edge.
     const juce::Point<float> gradOrigin {
-        centre.x - radius * 0.30f,
-        centre.y - radius * 0.40f
+        centre.x - radius * 0.30f,    // 35% from left of bounds
+        centre.y - radius * 0.40f     // 30% from top
     };
     juce::ColourGradient body(
-        juce::Colour(0xb3FFFFFF), gradOrigin,       // 70% white at top-left (was 24%)
-        juce::Colour(0x40000000),                   // 25% black at bottom-right (was 7%)
+        juce::Colour(0xffE2E3E5), gradOrigin,                   // bright catch-light at TL
+        juce::Colour(0xffA9AAAC),                                // panel-tone at the BR edge
         { centre.x + radius, centre.y + radius },
-        true /* radial */);
-    body.addColour(0.22, juce::Colour(0x66FFFFFF)); // 40% white at 22% (was 12%)
-    body.addColour(0.60, juce::Colour(0x14000000)); // 8% black at 60% (was 2%)
+        true);
+    body.addColour(0.30, juce::Colour(0xffCFD0D2));             // mid-bright
+    body.addColour(0.65, juce::Colour(0xffB1B2B4));             // mid-dark approaching panel
     g.setGradientFill(body);
     g.fillEllipse(juce::Rectangle<float>(radius * 2.0f, radius * 2.0f).withCentre(centre));
 }

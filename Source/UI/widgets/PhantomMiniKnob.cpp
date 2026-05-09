@@ -64,18 +64,31 @@ void PhantomMiniKnob::paint(juce::Graphics& g)
         // No DropShadow — JUCE's software blur fringes cyan on Windows.
         // Radial gradient alone provides the convex depth illusion.
 
-        // Radial gradient body — boosted contrast to give the convex/raised look
-        // without using JUCE DropShadow (which fringes cyan on Windows).
+        // Soft halo just outside the body (clipped at component bounds).
+        {
+            const float haloR = radius * 1.15f;
+            juce::ColourGradient halo(
+                juce::Colour(0x66FFFFFF),
+                centre.x - radius * 0.20f, centre.y - radius * 0.30f,
+                juce::Colour(0x00FFFFFF),
+                centre.x + haloR, centre.y + haloR,
+                true);
+            g.setGradientFill(halo);
+            g.fillEllipse(juce::Rectangle<float>(haloR * 2, haloR * 2).withCentre(centre));
+        }
+
+        // Radial gradient body — peak off-centre top-left, fades to panel-tone
+        // at the boundary. Same recipe as PhantomKnob.
         const juce::Point<float> gradOrigin {
             centre.x - radius * 0.30f,
             centre.y - radius * 0.40f
         };
-        juce::ColourGradient body(juce::Colour(0xb3FFFFFF), gradOrigin,   // 70% white
-                                    juce::Colour(0x40000000),              // 25% black
+        juce::ColourGradient body(juce::Colour(0xffE2E3E5), gradOrigin,
+                                    juce::Colour(0xffA9AAAC),
                                     { centre.x + radius, centre.y + radius },
                                     true);
-        body.addColour(0.22, juce::Colour(0x66FFFFFF));   // 40% white
-        body.addColour(0.60, juce::Colour(0x14000000));   // 8% black
+        body.addColour(0.30, juce::Colour(0xffCFD0D2));
+        body.addColour(0.65, juce::Colour(0xffB1B2B4));
         g.setGradientFill(body);
         g.fillEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre));
     }
