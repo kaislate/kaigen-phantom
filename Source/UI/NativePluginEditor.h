@@ -2,6 +2,7 @@
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "PhantomLookAndFeel.h"
 #include "panels/LeftPanel.h"
 #include "panels/RightPanel.h"
 #include "panels/TopBar.h"
@@ -29,6 +30,7 @@ private:
 
     PhantomProcessor& processor;
     juce::AudioProcessorValueTreeState& apvts;
+    PhantomLookAndFeel lookAndFeel;
     juce::TextButton backToWebViewButton { "<- WebView2" };
     RightPanel rightPanel;
     LeftPanel leftPanel;

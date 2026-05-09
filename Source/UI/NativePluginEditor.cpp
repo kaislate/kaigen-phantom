@@ -23,6 +23,7 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
       rightPanel(a, p), leftPanel(a), topBar(p, a), presetBrowser(p, a),
       modulationPanel(p, a), matrixView(p, a)
 {
+    setLookAndFeel(&lookAndFeel);
     setSize(editorWidth, editorHeight);
 
     backToWebViewButton.addListener(this);
@@ -112,6 +113,7 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
 
 NativePluginEditor::~NativePluginEditor()
 {
+    setLookAndFeel(nullptr);
     backToWebViewButton.removeListener(this);
 }
 

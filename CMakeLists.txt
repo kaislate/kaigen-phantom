@@ -43,6 +43,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/UI/Theme.cpp
+    Source/UI/PhantomLookAndFeel.cpp
     Source/UI/NativePluginEditor.cpp
     Source/UI/widgets/PhantomKnob.cpp
     Source/UI/widgets/PhantomMiniKnob.cpp
