@@ -293,23 +293,16 @@ void PhantomKnob::paintIndicatorArc(juce::Graphics& g, juce::Point<float> centre
     arc.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f,
                       arcStart, arcStart + arcSweep * value01, true);
 
-    // Layer 4 — Glow halo (approximated as three alpha-falloff strokes).
-    // Outer glow ring: very wide, low alpha.
-    g.setColour(juce::Colour(0x1EFFFFFF));   // ~12% white
-    g.strokePath(arc, juce::PathStrokeType(10.0f, juce::PathStrokeType::curved,
-                                            juce::PathStrokeType::rounded));
-    // Mid glow ring.
-    g.setColour(juce::Colour(0x3BFFFFFF));   // ~23% white
-    g.strokePath(arc, juce::PathStrokeType(7.5f, juce::PathStrokeType::curved,
-                                            juce::PathStrokeType::rounded));
-    // Core glow (rgba(255,255,255,0.45), 6 px — direct translation).
-    g.setColour(juce::Colour(0x73FFFFFF));   // rgba(255,255,255,0.45) = 0x73
-    g.strokePath(arc, juce::PathStrokeType(6.0f, juce::PathStrokeType::curved,
+    // Layer 4 — Glow halo (single soft stroke). Stacking multiple wide white
+    // strokes caused heavy ClearType color fringing (cyan halos) on Windows;
+    // CSS used a single 6 px stroke with feGaussianBlur — keep just one stroke.
+    g.setColour(juce::Colour(0x40FFFFFF));   // 25% white — softer than the 45% CSS spec
+    g.strokePath(arc, juce::PathStrokeType(5.0f, juce::PathStrokeType::curved,
                                             juce::PathStrokeType::rounded));
 
     // Layer 5 — Sharp value arc (#fff, 2.8 px).
     g.setColour(juce::Colours::white);
-    g.strokePath(arc, juce::PathStrokeType(2.8f, juce::PathStrokeType::curved,
+    g.strokePath(arc, juce::PathStrokeType(2.5f, juce::PathStrokeType::curved,
                                             juce::PathStrokeType::rounded));
 }
 

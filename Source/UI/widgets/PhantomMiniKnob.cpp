@@ -121,14 +121,14 @@ void PhantomMiniKnob::paint(juce::Graphics& g)
             arc.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f,
                                kArcStartRad, kArcStartRad + kArcSweepRad * normVal, true);
 
-            // Glow.
-            g.setColour(juce::Colour(0x73FFFFFF));
-            g.strokePath(arc, juce::PathStrokeType(4.0f, juce::PathStrokeType::curved,
+            // Glow — softer alpha to avoid ClearType cyan fringing on Windows.
+            g.setColour(juce::Colour(0x40FFFFFF));
+            g.strokePath(arc, juce::PathStrokeType(3.5f, juce::PathStrokeType::curved,
                                                       juce::PathStrokeType::rounded));
 
             // Sharp.
             g.setColour(juce::Colours::white);
-            g.strokePath(arc, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved,
+            g.strokePath(arc, juce::PathStrokeType(1.8f, juce::PathStrokeType::curved,
                                                       juce::PathStrokeType::rounded));
         }
     }
