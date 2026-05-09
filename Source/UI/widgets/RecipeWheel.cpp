@@ -157,10 +157,50 @@ void RecipeWheel::paint(juce::Graphics& g)
     const float outerR = r * kOuterRadiusFrac;
     const float innerR = r * kInnerRadiusFrac;
 
-    // Background.
+    // Background — fill component area with editor bg.
     g.setColour(Theme::matrixBg);
     g.fillRect(bounds);
 
+    // ── Silver convex mount disc ──────────────────────────────────────────
+    // CSS: radial-gradient(ellipse at 35% 30%, rgba(255,255,255,0.24)→...→rgba(0,0,0,0.07))
+    // wheelRadius here maps to the outer spoke radius so the silver disc
+    // frames the full spoke area with some breathing room.
+    const float wheelRadius = outerR * (1.0f / kOuterRadiusFrac) * 0.45f;
+    const juce::Point<float> gradOrigin {
+        centre.x - wheelRadius * 0.30f,
+        centre.y - wheelRadius * 0.40f
+    };
+    juce::ColourGradient mount(juce::Colour(0x3DFFFFFF), gradOrigin,
+                                juce::Colour(0x12000000),
+                                { centre.x + wheelRadius, centre.y + wheelRadius },
+                                true);
+    mount.addColour(0.20, juce::Colour(0x1EFFFFFF));
+    mount.addColour(0.55, juce::Colour(0x05000000));
+    g.setGradientFill(mount);
+    g.fillEllipse(juce::Rectangle<float>(wheelRadius * 2.0f, wheelRadius * 2.0f).withCentre(centre));
+
+    // Outer offset shadows — bottom-right shadow + top-left highlight.
+    {
+        const auto sb = juce::Rectangle<float>(wheelRadius * 2.0f, wheelRadius * 2.0f)
+                             .withCentre({ centre.x + 2.0f, centre.y + 2.0f });
+        juce::DropShadow shadow { juce::Colour(0x38000000), 14, juce::Point<int>(2, 2) };
+        juce::Path circlePath; circlePath.addEllipse(sb);
+        shadow.drawForPath(g, circlePath);
+    }
+    {
+        const auto hb = juce::Rectangle<float>(wheelRadius * 2.0f, wheelRadius * 2.0f)
+                             .withCentre({ centre.x - 2.0f, centre.y - 2.0f });
+        juce::DropShadow hl { juce::Colour(0x80FFFFFF), 10, juce::Point<int>(-2, -2) };
+        juce::Path circlePath; circlePath.addEllipse(hb);
+        hl.drawForPath(g, circlePath);
+    }
+
+    // Inset rim — thin dark ring at the disc edge.
+    g.setColour(juce::Colour(0x12000000));
+    g.drawEllipse(juce::Rectangle<float>(wheelRadius * 2.0f, wheelRadius * 2.0f)
+                       .withCentre(centre).reduced(0.5f), 1.5f);
+
+    // ── Spoke area gridlines (on top of silver mount) ─────────────────────
     // Outer ring (faint).
     g.setColour(Theme::panelBorder);
     g.drawEllipse(centre.x - outerR, centre.y - outerR, outerR * 2.0f, outerR * 2.0f, 1.0f);
@@ -173,11 +213,10 @@ void RecipeWheel::paint(juce::Graphics& g)
         g.drawEllipse(centre.x - gr, centre.y - gr, gr * 2.0f, gr * 2.0f, 0.6f);
     }
 
-    // Inner dead zone.
-    g.setColour(Theme::panelBorder);
-    g.drawEllipse(centre.x - innerR, centre.y - innerR, innerR * 2.0f, innerR * 2.0f, 1.0f);
+    // Hub radius shared by spoke origin clipping and OLED hub chrome.
+    const float hubRadius = wheelRadius * 0.40f;
 
-    // Spokes.
+    // ── Spokes ────────────────────────────────────────────────────────────
     for (int i = 0; i < kSpokes; ++i)
     {
         const auto& s = sliders[(size_t) i];
@@ -188,9 +227,11 @@ void RecipeWheel::paint(juce::Graphics& g)
         const float endX = centre.x + spokeLength * std::sin(a);
         const float endY = centre.y - spokeLength * std::cos(a);
 
-        // Spoke line.
+        // Spoke line starts at hub edge so it doesn't cross the OLED body.
+        const float startX = centre.x + hubRadius * std::sin(a);
+        const float startY = centre.y - hubRadius * std::cos(a);
         g.setColour(Theme::steelBlue);
-        g.drawLine(centre.x, centre.y, endX, endY, 1.5f);
+        g.drawLine(startX, startY, endX, endY, 1.5f);
 
         // Spoke head circle (filled at value's tip).
         g.setColour((i == activeSpoke) ? Theme::macroTeal : Theme::steelBlue);
@@ -203,6 +244,26 @@ void RecipeWheel::paint(juce::Graphics& g)
         g.setColour(Theme::textDim);
         g.fillEllipse(hintX - 2.0f, hintY - 2.0f, 4.0f, 4.0f);
     }
+
+    // ── OLED center hub ───────────────────────────────────────────────────
+    const auto hubBounds = juce::Rectangle<float>(hubRadius * 2.0f, hubRadius * 2.0f)
+                                .withCentre(centre);
+
+    // Black body.
+    g.setColour(juce::Colour(0xff000000));
+    g.fillEllipse(hubBounds);
+
+    // Hard inner shadow approximation — darkened inner edge ring.
+    g.setColour(juce::Colour(0xCC000000));
+    g.drawEllipse(hubBounds.reduced(2.0f), 3.0f);
+
+    // Concentric bezel rings (silver ring with inner+outer dark gaps).
+    g.setColour(juce::Colour(0x55000000));    // inner gap
+    g.drawEllipse(hubBounds.expanded(0.5f), 1.0f);
+    g.setColour(juce::Colour(0x8DB4B6BA));   // 55% rgba(180,182,186) silver bezel
+    g.drawEllipse(hubBounds.expanded(2.0f), 2.0f);
+    g.setColour(juce::Colour(0x18000000));    // outer gap
+    g.drawEllipse(hubBounds.expanded(4.0f), 1.5f);
 }
 
 void RecipeWheel::resized()

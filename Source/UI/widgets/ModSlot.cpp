@@ -63,8 +63,9 @@ void ModSlot::paint(juce::Graphics& g)
             break;
     }
 
-    // Fit a 36x36 dot centered in the dot area (or smaller if bounds are tight).
-    const float dotDiameter = juce::jmin(36.0f, (float) juce::jmin(dotArea.getWidth(), dotArea.getHeight() - 2));
+    // Fit a 28x28 dot centered in the dot area (or smaller if bounds are tight).
+    // 28 px ceiling (was 36) prevents horizontal clipping in narrow slot widths.
+    const float dotDiameter = juce::jmin(28.0f, (float) juce::jmin(dotArea.getWidth(), dotArea.getHeight() - 2));
     const auto dotCentre = juce::Point<float> { (float) dotArea.getCentreX(), (float) dotArea.getCentreY() };
     const auto dotRect = juce::Rectangle<float>(dotDiameter, dotDiameter).withCentre(dotCentre);
 

@@ -61,7 +61,7 @@ void Oscilloscope::paint(juce::Graphics& g)
             path.lineTo(x, y);
         }
     }
-    g.setColour(Theme::steelBlue);
+    g.setColour(Theme::accentBlue.withAlpha(0.85f));
     g.strokePath(path, juce::PathStrokeType(1.5f));
 }
 

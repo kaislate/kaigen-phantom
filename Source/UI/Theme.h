@@ -83,11 +83,9 @@ namespace kaigen::phantom::Theme
     // ── Misc ─────────────────────────────────────────────────────────────
     inline const juce::Colour clipRed           { 0xffe85050 };
 
-    // ── Backwards-compat aliases (Tasks 3-7 will phase these out, then
-    //     Task 8 will remove them entirely). KEEP AS REFERENCES, NOT COPIES,
-    //     so the compiler resolves them as the same symbol. ─────────────
+    // ── Backwards-compat aliases (Task 8: deepBg removed — zero usages.
+    //     Remaining 7 still have call sites; kept until a dedicated cleanup pass.)
     inline const juce::Colour& panelBg        = panelRadialB;
-    inline const juce::Colour& deepBg         = editorBg;
     inline const juce::Colour& panelBorder    = headerSeparator;
     inline const juce::Colour& textPrimary    = textOnLightBody;
     inline const juce::Colour& textSecondary  = textOnLightLabel;
