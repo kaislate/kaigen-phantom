@@ -30,8 +30,9 @@ private:
     juce::Rectangle<int> ghostCardBounds;
     juce::Rectangle<int> filterCardBounds;
 
-    // Recipe wheel
+    // Recipe wheel + preset selector
     RecipeWheel recipeWheel;
+    ToggleGroup recipePresetSelector;
 
     // Ghost section
     PhantomKnob ghostAmountKnob;

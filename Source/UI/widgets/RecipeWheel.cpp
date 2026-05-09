@@ -407,9 +407,27 @@ void RecipeWheel::paint(juce::Graphics& g)
             const float ly = cy + (fillEnd + 16.0f) * s_;
             g.setColour(juce::Colours::white.withAlpha(0.9f));
             g.setFont(juce::Font(juce::FontOptions("monospace", 9.0f, juce::Font::bold)));
-            const juce::String label = juce::String(juce::roundToInt(amp * 100)) + "%";
-            g.drawText(label,
+            const juce::String pctText = juce::String(juce::roundToInt(amp * 100)) + "%";
+            g.drawText(pctText,
                        (int) lx - 24, (int) ly - 8, 48, 16,
+                       juce::Justification::centred, false);
+        }
+
+        // ── 8b. Static harmonic label (H2..H8) at spoke tip ───────────
+        // CSS reference: .h-label is positioned at radius 152 in a 280-px
+        // wheel mount (i.e. 1.086 × wheel radius — outside the dark area
+        // in WebView2). For our native rendering we place the label just
+        // beyond the spoke tip but inside the component bounds.
+        {
+            const float labelR = R * 0.96f;
+            const float lx = cx + labelR * c;
+            const float ly = cy + labelR * s_;
+            const juce::String hText = "H" + juce::String(i + 2);   // H2..H8
+            g.setColour(hot ? juce::Colours::white.withAlpha(0.95f)
+                            : juce::Colours::white.withAlpha(0.55f));
+            g.setFont(juce::Font(juce::FontOptions("Courier New", 9.0f, juce::Font::bold)));
+            g.drawText(hText,
+                       (int) lx - 14, (int) ly - 8, 28, 14,
                        juce::Justification::centred, false);
         }
     }

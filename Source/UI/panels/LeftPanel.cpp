@@ -23,6 +23,8 @@ LeftPanel::LeftPanel(juce::AudioProcessorValueTreeState& a)
                       "a_recipe_h2", "a_recipe_h3", "a_recipe_h4",
                       "a_recipe_h5", "a_recipe_h6", "a_recipe_h7", "a_recipe_h8"
                   }),
+      recipePresetSelector(apvts, "a_recipe_preset",
+                           { "Warm", "Aggr", "Hollow", "Dense", "Stable", "Weird", "Custom" }),
       ghostAmountKnob  (apvts, "a_ghost",              PhantomKnob::Size::Large,  "Amount"),
       crossoverKnob    (apvts, "a_phantom_threshold",  PhantomKnob::Size::Medium, "Crossover"),
       strengthKnob     (apvts, "a_phantom_strength",   PhantomKnob::Size::Medium, "Strength"),
@@ -32,6 +34,7 @@ LeftPanel::LeftPanel(juce::AudioProcessorValueTreeState& a)
       filterSlopeToggle(apvts, "a_synth_filter_slope", { "-6 dB/oct", "-12 dB/oct", "-24 dB/oct" })
 {
     addAndMakeVisible(recipeWheel);
+    addAndMakeVisible(recipePresetSelector);
     addAndMakeVisible(ghostAmountKnob);
     addAndMakeVisible(crossoverKnob);
     addAndMakeVisible(strengthKnob);
@@ -95,9 +98,17 @@ void LeftPanel::paint(juce::Graphics& g)
 
 void LeftPanel::resized()
 {
-    recipeWheel.setBounds(8, 8, getWidth() - 16, 360);
-
     const int panelW = getWidth();
+
+    // Recipe wheel: square aspect so the radial gradients render circularly.
+    constexpr int kWheelTop  = 8;
+    constexpr int kWheelSize = 320;
+    const int wheelX = (panelW - kWheelSize) / 2;
+    recipeWheel.setBounds(wheelX, kWheelTop, kWheelSize, kWheelSize);
+
+    // Recipe preset selector: row of 7 buttons immediately below the wheel.
+    constexpr int kPresetH = 22;
+    recipePresetSelector.setBounds(8, kWheelTop + kWheelSize + 6, panelW - 16, kPresetH);
 
     // Knob component natural sizes (body + shadow padding × 2).
     //   Large:  114 + 32*2 = 178
