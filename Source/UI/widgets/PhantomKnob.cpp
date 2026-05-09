@@ -164,12 +164,12 @@ void PhantomKnob::paintBody(juce::Graphics& g, juce::Point<float> centre, float 
         centre.y - radius * 0.40f
     };
     juce::ColourGradient body(
-        juce::Colour(0x3DFFFFFF), gradOrigin,       // rgba(255,255,255,0.24) at 0%
-        juce::Colour(0x12000000),                   // rgba(0,0,0,0.07) at 100%
+        juce::Colour(0xb3FFFFFF), gradOrigin,       // 70% white at top-left (was 24%)
+        juce::Colour(0x40000000),                   // 25% black at bottom-right (was 7%)
         { centre.x + radius, centre.y + radius },
         true /* radial */);
-    body.addColour(0.22, juce::Colour(0x1EFFFFFF)); // rgba(255,255,255,0.12) at 22%
-    body.addColour(0.60, juce::Colour(0x05000000)); // rgba(0,0,0,0.02) at 60%
+    body.addColour(0.22, juce::Colour(0x66FFFFFF)); // 40% white at 22% (was 12%)
+    body.addColour(0.60, juce::Colour(0x14000000)); // 8% black at 60% (was 2%)
     g.setGradientFill(body);
     g.fillEllipse(juce::Rectangle<float>(radius * 2.0f, radius * 2.0f).withCentre(centre));
 }
