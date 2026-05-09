@@ -47,11 +47,11 @@ void MatrixCell::paint(juce::Graphics& g)
     const auto bounds = getLocalBounds().toFloat();
     const float depth = currentDepth();
     const bool routed = (std::abs(depth) > kRoutedThreshold);
+    const float absDep = juce::jmin(1.0f, std::abs(depth));
 
-    // Background.
-    g.setColour(routed ? Theme::matrixBg.brighter(0.10f) : Theme::matrixBg);
-    g.fillRect(bounds);
-
+    // ── Background ────────────────────────────────────────────────────────
+    // Empty: rgba(20,24,30,0.6) == Theme::mtxCellEmpty
+    // Routed: base fill uses type-color at CSS-spec alpha
     if (routed)
     {
         juce::Colour accent;
@@ -62,54 +62,80 @@ void MatrixCell::paint(juce::Graphics& g)
             case ModSlot::Type::Random: accent = Theme::randomPurple; break;
             default:                    accent = Theme::macroTeal;    break;
         }
-        const float alpha = juce::jmin(1.0f, std::abs(depth));
 
+        // Base fill: rgba(<type-color>, 0.18 + |depth|*0.20)
+        const float baseFillAlpha = 0.18f + 0.20f * absDep;
+        g.setColour(accent.withAlpha(baseFillAlpha));
+        g.fillRect(bounds);
+
+        // Bipolar gradient (CSS: linear-gradient 90deg for positive, 270deg for negative).
+        // Positive: left=transparent → right=accent at 0.50*|depth|
+        // Negative: left=accent at 0.50*|depth| → right=transparent
+        const float gradAlpha = 0.50f * absDep;
+        juce::ColourGradient grad;
         if (depth >= 0.0f)
         {
-            auto grad = juce::ColourGradient(accent.withAlpha(alpha),
-                                              bounds.getX(), bounds.getCentreY(),
-                                              accent.withAlpha(0.0f),
-                                              bounds.getRight(), bounds.getCentreY(),
-                                              false);
-            g.setGradientFill(grad);
+            grad = juce::ColourGradient(accent.withAlpha(0.0f),
+                                        bounds.getX(),     bounds.getCentreY(),
+                                        accent.withAlpha(gradAlpha),
+                                        bounds.getRight(), bounds.getCentreY(),
+                                        false);
         }
         else
         {
-            auto grad = juce::ColourGradient(accent.withAlpha(0.0f),
-                                              bounds.getX(), bounds.getCentreY(),
-                                              accent.withAlpha(alpha),
-                                              bounds.getRight(), bounds.getCentreY(),
-                                              false);
-            g.setGradientFill(grad);
+            grad = juce::ColourGradient(accent.withAlpha(gradAlpha),
+                                        bounds.getX(),     bounds.getCentreY(),
+                                        accent.withAlpha(0.0f),
+                                        bounds.getRight(), bounds.getCentreY(),
+                                        false);
         }
-        g.fillRect(bounds.reduced(1.0f));
+        g.setGradientFill(grad);
+        g.fillRect(bounds);
 
-        g.setColour(Theme::textPrimary);
+        // 1 px inset ring: rgba(<type-color>, 0.55)
+        g.setColour(accent.withAlpha(0.55f));
+        g.drawRect(bounds.reduced(0.5f), 1.0f);
+
+        // Depth percentage label — white text on dark surface.
+        g.setColour(Theme::vizText.withAlpha(0.85f));
         g.setFont(juce::FontOptions("Space Grotesk", 7.0f, juce::Font::bold));
         const int pct = juce::roundToInt(depth * 100.0f);
         const auto txt = (pct > 0 ? juce::String("+") + juce::String(pct) : juce::String(pct));
         g.drawText(txt, bounds, juce::Justification::centred, false);
 
+        // ── Live-pulse breathing animation (preserved from Phase 5) ───────
         if (liveContribution > 0.05f)
         {
-            // Breathing pulse — 700ms cycle, matching the WebView2 mtx-cell-pulse animation.
+            // 700ms cycle, matching the WebView2 mtx-cell-pulse animation.
             const double now    = juce::Time::getMillisecondCounterHiRes();
-            const float  phase  = (float) std::fmod(now, 700.0) / 700.0f;       // 0..1
+            const float  phase  = (float) std::fmod(now, 700.0) / 700.0f;  // 0..1
             const float  breath = 0.5f + 0.5f * std::sin(phase * juce::MathConstants<float>::twoPi);
             const float  contrib = juce::jmin(1.0f, liveContribution);
             const float  pulse  = contrib * (0.45f + 0.55f * breath);
 
-            // Brighten the cell fill so the eye catches the activity even on small cells.
+            // Brighten the cell fill so the eye catches the activity on small cells.
             g.setColour(accent.brighter(0.3f).withAlpha(pulse * 0.4f));
             g.fillRect(bounds.reduced(1.0f));
 
-            // Inner ring + outer halo for the visible "glow".
+            // Inner ring + outer halo for the visible glow.
             g.setColour(accent.brighter(0.6f).withAlpha(juce::jmin(1.0f, pulse * 1.4f)));
             g.drawRoundedRectangle(bounds.reduced(1.5f), 2.0f, 2.0f);
         }
     }
+    else
+    {
+        // Empty cell: rgba(20,24,30,0.6)
+        g.setColour(Theme::mtxCellEmpty);
+        g.fillRect(bounds);
 
-    g.setColour(Theme::panelBorder);
+        // Faint "+" hint text so the cell is clearly interactive.
+        g.setColour(juce::Colour(0x40ffffff));  // rgba(255,255,255,0.25)
+        g.setFont(juce::FontOptions("Space Grotesk", 7.0f, juce::Font::plain));
+        g.drawText("+", bounds, juce::Justification::centred, false);
+    }
+
+    // Grid gap line (subtle, matches mtxGridGap).
+    g.setColour(Theme::mtxGridGap);
     g.drawRect(bounds, 0.5f);
 }
 

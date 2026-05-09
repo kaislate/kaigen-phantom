@@ -162,16 +162,14 @@ void MatrixView::timerCallback()
 
 void MatrixView::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xc0000000));
+    // Flat dark fill for the entire overlay — no scrim, no rounded card chrome.
+    g.fillAll(Theme::matrixBg);
+
     auto card = getCardBounds();
 
-    g.setColour(Theme::matrixBg);
-    g.fillRoundedRectangle(card.toFloat(), 6.0f);
-    g.setColour(Theme::panelBorder);
-    g.drawRoundedRectangle(card.toFloat(), 6.0f, 1.0f);
-
+    // Title bar — use vizText so white text is legible on the dark surface.
     auto titleBar = card.removeFromTop(kTitleBarHeight).reduced(16, 8);
-    g.setColour(Theme::textPrimary);
+    g.setColour(Theme::vizText);
     g.setFont(juce::FontOptions("Space Grotesk", 14.0f, juce::Font::bold));
     g.drawText("Modulation Matrix", titleBar.toFloat(), juce::Justification::centredLeft, false);
 
@@ -185,7 +183,7 @@ void MatrixView::paint(juce::Graphics& g)
     if (totalCols == 0) return;
     const int cellW = stripAndGrid.getWidth() / totalCols;
 
-    g.setColour(Theme::textSecondary);
+    g.setColour(Theme::vizText.withAlpha(0.5f));
     g.setFont(juce::FontOptions("Space Grotesk", 8.0f, juce::Font::bold));
     int col = 0;
     for (const auto& cat : categories)

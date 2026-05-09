@@ -28,9 +28,10 @@ void MatrixModRow::setValueText(const juce::String& text)
 
 void MatrixModRow::paint(juce::Graphics& g)
 {
-    const auto bounds = getLocalBounds().reduced(4, 2);
+    const auto fullBounds = getLocalBounds().toFloat();
+    const auto bounds     = getLocalBounds().reduced(4, 2);
 
-    // Type-color border.
+    // Type-color accent.
     juce::Colour accent;
     switch (type)
     {
@@ -38,7 +39,16 @@ void MatrixModRow::paint(juce::Graphics& g)
         case ModSlot::Type::Lfo:    accent = Theme::lfoBlue;      break;
         case ModSlot::Type::Random: accent = Theme::randomPurple; break;
         case ModSlot::Type::Morph:  accent = Theme::morphWhite;   break;
+        default:                    accent = Theme::lfoBlue;       break;
     }
+
+    // ── Strip background — semi-transparent dark (rgba(20,24,30,0.5)) ──────
+    g.setColour(Theme::mtxModStrip);
+    g.fillRoundedRectangle(fullBounds, 3.0f);
+
+    // ── 2 px left accent bar in type color ───────────────────────────────
+    g.setColour(accent);
+    g.fillRect(fullBounds.getX(), fullBounds.getY(), 2.0f, fullBounds.getHeight());
 
     const float alpha = (type == ModSlot::Type::Macro) ? 1.0f : 0.45f;
 
@@ -48,13 +58,14 @@ void MatrixModRow::paint(juce::Graphics& g)
     const auto centreY = bounds.getCentreY();
     g.fillEllipse(bounds.getX() + 4.0f, (float) centreY - dotR, dotR * 2.0f, dotR * 2.0f);
 
-    // Name.
+    // Name — white text on dark strip.
+    g.setColour(Theme::vizText.withAlpha(alpha));
     g.setFont(juce::FontOptions("Space Grotesk", 10.0f, juce::Font::bold));
     g.drawText(label, bounds.withTrimmedLeft(20).withWidth(60).toFloat(),
                juce::Justification::centredLeft, false);
 
     // Value readout (right-aligned).
-    g.setColour(Theme::textSecondary);
+    g.setColour(Theme::vizText.withAlpha(0.5f * alpha));
     g.setFont(juce::FontOptions("Space Grotesk", 9.0f, juce::Font::plain));
     g.drawText(valueText, bounds.withTrimmedRight(4).toFloat(),
                juce::Justification::centredRight, false);
