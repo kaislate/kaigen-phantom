@@ -151,58 +151,10 @@ void PhantomKnob::resized()
 
 void PhantomKnob::paintBody(juce::Graphics& g, juce::Point<float> centre, float radius)
 {
-    juce::Path circle;
-    circle.addEllipse(juce::Rectangle<float>(radius * 2.0f, radius * 2.0f).withCentre(centre));
-
-    // Size-specific box-shadow offsets and blur radii (from knob.js CSS).
-    struct ShadowParams { int ox, oy, blurA, ox2, oy2, blurB; };
-    const ShadowParams sp = [&]() -> ShadowParams {
-        switch (sizeVariant)
-        {
-            case Size::Large:  return {  4,  5, 18,  7,  9, 32 };
-            case Size::Small:  return {  2,  3, 10,  3,  5, 17 };
-            default:           return {  3,  4, 14,  5,  7, 24 };
-        }
-    }();
-
-    // Alpha values — CSS spec halved on the TL side because JUCE's software-blur
-    // DropShadow on Windows fringes high-alpha white blurs cyan/teal against the
-    // silver gradient. Halving the white-blur alpha removes the fringe artifact
-    // while preserving the convex-bulge depth illusion. BR (black) shadow alphas
-    // unchanged — black blurs render cleanly.
-    juce::uint8 tlAlpha1, tlAlpha2, brAlpha1, brAlpha2;
-    switch (sizeVariant)
-    {
-        case Size::Large:
-            tlAlpha1 = 0x59; tlAlpha2 = 0x2E; brAlpha1 = 0x5C; brAlpha2 = 0x2E; break;
-        case Size::Small:
-            tlAlpha1 = 0x54; tlAlpha2 = 0x26; brAlpha1 = 0x4D; brAlpha2 = 0x24; break;
-        default:   // Medium
-            tlAlpha1 = 0x59; tlAlpha2 = 0x2C; brAlpha1 = 0x57; brAlpha2 = 0x29; break;
-    }
-
-    // BR shadows — drawn first (behind TL highlights).
-    {
-        juce::DropShadow brB { juce::Colour(brAlpha2, (juce::uint8)0, (juce::uint8)0, (juce::uint8)0),
-                                sp.blurB, { sp.ox2, sp.oy2 } };
-        brB.drawForPath(g, circle);
-    }
-    {
-        juce::DropShadow brA { juce::Colour(brAlpha1, (juce::uint8)0, (juce::uint8)0, (juce::uint8)0),
-                                sp.blurA, { sp.ox, sp.oy } };
-        brA.drawForPath(g, circle);
-    }
-    // TL highlights — drawn on top.
-    {
-        juce::DropShadow tlB { juce::Colour(tlAlpha2, (juce::uint8)0xFF, (juce::uint8)0xFF, (juce::uint8)0xFF),
-                                sp.blurB, { -sp.ox2, -sp.oy2 } };
-        tlB.drawForPath(g, circle);
-    }
-    {
-        juce::DropShadow tlA { juce::Colour(tlAlpha1, (juce::uint8)0xFF, (juce::uint8)0xFF, (juce::uint8)0xFF),
-                                sp.blurA, { -sp.ox, -sp.oy } };
-        tlA.drawForPath(g, circle);
-    }
+    // No DropShadow — JUCE's software blur on Windows produces cyan color
+    // fringing on white-blur-on-silver (regardless of alpha or radius).
+    // Convex depth comes from the radial gradient body alone. CSS-style
+    // soft halos are deferred until a non-blur shadow approach is available.
 
     // Radial gradient body — "circle at 35% 30%" in a sz×sz viewport.
     // 35% from left = centre.x - radius*0.30  (since centre is at 50%)

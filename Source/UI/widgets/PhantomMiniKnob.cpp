@@ -59,17 +59,10 @@ void PhantomMiniKnob::paint(juce::Graphics& g)
     const float oledR  = radius - kInset;
     const float arcR   = oledR - 3.0f;
 
-    // ── Layer 1: neumorphic raised body — radial gradient + offset shadows ──
+    // ── Layer 1: neumorphic raised body — radial gradient only (no blur shadow) ─
     {
-        juce::Path circle;
-        circle.addEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre));
-
-        // BR shadow (compact size). Black blurs cleanly.
-        juce::DropShadow brShadow { juce::Colour(0x4D000000), 8, juce::Point<int>(2, 2) };
-        brShadow.drawForPath(g, circle);
-        // TL highlight — alpha halved to avoid cyan fringing in JUCE's software blur.
-        juce::DropShadow tlHighlight { juce::Colour(0x54FFFFFF), 6, juce::Point<int>(-2, -2) };
-        tlHighlight.drawForPath(g, circle);
+        // No DropShadow — JUCE's software blur fringes cyan on Windows.
+        // Radial gradient alone provides the convex depth illusion.
 
         // Radial gradient body.
         const juce::Point<float> gradOrigin {
