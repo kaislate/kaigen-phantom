@@ -26,6 +26,10 @@ private:
 
     juce::AudioProcessorValueTreeState& apvts;
 
+    // Sub-section inset card bounds — computed in resized(), used in paint().
+    juce::Rectangle<int> ghostCardBounds;
+    juce::Rectangle<int> filterCardBounds;
+
     // Recipe wheel
     RecipeWheel recipeWheel;
 

@@ -78,13 +78,19 @@ void LeftPanel::sliderValueChanged(juce::Slider* s)
 
 void LeftPanel::paint(juce::Graphics& g)
 {
-    g.fillAll(Theme::panelBg);
+    // Silver panel surface — replaces the flat panelBg fill.
+    Theme::paintSilverPanel(g, getLocalBounds());
 
-    // Ghost section header
-    drawSectionHeader(g, juce::Rectangle<int>(12, 376, 200, 16), "Ghost");
+    // Sub-section inset cards (neumorphic dish beneath each section's controls).
+    // Recipe wheel area is excluded — it gets its own treatment in Task 8.
+    if (! ghostCardBounds.isEmpty())
+        Theme::paintInsetCard(g, ghostCardBounds, 14.0f);
+    if (! filterCardBounds.isEmpty())
+        Theme::paintInsetCard(g, filterCardBounds, 14.0f);
 
-    // Filter section header -- below ghost section.
-    drawSectionHeader(g, juce::Rectangle<int>(12, 550, 200, 16), "Filter");
+    // Section header labels (etched text, established in Task 3).
+    drawSectionHeader(g, juce::Rectangle<int>(ghostCardBounds.getX() + 4, ghostCardBounds.getY() + 6, 200, 16), "Ghost");
+    drawSectionHeader(g, juce::Rectangle<int>(filterCardBounds.getX() + 4, filterCardBounds.getY() + 6, 200, 16), "Filter");
 }
 
 void LeftPanel::resized()
@@ -102,6 +108,23 @@ void LeftPanel::resized()
     filterLinkBtn.setBounds    (98,  filterY + 30,  28, 28);
     hpfKnob.setBounds          (130, filterY,       80, 100);
     filterSlopeToggle.setBounds(12,  filterY + 110, 200, 26);
+
+    // Compute inset card bounds from the section layouts above.
+    // Ghost card: from header row (30px above ghostY) to bottom of toggle (ghostY+110+26) + 8px padding.
+    constexpr int cardPadX = 8;
+    const int panelW       = getWidth();
+
+    const int ghostCardTop    = ghostY - 30;            // header label sits ~24px above the knobs
+    const int ghostCardBottom = ghostY + 110 + 26 + 8;  // bottom of ghostModeToggle + padding
+    ghostCardBounds = juce::Rectangle<int>(cardPadX, ghostCardTop,
+                                           panelW - cardPadX * 2,
+                                           ghostCardBottom - ghostCardTop);
+
+    const int filterCardTop    = filterY - 30;
+    const int filterCardBottom = filterY + 110 + 26 + 8;
+    filterCardBounds = juce::Rectangle<int>(cardPadX, filterCardTop,
+                                             panelW - cardPadX * 2,
+                                             filterCardBottom - filterCardTop);
 }
 
 } // namespace kaigen::phantom

@@ -26,6 +26,12 @@ public:
 private:
     juce::AudioProcessorValueTreeState& apvts;
 
+    // Sub-section inset card bounds — computed in resized(), used in paint().
+    juce::Rectangle<int> harmonicCardBounds;
+    juce::Rectangle<int> stereoCardBounds;
+    juce::Rectangle<int> levelsCardBounds;
+    juce::Rectangle<int> advancedCardBounds;
+
     // Harmonic Engine section
     PhantomKnob saturationKnob;
     PhantomKnob shapeKnob;

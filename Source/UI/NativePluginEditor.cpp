@@ -119,12 +119,9 @@ NativePluginEditor::~NativePluginEditor()
 
 void NativePluginEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(Theme::deepBg);
-    auto area = getLocalBounds();
-    area.removeFromTop(topBarHeight);
-    area.removeFromBottom(modPanelHeight);
-    // LeftPanel and RightPanel are real Components — no wireframes.
-    // ModulationPanel is now real too.
+    // Outer body — dark behind the modulation panel and behind any overlay edges.
+    // TopBar, LeftPanel, RightPanel, and ModulationPanel all paint their own surfaces.
+    g.fillAll(Theme::editorBg);
 }
 
 void NativePluginEditor::resized()

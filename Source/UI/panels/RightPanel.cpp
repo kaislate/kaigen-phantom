@@ -92,11 +92,25 @@ RightPanel::~RightPanel() = default;
 
 void RightPanel::paint(juce::Graphics& g)
 {
-    g.fillAll(Theme::panelBg);
+    // Silver panel surface — replaces the flat panelBg fill.
+    Theme::paintSilverPanel(g, getLocalBounds());
 
-    drawSectionHeader(g, juce::Rectangle<int>(12,   8, 200, 16), "Harmonic Engine");
-    drawSectionHeader(g, juce::Rectangle<int>(310,  8, 100, 16), "Stereo");
-    drawSectionHeader(g, juce::Rectangle<int>(420,  8, 200, 16), "Levels");
+    // Sub-section inset cards (neumorphic dish beneath each section's controls).
+    // Visualizer area is excluded — it gets the pitch-black inset in Task 5.
+    if (! harmonicCardBounds.isEmpty())
+        Theme::paintInsetCard(g, harmonicCardBounds, 14.0f);
+    if (! stereoCardBounds.isEmpty())
+        Theme::paintInsetCard(g, stereoCardBounds, 14.0f);
+    if (! levelsCardBounds.isEmpty())
+        Theme::paintInsetCard(g, levelsCardBounds, 14.0f);
+    if (! advancedCardBounds.isEmpty())
+        Theme::paintInsetCard(g, advancedCardBounds, 14.0f);
+
+    // Section header labels (etched text, established in Task 3).
+    // x-positions match the section columns laid out in resized().
+    drawSectionHeader(g, juce::Rectangle<int>(harmonicCardBounds.getX() + 4, 8, 200, 16), "Harmonic Engine");
+    drawSectionHeader(g, juce::Rectangle<int>(stereoCardBounds.getX()  + 4, 8, 100, 16), "Stereo");
+    drawSectionHeader(g, juce::Rectangle<int>(levelsCardBounds.getX()  + 4, 8, 200, 16), "Levels");
 }
 
 void RightPanel::resized()
@@ -104,38 +118,60 @@ void RightPanel::resized()
     auto area = getLocalBounds();
     area.removeFromTop(28);
 
-    auto knobRow = area.removeFromTop(80).reduced(12, 0);
-    const int knobWidth = 80;
-    const int gap       = 8;
+    // knobRowFull is the full 80px-tall strip used by all top-row sections.
+    const int knobRowTop    = 28;
+    const int knobRowHeight = 80;
+    auto knobRow = area.removeFromTop(knobRowHeight).reduced(12, 0);
+    const int knobWidth  = 80;
+    const int gap        = 8;
     const int sectionGap = 24;
+    const int cardPadY   = 6;    // card extends slightly above/below the knob row
+    const int cardTop    = knobRowTop - cardPadY;
+    const int cardHeight = knobRowHeight + cardPadY * 2;
 
     auto layoutKnob = [&](PhantomKnob& k) {
         k.setBounds(knobRow.removeFromLeft(knobWidth));
         knobRow.removeFromLeft(gap);
     };
 
-    // Harmonic Engine
+    // --- Harmonic Engine ---
+    const int harmonicCardX = knobRow.getX() - 4;  // slight inward padding from reduced edge
     layoutKnob(saturationKnob);
     layoutKnob(shapeKnob);
     layoutKnob(skipKnob);
+    // after 3 knobs: 3*(80+8)-8 = 232px consumed, knobRow.getX() is at harmonicCardX+232
+    const int harmonicCardRight = knobRow.getX() - gap + 4;
+    harmonicCardBounds = juce::Rectangle<int>(harmonicCardX, cardTop,
+                                              harmonicCardRight - harmonicCardX, cardHeight);
 
     knobRow.removeFromLeft(sectionGap);
 
-    // Stereo
+    // --- Stereo ---
+    const int stereoCardX = knobRow.getX() - 4;
     layoutKnob(widthKnob);
+    const int stereoCardRight = knobRow.getX() - gap + 4;
+    stereoCardBounds = juce::Rectangle<int>(stereoCardX, cardTop,
+                                             stereoCardRight - stereoCardX, cardHeight);
 
     knobRow.removeFromLeft(sectionGap);
 
-    // Levels: meter, In knob, Out knob, meter
+    // --- Levels ---
+    const int levelsCardX = knobRow.getX() - 4;
     inMeter.setBounds(knobRow.removeFromLeft(14));
     knobRow.removeFromLeft(6);
     layoutKnob(inGainKnob);
     layoutKnob(outGainKnob);
     outMeter.setBounds(knobRow.removeFromLeft(14));
+    const int levelsCardRight = knobRow.getX() + 4;
+    levelsCardBounds = juce::Rectangle<int>(levelsCardX, cardTop,
+                                             levelsCardRight - levelsCardX, cardHeight);
 
-    // Advanced section: toggle button (replaces section header).
+    // --- Advanced section: toggle button + optional mini knob row ---
     area.removeFromTop(8);
     advancedToggle.setBounds(12, 130, 100, 18);
+
+    const int advancedCardTop = 128;
+    int advancedCardBottom    = 0;
 
     if (advancedExpanded)
     {
@@ -148,21 +184,27 @@ void RightPanel::resized()
             mk->setBounds(miniRow.removeFromLeft(miniWidth));
             miniRow.removeFromLeft(miniGap);
         }
+        advancedCardBottom = 130 + 18 + 20 + 60 + 6;  // toggle + space + miniRow + padding
     }
     else
     {
         // Collapsed: skip mini-row's vertical space; visualizers shift up.
         area.removeFromTop(8);
+        advancedCardBottom = 130 + 18 + 8 + 4;  // toggle + collapsed space + padding
     }
 
-    // Visualizers below Advanced row.
+    advancedCardBounds = juce::Rectangle<int>(8, advancedCardTop,
+                                               getWidth() - 16,
+                                               advancedCardBottom - advancedCardTop);
+
+    // Visualizers below Advanced row — excluded from inset cards (Task 5).
     area.removeFromTop(12);
     auto vizArea = area.reduced(12, 0);
     oscilloscope.setBounds(vizArea.removeFromTop(120));
     vizArea.removeFromTop(8);
     spectrum    .setBounds(vizArea.removeFromTop(280));
 
-    // Auto button — positioned next to the "Levels" section header (which sits at x=420 in paint()).
+    // Auto button — positioned next to the "Levels" section header.
     autoGainButton.setBounds(580, 6, 40, 18);
 }
 
