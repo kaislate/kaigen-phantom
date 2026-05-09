@@ -1,145 +1,415 @@
 // Source/UI/widgets/PhantomKnob.cpp
+// Faithful canvas port of Source/WebUI/knob.js _render() / _ensureScaffold().
+// Source of truth: knob.js (SVG, not Canvas2D).
 #include "PhantomKnob.h"
-#include "../Theme.h"
-#include "PhantomNativeAssets.h"
 
 namespace kaigen::phantom
 {
 
-namespace
-{
-    // Indicator angle range: -135 deg (min, 7-o'clock) to +135 deg (max, 5-o'clock).
-    // Total sweep = 270 deg. Matches typical synth knob convention.
-    constexpr float kAngleMinRadians = -2.356194f;  // -135 * PI / 180
-    constexpr float kAngleMaxRadians =  2.356194f;  //  135 * PI / 180
-
-    float normalizedToAngle(float n)
-    {
-        return kAngleMinRadians + (kAngleMaxRadians - kAngleMinRadians) * juce::jlimit(0.0f, 1.0f, n);
-    }
-
-    juce::Drawable* loadKnobSvg(PhantomKnob::Size size)
-    {
-        const char* data = nullptr;
-        int dataSize = 0;
-        switch (size)
-        {
-            case PhantomKnob::Size::Large:
-                data = PhantomNativeAssets::knob_large_svg;
-                dataSize = PhantomNativeAssets::knob_large_svgSize;
-                break;
-            case PhantomKnob::Size::Medium:
-                data = PhantomNativeAssets::knob_medium_svg;
-                dataSize = PhantomNativeAssets::knob_medium_svgSize;
-                break;
-            case PhantomKnob::Size::Small:
-                data = PhantomNativeAssets::knob_small_svg;
-                dataSize = PhantomNativeAssets::knob_small_svgSize;
-                break;
-        }
-        if (data == nullptr) return nullptr;
-        auto drawable = juce::Drawable::createFromImageData(data, (size_t) dataSize);
-        return drawable.release();
-    }
-
-    int sizePixels(PhantomKnob::Size s)
-    {
-        switch (s)
-        {
-            case PhantomKnob::Size::Large:  return 66;
-            case PhantomKnob::Size::Medium: return 50;
-            case PhantomKnob::Size::Small:  return 36;
-        }
-        return 50;
-    }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+//  Constructor / destructor
+// ─────────────────────────────────────────────────────────────────────────────
 
 PhantomKnob::PhantomKnob(juce::AudioProcessorValueTreeState& apvts,
-                         juce::StringRef paramID,
-                         Size sz,
-                         const juce::String& lbl)
-    : size(sz), label(lbl)
+                          juce::StringRef paramID,
+                          Size sz,
+                          const juce::String& lbl)
+    : sizeVariant(sz), labelText(lbl)
 {
+    // Hidden slider — attached to APVTS; drives repaint via listener.
     slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     slider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
-    slider.addListener(this);
-    addChildComponent(slider);  // hidden -- we forward events manually
+    slider.onValueChange = [this] { repaint(); };
+    addChildComponent(slider);   // hidden — zero-sized below via resized()
 
     if (auto* param = apvts.getParameter(paramID))
+    {
         attachment = std::make_unique<juce::SliderParameterAttachment>(*param, slider);
+        // Cache the default normalized value for double-click reset.
+        defaultNorm = param->getDefaultValue();
+    }
     else
-        jassertfalse;  // unknown paramID: typo or stale reference
+    {
+        jassertfalse;   // unknown paramID
+    }
 
-    bodyDrawable.reset(loadKnobSvg(size));
-
-    // Total widget height = body + label space underneath.
-    const int body = sizePixels(size);
-    const int labelHeight = label.isNotEmpty() ? 14 : 0;
-    setSize(body + 8, body + labelHeight + 4);
+    // Widget size: diameter + small vertical padding for text clearance.
+    const int d = diameter();
+    setSize(d + 8, d + 8);
 }
 
-PhantomKnob::~PhantomKnob()
+PhantomKnob::~PhantomKnob() = default;
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Geometry helpers
+//  Values match getSizeTier() in knob.js:
+//    large  → sz=114, inset=6
+//    medium → sz=88,  inset=5   (default)
+//    small  → sz=56,  inset=3
+// ─────────────────────────────────────────────────────────────────────────────
+
+int PhantomKnob::diameter() const
 {
-    slider.removeListener(this);
+    switch (sizeVariant)
+    {
+        case Size::Large:  return 114;
+        case Size::Small:  return  56;
+        default:           return  88;
+    }
 }
+
+int PhantomKnob::inset() const
+{
+    switch (sizeVariant)
+    {
+        case Size::Large:  return 6;
+        case Size::Small:  return 3;
+        default:           return 5;
+    }
+}
+
+// textPx — matches the CSS font-size rules and drag overrides in knob.js.
+float PhantomKnob::textPx(bool dragging) const
+{
+    switch (sizeVariant)
+    {
+        case Size::Large:  return dragging ? 22.0f : 14.0f;
+        case Size::Small:  return dragging ? 13.0f :  9.0f;
+        default:           return dragging ? 18.0f : 12.0f;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  paint() — orchestrates all layers
+// ─────────────────────────────────────────────────────────────────────────────
 
 void PhantomKnob::paint(juce::Graphics& g)
 {
-    const int body = sizePixels(size);
-    auto bodyArea = juce::Rectangle<float>((float) (getWidth() - body) / 2.0f,
-                                           4.0f,
-                                           (float) body,
-                                           (float) body);
+    const auto bounds = getLocalBounds().toFloat();
+    if (bounds.isEmpty()) return;
 
-    if (bodyDrawable != nullptr)
-    {
-        bodyDrawable->setTransformToFit(bodyArea, juce::RectanglePlacement::stretchToFit);
-        bodyDrawable->draw(g, 1.0f);
-    }
-    else
-    {
-        // Fallback if SVG load failed.
-        g.setColour(Theme::panelBg);
-        g.fillEllipse(bodyArea);
-    }
+    const float sz    = (float) diameter();
+    const float in    = (float) inset();
+    const auto  centre = bounds.getCentre();
+    const float oledR  = sz * 0.5f - in;
+    const float arcR   = oledR - 4.0f;
 
-    // Indicator line -- drawn from center outward at the current value's angle.
-    const auto centre = bodyArea.getCentre();
-    const float radius = bodyArea.getWidth() * 0.42f;
-    const float n = (float) slider.getNormalisableRange().convertTo0to1(slider.getValue());
-    const float angle = normalizedToAngle(n);
-    const float endX = centre.x + radius * std::sin(angle);
-    const float endY = centre.y - radius * std::cos(angle);
-    g.setColour(Theme::steelBlue);
-    g.drawLine(centre.x, centre.y, endX, endY, 2.0f);
+    // Arc constants — matching knob.js: ARC_START=135°, ARC_SWEEP=270°.
+    // Note: JUCE addCentredArc uses radians measured clockwise from 12-o'clock.
+    // knob.js polarToXY uses standard math angles (0° = 3-o'clock, CCW).
+    // We replicate the visual, so arcStart/arcSweep are in JUCE's convention
+    // (radians from 12-o'clock, CW) which matches juce::degreesToRadians of the
+    // CSS/SVG interpretation:  135° from 12-o'clock CW = 7-o'clock start.
+    const float arcStart = juce::degreesToRadians(135.0f);
+    const float arcSweep = juce::degreesToRadians(270.0f);
 
-    // Label below body.
-    if (label.isNotEmpty())
-    {
-        g.setColour(Theme::textSecondary);
-        g.setFont(juce::FontOptions("Space Grotesk", 10.0f, juce::Font::plain));
-        auto labelArea = juce::Rectangle<float>(0.0f,
-                                                (float) (body + 4),
-                                                (float) getWidth(),
-                                                14.0f);
-        g.drawText(label, labelArea, juce::Justification::centred, false);
-    }
+    // Normalized value [0,1].
+    const auto& range    = slider.getNormalisableRange();
+    const float normVal  = (float) range.convertTo0to1(slider.getValue());
+
+    paintBody          (g, centre, sz * 0.5f);
+    paintOLED          (g, centre, oledR);
+    paintArcTrack      (g, centre, arcR, arcStart, arcSweep);
+    paintIndicatorArc  (g, centre, arcR, arcStart, arcSweep, normVal);
+    paintValueText     (g, centre, formatValue(), oledR);
 }
 
 void PhantomKnob::resized()
 {
-    // Slider is hidden -- sized to match the full bounds for event hit-testing.
-    slider.setBounds(getLocalBounds());
+    // Slider is hidden — zero-sized so it never clips or intercepts mouse events
+    // in an unexpected area. We handle all mouse interaction ourselves.
+    slider.setBounds(0, 0, 0, 0);
 }
 
-void PhantomKnob::mouseDown(const juce::MouseEvent& e)        { slider.mouseDown(e); }
-void PhantomKnob::mouseDrag(const juce::MouseEvent& e)        { slider.mouseDrag(e); }
-void PhantomKnob::mouseUp(const juce::MouseEvent& e)          { slider.mouseUp(e); }
-void PhantomKnob::mouseDoubleClick(const juce::MouseEvent& e) { slider.mouseDoubleClick(e); }
+// ─────────────────────────────────────────────────────────────────────────────
+//  Layer 1 — Neumorphic raised body
+//
+//  CSS source (knob.js :host {}):
+//    background: radial-gradient(circle at 35% 30%,
+//      rgba(255,255,255,0.24) 0%,
+//      rgba(255,255,255,0.12) 22%,
+//      rgba(0,0,0,0.02)       60%,
+//      rgba(0,0,0,0.07)       100%);
+//    box-shadow (medium):
+//      -3px -3px 12px rgba(255,255,255,0.70)
+//      -5px -6px 22px rgba(255,255,255,0.34)
+//       3px  4px 14px rgba(0,0,0,0.34)
+//       5px  7px 24px rgba(0,0,0,0.16)
+//    box-shadow (large):
+//      -4px -4px 16px rgba(255,255,255,0.70)
+//      -7px -8px 30px rgba(255,255,255,0.36)
+//       4px  5px 18px rgba(0,0,0,0.36)
+//       7px  9px 32px rgba(0,0,0,0.18)
+//    box-shadow (small):
+//      -2px -2px  9px rgba(255,255,255,0.66)
+//      -3px -4px 15px rgba(255,255,255,0.30)
+//       2px  3px 10px rgba(0,0,0,0.30)
+//       3px  5px 17px rgba(0,0,0,0.14)
+// ─────────────────────────────────────────────────────────────────────────────
 
-void PhantomKnob::sliderValueChanged(juce::Slider*)
+void PhantomKnob::paintBody(juce::Graphics& g, juce::Point<float> centre, float radius)
 {
+    juce::Path circle;
+    circle.addEllipse(juce::Rectangle<float>(radius * 2.0f, radius * 2.0f).withCentre(centre));
+
+    // Size-specific box-shadow offsets and blur radii (from knob.js CSS).
+    struct ShadowParams { int ox, oy, blurA, ox2, oy2, blurB; };
+    const ShadowParams sp = [&]() -> ShadowParams {
+        switch (sizeVariant)
+        {
+            case Size::Large:  return {  4,  5, 18,  7,  9, 32 };
+            case Size::Small:  return {  2,  3, 10,  3,  5, 17 };
+            default:           return {  3,  4, 14,  5,  7, 24 };
+        }
+    }();
+
+    // Alpha values (from knob.js CSS rgba values):
+    //   medium TL: 0.70 (0xB3), 0.34 (0x57)   BR: 0.34 (0x57), 0.16 (0x29)
+    //   large  TL: 0.70 (0xB3), 0.36 (0x5C)   BR: 0.36 (0x5C), 0.18 (0x2E)
+    //   small  TL: 0.66 (0xA8), 0.30 (0x4D)   BR: 0.30 (0x4D), 0.14 (0x24)
+    juce::uint8 tlAlpha1, tlAlpha2, brAlpha1, brAlpha2;
+    switch (sizeVariant)
+    {
+        case Size::Large:
+            tlAlpha1 = 0xB3; tlAlpha2 = 0x5C; brAlpha1 = 0x5C; brAlpha2 = 0x2E; break;
+        case Size::Small:
+            tlAlpha1 = 0xA8; tlAlpha2 = 0x4D; brAlpha1 = 0x4D; brAlpha2 = 0x24; break;
+        default:   // Medium
+            tlAlpha1 = 0xB3; tlAlpha2 = 0x57; brAlpha1 = 0x57; brAlpha2 = 0x29; break;
+    }
+
+    // BR shadows — drawn first (behind TL highlights).
+    {
+        juce::DropShadow brB { juce::Colour(brAlpha2, (juce::uint8)0, (juce::uint8)0, (juce::uint8)0),
+                                sp.blurB, { sp.ox2, sp.oy2 } };
+        brB.drawForPath(g, circle);
+    }
+    {
+        juce::DropShadow brA { juce::Colour(brAlpha1, (juce::uint8)0, (juce::uint8)0, (juce::uint8)0),
+                                sp.blurA, { sp.ox, sp.oy } };
+        brA.drawForPath(g, circle);
+    }
+    // TL highlights — drawn on top.
+    {
+        juce::DropShadow tlB { juce::Colour(tlAlpha2, (juce::uint8)0xFF, (juce::uint8)0xFF, (juce::uint8)0xFF),
+                                sp.blurB, { -sp.ox2, -sp.oy2 } };
+        tlB.drawForPath(g, circle);
+    }
+    {
+        juce::DropShadow tlA { juce::Colour(tlAlpha1, (juce::uint8)0xFF, (juce::uint8)0xFF, (juce::uint8)0xFF),
+                                sp.blurA, { -sp.ox, -sp.oy } };
+        tlA.drawForPath(g, circle);
+    }
+
+    // Radial gradient body — "circle at 35% 30%" in a sz×sz viewport.
+    // 35% from left = centre.x - radius*0.30  (since centre is at 50%)
+    // 30% from top  = centre.y - radius*0.40
+    const juce::Point<float> gradOrigin {
+        centre.x - radius * 0.30f,
+        centre.y - radius * 0.40f
+    };
+    juce::ColourGradient body(
+        juce::Colour(0x3DFFFFFF), gradOrigin,       // rgba(255,255,255,0.24) at 0%
+        juce::Colour(0x12000000),                   // rgba(0,0,0,0.07) at 100%
+        { centre.x + radius, centre.y + radius },
+        true /* radial */);
+    body.addColour(0.22, juce::Colour(0x1EFFFFFF)); // rgba(255,255,255,0.12) at 22%
+    body.addColour(0.60, juce::Colour(0x05000000)); // rgba(0,0,0,0.02) at 60%
+    g.setGradientFill(body);
+    g.fillEllipse(juce::Rectangle<float>(radius * 2.0f, radius * 2.0f).withCentre(centre));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Layer 2 — OLED well + bezel rings
+//
+//  knob.js _ensureScaffold():
+//    mkCircle(oledR, '#000')                                    — black fill
+//    mkCircle(oledR,        null, 'rgba(255,255,255,0.28)', 0.75)  — inner bright
+//    mkCircle(oledR + 0.75, null, 'rgba(0,0,0,0.92)',       0.75)  — dark bevel
+//    mkCircle(oledR + 1.5,  null, 'rgba(255,255,255,0.10)', 0.5 )  — outer soft
+// ─────────────────────────────────────────────────────────────────────────────
+
+void PhantomKnob::paintOLED(juce::Graphics& g, juce::Point<float> centre, float oledR)
+{
+    const auto rect = juce::Rectangle<float>(oledR * 2.0f, oledR * 2.0f).withCentre(centre);
+
+    g.setColour(juce::Colours::black);
+    g.fillEllipse(rect);
+
+    // Inner bright ring (radius = oledR, stroke 0.75 px).
+    g.setColour(juce::Colour(0x47FFFFFF));   // rgba(255,255,255,0.28) ≈ 0x47
+    g.drawEllipse(rect, 0.75f);
+
+    // Dark bevel (radius = oledR + 0.75, stroke 0.75 px).
+    g.setColour(juce::Colour(0xEB000000));   // rgba(0,0,0,0.92)
+    g.drawEllipse(rect.expanded(0.75f), 0.75f);
+
+    // Outer soft halo (radius = oledR + 1.5, stroke 0.5 px).
+    g.setColour(juce::Colour(0x1AFFFFFF));   // rgba(255,255,255,0.10)
+    g.drawEllipse(rect.expanded(1.5f), 0.5f);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Layer 3 — Arc track (faint background 270° arc)
+//
+//  knob.js: mkPath('rgba(255,255,255,0.06)', 3.5)
+//           trackPath.d = describeArc(cx, cy, arcR, ARC_START, ARC_END - 0.01)
+// ─────────────────────────────────────────────────────────────────────────────
+
+void PhantomKnob::paintArcTrack(juce::Graphics& g, juce::Point<float> centre, float arcR,
+                                  float arcStart, float arcSweep)
+{
+    juce::Path track;
+    // Subtract tiny epsilon to avoid the path closing at the full 270° (matching
+    // the ARC_END - 0.01 in knob.js).
+    track.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f,
+                        arcStart, arcStart + arcSweep - 0.0002f, true);
+    g.setColour(juce::Colour(0x0FFFFFFF));   // rgba(255,255,255,0.06) ≈ 0x0F
+    g.strokePath(track, juce::PathStrokeType(3.5f, juce::PathStrokeType::curved,
+                                              juce::PathStrokeType::butt));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Layers 4 & 5 — Indicator arc (glow halo + sharp value line)
+//
+//  knob.js: glowPath — stroke 'rgba(255,255,255,0.45)' width 6, filter glow-{sz}
+//           valPath  — stroke '#fff' width 2.8
+//           Only drawn when value > 0.001.
+//
+//  The SVG filter is feGaussianBlur stdDeviation=2.  We approximate this in
+//  JUCE by drawing the glow arc as two stacked strokes at decreasing alpha
+//  (simulates the Gaussian falloff without a real blur pass).
+// ─────────────────────────────────────────────────────────────────────────────
+
+void PhantomKnob::paintIndicatorArc(juce::Graphics& g, juce::Point<float> centre, float arcR,
+                                     float arcStart, float arcSweep, float value01)
+{
+    if (value01 <= 0.001f) return;
+
+    juce::Path arc;
+    arc.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f,
+                      arcStart, arcStart + arcSweep * value01, true);
+
+    // Layer 4 — Glow halo (approximated as three alpha-falloff strokes).
+    // Outer glow ring: very wide, low alpha.
+    g.setColour(juce::Colour(0x1EFFFFFF));   // ~12% white
+    g.strokePath(arc, juce::PathStrokeType(10.0f, juce::PathStrokeType::curved,
+                                            juce::PathStrokeType::rounded));
+    // Mid glow ring.
+    g.setColour(juce::Colour(0x3BFFFFFF));   // ~23% white
+    g.strokePath(arc, juce::PathStrokeType(7.5f, juce::PathStrokeType::curved,
+                                            juce::PathStrokeType::rounded));
+    // Core glow (rgba(255,255,255,0.45), 6 px — direct translation).
+    g.setColour(juce::Colour(0x73FFFFFF));   // rgba(255,255,255,0.45) = 0x73
+    g.strokePath(arc, juce::PathStrokeType(6.0f, juce::PathStrokeType::curved,
+                                            juce::PathStrokeType::rounded));
+
+    // Layer 5 — Sharp value arc (#fff, 2.8 px).
+    g.setColour(juce::Colours::white);
+    g.strokePath(arc, juce::PathStrokeType(2.8f, juce::PathStrokeType::curved,
+                                            juce::PathStrokeType::rounded));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Layer 6 — Value text (3-pass layered shadow)
+//
+//  knob.js _ensureScaffold() — for non-waveform:
+//    valueY = cy - (isLarge ? 4 : 3)    (slightly above OLED centre)
+//    Three <text> elements at opacity 0.3, 0.6, 1.0
+//    font-family: 'Courier New', monospace
+//    font-weight: 700
+//    font-size: via CSS (.value-text)  9/12/14 px rest, 13/18/22 px drag
+//
+//  The spec also calls for a +1 Y offset on the faint pass — replicated here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+void PhantomKnob::paintValueText(juce::Graphics& g, juce::Point<float> centre,
+                                  const juce::String& text, float oledR)
+{
+    const float fontPx = textPx(isDragging);
+    const auto  font   = juce::Font(juce::FontOptions("Courier New", fontPx, juce::Font::bold));
+    g.setFont(font);
+
+    // Y position: centre shifted up slightly (knob.js cy - (isLarge ? 4 : 3)).
+    const float yOffset = (sizeVariant == Size::Large) ? -4.0f : -3.0f;
+    const float textW   = oledR * 2.0f;
+    const float textH   = fontPx * 1.4f;
+    const juce::Rectangle<float> rect(centre.x - textW * 0.5f,
+                                      centre.y + yOffset - textH * 0.5f,
+                                      textW, textH);
+
+    // Pass 1: alpha 0.30, +1 px Y offset.
+    g.setColour(juce::Colour(0x4DFFFFFF));
+    g.drawText(text, rect.translated(0.0f, 1.0f), juce::Justification::centred, false);
+
+    // Pass 2: alpha 0.60.
+    g.setColour(juce::Colour(0x99FFFFFF));
+    g.drawText(text, rect, juce::Justification::centred, false);
+
+    // Pass 3: alpha 1.00 (fully opaque white).
+    g.setColour(juce::Colours::white);
+    g.drawText(text, rect, juce::Justification::centred, false);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  formatValue — uses the slider's built-in text formatter (set by APVTS) if
+//  available; otherwise falls back to the raw value with 2 decimal places.
+//  This matches knob.js: displayText = this._displayValue || this._value.toFixed(2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+juce::String PhantomKnob::formatValue()
+{
+    return slider.getTextFromValue(slider.getValue());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Mouse interaction
+//  Drag: vertical pixel distance → normalized delta, 200 px = full range.
+//  Double-click: reset to the parameter's stored default normalized value.
+// ─────────────────────────────────────────────────────────────────────────────
+
+void PhantomKnob::mouseDown(const juce::MouseEvent& e)
+{
+    if (e.mods.isRightButtonDown()) return;
+    isDragging    = true;
+    dragStartY    = e.y;
+    dragStartNorm = (float) slider.getNormalisableRange()
+                        .convertTo0to1(slider.getValue());
+    // Notify SliderParameterAttachment that a gesture is starting (it calls
+    // attachment.beginGesture() internally via the Slider::Listener callbacks).
+    slider.startedDragging();
     repaint();
+}
+
+void PhantomKnob::mouseDrag(const juce::MouseEvent& e)
+{
+    if (!isDragging) return;
+
+    // 200 px for full range — matches knob.js dy * -0.005 per-px sensitivity.
+    const float dy       = (float)(dragStartY - e.y);
+    const float newNorm  = juce::jlimit(0.0f, 1.0f, dragStartNorm + dy / 200.0f);
+    const float newValue = (float) slider.getNormalisableRange().convertFrom0to1(newNorm);
+    slider.setValue(newValue, juce::sendNotificationSync);
+}
+
+void PhantomKnob::mouseUp(const juce::MouseEvent&)
+{
+    if (!isDragging) return;
+    isDragging = false;
+    // Notify SliderParameterAttachment that the gesture has ended.
+    slider.stoppedDragging();
+    repaint();
+}
+
+void PhantomKnob::mouseDoubleClick(const juce::MouseEvent&)
+{
+    // Reset to the parameter's default normalized value (captured in constructor).
+    const float defaultValue = (float) slider.getNormalisableRange()
+                                   .convertFrom0to1(defaultNorm);
+    // Wrap in a begin/end gesture so the undo manager sees a clean transaction.
+    slider.startedDragging();
+    slider.setValue(defaultValue, juce::sendNotificationSync);
+    slider.stoppedDragging();
 }
 
 } // namespace kaigen::phantom

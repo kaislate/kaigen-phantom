@@ -21,10 +21,6 @@ public:
     PhantomLookAndFeel();
     ~PhantomLookAndFeel() override = default;
 
-    void drawRotarySlider(juce::Graphics&, int x, int y, int w, int h,
-                           float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
-                           juce::Slider&) override;
-
     void drawButtonBackground(juce::Graphics&, juce::Button&,
                                const juce::Colour& backgroundColour,
                                bool shouldDrawButtonAsHighlighted,
