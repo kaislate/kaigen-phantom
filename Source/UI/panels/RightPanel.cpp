@@ -173,31 +173,33 @@ void RightPanel::resized()
     // Reserve area below the top knob row for advanced + visualizers.
     area.removeFromTop(knobRowTop + knobRowHeight + cardPadY);
 
-    // --- Advanced section: toggle button + optional mini knob row ---
-    // Top row ends at knobRowTop + knobRowHeight (= 36 + 136 = 172). Advanced
-    // toggle sits a short gap below.
-    constexpr int advancedToggleY = 188;
-    constexpr int advancedToggleH = 22;
-    advancedToggle.setBounds(12, advancedToggleY, 110, advancedToggleH);
+    // --- Advanced section: toggle ABOVE the mini knob row ---
+    // Top row ends at knobRowTop + knobRowHeight (= 36 + 136 = 172). The
+    // Advanced toggle sits a short gap below, hugging the left edge so the
+    // full panel width is available for the mini-knob row beneath it.
+    constexpr int advancedToggleY = 182;
+    constexpr int advancedToggleH = 20;
+    advancedToggle.setBounds(12, advancedToggleY, 100, advancedToggleH);
 
     const int advancedCardTop = advancedToggleY - 4;
     int advancedCardBottom    = 0;
 
     if (advancedExpanded)
     {
-        // Mini knobs spread evenly across the available width to the right of
-        // the toggle. Component natural size: 48 body + 17 px shadow pad each
-        // side + 11 label = 82 wide × 93 tall.
-        constexpr int miniRowY = advancedToggleY + advancedToggleH + 8;
+        // Mini knob row spans the FULL panel width (toggle is above it now).
+        // Component natural size: 48 body + 17 shadow pad × 2 + 11 label
+        //   = 82 wide × 93 tall.
+        constexpr int miniRowY = advancedToggleY + advancedToggleH + 6;
         constexpr int miniW    = 82;
         constexpr int miniH    = 93;
-        const int rowLeft  = 12 + 110 + 12;   // toggle right edge + gap
+        const int rowLeft  = 12;
         const int rowRight = getWidth() - 12;
         const int rowAvail = rowRight - rowLeft;
         const int n = (int) miniKnobs.size();
-        // Evenly distribute: give each knob `slotW` of horizontal space, allow
-        // overlap if total > rowAvail.
-        const int slotW = (n > 0) ? rowAvail / n : miniW;
+
+        // Evenly distribute knobs across the available width. Allow modest
+        // shadow overlap (slotW < miniW is fine — bodies stay separate).
+        const int slotW = (n > 0) ? (rowAvail - miniW) / juce::jmax(1, n - 1) : 0;
         int mx = rowLeft;
         for (auto& mk : miniKnobs)
         {
