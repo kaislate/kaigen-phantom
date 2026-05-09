@@ -10,9 +10,10 @@ namespace
 {
     void drawSectionHeader(juce::Graphics& g, juce::Rectangle<int> bounds, const juce::String& title)
     {
-        g.setColour(Theme::textSecondary);
-        g.setFont(juce::FontOptions("Space Grotesk", 11.0f, juce::Font::bold));
-        g.drawText(title, bounds.toFloat(), juce::Justification::centredLeft, false);
+        const auto labelFont = juce::Font(juce::FontOptions("Space Grotesk", 10.0f, juce::Font::bold))
+                                   .withExtraKerningFactor(0.25f);
+        Theme::drawEtchedText(g, title.toUpperCase(), bounds, juce::Justification::centredLeft,
+                              labelFont, Theme::textOnLightLabel);
     }
 }
 

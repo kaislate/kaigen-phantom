@@ -15,9 +15,35 @@ TopBar::~TopBar() = default;
 
 void TopBar::paint(juce::Graphics& g)
 {
-    g.fillAll(Theme::panelBg);
-    g.setColour(Theme::panelBorder);
-    g.drawHorizontalLine(getHeight() - 1, 0.0f, (float) getWidth());
+    Theme::paintHeaderStrip(g, getLocalBounds());
+
+    // PHANTOM logo — left side, vertically centred.
+    {
+        const auto logoBounds = juce::Rectangle<int>(16, 0, 160, getHeight());
+        const auto font = juce::Font(juce::FontOptions("Space Grotesk", 22.0f, juce::Font::plain))
+                              .withExtraKerningFactor(0.45f);
+        // Bright white shadow below (72% white, CSS: 0 1px 0 rgba(255,255,255,0.72))
+        g.setFont(font);
+        g.setColour(juce::Colour(0xb8FFFFFF));
+        g.drawText("PHANTOM", logoBounds.translated(0, 1), juce::Justification::centredLeft, false);
+        // Foreground
+        g.setColour(Theme::logoPhantom);
+        g.drawText("PHANTOM", logoBounds, juce::Justification::centredLeft, false);
+    }
+
+    // KAIGEN logo — right side, vertically centred.
+    {
+        const auto logoBounds = juce::Rectangle<int>(getWidth() - 120, 0, 104, getHeight());
+        const auto font = juce::Font(juce::FontOptions("Space Grotesk", 13.0f, juce::Font::plain))
+                              .withExtraKerningFactor(0.46f);
+        // White shadow below (60% white, CSS: 0 1px 0 rgba(255,255,255,0.60))
+        g.setFont(font);
+        g.setColour(juce::Colour(0x99FFFFFF));
+        g.drawText("KAIGEN", logoBounds.translated(0, 1), juce::Justification::centredRight, false);
+        // Foreground
+        g.setColour(Theme::logoKaigen);
+        g.drawText("KAIGEN", logoBounds, juce::Justification::centredRight, false);
+    }
 }
 
 void TopBar::resized()
