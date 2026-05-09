@@ -35,9 +35,34 @@ PhantomKnob::PhantomKnob(juce::AudioProcessorValueTreeState& apvts,
         jassertfalse;   // unknown paramID
     }
 
-    // Widget size: diameter + small vertical padding for text clearance.
+    // Widget size: diameter + shadow padding on all sides so the DropShadow
+    // halos can render without being clipped at the component bounds. The
+    // body is centered within the bounds; hitTest() restricts clicks to the
+    // body region so adjacent overlapping shadow areas don't steal clicks.
     const int d = diameter();
-    setSize(d + 8, d + 8);
+    const int pad = shadowPadding();
+    setSize(d + pad * 2, d + pad * 2);
+}
+
+int PhantomKnob::shadowPadding() const
+{
+    // Roughly the largest blur radius from the box-shadow recipe per size.
+    switch (sizeVariant)
+    {
+        case Size::Large:  return 32;
+        case Size::Small:  return 17;
+        default:           return 24;
+    }
+}
+
+bool PhantomKnob::hitTest(int x, int y)
+{
+    // Only the visible body intercepts clicks; the shadow halo is decorative.
+    const auto centre = getLocalBounds().getCentre();
+    const float dx = (float) (x - centre.x);
+    const float dy = (float) (y - centre.y);
+    const float bodyR = (float) diameter() * 0.5f;
+    return (dx * dx + dy * dy) <= (bodyR * bodyR);
 }
 
 PhantomKnob::~PhantomKnob() = default;

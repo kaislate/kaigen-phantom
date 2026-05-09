@@ -36,8 +36,21 @@ PhantomMiniKnob::PhantomMiniKnob(juce::AudioProcessorValueTreeState& apvts,
         jassertfalse;  // unknown paramID
     }
 
+    // Shadow padding so the DropShadow halo isn't clipped at component bounds.
+    constexpr int kShadowPad = 17;
     const int labelHeight = label.isNotEmpty() ? 11 : 0;
-    setSize(kBodySize + 6, kBodySize + labelHeight + 2);
+    setSize(kBodySize + kShadowPad * 2, kBodySize + kShadowPad * 2 + labelHeight);
+}
+
+bool PhantomMiniKnob::hitTest(int x, int y)
+{
+    // Body region only; shadow halo is decorative.
+    const auto bodyCentreX = (float) getWidth() * 0.5f;
+    const auto bodyCentreY = (float) (kBodySize / 2 + 17);  // pad above body
+    const float dx = (float) x - bodyCentreX;
+    const float dy = (float) y - bodyCentreY;
+    const float r = (float) kBodySize * 0.5f;
+    return (dx * dx + dy * dy) <= (r * r);
 }
 
 PhantomMiniKnob::~PhantomMiniKnob() = default;
@@ -49,8 +62,11 @@ juce::String PhantomMiniKnob::formatValue()
 
 void PhantomMiniKnob::paint(juce::Graphics& g)
 {
+    // Body sits in the upper portion of the bounds (above the label).
+    // 17px shadow padding on top + sides; label area below.
+    constexpr int kShadowPad = 17;
     auto bodyArea = juce::Rectangle<float>((float) (getWidth() - kBodySize) * 0.5f,
-                                            2.0f,
+                                            (float) kShadowPad,
                                             (float) kBodySize,
                                             (float) kBodySize);
 
@@ -169,8 +185,10 @@ void PhantomMiniKnob::paint(juce::Graphics& g)
     {
         g.setColour(Theme::textOnLightLabel);
         g.setFont(juce::FontOptions("Space Grotesk", 8.0f, juce::Font::plain));
+        // Label sits BELOW the body + shadow padding.
+        constexpr int kShadowPadLabel = 17;
         auto labelArea = juce::Rectangle<float>(0.0f,
-                                                  (float) (kBodySize + 2),
+                                                  (float) (kShadowPadLabel + kBodySize + 2),
                                                   (float) getWidth(),
                                                   11.0f);
         g.drawText(label, labelArea, juce::Justification::centred, false);
