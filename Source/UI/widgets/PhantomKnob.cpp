@@ -22,11 +22,12 @@ PhantomKnob::PhantomKnob(juce::AudioProcessorValueTreeState& apvts,
     slider.onValueChange = [this] { repaint(); };
     addChildComponent(slider);   // hidden — zero-sized below via resized()
 
-    if (auto* param = apvts.getParameter(paramID))
+    if (auto* p = apvts.getParameter(paramID))
     {
-        attachment = std::make_unique<juce::SliderParameterAttachment>(*param, slider);
+        param = p;
+        attachment = std::make_unique<juce::SliderParameterAttachment>(*p, slider);
         // Cache the default normalized value for double-click reset.
-        defaultNorm = param->getDefaultValue();
+        defaultNorm = p->getDefaultValue();
     }
     else
     {
@@ -326,17 +327,27 @@ void PhantomKnob::paintIndicatorArc(juce::Graphics& g, juce::Point<float> centre
 void PhantomKnob::paintValueText(juce::Graphics& g, juce::Point<float> centre,
                                   const juce::String& text, float oledR)
 {
-    const float fontPx = textPx(isDragging);
-    const auto  font   = juce::Font(juce::FontOptions("Courier New", fontPx, juce::Font::bold));
+    // Inner OLED width available for text — keep ~85% of diameter so glyphs
+    // don't bleed against the bezel.
+    const float maxW = oledR * 1.7f;
+
+    // Start with the size-tier font. If the text is too wide, scale font down
+    // until it fits (down to 6 px minimum so it stays readable).
+    float fontPx = textPx(isDragging);
+    juce::Font font(juce::FontOptions("Courier New", fontPx, juce::Font::bold));
+    while (fontPx > 6.0f && (float) juce::GlyphArrangement::getStringWidthInt(font, text) > maxW)
+    {
+        fontPx -= 1.0f;
+        font = juce::Font(juce::FontOptions("Courier New", fontPx, juce::Font::bold));
+    }
     g.setFont(font);
 
     // Y position: centre shifted up slightly (knob.js cy - (isLarge ? 4 : 3)).
     const float yOffset = (sizeVariant == Size::Large) ? -4.0f : -3.0f;
-    const float textW   = oledR * 2.0f;
     const float textH   = fontPx * 1.4f;
-    const juce::Rectangle<float> rect(centre.x - textW * 0.5f,
+    const juce::Rectangle<float> rect(centre.x - maxW * 0.5f,
                                       centre.y + yOffset - textH * 0.5f,
-                                      textW, textH);
+                                      maxW, textH);
 
     // Pass 1: alpha 0.30, +1 px Y offset.
     g.setColour(juce::Colour(0x4DFFFFFF));
@@ -359,7 +370,14 @@ void PhantomKnob::paintValueText(juce::Graphics& g, juce::Point<float> centre,
 
 juce::String PhantomKnob::formatValue()
 {
-    return slider.getTextFromValue(slider.getValue());
+    // Prefer the parameter's own getText() formatter (set in createAndAddParameter
+    // with units like "Hz", "dB", "%"). Fallback: 2-decimal numeric.
+    if (param != nullptr)
+    {
+        const auto t = param->getCurrentValueAsText();
+        if (t.isNotEmpty()) return t;
+    }
+    return juce::String(slider.getValue(), 2);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

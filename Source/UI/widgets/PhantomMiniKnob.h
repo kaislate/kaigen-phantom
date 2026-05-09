@@ -6,7 +6,11 @@
 namespace kaigen::phantom
 {
 
-class PhantomMiniKnob : public juce::Component, private juce::Slider::Listener
+/** Compact rotary widget used in the Advanced row. Visually identical paint
+ *  stack to PhantomKnob (neumorphic body + OLED + arc indicator + value text)
+ *  but at a smaller size (~36 px) with an external label rendered below the
+ *  body. */
+class PhantomMiniKnob : public juce::Component
 {
 public:
     PhantomMiniKnob(juce::AudioProcessorValueTreeState& apvts,
@@ -22,12 +26,17 @@ public:
     void mouseDoubleClick(const juce::MouseEvent& e) override;
 
 private:
-    void sliderValueChanged(juce::Slider* s) override;
-
     juce::Slider slider;
+    juce::RangedAudioParameter* param { nullptr };  // non-owning
     std::unique_ptr<juce::SliderParameterAttachment> attachment;
     juce::String label;
-    std::unique_ptr<juce::Drawable> bodyDrawable;
+
+    bool  isDragging    { false };
+    float dragStartNorm { 0.0f };
+    int   dragStartY    { 0 };
+    float defaultNorm   { 0.0f };
+
+    juce::String formatValue();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomMiniKnob)
 };

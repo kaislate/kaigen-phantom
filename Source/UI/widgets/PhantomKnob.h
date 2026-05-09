@@ -64,6 +64,7 @@ private:
     juce::String labelText;
 
     juce::Slider slider;
+    juce::RangedAudioParameter* param { nullptr };  // non-owning; for getText() formatting
     std::unique_ptr<juce::SliderParameterAttachment> attachment;
 
     bool  isDragging    { false };
