@@ -15,8 +15,7 @@ class PhantomProcessor;
 namespace kaigen::phantom
 {
 
-class NativePluginEditor : public juce::AudioProcessorEditor,
-                           private juce::Button::Listener
+class NativePluginEditor : public juce::AudioProcessorEditor
 {
 public:
     NativePluginEditor(PhantomProcessor& processor, juce::AudioProcessorValueTreeState& apvts);
@@ -26,12 +25,9 @@ public:
     void resized() override;
 
 private:
-    void buttonClicked(juce::Button* b) override;
-
     PhantomProcessor& processor;
     juce::AudioProcessorValueTreeState& apvts;
     PhantomLookAndFeel lookAndFeel;
-    juce::TextButton backToWebViewButton { "<- WebView2" };
     RightPanel rightPanel;
     LeftPanel leftPanel;
     TopBar topBar;

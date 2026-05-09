@@ -45,9 +45,8 @@ void Spectrum::paint(juce::Graphics& g)
     const float w = bounds.getWidth();
     const float h = bounds.getHeight();
 
-    // Background.
-    g.setColour(Theme::matrixBg);
-    g.fillRect(bounds);
+    // Pitch-black inset surface: hard inner shadow + outer highlights.
+    Theme::paintVisualizerInset(g, getLocalBounds(), 6.0f);
 
     // Bars: input as a filled silhouette in dim white, output overlaid in steel blue.
     const float binWidth = w / (float) kBins;
@@ -67,10 +66,6 @@ void Spectrum::paint(juce::Graphics& g)
 
     drawBars(smoothedInput,  Theme::textDim);
     drawBars(smoothedOutput, Theme::steelBlue.withAlpha(0.85f));
-
-    // Border.
-    g.setColour(Theme::panelBorder);
-    g.drawRect(bounds, 1.0f);
 }
 
 } // namespace kaigen::phantom

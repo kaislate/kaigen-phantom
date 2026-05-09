@@ -26,8 +26,6 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
     setLookAndFeel(&lookAndFeel);
     setSize(editorWidth, editorHeight);
 
-    backToWebViewButton.addListener(this);
-    addAndMakeVisible(backToWebViewButton);
     addAndMakeVisible(rightPanel);
     addAndMakeVisible(leftPanel);
     addAndMakeVisible(topBar);
@@ -114,7 +112,6 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
 NativePluginEditor::~NativePluginEditor()
 {
     setLookAndFeel(nullptr);
-    backToWebViewButton.removeListener(this);
 }
 
 void NativePluginEditor::paint(juce::Graphics& g)
@@ -126,9 +123,6 @@ void NativePluginEditor::paint(juce::Graphics& g)
 
 void NativePluginEditor::resized()
 {
-    // Corner escape-hatch button -- dev-only, removed in Phase 6.
-    backToWebViewButton.setBounds(getWidth() - 110, 10, 100, 26);
-
     auto area = getLocalBounds();
 
     auto topBarArea = area.removeFromTop(topBarHeight);
@@ -147,23 +141,6 @@ void NativePluginEditor::resized()
     // PresetBrowser overlays the entire editor when visible.
     presetBrowser.setBounds(getLocalBounds());
     matrixView.setBounds(getLocalBounds());
-}
-
-void NativePluginEditor::buttonClicked(juce::Button* b)
-{
-    if (b == &backToWebViewButton)
-    {
-        auto state = processor.getEditorView();
-        state.useNativeEditor = false;
-        processor.setEditorView(state);
-        processor.updateHostDisplay();
-        // Note: change takes effect on next editor reopen. The current
-        // editor stays as-is until the host destroys + recreates it.
-        juce::AlertWindow::showMessageBoxAsync(
-            juce::MessageBoxIconType::InfoIcon,
-            "Switched to WebView2",
-            "Close and reopen the plugin window to load the WebView2 UI.");
-    }
 }
 
 } // namespace kaigen::phantom

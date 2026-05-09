@@ -37,14 +37,13 @@ void Oscilloscope::timerCallback()
 
 void Oscilloscope::paint(juce::Graphics& g)
 {
+    // Pitch-black inset surface: hard inner shadow + outer highlights.
+    Theme::paintVisualizerInset(g, getLocalBounds(), 6.0f);
+
     const auto bounds = getLocalBounds().toFloat();
     const float w = bounds.getWidth();
     const float h = bounds.getHeight();
     const float midY = h * 0.5f;
-
-    // Background.
-    g.setColour(Theme::matrixBg);
-    g.fillRect(bounds);
 
     // Center line.
     g.setColour(Theme::panelBorder);
