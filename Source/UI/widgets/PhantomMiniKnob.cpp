@@ -64,11 +64,11 @@ void PhantomMiniKnob::paint(juce::Graphics& g)
         juce::Path circle;
         circle.addEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre));
 
-        // BR shadow (compact size).
+        // BR shadow (compact size). Black blurs cleanly.
         juce::DropShadow brShadow { juce::Colour(0x4D000000), 8, juce::Point<int>(2, 2) };
         brShadow.drawForPath(g, circle);
-        // TL highlight (compact size).
-        juce::DropShadow tlHighlight { juce::Colour(0xa6FFFFFF), 6, juce::Point<int>(-2, -2) };
+        // TL highlight — alpha halved to avoid cyan fringing in JUCE's software blur.
+        juce::DropShadow tlHighlight { juce::Colour(0x54FFFFFF), 6, juce::Point<int>(-2, -2) };
         tlHighlight.drawForPath(g, circle);
 
         // Radial gradient body.

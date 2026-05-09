@@ -165,19 +165,20 @@ void PhantomKnob::paintBody(juce::Graphics& g, juce::Point<float> centre, float 
         }
     }();
 
-    // Alpha values (from knob.js CSS rgba values):
-    //   medium TL: 0.70 (0xB3), 0.34 (0x57)   BR: 0.34 (0x57), 0.16 (0x29)
-    //   large  TL: 0.70 (0xB3), 0.36 (0x5C)   BR: 0.36 (0x5C), 0.18 (0x2E)
-    //   small  TL: 0.66 (0xA8), 0.30 (0x4D)   BR: 0.30 (0x4D), 0.14 (0x24)
+    // Alpha values — CSS spec halved on the TL side because JUCE's software-blur
+    // DropShadow on Windows fringes high-alpha white blurs cyan/teal against the
+    // silver gradient. Halving the white-blur alpha removes the fringe artifact
+    // while preserving the convex-bulge depth illusion. BR (black) shadow alphas
+    // unchanged — black blurs render cleanly.
     juce::uint8 tlAlpha1, tlAlpha2, brAlpha1, brAlpha2;
     switch (sizeVariant)
     {
         case Size::Large:
-            tlAlpha1 = 0xB3; tlAlpha2 = 0x5C; brAlpha1 = 0x5C; brAlpha2 = 0x2E; break;
+            tlAlpha1 = 0x59; tlAlpha2 = 0x2E; brAlpha1 = 0x5C; brAlpha2 = 0x2E; break;
         case Size::Small:
-            tlAlpha1 = 0xA8; tlAlpha2 = 0x4D; brAlpha1 = 0x4D; brAlpha2 = 0x24; break;
+            tlAlpha1 = 0x54; tlAlpha2 = 0x26; brAlpha1 = 0x4D; brAlpha2 = 0x24; break;
         default:   // Medium
-            tlAlpha1 = 0xB3; tlAlpha2 = 0x57; brAlpha1 = 0x57; brAlpha2 = 0x29; break;
+            tlAlpha1 = 0x59; tlAlpha2 = 0x2C; brAlpha1 = 0x57; brAlpha2 = 0x29; break;
     }
 
     // BR shadows — drawn first (behind TL highlights).
