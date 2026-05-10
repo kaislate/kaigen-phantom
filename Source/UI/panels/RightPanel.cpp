@@ -162,15 +162,16 @@ void RightPanel::resized()
     // by 2 px each (closer to the centre of the section) and tightened
     // against the In/Out knobs.
     const int levelsCardX = x - 4;
-    constexpr int kMeterW = 8;
-    inMeter.setBounds(x + 2, knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
-    x += kMeterW + 4;
+    constexpr int kMeterW = 12;          // wider (was 8)
+    constexpr int kMeterInset = 8;       // meters sit further inward toward the knobs
+    inMeter.setBounds(x + kMeterInset, knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
+    x += kMeterInset + kMeterW + 2;
     inGainKnob .setBounds(x, knobRowTop, kMedium, kMedium);
     x += kMedium - knobOverlap;
     outGainKnob.setBounds(x, knobRowTop, kMedium, kMedium);
-    x += kMedium + 4;
+    x += kMedium + 2;
     outMeter.setBounds(x, knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
-    x += kMeterW;
+    x += kMeterW + kMeterInset;
     const int levelsCardRight = x + 4;
     levelsCardBounds = juce::Rectangle<int>(levelsCardX, cardTop,
                                              levelsCardRight - levelsCardX, cardHeight);
