@@ -132,7 +132,7 @@ void PresetSelector::paint(juce::Graphics& g)
     // Preset name centered inside the pill (between heart on left and the
     // modified asterisk on the right). Dark-on-light per CSS rgba(0,0,0,0.75).
     const auto pillTextArea = pillBounds.reduced(26, 0);
-    g.setFont(juce::FontOptions("Space Grotesk", 11.0f, juce::Font::plain));
+    g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::bold));
     g.setColour(juce::Colour(0xbf000000));
     const auto display = currentPresetName.isEmpty() ? juce::String("Default") : currentPresetName;
     g.drawText(display, pillTextArea, juce::Justification::centred, true);
@@ -142,7 +142,7 @@ void PresetSelector::paint(juce::Graphics& g)
     // Red matches the CSS #c74a4a.
     auto asteriskArea = juce::Rectangle<int>(pillBounds.getRight() - 18, pillBounds.getY(),
                                               14, pillBounds.getHeight());
-    g.setFont(juce::FontOptions("Space Grotesk", 13.0f, juce::Font::bold));
+    g.setFont(juce::FontOptions(Theme::uiFontFamily(), 13.0f, juce::Font::bold));
     g.setColour(juce::Colour(0xffc74a4a));
     g.drawText("*", asteriskArea, juce::Justification::centred, false);
 }

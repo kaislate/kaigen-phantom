@@ -217,6 +217,19 @@ namespace kaigen::phantom::Theme
         }
     }
 
+    const juce::String& uiFontFamily()
+    {
+        static const juce::String picked = []()
+        {
+            const auto names = juce::Font::findAllTypefaceNames();
+            for (auto* candidate : { "Space Grotesk", "Segoe UI Variable",
+                                     "Segoe UI", "Inter", "Helvetica Neue" })
+                if (names.contains(candidate)) return juce::String(candidate);
+            return juce::Font::getDefaultSansSerifFontName();
+        }();
+        return picked;
+    }
+
     void paintHeaderStrip(juce::Graphics& g, juce::Rectangle<int> bounds)
     {
         const auto fb = bounds.toFloat();
@@ -267,25 +280,48 @@ namespace kaigen::phantom::Theme
         g.setGradientFill(body);
         g.fillRoundedRectangle(bounds, corner);
 
-        // Outer "lifted" white highlight just below the pill (CSS 0 1px 2px
-        // rgba(255,255,255,0.6)).
-        g.setColour(juce::Colour(0x99FFFFFF));
-        g.drawLine(bounds.getX() + corner * 0.6f, bounds.getBottom() + 0.5f,
-                    bounds.getRight() - corner * 0.6f, bounds.getBottom() + 0.5f, 0.7f);
+        // Soft outer "lifted" highlight just below the pill — emulates
+        // CSS 0 1px 2px rgba(255,255,255,0.6) with a vertical fade so the
+        // pill reads as floating, not outlined.
+        {
+            const float xL = bounds.getX() + corner * 0.5f;
+            const float xR = bounds.getRight() - corner * 0.5f;
+            juce::ColourGradient outer(juce::Colour(0x80FFFFFF), 0.0f, bounds.getBottom(),
+                                        juce::Colour(0x00FFFFFF), 0.0f, bounds.getBottom() + 3.0f,
+                                        false);
+            g.setGradientFill(outer);
+            g.fillRect(juce::Rectangle<float>(xL, bounds.getBottom(),
+                                               xR - xL, 3.0f));
+        }
 
-        // Inset top shadow (CSS inset 0 2px 4px rgba(0,0,0,0.10)).
-        g.setColour(juce::Colour(0x33000000));
-        g.drawLine(bounds.getX() + corner * 0.6f, bounds.getY() + 0.6f,
-                    bounds.getRight() - corner * 0.6f, bounds.getY() + 0.6f, 0.8f);
+        // Soft inset top shadow — vertical gradient band fading 4px down from
+        // the top edge (CSS inset 0 2px 4px rgba(0,0,0,0.10)).
+        {
+            juce::Path top;
+            top.addRoundedRectangle(bounds, corner);
+            juce::Graphics::ScopedSaveState save(g);
+            g.reduceClipRegion(top);
+            juce::ColourGradient shadowTop(juce::Colour(0x29000000), 0.0f, bounds.getY(),
+                                            juce::Colour(0x00000000), 0.0f, bounds.getY() + 4.5f,
+                                            false);
+            g.setGradientFill(shadowTop);
+            g.fillRect(juce::Rectangle<float>(bounds.getX(), bounds.getY(),
+                                               bounds.getWidth(), 5.0f));
 
-        // Inset bottom white highlight (CSS inset 0 -1px 2px rgba(255,255,255,0.3)).
-        g.setColour(juce::Colour(0x66FFFFFF));
-        g.drawLine(bounds.getX() + corner * 0.6f, bounds.getBottom() - 1.0f,
-                    bounds.getRight() - corner * 0.6f, bounds.getBottom() - 1.0f, 0.6f);
+            // Soft inset bottom highlight — gradient band fading 2.5px up from
+            // the bottom edge (CSS inset 0 -1px 2px rgba(255,255,255,0.3)).
+            juce::ColourGradient highBot(juce::Colour(0x00FFFFFF),
+                                          0.0f, bounds.getBottom() - 2.5f,
+                                          juce::Colour(0x4dFFFFFF),
+                                          0.0f, bounds.getBottom(),
+                                          false);
+            g.setGradientFill(highBot);
+            g.fillRect(juce::Rectangle<float>(bounds.getX(), bounds.getBottom() - 2.5f,
+                                               bounds.getWidth(), 2.5f));
+        }
 
-        // Subtle outer edge.
-        g.setColour(juce::Colour(0x1f000000));
-        g.drawRoundedRectangle(bounds.reduced(0.25f), corner, 0.5f);
+        // No outer outline — the soft drop shadow alone defines the edge.
+        // Adding a stroke makes the pill look stamped rather than recessed.
     }
 
     void paintVisualizerInset(juce::Graphics& g, juce::Rectangle<int> bounds, float cornerRadius)

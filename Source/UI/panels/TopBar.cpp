@@ -20,7 +20,7 @@ void TopBar::paint(juce::Graphics& g)
     // PHANTOM logo — left side, vertically centred.
     {
         const auto logoBounds = juce::Rectangle<int>(16, 0, 240, getHeight());
-        const auto font = juce::Font(juce::FontOptions("Space Grotesk", 22.0f, juce::Font::plain))
+        const auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 22.0f, juce::Font::plain))
                               .withExtraKerningFactor(0.45f);
         // Bright white shadow below (72% white, CSS: 0 1px 0 rgba(255,255,255,0.72))
         g.setFont(font);
@@ -34,7 +34,7 @@ void TopBar::paint(juce::Graphics& g)
     // KAIGEN logo — right side, vertically centred.
     {
         const auto logoBounds = juce::Rectangle<int>(getWidth() - 120, 0, 104, getHeight());
-        const auto font = juce::Font(juce::FontOptions("Space Grotesk", 13.0f, juce::Font::plain))
+        const auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 13.0f, juce::Font::plain))
                               .withExtraKerningFactor(0.46f);
         // White shadow below (60% white, CSS: 0 1px 0 rgba(255,255,255,0.60))
         g.setFont(font);

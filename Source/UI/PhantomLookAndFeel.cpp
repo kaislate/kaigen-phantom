@@ -187,7 +187,7 @@ void PhantomLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& b,
                         : isHeaderGlyph  ? juce::jmin(13.0f, b.getHeight() * 0.65f)
                                           : juce::jmin(13.0f, b.getHeight() * 0.50f);
     const float kerning  = isMtSegment ? 0.25f : 0.10f;
-    juce::Font font(juce::FontOptions("Space Grotesk", fontPx,
+    juce::Font font(juce::FontOptions(Theme::uiFontFamily(), fontPx,
                                       isHeaderGlyph ? juce::Font::plain : juce::Font::bold));
     font.setExtraKerningFactor(kerning);
 

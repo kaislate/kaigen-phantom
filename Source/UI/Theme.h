@@ -111,6 +111,13 @@ namespace kaigen::phantom::Theme
     /** Paints the editor's top header strip (linear gradient + bottom hairline). */
     void paintHeaderStrip(juce::Graphics& g, juce::Rectangle<int> bounds);
 
+    /** Returns the best available "Space Grotesk-ish" font family name. Tries
+     *  "Space Grotesk" first (in case the user has it installed system-wide
+     *  or we ever bundle it), then falls through to "Segoe UI Variable" /
+     *  "Segoe UI" — both produce a refined sans-serif rendering close to the
+     *  webview's fallback path. Cached after first call. */
+    const juce::String& uiFontFamily();
+
     /** Depressed glass pill used in the top-bar preset selector. Renders a
      *  subtle dark inset gradient with an outer light "lifted" highlight,
      *  matching the CSS #preset-name-container box-shadow stack. Caller
