@@ -97,25 +97,70 @@ void ModulationPanel::resized()
 {
     auto area = getLocalBounds();
 
-    // Mode bar at top of panel.
-    auto modeBar = area.removeFromTop(30).reduced(12, 4);
-    slotsButton .setBounds(modeBar.removeFromLeft(64));
-    modeBar.removeFromLeft(4);
-    matrixButton.setBounds(modeBar.removeFromLeft(64));
-    counterLabel.setBounds(modeBar.removeFromRight(140));
+    // ── Top row: mode-bar buttons (left) + always-visible macros + morph (right) ──
+    auto topRow = area.removeFromTop(getHeight() < 90 ? getHeight() : 60).reduced(12, 4);
 
-    // Slot row visible only when MODULATIONS toggle is expanded (and matrix
-    // mode is off).
-    const bool slotRowVisible = slotsExpanded && ! matrixActive;
-    for (auto* slot : slots)
-        slot->setVisible(slotRowVisible);
+    // Mode bar — left.
+    slotsButton.setBounds(topRow.removeFromLeft(96));   // wider to fit "MODULATIONS"
+    topRow.removeFromLeft(4);
+    matrixButton.setBounds(topRow.removeFromLeft(64));
 
-    if (! slotRowVisible || slots.isEmpty()) return;
+    // Macros + Morph — right (always visible).
+    // Order in the grouped cluster: Mac1 Mac2 Mac3 Mac4 [gap] Morph.
+    if (slots.size() >= 8)   // sanity
+    {
+        constexpr int kMacroW    = 38;
+        constexpr int kMorphW    = 48;   // slightly wider so morph reads as more prominent
+        constexpr int kSlotGap   = 2;
+        constexpr int kMorphGap  = 12;   // extra gap before morph to set it apart
 
+        // Slot indices in `slots`: macro1=3, macro2=4, morph=5, macro3=6, macro4=7.
+        constexpr int macroIdxs[4] = { 3, 4, 6, 7 };
+        constexpr int morphIdx  = 5;
+
+        // Reserve width on the right side of topRow.
+        const int totalW = kMacroW * 4 + kSlotGap * 3 + kMorphGap + kMorphW;
+        // Counter sits to the right of macros+morph.
+        counterLabel.setBounds(topRow.removeFromRight(110));
+        topRow.removeFromRight(8);
+
+        auto slotsArea = topRow.removeFromRight(totalW);
+        // Lay out macros 1-4.
+        for (int i = 0; i < 4; ++i)
+        {
+            auto slot = slots[macroIdxs[i]];
+            slot->setBounds(slotsArea.removeFromLeft(kMacroW));
+            slot->setVisible(true);
+            if (i < 3) slotsArea.removeFromLeft(kSlotGap);
+        }
+        slotsArea.removeFromLeft(kMorphGap);
+        slots[morphIdx]->setBounds(slotsArea.removeFromLeft(kMorphW));
+        slots[morphIdx]->setVisible(true);
+    }
+
+    // ── Expanded row: full slot row (LFO + Random + all 11 slots) ──
+    const bool fullRowVisible = slotsExpanded && ! matrixActive;
+    for (int i = 0; i < slots.size(); ++i)
+    {
+        // Macros + Morph stay always visible. LFO/Random visible only in
+        // expanded mode.
+        const bool isMacroOrMorph = (i == 3 || i == 4 || i == 5 || i == 6 || i == 7);
+        if (! isMacroOrMorph)
+            slots[i]->setVisible(fullRowVisible);
+    }
+
+    if (! fullRowVisible || slots.isEmpty() || area.getHeight() < 30) return;
+
+    // Expanded row positions ONLY the LFO + Random slots (the 6 not in the
+    // top row): indices 0, 1, 2, 8, 9, 10. Macros + Morph stay in the top
+    // row (they're already visible there).
+    constexpr int lfoRandomIdxs[6] = { 0, 1, 2, 8, 9, 10 };
     auto slotRow = area.reduced(12, 4);
-    const int slotW = slotRow.getWidth() / slots.size();
-    for (auto* slot : slots)
-        slot->setBounds(slotRow.removeFromLeft(slotW));
+    const int slotW = slotRow.getWidth() / 6;
+    for (int idx : lfoRandomIdxs)
+    {
+        slots[idx]->setBounds(slotRow.removeFromLeft(slotW));
+    }
 }
 
 } // namespace kaigen::phantom
