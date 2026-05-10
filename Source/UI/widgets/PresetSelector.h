@@ -9,11 +9,16 @@ class PhantomProcessor;
 namespace kaigen::phantom
 {
 
-/** Compact preset selector for the TopBar.
- *  - Center: current preset name (text label)
- *  - Left: prev / next buttons (iterate flattened preset list)
- *  - Right: Browse button (opens PresetBrowser overlay) + Save button
- *           (opens juce::AlertWindow text-input dialog)
+/** Top-bar preset selector — webview-faithful layout.
+ *
+ *  Layout (left to right):
+ *    [|||]  glyph button — opens preset browser
+ *    [♡  Preset Name  *]  glass pill — clickable opens browser; heart/asterisk
+ *                          are visual placeholders until favorites/modified
+ *                          tracking is wired
+ *    [▲]   prev preset
+ *    [▼]   next preset
+ *    [💾]  save
  *
  *  Owns the `currentPresetName` and `currentPresetPack` state — the C++
  *  PresetManager doesn't track which preset is currently loaded. */
@@ -24,8 +29,8 @@ public:
                    juce::AudioProcessorValueTreeState& apvts);
     ~PresetSelector() override;
 
-    /** Called when the user clicks "Browse". NativePluginEditor wires this
-     *  to show its PresetBrowser overlay. */
+    /** Called when the user clicks the library glyph or the pill body.
+     *  NativePluginEditor wires this to show its PresetBrowser overlay. */
     std::function<void()> onBrowseRequested;
 
     /** Updates the displayed preset name. Called by PresetBrowser when the
@@ -34,6 +39,7 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void mouseDown(const juce::MouseEvent& e) override;
 
 private:
     void prevPreset();
@@ -46,10 +52,19 @@ private:
     juce::String currentPresetName;
     juce::String currentPresetPack;
 
-    juce::TextButton prevButton  { "<"     };
-    juce::TextButton nextButton  { ">"     };
-    juce::TextButton browseButton{ "Browse" };
-    juce::TextButton saveButton  { "Save"   };
+    // Glyph buttons — etched, no background (phantom-style "header-glyph").
+    // Glyph text assigned in the ctor body so we can use UTF-8 for the unicode
+    // characters without depending on source-file encoding.
+    juce::TextButton libraryButton;   // |||
+    juce::TextButton heartButton;     // ♡
+    juce::TextButton prevButton;      // ▲
+    juce::TextButton nextButton;      // ▼
+    juce::TextButton saveButton;      // 💾
+
+    // Computed in resized(), used in paint() for the pill background and in
+    // mouseDown() to decide whether a click on the parent's empty space
+    // should open the browser.
+    juce::Rectangle<int> pillBounds;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PresetSelector)
 };

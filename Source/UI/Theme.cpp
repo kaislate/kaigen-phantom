@@ -222,14 +222,67 @@ namespace kaigen::phantom::Theme
         const auto fb = bounds.toFloat();
         if (fb.isEmpty()) return;
 
+        // Vertical gradient: 38% white top → 4% white bottom (matches CSS .hdr).
         juce::ColourGradient grad(headerHi, fb.getX(), fb.getY(),
                                    headerLo, fb.getX(), fb.getBottom(), false);
         g.setGradientFill(grad);
         g.fillRect(fb);
 
-        // Bottom hairline separator.
+        // Soft fading separator at the bottom (matches CSS .hdr::after):
+        // transparent at the edges, ~7% black across the central 50%, fading
+        // to 0 at 5% / 95%. Replaces the previous hard hairline.
+        const float yLine = fb.getBottom() - 0.5f;
+        const float xL    = fb.getX() + fb.getWidth() * 0.05f;
+        const float xR    = fb.getRight() - fb.getWidth() * 0.05f;
+        const float xMidL = fb.getX() + fb.getWidth() * 0.25f;
+        const float xMidR = fb.getRight() - fb.getWidth() * 0.25f;
+
         g.setColour(headerSeparator);
-        g.drawHorizontalLine(bounds.getBottom() - 1, fb.getX(), fb.getRight());
+        g.fillRect(juce::Rectangle<float>(xMidL, yLine - 0.5f, xMidR - xMidL, 1.0f));
+
+        juce::ColourGradient fadeL(juce::Colour(0x00000000), xL, yLine,
+                                    headerSeparator,         xMidL, yLine, false);
+        g.setGradientFill(fadeL);
+        g.fillRect(juce::Rectangle<float>(xL, yLine - 0.5f, xMidL - xL, 1.0f));
+
+        juce::ColourGradient fadeR(headerSeparator,         xMidR, yLine,
+                                    juce::Colour(0x00000000), xR, yLine, false);
+        g.setGradientFill(fadeR);
+        g.fillRect(juce::Rectangle<float>(xMidR, yLine - 0.5f, xR - xMidR, 1.0f));
+    }
+
+    void paintGlassPill(juce::Graphics& g, juce::Rectangle<float> bounds)
+    {
+        if (bounds.isEmpty()) return;
+        const float corner = bounds.getHeight() * 0.5f;
+
+        // Body: vertical gradient matching CSS
+        // linear-gradient(180deg, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.02) 100%).
+        juce::ColourGradient body(juce::Colour(0x0f000000), bounds.getX(), bounds.getY(),
+                                   juce::Colour(0x05000000), bounds.getX(), bounds.getBottom(),
+                                   false);
+        g.setGradientFill(body);
+        g.fillRoundedRectangle(bounds, corner);
+
+        // Outer "lifted" highlight 1px below — CSS: 0 1px 2px rgba(255,255,255,0.6).
+        // Approximated as a soft light line just below the bottom edge.
+        g.setColour(juce::Colour(0x70FFFFFF));
+        g.drawLine(bounds.getX() + corner * 0.6f, bounds.getBottom() + 0.5f,
+                    bounds.getRight() - corner * 0.6f, bounds.getBottom() + 0.5f, 0.6f);
+
+        // Inset top dark line — CSS: inset 0 2px 4px rgba(0,0,0,0.10).
+        g.setColour(juce::Colour(0x1a000000));
+        g.drawLine(bounds.getX() + corner * 0.6f, bounds.getY() + 0.5f,
+                    bounds.getRight() - corner * 0.6f, bounds.getY() + 0.5f, 0.7f);
+
+        // Inset bottom white highlight — CSS: inset 0 -1px 2px rgba(255,255,255,0.3).
+        g.setColour(juce::Colour(0x4dFFFFFF));
+        g.drawLine(bounds.getX() + corner * 0.6f, bounds.getBottom() - 0.7f,
+                    bounds.getRight() - corner * 0.6f, bounds.getBottom() - 0.7f, 0.5f);
+
+        // Subtle outer outline so the pill has a defined edge against the strip.
+        g.setColour(juce::Colour(0x14000000));
+        g.drawRoundedRectangle(bounds.reduced(0.25f), corner, 0.5f);
     }
 
     void paintVisualizerInset(juce::Graphics& g, juce::Rectangle<int> bounds, float cornerRadius)

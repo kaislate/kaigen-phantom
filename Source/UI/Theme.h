@@ -111,6 +111,12 @@ namespace kaigen::phantom::Theme
     /** Paints the editor's top header strip (linear gradient + bottom hairline). */
     void paintHeaderStrip(juce::Graphics& g, juce::Rectangle<int> bounds);
 
+    /** Depressed glass pill used in the top-bar preset selector. Renders a
+     *  subtle dark inset gradient with an outer light "lifted" highlight,
+     *  matching the CSS #preset-name-container box-shadow stack. Caller
+     *  passes the rect; corner radius is half the height (full pill). */
+    void paintGlassPill(juce::Graphics& g, juce::Rectangle<float> bounds);
+
     /** Paints a pitch-black inset surface for visualizers (hard inner shadow). */
     void paintVisualizerInset(juce::Graphics& g, juce::Rectangle<int> bounds, float cornerRadius = 6.0f);
 

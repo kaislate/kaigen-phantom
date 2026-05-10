@@ -44,6 +44,14 @@ void PhantomLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& b
     const auto styleHint = b.getProperties().getWithDefault("phantom-style", "");
     const bool isHeaderRaised = styleHint == juce::var("header-raised");
     const bool isMtSegment    = styleHint == juce::var("mt-segment");
+    const bool isHeaderGlyph  = styleHint == juce::var("header-glyph");
+
+    if (isHeaderGlyph)
+    {
+        // No background — pure etched glyph. Hover painted in drawButtonText
+        // via colour shift; nothing to fill here.
+        return;
+    }
 
     if (isMtSegment)
     {
@@ -148,16 +156,25 @@ void PhantomLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& b
 }
 
 void PhantomLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& b,
-                                          bool /*shouldDrawButtonAsHighlighted*/,
+                                          bool shouldDrawButtonAsHighlighted,
                                           bool shouldDrawButtonAsDown)
 {
     const bool isOn = b.getToggleState() || shouldDrawButtonAsDown;
     const auto styleHint = b.getProperties().getWithDefault("phantom-style", "");
     const bool isHeaderRaised = styleHint == juce::var("header-raised");
     const bool isMtSegment    = styleHint == juce::var("mt-segment");
+    const bool isHeaderGlyph  = styleHint == juce::var("header-glyph");
 
     juce::Colour colour;
-    if (isHeaderRaised)
+    if (isHeaderGlyph)
+    {
+        // CSS .preset-controls buttons: color #656769 (rest), darker on hover.
+        // 88% black on press, 70% on hover, ~40% (the spec #656769 = ~60%) at rest.
+        colour = shouldDrawButtonAsDown        ? juce::Colour(0xe0000000)
+               : shouldDrawButtonAsHighlighted ? juce::Colour(0xb3000000)
+                                                : juce::Colour(0xff656769);
+    }
+    else if (isHeaderRaised)
         colour = Theme::textOnLightActive;   // ~62% black, readable on the silver pill
     else if (isMtSegment)
         colour = isOn ? juce::Colour(0x94000000)    // ~58% black active (CSS spec)
@@ -166,16 +183,17 @@ void PhantomLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& b,
         colour = isOn ? b.findColour(juce::TextButton::textColourOnId)
                       : b.findColour(juce::TextButton::textColourOffId);
 
-    // Smaller font + wider kerning for .mt segments.
-    const float fontPx   = isMtSegment ? juce::jmin(10.0f, b.getHeight() * 0.50f)
-                                        : juce::jmin(13.0f, b.getHeight() * 0.50f);
+    const float fontPx  = isMtSegment    ? juce::jmin(10.0f, b.getHeight() * 0.50f)
+                        : isHeaderGlyph  ? juce::jmin(13.0f, b.getHeight() * 0.65f)
+                                          : juce::jmin(13.0f, b.getHeight() * 0.50f);
     const float kerning  = isMtSegment ? 0.25f : 0.10f;
-    juce::Font font(juce::FontOptions("Space Grotesk", fontPx, juce::Font::bold));
+    juce::Font font(juce::FontOptions("Space Grotesk", fontPx,
+                                      isHeaderGlyph ? juce::Font::plain : juce::Font::bold));
     font.setExtraKerningFactor(kerning);
 
-    // Etched: shadow below glyph + foreground.
     g.setFont(font);
-    g.setColour(juce::Colour(0x80FFFFFF));   // 50% white shadow
+    // White shadow 1px below glyph (etched effect).
+    g.setColour(juce::Colour(0x80FFFFFF));
     g.drawText(b.getButtonText(), b.getLocalBounds().translated(0, 1),
                 juce::Justification::centred, false);
     g.setColour(colour);

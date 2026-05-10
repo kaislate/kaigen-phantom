@@ -31,24 +31,41 @@ namespace
                 return (int) i;
         return -1;
     }
+
+    // UTF-8 byte sequences for the glyph text. Defined here so the source
+    // file's encoding doesn't matter.
+    inline juce::String glyphHeart() { return juce::String(juce::CharPointer_UTF8("\xE2\x99\xA1")); }   // ♡
+    inline juce::String glyphPrev () { return juce::String(juce::CharPointer_UTF8("\xE2\x96\xB2")); }   // ▲
+    inline juce::String glyphNext () { return juce::String(juce::CharPointer_UTF8("\xE2\x96\xBC")); }   // ▼
+    inline juce::String glyphSave () { return juce::String(juce::CharPointer_UTF8("\xF0\x9F\x92\xBE")); } // 💾
 }
 
 PresetSelector::PresetSelector(PhantomProcessor& p, juce::AudioProcessorValueTreeState& a)
     : processor(p), apvts(a)
 {
-    prevButton .onClick = [this] { prevPreset(); };
-    nextButton .onClick = [this] { nextPreset(); };
-    browseButton.onClick = [this] { if (onBrowseRequested) onBrowseRequested(); };
-    saveButton .onClick = [this] { saveDialog(); };
-    addAndMakeVisible(prevButton);
-    addAndMakeVisible(nextButton);
-    addAndMakeVisible(browseButton);
-    addAndMakeVisible(saveButton);
+    libraryButton.setButtonText("|||");
+    heartButton  .setButtonText(glyphHeart());
+    prevButton   .setButtonText(glyphPrev());
+    nextButton   .setButtonText(glyphNext());
+    saveButton   .setButtonText(glyphSave());
 
-    // Tag header buttons so PhantomLookAndFeel paints them as raised neumorphic pills
-    // (instead of the default recessed-toggle pill).
-    for (auto* b : { &prevButton, &nextButton, &browseButton, &saveButton })
-        b->getProperties().set("phantom-style", "header-raised");
+    libraryButton.onClick = [this] { if (onBrowseRequested) onBrowseRequested(); };
+    heartButton  .onClick = [] { /* favorites — wired in a follow-up */ };
+    prevButton   .onClick = [this] { prevPreset(); };
+    nextButton   .onClick = [this] { nextPreset(); };
+    saveButton   .onClick = [this] { saveDialog(); };
+
+    for (auto* b : { &libraryButton, &heartButton, &prevButton, &nextButton, &saveButton })
+    {
+        b->getProperties().set("phantom-style", "header-glyph");
+        addAndMakeVisible(b);
+    }
+
+    libraryButton.setTooltip("Open preset browser");
+    heartButton  .setTooltip("Favorite (coming soon)");
+    prevButton   .setTooltip("Previous preset");
+    nextButton   .setTooltip("Next preset");
+    saveButton   .setTooltip("Save preset");
 }
 
 PresetSelector::~PresetSelector() = default;
@@ -105,34 +122,59 @@ void PresetSelector::saveDialog()
             if (saved.isNotEmpty())
                 setCurrentPreset(saved, "User");
         }),
-        false);  // unique_ptr in callback owns the deletion
+        false);
 }
 
 void PresetSelector::paint(juce::Graphics& g)
 {
-    g.fillAll(Theme::panelBg);
+    // The TopBar paints the strip background — we only paint the glass pill
+    // and the preset name on top of it.
+    Theme::paintGlassPill(g, pillBounds.toFloat());
 
-    // Current preset name in center.
-    g.setColour(Theme::textPrimary);
-    g.setFont(juce::FontOptions("Space Grotesk", 13.0f, juce::Font::bold));
+    // Preset name centered inside the pill (between heart on left and any
+    // future modified-asterisk on the right). Etched dark on the glass.
+    const auto pillTextArea = pillBounds.reduced(28, 0);
+    g.setFont(juce::FontOptions("Space Grotesk", 12.0f, juce::Font::plain));
+    g.setColour(juce::Colour(0xbf000000));   // ~75% black, matches CSS rgba(0,0,0,0.75)
     const auto display = currentPresetName.isEmpty() ? juce::String("Default") : currentPresetName;
-    auto labelArea = getLocalBounds().reduced(120, 0);
-    g.drawText(display, labelArea.toFloat(), juce::Justification::centred, true);
+    g.drawText(display, pillTextArea, juce::Justification::centred, true);
+}
+
+void PresetSelector::mouseDown(const juce::MouseEvent& e)
+{
+    // Click anywhere on the glass pill (outside the heart) opens the browser.
+    if (pillBounds.contains(e.getPosition()) && ! heartButton.getBounds().contains(e.getPosition()))
+        if (onBrowseRequested) onBrowseRequested();
 }
 
 void PresetSelector::resized()
 {
-    auto area = getLocalBounds().reduced(8, 4);
+    // Layout left → right: ||| [♡  Name  *] ▲ ▼ 💾
+    auto area = getLocalBounds().reduced(0, 4);
 
-    // Left: prev / next
-    prevButton.setBounds(area.removeFromLeft(28));
-    area.removeFromLeft(2);
-    nextButton.setBounds(area.removeFromLeft(28));
+    constexpr int glyphW       = 26;
+    constexpr int gapAroundPill =  6;
+    constexpr int heartW       = 18;
+    constexpr int pillMinW     = 220;
 
-    // Right: save / browse (right-to-left layout)
-    saveButton  .setBounds(area.removeFromRight(60));
-    area.removeFromRight(4);
-    browseButton.setBounds(area.removeFromRight(60));
+    libraryButton.setBounds(area.removeFromLeft(glyphW));
+    area.removeFromLeft(gapAroundPill);
+
+    // Save sits at the right end; prev/next sit to its left.
+    saveButton.setBounds(area.removeFromRight(glyphW));
+    area.removeFromRight(2);
+    nextButton.setBounds(area.removeFromRight(glyphW));
+    prevButton.setBounds(area.removeFromRight(glyphW));
+    area.removeFromRight(gapAroundPill);
+
+    // Whatever's left is the glass pill (with a sensible minimum).
+    auto pill = area;
+    if (pill.getWidth() < pillMinW)
+        pill.setWidth(pillMinW);
+    pillBounds = pill;
+
+    // Heart sits inside the pill on the left.
+    heartButton.setBounds(pill.getX() + 6, pill.getY(), heartW, pill.getHeight());
 }
 
 } // namespace kaigen::phantom
