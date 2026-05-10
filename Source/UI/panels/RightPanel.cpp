@@ -157,16 +157,20 @@ void RightPanel::resized()
 
     x += sectionGap;
 
-    // --- Levels: meter + 2 medium knobs + meter ---
+    // --- Levels: meter + 2 medium knobs + meter ───────────────────────
+    // Meters sit inside their own 8-wide depressed slots, moved inward
+    // by 2 px each (closer to the centre of the section) and tightened
+    // against the In/Out knobs.
     const int levelsCardX = x - 4;
-    inMeter.setBounds(x, knobRowTop + (kMedium - 90) / 2, 14, 90);
-    x += 14 + 6;
+    constexpr int kMeterW = 8;
+    inMeter.setBounds(x + 2, knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
+    x += kMeterW + 4;
     inGainKnob .setBounds(x, knobRowTop, kMedium, kMedium);
     x += kMedium - knobOverlap;
     outGainKnob.setBounds(x, knobRowTop, kMedium, kMedium);
-    x += kMedium + 6;
-    outMeter.setBounds(x, knobRowTop + (kMedium - 90) / 2, 14, 90);
-    x += 14;
+    x += kMedium + 4;
+    outMeter.setBounds(x, knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
+    x += kMeterW;
     const int levelsCardRight = x + 4;
     levelsCardBounds = juce::Rectangle<int>(levelsCardX, cardTop,
                                              levelsCardRight - levelsCardX, cardHeight);
@@ -189,7 +193,9 @@ void RightPanel::resized()
         // Mini knob row spans the FULL panel width (toggle is above it now).
         // Component natural size: 48 body + 17 shadow pad × 2 + 11 label
         //   = 82 wide × 93 tall.
-        constexpr int miniRowY = advancedToggleY + advancedToggleH + 6;
+        // 14-px gap below toggle so the mini knob's TOP shadow halo (17 px)
+        // clears the title-notch dip area (16 px deep) by ~7 px.
+        constexpr int miniRowY = advancedToggleY + advancedToggleH + 14;
         constexpr int miniW    = 82;
         constexpr int miniH    = 93;
         const int rowLeft  = 12;
