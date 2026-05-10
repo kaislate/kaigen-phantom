@@ -140,7 +140,7 @@ void Oscilloscope::paint(juce::Graphics& g)
     g.drawHorizontalLine((int) mid, 0.0f, w);
 
     // ── 3. Vertical time-grid lines (7 lines at i*w/8, rgba(255,255,255,0.03)) ─
-    g.setColour(juce::Colour(0x07ffffff)); // 0x07 ≈ 3% of 255
+    g.setColour(juce::Colour(0x08ffffff)); // 0x08 = 8/255 ≈ 3%
     for (int i = 1; i < 8; ++i)
     {
         const float x = std::round(w * (float) i / 8.0f) + 0.5f;
