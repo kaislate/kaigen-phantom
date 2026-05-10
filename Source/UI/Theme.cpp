@@ -108,6 +108,93 @@ namespace kaigen::phantom::Theme
         }
     }
 
+    namespace
+    {
+        // Build a rounded-rect path with a quadratic notch dipping inward at the
+        // top center (the swoop where the section title sits).
+        juce::Path buildNotchedRoundedRect(juce::Rectangle<float> r, float corner,
+                                            float notchW, float notchD)
+        {
+            juce::Path p;
+            const float x = r.getX();
+            const float y = r.getY();
+            const float w = r.getWidth();
+            const float h = r.getHeight();
+            const float cx = x + w * 0.5f;
+            // Clamp notch so it never exceeds the available straight top section.
+            const float maxNotchHalf = juce::jmax(0.0f, w * 0.5f - corner - 4.0f);
+            const float notchHalf    = juce::jmin(notchW * 0.5f, maxNotchHalf);
+
+            p.startNewSubPath(x + corner, y);
+            p.lineTo(cx - notchHalf, y);
+            // Quadratic dip — control point below the top edge.
+            p.quadraticTo(cx, y + notchD, cx + notchHalf, y);
+            p.lineTo(x + w - corner, y);
+            p.quadraticTo(x + w, y, x + w, y + corner);
+            p.lineTo(x + w, y + h - corner);
+            p.quadraticTo(x + w, y + h, x + w - corner, y + h);
+            p.lineTo(x + corner, y + h);
+            p.quadraticTo(x, y + h, x, y + h - corner);
+            p.lineTo(x, y + corner);
+            p.quadraticTo(x, y, x + corner, y);
+            p.closeSubPath();
+            return p;
+        }
+    }
+
+    void paintInsetCardWithNotch(juce::Graphics& g, juce::Rectangle<int> bounds,
+                                   float cornerRadius, float notchWidth, float notchDepth)
+    {
+        const auto fb = bounds.toFloat();
+        if (fb.isEmpty()) return;
+
+        const auto path = buildNotchedRoundedRect(fb, cornerRadius, notchWidth, notchDepth);
+
+        // Subtle wash background.
+        g.setColour(insetSurfaceTint);
+        g.fillPath(path);
+
+        // Edge gradients clipped to the path.
+        juce::Graphics::ScopedSaveState saved(g);
+        g.reduceClipRegion(path);
+
+        const float depth = 14.0f;
+        const juce::Colour silver = juce::Colour::fromRGB(220, 222, 226);
+
+        // Top — dark inset shadow.
+        {
+            juce::ColourGradient grad(juce::Colour(0x33000000), fb.getX(), fb.getY(),
+                                       juce::Colour(0x00000000), fb.getX(), fb.getY() + depth + notchDepth,
+                                       false);
+            g.setGradientFill(grad);
+            g.fillRect(fb.withHeight(depth + notchDepth));
+        }
+        // Left — dark.
+        {
+            juce::ColourGradient grad(juce::Colour(0x33000000), fb.getX(), fb.getY(),
+                                       juce::Colour(0x00000000), fb.getX() + depth, fb.getY(),
+                                       false);
+            g.setGradientFill(grad);
+            g.fillRect(fb.withWidth(depth));
+        }
+        // Bottom — silver highlight.
+        {
+            juce::ColourGradient grad(silver.withAlpha(0.72f), fb.getX(), fb.getBottom(),
+                                       silver.withAlpha(0.0f),  fb.getX(), fb.getBottom() - depth,
+                                       false);
+            g.setGradientFill(grad);
+            g.fillRect(fb.withTop(fb.getBottom() - depth));
+        }
+        // Right — silver highlight.
+        {
+            juce::ColourGradient grad(silver.withAlpha(0.72f), fb.getRight(), fb.getY(),
+                                       silver.withAlpha(0.0f),  fb.getRight() - depth, fb.getY(),
+                                       false);
+            g.setGradientFill(grad);
+            g.fillRect(fb.withLeft(fb.getRight() - depth));
+        }
+    }
+
     void paintHeaderStrip(juce::Graphics& g, juce::Rectangle<int> bounds)
     {
         const auto fb = bounds.toFloat();

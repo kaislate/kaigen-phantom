@@ -12,7 +12,7 @@ namespace
     {
         const auto labelFont = juce::Font(juce::FontOptions("Space Grotesk", 10.0f, juce::Font::bold))
                                    .withExtraKerningFactor(0.25f);
-        Theme::drawEtchedText(g, title.toUpperCase(), bounds, juce::Justification::centredLeft,
+        Theme::drawEtchedText(g, title.toUpperCase(), bounds, juce::Justification::centred,
                               labelFont, Theme::textOnLightLabel);
     }
 }
@@ -96,22 +96,21 @@ void RightPanel::paint(juce::Graphics& g)
     // Silver panel surface — replaces the flat panelBg fill.
     Theme::paintSilverPanel(g, getLocalBounds());
 
-    // Sub-section inset cards (neumorphic dish beneath each section's controls).
-    // Visualizer area is excluded — it gets the pitch-black inset in Task 5.
+    // Sub-section inset cards with title-notch at top center.
     if (! harmonicCardBounds.isEmpty())
-        Theme::paintInsetCard(g, harmonicCardBounds, 14.0f);
+        Theme::paintInsetCardWithNotch(g, harmonicCardBounds, 14.0f, 130.0f, 8.0f);
     if (! stereoCardBounds.isEmpty())
-        Theme::paintInsetCard(g, stereoCardBounds, 14.0f);
+        Theme::paintInsetCardWithNotch(g, stereoCardBounds, 14.0f, 70.0f, 8.0f);
     if (! levelsCardBounds.isEmpty())
-        Theme::paintInsetCard(g, levelsCardBounds, 14.0f);
+        Theme::paintInsetCardWithNotch(g, levelsCardBounds, 14.0f, 70.0f, 8.0f);
     if (! advancedCardBounds.isEmpty())
-        Theme::paintInsetCard(g, advancedCardBounds, 14.0f);
+        Theme::paintInsetCardWithNotch(g, advancedCardBounds, 14.0f, 110.0f, 8.0f);
 
-    // Section header labels (etched text, established in Task 3).
-    // x-positions match the section columns laid out in resized().
-    drawSectionHeader(g, juce::Rectangle<int>(harmonicCardBounds.getX() + 4, 8, 200, 16), "Harmonic Engine");
-    drawSectionHeader(g, juce::Rectangle<int>(stereoCardBounds.getX()  + 4, 8, 100, 16), "Stereo");
-    drawSectionHeader(g, juce::Rectangle<int>(levelsCardBounds.getX()  + 4, 8, 200, 16), "Levels");
+    // Section titles — centered in the notch.
+    drawSectionHeader(g, juce::Rectangle<int>(harmonicCardBounds.getX(), harmonicCardBounds.getY() - 4, harmonicCardBounds.getWidth(), 14), "Harmonic Engine");
+    drawSectionHeader(g, juce::Rectangle<int>(stereoCardBounds.getX(),   stereoCardBounds.getY()   - 4, stereoCardBounds.getWidth(),   14), "Stereo");
+    drawSectionHeader(g, juce::Rectangle<int>(levelsCardBounds.getX(),   levelsCardBounds.getY()   - 4, levelsCardBounds.getWidth(),   14), "Levels");
+    drawSectionHeader(g, juce::Rectangle<int>(advancedCardBounds.getX(), advancedCardBounds.getY() - 4, advancedCardBounds.getWidth(), 14), "Advanced");
 }
 
 void RightPanel::resized()
@@ -175,10 +174,9 @@ void RightPanel::resized()
     area.removeFromTop(knobRowTop + knobRowHeight + cardPadY);
 
     // --- Advanced section: toggle ABOVE the mini knob row ---
-    // Top row ends at knobRowTop + knobRowHeight (= 36 + 136 = 172). The
-    // Advanced toggle sits a short gap below, hugging the left edge so the
-    // full panel width is available for the mini-knob row beneath it.
-    constexpr int advancedToggleY = 182;
+    // Add ~32 px of breathing room below the top row before the Advanced
+    // section starts, matching the photo reference.
+    constexpr int advancedToggleY = 220;          // was 182
     constexpr int advancedToggleH = 20;
     advancedToggle.setBounds(12, advancedToggleY, 100, advancedToggleH);
 

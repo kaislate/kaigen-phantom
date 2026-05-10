@@ -100,6 +100,14 @@ namespace kaigen::phantom::Theme
     /** Paints a sub-panel "candy-inner" inset card (rounded, neumorphic dish). */
     void paintInsetCard(juce::Graphics& g, juce::Rectangle<int> bounds, float cornerRadius = 14.0f);
 
+    /** Paints an inset card with a swoop-inward notch at the top center where
+     *  a section title sits. Same edge-gradient inset shadow/highlight as
+     *  `paintInsetCard`, but the path has a quadratic dip in the top edge. */
+    void paintInsetCardWithNotch(juce::Graphics& g, juce::Rectangle<int> bounds,
+                                  float cornerRadius = 14.0f,
+                                  float notchWidth = 110.0f,
+                                  float notchDepth = 8.0f);
+
     /** Paints the editor's top header strip (linear gradient + bottom hairline). */
     void paintHeaderStrip(juce::Graphics& g, juce::Rectangle<int> bounds);
 

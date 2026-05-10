@@ -11,7 +11,7 @@ namespace
     {
         const auto labelFont = juce::Font(juce::FontOptions("Space Grotesk", 10.0f, juce::Font::bold))
                                    .withExtraKerningFactor(0.25f);
-        Theme::drawEtchedText(g, title.toUpperCase(), bounds, juce::Justification::centredLeft,
+        Theme::drawEtchedText(g, title.toUpperCase(), bounds, juce::Justification::centred,
                               labelFont, Theme::textOnLightLabel);
     }
 }
@@ -84,16 +84,15 @@ void LeftPanel::paint(juce::Graphics& g)
     // Silver panel surface — replaces the flat panelBg fill.
     Theme::paintSilverPanel(g, getLocalBounds());
 
-    // Sub-section inset cards (neumorphic dish beneath each section's controls).
-    // Recipe wheel area is excluded — it gets its own treatment in Task 8.
+    // Sub-section inset cards with title-notch at top center.
     if (! ghostCardBounds.isEmpty())
-        Theme::paintInsetCard(g, ghostCardBounds, 14.0f);
+        Theme::paintInsetCardWithNotch(g, ghostCardBounds, 14.0f, 90.0f, 8.0f);
     if (! filterCardBounds.isEmpty())
-        Theme::paintInsetCard(g, filterCardBounds, 14.0f);
+        Theme::paintInsetCardWithNotch(g, filterCardBounds, 14.0f, 90.0f, 8.0f);
 
-    // Section header labels (etched text, established in Task 3).
-    drawSectionHeader(g, juce::Rectangle<int>(ghostCardBounds.getX() + 4, ghostCardBounds.getY() + 6, 200, 16), "Ghost");
-    drawSectionHeader(g, juce::Rectangle<int>(filterCardBounds.getX() + 4, filterCardBounds.getY() + 6, 200, 16), "Filter");
+    // Section titles — centered in the notch, etched dark-on-silver.
+    drawSectionHeader(g, juce::Rectangle<int>(ghostCardBounds.getX(),  ghostCardBounds.getY() - 4,  ghostCardBounds.getWidth(),  14), "Ghost");
+    drawSectionHeader(g, juce::Rectangle<int>(filterCardBounds.getX(), filterCardBounds.getY() - 4, filterCardBounds.getWidth(), 14), "Filter");
 
     // ── H2..H8 spoke labels (etched in the silver around the wheel) ───
     // The wheel component is square at the top of the panel; we paint the
@@ -142,11 +141,9 @@ void LeftPanel::resized()
     constexpr int kMedium = 136;
 
     // ── Ghost section ──────────────────────────────────────────────────
-    // Large + Medium + Medium = 178 + 136 + 136 = 450; panel is 420.
-    // We allow controlled overlap so shadow halos blend together.
-    constexpr int ghostY  = 386;   // y of knob component top
+    constexpr int ghostY  = 392;   // knob component top
     const int ghostTotal  = kLarge + kMedium + kMedium;
-    const int ghostOverlap = (ghostTotal - panelW + 16) / 2;  // split overlap
+    const int ghostOverlap = (ghostTotal - panelW + 16) / 2;
     int gx = 8;
     ghostAmountKnob.setBounds(gx, ghostY, kLarge, kLarge);
     gx += kLarge - ghostOverlap;
@@ -156,27 +153,26 @@ void LeftPanel::resized()
 
     ghostModeToggle.setBounds(12, ghostY + kLarge + 4, panelW - 24, 26);
 
-    // ── Filter section ─────────────────────────────────────────────────
-    // Medium + 40px link gap + Medium = 312; centered in 420.
-    constexpr int filterY = 600;
+    // ── Filter section (more vertical gap from Ghost) ──────────────────
+    constexpr int filterY = 660;   // was 600 — bumped down for breathing room
     const int filterTotal = kMedium + 40 + kMedium;
     int fx = (panelW - filterTotal) / 2;
     lpfKnob.setBounds(fx, filterY, kMedium, kMedium);
     filterLinkBtn.setBounds(fx + kMedium + 6, filterY + (kMedium - 28) / 2, 28, 28);
     hpfKnob.setBounds(fx + kMedium + 40, filterY, kMedium, kMedium);
 
-    filterSlopeToggle.setBounds(12, filterY + kMedium + 4, 220, 26);
+    filterSlopeToggle.setBounds(12, filterY + kMedium + 4, panelW - 24, 22);
 
-    // ── Card bounds (header sits ~24 px above knob top) ────────────────
+    // ── Card bounds — title sits IN the notch above the card top ──────
     constexpr int cardPadX = 8;
-    const int ghostCardTop    = ghostY - 24;
+    const int ghostCardTop    = ghostY - 8;    // small inset above knobs
     const int ghostCardBottom = ghostY + kLarge + 4 + 26 + 8;
     ghostCardBounds = juce::Rectangle<int>(cardPadX, ghostCardTop,
                                            panelW - cardPadX * 2,
                                            ghostCardBottom - ghostCardTop);
 
-    const int filterCardTop    = filterY - 24;
-    const int filterCardBottom = filterY + kMedium + 4 + 26 + 8;
+    const int filterCardTop    = filterY - 8;
+    const int filterCardBottom = filterY + kMedium + 4 + 22 + 8;
     filterCardBounds = juce::Rectangle<int>(cardPadX, filterCardTop,
                                              panelW - cardPadX * 2,
                                              filterCardBottom - filterCardTop);
