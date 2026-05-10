@@ -14,8 +14,9 @@ namespace
 
 WordSelector::WordSelector(juce::AudioProcessorValueTreeState& apvts,
                             juce::StringRef paramID,
-                            const juce::StringArray& lbls)
-    : labels(lbls)
+                            const juce::StringArray& lbls,
+                            int rows)
+    : labels(lbls), numRows(juce::jmax(1, rows))
 {
     combo.setVisible(false);
     addChildComponent(combo);
@@ -39,12 +40,18 @@ void WordSelector::resized()
     wordBounds.clear();
     if (labels.isEmpty()) return;
 
-    // Equal-width columns spanning the full bounds. Vertical etched dividers
-    // sit between adjacent columns at the column boundaries.
+    // Grid layout: ceil(n/rows) columns × `numRows` rows. Cells span
+    // the full bounds; last row may have fewer items than columns.
     const int n = labels.size();
-    const int colW = getWidth() / n;
+    const int cols = (n + numRows - 1) / numRows;
+    const int colW = getWidth() / cols;
+    const int rowH = getHeight() / numRows;
     for (int i = 0; i < n; ++i)
-        wordBounds.add(juce::Rectangle<int>(i * colW, 0, colW, getHeight()));
+    {
+        const int r = i / cols;
+        const int c = i % cols;
+        wordBounds.add(juce::Rectangle<int>(c * colW, r * rowH, colW, rowH));
+    }
 }
 
 int WordSelector::hitWord(juce::Point<int> p) const
@@ -65,23 +72,27 @@ void WordSelector::paint(juce::Graphics& g)
     font.setExtraKerningFactor(kKerning);
     g.setFont(font);
 
-    // ── Etched vertical dividers between slots ───────────────────────────
-    // CSS .preset-sep: 2x14 px, gradient half-dark / half-white (creates an
-    // engraved seam). Drawn at column boundaries.
-    for (int i = 1; i < labels.size(); ++i)
+    // ── Etched vertical dividers between columns (per row) ───────────────
+    const int n = labels.size();
+    const int cols = (n + numRows - 1) / numRows;
+    const int rowH = getHeight() / juce::jmax(1, numRows);
+    for (int r = 0; r < numRows; ++r)
     {
-        const int sepX = wordBounds[i].getX();
-        const int yMid = getHeight() / 2;
-        const int sepH = juce::jmin(14, getHeight() - 6);
-        const int yTop = yMid - sepH / 2;
-        // Dark side (left of seam) — engraved-into-surface.
-        g.setColour(juce::Colour(0x38000000));   // 22% black
-        g.drawLine((float) sepX - 0.5f, (float) yTop,
-                    (float) sepX - 0.5f, (float) (yTop + sepH), 1.0f);
-        // Bright side (right of seam) — surface highlight.
-        g.setColour(juce::Colour(0x80FFFFFF));   // 50% white
-        g.drawLine((float) sepX + 0.5f, (float) yTop,
-                    (float) sepX + 0.5f, (float) (yTop + sepH), 1.0f);
+        const int rowStart = r * cols;
+        const int rowEnd   = juce::jmin(n, rowStart + cols);
+        for (int i = rowStart + 1; i < rowEnd; ++i)
+        {
+            const int sepX = wordBounds[i].getX();
+            const int yMid = r * rowH + rowH / 2;
+            const int sepH = juce::jmin(rowH - 4, 14);
+            const int yTop = yMid - sepH / 2;
+            g.setColour(juce::Colour(0x38000000));
+            g.drawLine((float) sepX - 0.5f, (float) yTop,
+                        (float) sepX - 0.5f, (float) (yTop + sepH), 1.0f);
+            g.setColour(juce::Colour(0x80FFFFFF));
+            g.drawLine((float) sepX + 0.5f, (float) yTop,
+                        (float) sepX + 0.5f, (float) (yTop + sepH), 1.0f);
+        }
     }
 
     // ── Words ────────────────────────────────────────────────────────────

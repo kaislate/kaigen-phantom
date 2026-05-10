@@ -359,6 +359,20 @@ void PhantomKnob::paintValueText(juce::Graphics& g, juce::Point<float> centre,
     // Pass 3: alpha 1.00 (fully opaque white).
     g.setColour(juce::Colours::white);
     g.drawText(text, rect, juce::Justification::centred, false);
+
+    // ── Knob label below the value text (cursive, only Large + Medium) ──
+    if (labelText.isNotEmpty() && sizeVariant != Size::Small)
+    {
+        const float labelPx = (sizeVariant == Size::Large) ? 11.0f : 9.0f;
+        const auto labelFont = juce::Font(juce::FontOptions("Segoe Script", labelPx,
+                                                              juce::Font::italic));
+        g.setFont(labelFont);
+        const auto labelY = centre.y + yOffset + textH * 0.5f + 2.0f;
+        const juce::Rectangle<float> lblRect(centre.x - maxW * 0.5f, labelY,
+                                              maxW, labelPx + 4.0f);
+        g.setColour(juce::Colour(0xCCFFFFFF));   // ~80% white
+        g.drawText(labelText.toLowerCase(), lblRect, juce::Justification::centred, false);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

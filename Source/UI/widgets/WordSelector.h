@@ -15,7 +15,8 @@ class WordSelector : public juce::Component, private juce::ComboBox::Listener
 public:
     WordSelector(juce::AudioProcessorValueTreeState& apvts,
                  juce::StringRef paramID,
-                 const juce::StringArray& labels);
+                 const juce::StringArray& labels,
+                 int numRows = 1);
     ~WordSelector() override;
 
     void paint(juce::Graphics& g) override;
@@ -33,6 +34,7 @@ private:
     juce::StringArray labels;
     juce::Array<juce::Rectangle<int>> wordBounds;   // computed in resized()
     int hoverIndex { -1 };
+    int numRows    { 1 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WordSelector)
 };

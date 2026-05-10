@@ -131,10 +131,10 @@ namespace kaigen::phantom::Theme
             const float cx = x + w * 0.5f;
             const float maxNotchHalf = juce::jmax(0.0f, w * 0.5f - corner - 4.0f);
             const float notchHalf    = juce::jmin(notchW * 0.5f, maxNotchHalf);
-            // Wider taper distance — slope ~equal to dip depth so the side
-            // angles ~45° and the silver bezel reads as gently curving into
-            // the tray rather than dropping abruptly.
-            const float taper        = juce::jmin(dipDepth * 1.5f, notchHalf * 0.5f);
+            // Generous taper — slope ~2× the dip depth wide so the silver
+            // bezel reads as a long gentle curve into the tray rather than
+            // a sharp drop.
+            const float taper        = juce::jmin(dipDepth * 2.4f, notchHalf * 0.6f);
 
             p.startNewSubPath(x + corner, y);
             p.lineTo(cx - notchHalf, y);

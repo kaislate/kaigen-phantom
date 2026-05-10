@@ -24,7 +24,8 @@ LeftPanel::LeftPanel(juce::AudioProcessorValueTreeState& a)
                       "a_recipe_h5", "a_recipe_h6", "a_recipe_h7", "a_recipe_h8"
                   }),
       recipePresetSelector(apvts, "a_recipe_preset",
-                           { "Warm", "Aggr", "Hollow", "Dense", "Stable", "Weird", "Custom" }),
+                           { "Warm", "Aggr", "Hollow", "Dense", "Stable", "Weird", "Custom" },
+                           /*numRows*/ 3),
       ghostAmountKnob  (apvts, "a_ghost",              PhantomKnob::Size::Large,  "Amount"),
       crossoverKnob    (apvts, "a_phantom_threshold",  PhantomKnob::Size::Medium, "Crossover"),
       strengthKnob     (apvts, "a_phantom_strength",   PhantomKnob::Size::Medium, "Strength"),
@@ -87,9 +88,9 @@ void LeftPanel::paint(juce::Graphics& g)
     // Sub-section inset cards with title-notch at top center. Notch width
     // sized to fully encompass the title text (with breathing room).
     if (! ghostCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, ghostCardBounds, 14.0f, 80.0f, 16.0f);
+        Theme::paintInsetCardWithNotch(g, ghostCardBounds, 14.0f, 130.0f, 16.0f);
     if (! filterCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, filterCardBounds, 14.0f, 80.0f, 16.0f);
+        Theme::paintInsetCardWithNotch(g, filterCardBounds, 14.0f, 130.0f, 16.0f);
 
     // Section titles — centered in the flat-bottomed notch (vertical centre
     // of the dip is at cardY + dipDepth/2 = cardY + 8).
@@ -133,7 +134,9 @@ void LeftPanel::resized()
     recipeWheel.setBounds(wheelX, kWheelTop, kWheelSize, kWheelSize);
 
     // Recipe preset selector: row of 7 buttons immediately below the wheel.
-    constexpr int kPresetH = 22;
+    // 3 rows × ~22 px each = 66 px tall.
+    constexpr int kPresetRowH = 22;
+    constexpr int kPresetH    = kPresetRowH * 3;
     recipePresetSelector.setBounds(8, kWheelTop + kWheelSize + 6, panelW - 16, kPresetH);
 
     // Knob component natural sizes (body + shadow padding × 2).
@@ -153,11 +156,9 @@ void LeftPanel::resized()
     gx += kMedium - ghostOverlap;
     strengthKnob.setBounds(gx, ghostY, kMedium, kMedium);
 
-    // Ghost mode words (Replace / Combine / Phantom Only) — under the
-    // Amount + Crossover knobs, no background pill (text-only).
-    const int ghostToggleX = 8;
-    const int ghostToggleW = (kLarge - ghostOverlap) + kMedium;
-    ghostModeToggle.setBounds(ghostToggleX, ghostY + kLarge + 4, ghostToggleW, 22);
+    // Ghost mode words (Replace / Combine / Phantom Only) — centered across
+    // the full Ghost section (matches Filter dB/oct layout below).
+    ghostModeToggle.setBounds(12, ghostY + kLarge + 4, panelW - 24, 22);
 
     // ── Filter section (more vertical gap from Ghost) ──────────────────
     constexpr int filterY = 660;   // was 600 — bumped down for breathing room

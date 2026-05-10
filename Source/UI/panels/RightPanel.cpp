@@ -99,13 +99,13 @@ void RightPanel::paint(juce::Graphics& g)
     // Sub-section inset cards with title-notch at top center.
     // Notch widths sized to fully encompass each title with breathing room.
     if (! harmonicCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, harmonicCardBounds, 14.0f, 150.0f, 16.0f);
+        Theme::paintInsetCardWithNotch(g, harmonicCardBounds, 14.0f, 180.0f, 16.0f);
     if (! stereoCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, stereoCardBounds, 14.0f, 80.0f, 16.0f);
+        Theme::paintInsetCardWithNotch(g, stereoCardBounds, 14.0f, 130.0f, 16.0f);
     if (! levelsCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, levelsCardBounds, 14.0f, 80.0f, 16.0f);
+        Theme::paintInsetCardWithNotch(g, levelsCardBounds, 14.0f, 130.0f, 16.0f);
     if (! advancedCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, advancedCardBounds, 14.0f, 100.0f, 16.0f);
+        Theme::paintInsetCardWithNotch(g, advancedCardBounds, 14.0f, 130.0f, 16.0f);
 
     // Section titles — centered IN the flat-bottomed notch.
     drawSectionHeader(g, juce::Rectangle<int>(harmonicCardBounds.getX(), harmonicCardBounds.getY() + 1, harmonicCardBounds.getWidth(), 14), "Harmonic Engine");
