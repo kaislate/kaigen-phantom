@@ -35,9 +35,8 @@ public:
     /** True if the Modulations slot row is expanded (visible). Default false. */
     bool isSlotsExpanded() const noexcept { return slotsExpanded; }
 
-    /** Footer height when the slot row is collapsed — still tall enough to
-     *  fit always-visible macro 1-4 + morph slots on the right. */
-    static constexpr int kCollapsedHeight = 60;
+    /** Footer height when the slot row is collapsed. */
+    static constexpr int kCollapsedHeight = 48;
 
     /** Update the routing counter (called by NativePluginEditor on state change). */
     void setRoutingCount(int count);

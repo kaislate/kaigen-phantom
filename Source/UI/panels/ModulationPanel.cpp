@@ -47,8 +47,10 @@ ModulationPanel::ModulationPanel(PhantomProcessor& p, juce::AudioProcessorValueT
     addAndMakeVisible(slotsButton);
     addAndMakeVisible(matrixButton);
 
-    counterLabel.setColour(juce::Label::textColourId, Theme::textSecondary);
-    counterLabel.setFont(juce::FontOptions("Space Grotesk", 10.0f, juce::Font::bold));
+    // Etched dark on silver, slightly brighter than the ~22% standard.
+    counterLabel.setColour(juce::Label::textColourId, juce::Colour(0xa0000000));   // ~63% black
+    counterLabel.setFont(juce::Font(juce::FontOptions("Space Grotesk", 10.0f, juce::Font::bold))
+                            .withExtraKerningFactor(0.18f));
     counterLabel.setJustificationType(juce::Justification::centredRight);
     counterLabel.setText("0 ROUTINGS", juce::dontSendNotification);
     addAndMakeVisible(counterLabel);
@@ -109,10 +111,10 @@ void ModulationPanel::resized()
     // Order in the grouped cluster: Mac1 Mac2 Mac3 Mac4 [gap] Morph.
     if (slots.size() >= 8)   // sanity
     {
-        constexpr int kMacroW    = 44;   // arc + center label "m1".."m4"
-        constexpr int kMorphW    = 92;   // arc + label "Morph" beside it
-        constexpr int kSlotGap   = 4;
-        constexpr int kMorphGap  = 12;   // extra gap before morph to set it apart
+        constexpr int kMacroW    = 44;
+        constexpr int kMorphW    = 92;
+        constexpr int kSlotGap   = 10;   // wider spacing between macros
+        constexpr int kMorphGap  = 16;
 
         // Slot indices in `slots`: macro1=3, macro2=4, morph=5, macro3=6, macro4=7.
         constexpr int macroIdxs[4] = { 3, 4, 6, 7 };
