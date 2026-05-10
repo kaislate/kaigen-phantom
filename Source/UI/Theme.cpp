@@ -222,9 +222,16 @@ namespace kaigen::phantom::Theme
         const auto fb = bounds.toFloat();
         if (fb.isEmpty()) return;
 
-        // Vertical gradient: 38% white top → 4% white bottom (matches CSS .hdr).
-        juce::ColourGradient grad(headerHi, fb.getX(), fb.getY(),
-                                   headerLo, fb.getX(), fb.getBottom(), false);
+        // Strip base — medium charcoal so the strip reads as its own surface
+        // rather than inheriting the editor's near-black background. Matches
+        // the reference (~RGB 60-70 mid, slight warm tint).
+        g.setColour(juce::Colour(0xff3a3c40));
+        g.fillRect(fb);
+
+        // Subtle light highlight gradient on top of the base — gives the
+        // strip a faint top-lit feel without making it look bright.
+        juce::ColourGradient grad(juce::Colour(0x33ffffff), fb.getX(), fb.getY(),
+                                   juce::Colour(0x05ffffff), fb.getX(), fb.getBottom(), false);
         g.setGradientFill(grad);
         g.fillRect(fb);
 
