@@ -44,8 +44,8 @@ private:
     // Filter section
     PhantomKnob lpfKnob;
     PhantomKnob hpfKnob;
-    LinkButton  filterLinkBtn;
-    ToggleGroup filterSlopeToggle;
+    LinkButton   filterLinkBtn;
+    WordSelector filterSlopeToggle;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LeftPanel)
 };
