@@ -58,25 +58,53 @@ namespace kaigen::phantom::Theme
         g.setColour(insetSurfaceTint);
         g.fillRoundedRectangle(fb, cornerRadius);
 
-        // Top-left inset shadow (CSS: inset 3px 3px 14px rgba(0,0,0,0.12)).
-        // Approximate with 3 stacked thin rectangles fading inward.
-        for (int i = 0; i < 3; ++i)
-        {
-            const float a = 0.12f * (1.0f - (float) i / 3.0f);
-            g.setColour(juce::Colour::fromFloatRGBA(0.0f, 0.0f, 0.0f, a));
-            const auto layer = fb.reduced((float) i + 1.0f);
-            g.drawRoundedRectangle(layer, cornerRadius - i, 1.0f);
-        }
+        // ── Inset shadow / highlight via clipped edge gradients ──
+        // CSS reference (.candy-inner):
+        //   inset  3px  3px 14px rgba(0,0,0,0.12)        — top-left dark inset
+        //   inset -3px -3px 12px rgba(220,222,226,0.72)  — bottom-right silver
+        // We clip to the rounded rect, then fill four edge gradients to fake
+        // the inset blur. The strong silver bottom-right highlight is the
+        // load-bearing trick for the depressed-tray illusion.
+        juce::Path clip;
+        clip.addRoundedRectangle(fb, cornerRadius);
 
-        // Bottom-right inset highlight (CSS: inset -3px -3px 12px rgba(220,222,226,0.72)).
-        // Approximate with a soft path on the bottom-right edge.
-        for (int i = 0; i < 3; ++i)
+        juce::Graphics::ScopedSaveState saved(g);
+        g.reduceClipRegion(clip);
+
+        const float depth = 14.0f;
+        const juce::Colour silver = juce::Colour::fromRGB(220, 222, 226);
+
+        // Top edge — dark inset shadow (surface curves down into tray).
         {
-            const float a = 0.72f * (1.0f - (float) i / 3.0f);
-            g.setColour(juce::Colour::fromFloatRGBA(220.0f / 255.0f, 222.0f / 255.0f, 226.0f / 255.0f, a * 0.4f));
-            const auto layer = fb.reduced((float) i + 1.0f);
-            // Draw bottom + right edges only — emulate the directional inset highlight.
-            g.drawRoundedRectangle(layer, cornerRadius - i, 0.7f);
+            juce::ColourGradient grad(juce::Colour(0x33000000), fb.getX(), fb.getY(),
+                                       juce::Colour(0x00000000), fb.getX(), fb.getY() + depth,
+                                       false);
+            g.setGradientFill(grad);
+            g.fillRect(fb.withHeight(depth));
+        }
+        // Left edge — dark inset shadow.
+        {
+            juce::ColourGradient grad(juce::Colour(0x33000000), fb.getX(), fb.getY(),
+                                       juce::Colour(0x00000000), fb.getX() + depth, fb.getY(),
+                                       false);
+            g.setGradientFill(grad);
+            g.fillRect(fb.withWidth(depth));
+        }
+        // Bottom edge — strong silver highlight (surface curves back out).
+        {
+            juce::ColourGradient grad(silver.withAlpha(0.72f), fb.getX(), fb.getBottom(),
+                                       silver.withAlpha(0.0f),  fb.getX(), fb.getBottom() - depth,
+                                       false);
+            g.setGradientFill(grad);
+            g.fillRect(fb.withTop(fb.getBottom() - depth));
+        }
+        // Right edge — silver highlight.
+        {
+            juce::ColourGradient grad(silver.withAlpha(0.72f), fb.getRight(), fb.getY(),
+                                       silver.withAlpha(0.0f),  fb.getRight() - depth, fb.getY(),
+                                       false);
+            g.setGradientFill(grad);
+            g.fillRect(fb.withLeft(fb.getRight() - depth));
         }
     }
 
