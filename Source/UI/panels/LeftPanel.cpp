@@ -87,13 +87,14 @@ void LeftPanel::paint(juce::Graphics& g)
     // Sub-section inset cards with title-notch at top center. Notch width
     // sized to fully encompass the title text (with breathing room).
     if (! ghostCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, ghostCardBounds, 14.0f, 110.0f, 10.0f);
+        Theme::paintInsetCardWithNotch(g, ghostCardBounds, 14.0f, 80.0f, 16.0f);
     if (! filterCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, filterCardBounds, 14.0f, 110.0f, 10.0f);
+        Theme::paintInsetCardWithNotch(g, filterCardBounds, 14.0f, 80.0f, 16.0f);
 
-    // Section titles — centered in the notch, etched dark-on-silver.
-    drawSectionHeader(g, juce::Rectangle<int>(ghostCardBounds.getX(),  ghostCardBounds.getY() - 4,  ghostCardBounds.getWidth(),  14), "Ghost");
-    drawSectionHeader(g, juce::Rectangle<int>(filterCardBounds.getX(), filterCardBounds.getY() - 4, filterCardBounds.getWidth(), 14), "Filter");
+    // Section titles — centered in the flat-bottomed notch (vertical centre
+    // of the dip is at cardY + dipDepth/2 = cardY + 8).
+    drawSectionHeader(g, juce::Rectangle<int>(ghostCardBounds.getX(),  ghostCardBounds.getY() + 1, ghostCardBounds.getWidth(),  14), "Ghost");
+    drawSectionHeader(g, juce::Rectangle<int>(filterCardBounds.getX(), filterCardBounds.getY() + 1, filterCardBounds.getWidth(), 14), "Filter");
 
     // ── H2..H8 spoke labels (etched in the silver around the wheel) ───
     // The wheel component is square at the top of the panel; we paint the

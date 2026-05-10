@@ -99,19 +99,19 @@ void RightPanel::paint(juce::Graphics& g)
     // Sub-section inset cards with title-notch at top center.
     // Notch widths sized to fully encompass each title with breathing room.
     if (! harmonicCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, harmonicCardBounds, 14.0f, 180.0f, 10.0f);
+        Theme::paintInsetCardWithNotch(g, harmonicCardBounds, 14.0f, 150.0f, 16.0f);
     if (! stereoCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, stereoCardBounds, 14.0f, 90.0f, 10.0f);
+        Theme::paintInsetCardWithNotch(g, stereoCardBounds, 14.0f, 80.0f, 16.0f);
     if (! levelsCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, levelsCardBounds, 14.0f, 90.0f, 10.0f);
+        Theme::paintInsetCardWithNotch(g, levelsCardBounds, 14.0f, 80.0f, 16.0f);
     if (! advancedCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, advancedCardBounds, 14.0f, 130.0f, 10.0f);
+        Theme::paintInsetCardWithNotch(g, advancedCardBounds, 14.0f, 100.0f, 16.0f);
 
-    // Section titles — centered in the notch.
-    drawSectionHeader(g, juce::Rectangle<int>(harmonicCardBounds.getX(), harmonicCardBounds.getY() - 4, harmonicCardBounds.getWidth(), 14), "Harmonic Engine");
-    drawSectionHeader(g, juce::Rectangle<int>(stereoCardBounds.getX(),   stereoCardBounds.getY()   - 4, stereoCardBounds.getWidth(),   14), "Stereo");
-    drawSectionHeader(g, juce::Rectangle<int>(levelsCardBounds.getX(),   levelsCardBounds.getY()   - 4, levelsCardBounds.getWidth(),   14), "Levels");
-    drawSectionHeader(g, juce::Rectangle<int>(advancedCardBounds.getX(), advancedCardBounds.getY() - 4, advancedCardBounds.getWidth(), 14), "Advanced");
+    // Section titles — centered IN the flat-bottomed notch.
+    drawSectionHeader(g, juce::Rectangle<int>(harmonicCardBounds.getX(), harmonicCardBounds.getY() + 1, harmonicCardBounds.getWidth(), 14), "Harmonic Engine");
+    drawSectionHeader(g, juce::Rectangle<int>(stereoCardBounds.getX(),   stereoCardBounds.getY()   + 1, stereoCardBounds.getWidth(),   14), "Stereo");
+    drawSectionHeader(g, juce::Rectangle<int>(levelsCardBounds.getX(),   levelsCardBounds.getY()   + 1, levelsCardBounds.getWidth(),   14), "Levels");
+    drawSectionHeader(g, juce::Rectangle<int>(advancedCardBounds.getX(), advancedCardBounds.getY() + 1, advancedCardBounds.getWidth(), 14), "Advanced");
 }
 
 void RightPanel::resized()

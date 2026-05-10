@@ -110,10 +110,18 @@ namespace kaigen::phantom::Theme
 
     namespace
     {
-        // Build a rounded-rect path with a quadratic notch dipping inward at the
-        // top center (the swoop where the section title sits).
+        // Build a rounded-rect path with a FLAT-BOTTOMED notch dipping inward
+        // at the top center. The notch has steep sides (small radius corners)
+        // so the title sits in a clearly defined recess instead of a smooth U.
+        //
+        //  ___________________   ___ y                  _________________
+        //                    \\_/                      /
+        //                     |   <-- dipDepth (~16) --|
+        //                     |________________________|
+        //                       <-- notchWidth (~140) -->
+        //
         juce::Path buildNotchedRoundedRect(juce::Rectangle<float> r, float corner,
-                                            float notchW, float notchD)
+                                            float notchW, float dipDepth)
         {
             juce::Path p;
             const float x = r.getX();
@@ -121,14 +129,26 @@ namespace kaigen::phantom::Theme
             const float w = r.getWidth();
             const float h = r.getHeight();
             const float cx = x + w * 0.5f;
-            // Clamp notch so it never exceeds the available straight top section.
             const float maxNotchHalf = juce::jmax(0.0f, w * 0.5f - corner - 4.0f);
             const float notchHalf    = juce::jmin(notchW * 0.5f, maxNotchHalf);
+            const float sideR        = juce::jmin(6.0f, dipDepth * 0.5f);   // corner radius at the dip edges
 
             p.startNewSubPath(x + corner, y);
             p.lineTo(cx - notchHalf, y);
-            // Quadratic dip — control point below the top edge.
-            p.quadraticTo(cx, y + notchD, cx + notchHalf, y);
+            // Steep curve DOWN into the notch (small radius transition).
+            p.quadraticTo(cx - notchHalf + sideR, y,
+                          cx - notchHalf + sideR, y + sideR);
+            p.lineTo(cx - notchHalf + sideR, y + dipDepth - sideR);
+            p.quadraticTo(cx - notchHalf + sideR, y + dipDepth,
+                          cx - notchHalf + sideR * 2.0f, y + dipDepth);
+            // Flat bottom of the notch.
+            p.lineTo(cx + notchHalf - sideR * 2.0f, y + dipDepth);
+            // Steep curve UP out of the notch.
+            p.quadraticTo(cx + notchHalf - sideR, y + dipDepth,
+                          cx + notchHalf - sideR, y + dipDepth - sideR);
+            p.lineTo(cx + notchHalf - sideR, y + sideR);
+            p.quadraticTo(cx + notchHalf - sideR, y,
+                          cx + notchHalf, y);
             p.lineTo(x + w - corner, y);
             p.quadraticTo(x + w, y, x + w, y + corner);
             p.lineTo(x + w, y + h - corner);
