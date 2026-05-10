@@ -29,9 +29,16 @@ public:
                    juce::AudioProcessorValueTreeState& apvts);
     ~PresetSelector() override;
 
-    /** Called when the user clicks the library glyph or the pill body.
-     *  NativePluginEditor wires this to show its PresetBrowser overlay. */
+    /** Called when the user clicks the |||  library glyph. NativePluginEditor
+     *  wires this to show the full PresetBrowser modal. */
     std::function<void()> onBrowseRequested;
+
+    /** Called when the user clicks the preset name pill. NativePluginEditor
+     *  wires this to show the compact Arturia-style PresetDropdown anchored
+     *  beneath the pill. The callback receives the pill's bounds in
+     *  PresetSelector-local coordinates so the editor can position the
+     *  dropdown correctly. */
+    std::function<void(juce::Rectangle<int> pillBoundsLocal)> onQuickPickRequested;
 
     /** Updates the displayed preset name. Called by PresetBrowser when the
      *  user picks a preset there. */

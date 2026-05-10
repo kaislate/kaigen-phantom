@@ -7,6 +7,7 @@
 #include "panels/RightPanel.h"
 #include "panels/TopBar.h"
 #include "panels/PresetBrowser.h"
+#include "widgets/PresetDropdown.h"
 #include "panels/ModulationPanel.h"
 #include "panels/MatrixView.h"
 
@@ -32,6 +33,7 @@ private:
     LeftPanel leftPanel;
     TopBar topBar;
     PresetBrowser presetBrowser;
+    PresetDropdown presetDropdown;
     ModulationPanel modulationPanel;
     MatrixView matrixView;
 

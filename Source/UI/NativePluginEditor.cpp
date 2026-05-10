@@ -21,7 +21,7 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
                                        juce::AudioProcessorValueTreeState& a)
     : juce::AudioProcessorEditor(&p), processor(p), apvts(a),
       rightPanel(a, p), leftPanel(a), topBar(p, a), presetBrowser(p, a),
-      modulationPanel(p, a), matrixView(p, a)
+      presetDropdown(p, a), modulationPanel(p, a), matrixView(p, a)
 {
     setLookAndFeel(&lookAndFeel);
     setSize(editorWidth, editorHeight);
@@ -70,20 +70,42 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
     presetBrowser.setVisible(false);
     presetBrowser.toFront(false);  // ensure it's painted on top of other panels
 
+    // Quick-pick dropdown: visible-on-demand, full-editor overlay, only the
+    // card sub-rect actually paints. Hidden by default.
+    addAndMakeVisible(presetDropdown);
+    presetDropdown.setVisible(false);
+    presetDropdown.toFront(false);
+
     // Wire PresetSelector callbacks via TopBar.
     topBar.getPresetSelector().onBrowseRequested = [this, persistMatrixMode]
     {
-        // Mutual exclusion: opening the browser dismisses matrix if open.
+        // Mutual exclusion: opening the browser dismisses matrix + dropdown.
         if (matrixView.isVisible())
         {
             matrixView.setVisible(false);
             resized();
             persistMatrixMode(false);
         }
+        presetDropdown.setVisible(false);
         presetBrowser.setVisible(true);
         presetBrowser.toFront(false);
     };
+    topBar.getPresetSelector().onQuickPickRequested = [this](juce::Rectangle<int> pillLocal)
+    {
+        // Translate pill bounds from PresetSelector → editor coordinates so
+        // the dropdown's anchor lines up with the actual pill on screen.
+        const auto anchor = getLocalArea(&topBar.getPresetSelector(), pillLocal);
+        presetBrowser.setVisible(false);     // mutual exclusion
+        presetDropdown.setBounds(getLocalBounds());
+        presetDropdown.anchorBelow(anchor);
+        presetDropdown.setVisible(true);
+        presetDropdown.toFront(false);
+    };
     presetBrowser.onPresetSelected = [this](juce::String name, juce::String pack)
+    {
+        topBar.getPresetSelector().setCurrentPreset(name, pack);
+    };
+    presetDropdown.onPresetSelected = [this](juce::String name, juce::String pack)
     {
         topBar.getPresetSelector().setCurrentPreset(name, pack);
     };
@@ -134,8 +156,10 @@ void NativePluginEditor::resized()
     leftPanel.setBounds(leftBounds);
     rightPanel.setBounds(area);
 
-    // PresetBrowser overlays the entire editor when visible.
+    // PresetBrowser + PresetDropdown both overlay the entire editor when
+    // visible (PresetDropdown only paints inside its anchored card sub-rect).
     presetBrowser.setBounds(getLocalBounds());
+    presetDropdown.setBounds(getLocalBounds());
     matrixView.setBounds(getLocalBounds());
 }
 

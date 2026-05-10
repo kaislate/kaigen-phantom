@@ -149,9 +149,11 @@ void PresetSelector::paint(juce::Graphics& g)
 
 void PresetSelector::mouseDown(const juce::MouseEvent& e)
 {
-    // Click anywhere on the glass pill (outside the heart) opens the browser.
+    // Click anywhere on the glass pill (outside the heart) opens the
+    // Arturia-style quick picker. The full browser opens via the |||
+    // library glyph (not via the pill).
     if (pillBounds.contains(e.getPosition()) && ! heartButton.getBounds().contains(e.getPosition()))
-        if (onBrowseRequested) onBrowseRequested();
+        if (onQuickPickRequested) onQuickPickRequested(pillBounds);
 }
 
 void PresetSelector::resized()
