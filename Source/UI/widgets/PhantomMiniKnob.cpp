@@ -10,8 +10,8 @@ namespace
 {
     constexpr int   kBodySize        = 48;   // diameter of the knob body (was 36 — too small)
     constexpr float kInset           = 3.0f;
-    constexpr float kArcStartRad     = 2.356194f;          // 135°
-    constexpr float kArcSweepRad     = 4.712389f;          // 270°
+    constexpr float kArcStartRad     = 3.926991f;          // 225° — bottom-left start
+    constexpr float kArcSweepRad     = 4.363323f;          // 250° — leaves ~110° bottom gap
 }
 
 PhantomMiniKnob::PhantomMiniKnob(juce::AudioProcessorValueTreeState& apvts,

@@ -84,11 +84,12 @@ void LeftPanel::paint(juce::Graphics& g)
     // Silver panel surface — replaces the flat panelBg fill.
     Theme::paintSilverPanel(g, getLocalBounds());
 
-    // Sub-section inset cards with title-notch at top center.
+    // Sub-section inset cards with title-notch at top center. Notch width
+    // sized to fully encompass the title text (with breathing room).
     if (! ghostCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, ghostCardBounds, 14.0f, 90.0f, 8.0f);
+        Theme::paintInsetCardWithNotch(g, ghostCardBounds, 14.0f, 110.0f, 10.0f);
     if (! filterCardBounds.isEmpty())
-        Theme::paintInsetCardWithNotch(g, filterCardBounds, 14.0f, 90.0f, 8.0f);
+        Theme::paintInsetCardWithNotch(g, filterCardBounds, 14.0f, 110.0f, 10.0f);
 
     // Section titles — centered in the notch, etched dark-on-silver.
     drawSectionHeader(g, juce::Rectangle<int>(ghostCardBounds.getX(),  ghostCardBounds.getY() - 4,  ghostCardBounds.getWidth(),  14), "Ghost");

@@ -121,14 +121,11 @@ void PhantomKnob::paint(juce::Graphics& g)
     const float oledR  = sz * 0.5f - in;
     const float arcR   = oledR - 4.0f;
 
-    // Arc constants — matching knob.js: ARC_START=135°, ARC_SWEEP=270°.
-    // Note: JUCE addCentredArc uses radians measured clockwise from 12-o'clock.
-    // knob.js polarToXY uses standard math angles (0° = 3-o'clock, CCW).
-    // We replicate the visual, so arcStart/arcSweep are in JUCE's convention
-    // (radians from 12-o'clock, CW) which matches juce::degreesToRadians of the
-    // CSS/SVG interpretation:  135° from 12-o'clock CW = 7-o'clock start.
-    const float arcStart = juce::degreesToRadians(135.0f);
-    const float arcSweep = juce::degreesToRadians(270.0f);
+    // Arc starts bottom-LEFT (225° in JUCE = 7:30 position) and sweeps clockwise
+    // through left, top, right, ending bottom-RIGHT (135° in JUCE = 4:30
+    // position). Total sweep 250° leaves a ~110° gap at the bottom.
+    const float arcStart = juce::degreesToRadians(225.0f);
+    const float arcSweep = juce::degreesToRadians(250.0f);
 
     // Normalized value [0,1].
     const auto& range    = slider.getNormalisableRange();
