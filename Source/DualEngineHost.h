@@ -57,8 +57,39 @@ public:
     void setModulationEngines(kaigen::phantom::ModulationEngine* modA,
                               kaigen::phantom::ModulationEngine* modB) noexcept;
 
+    /** Diagnostic: returns true iff every "a_*" / "b_*" param in the APVTS
+     *  layout has a populated entry in the corresponding cache. Used by a
+     *  unit test to catch the case where someone adds a per-engine APVTS
+     *  param but forgets to register it in `buildParamCache`. Any IDs
+     *  found missing are appended to `missing`. Compares by full string
+     *  (NOT pointer equality), so it also validates the cache against
+     *  drift in the layout-vs-cache invariant. */
+    bool validateParamCachesCoverAPVTS(juce::StringArray& missing) const;
+
 private:
-    void syncEngineFromPrefix(PhantomEngine& target, const char* prefix);
+    /** Per-engine pre-resolved parameter cache. Each entry holds the full
+     *  param ID (e.g. "a_phantom_threshold") AND a direct atomic pointer.
+     *  Built once at construction so the audio-thread sync loop does ZERO
+     *  string allocation and ZERO APVTS hash lookups per block. The leaf-key
+     *  is the const char* literal pointer (string literals dedupe at link
+     *  time, so pointer equality is reliable for ParamID::LEAF_* lookups). */
+    struct CachedLeaf
+    {
+        const char*                 leafKey  { nullptr };
+        juce::String                fullId;
+        std::atomic<float>*         baseAtom { nullptr };
+        juce::RangedAudioParameter* param    { nullptr };
+    };
+
+    void syncEngineFromPrefix(PhantomEngine& target,
+                              const std::vector<CachedLeaf>& cache,
+                              kaigen::phantom::ModulationEngine* modEng);
+
+    void buildParamCache(std::vector<CachedLeaf>& cache, const char* prefix);
+    const CachedLeaf& findCached(const std::vector<CachedLeaf>& cache, const char* leaf) const noexcept;
+
+    std::vector<CachedLeaf> cacheA;
+    std::vector<CachedLeaf> cacheB;
 
     juce::AudioProcessorValueTreeState& apvts;
     PhantomEngine    engineA, engineB;

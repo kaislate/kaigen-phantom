@@ -8,6 +8,81 @@ namespace kaigen::phantom
 DualEngineHost::DualEngineHost(juce::AudioProcessorValueTreeState& a)
     : apvts(a)
 {
+    // Pre-resolve every per-engine parameter ID + atomic pointer ONCE.
+    // The audio-thread sync loop below uses these cached entries, doing
+    // zero string allocations and zero APVTS hash lookups per block.
+    buildParamCache(cacheA, "a_");
+    buildParamCache(cacheB, "b_");
+}
+
+void DualEngineHost::buildParamCache(std::vector<CachedLeaf>& cache, const char* prefix)
+{
+    cache.clear();
+    cache.reserve(40);
+
+    auto add = [&](const char* leaf) {
+        CachedLeaf c;
+        c.leafKey = leaf;
+        c.fullId  = juce::String(prefix) + leaf;
+        c.baseAtom = apvts.getRawParameterValue(c.fullId);
+        c.param    = apvts.getParameter(c.fullId);
+        jassert(c.baseAtom != nullptr);
+        cache.push_back(std::move(c));
+    };
+
+    // All per-engine leaf params syncEngineFromPrefix touches.
+    add(ParamID::LEAF_PHANTOM_THRESHOLD);
+    add(ParamID::LEAF_PHANTOM_STRENGTH);
+    add(ParamID::LEAF_HARMONIC_SATURATION);
+    add(ParamID::LEAF_SYNTH_STEP);
+    add(ParamID::LEAF_SYNTH_DUTY);
+    add(ParamID::LEAF_SYNTH_SKIP);
+    add(ParamID::LEAF_GHOST);
+    add(ParamID::LEAF_GHOST_MODE);
+    add(ParamID::LEAF_OUTPUT_GAIN);
+    add(ParamID::LEAF_ENV_ATTACK_MS);
+    add(ParamID::LEAF_ENV_RELEASE_MS);
+    add(ParamID::LEAF_ENV_SOURCE);
+    add(ParamID::LEAF_BINAURAL_MODE);
+    add(ParamID::LEAF_BINAURAL_WIDTH);
+    add(ParamID::LEAF_STEREO_WIDTH);
+    add(ParamID::LEAF_SYNTH_LPF_HZ);
+    add(ParamID::LEAF_SYNTH_HPF_HZ);
+    add(ParamID::LEAF_SYNTH_FILTER_SLOPE);
+    add(ParamID::LEAF_RECIPE_H2);
+    add(ParamID::LEAF_RECIPE_H3);
+    add(ParamID::LEAF_RECIPE_H4);
+    add(ParamID::LEAF_RECIPE_H5);
+    add(ParamID::LEAF_RECIPE_H6);
+    add(ParamID::LEAF_RECIPE_H7);
+    add(ParamID::LEAF_RECIPE_H8);
+    add(ParamID::LEAF_MODE);
+    add(ParamID::LEAF_SYNTH_WAVELET_LENGTH);
+    add(ParamID::LEAF_SYNTH_GATE_THRESHOLD);
+    add(ParamID::LEAF_SYNTH_H1);
+    add(ParamID::LEAF_SYNTH_SUB);
+    add(ParamID::LEAF_SYNTH_MIN_SAMPLES);
+    add(ParamID::LEAF_SYNTH_MAX_SAMPLES);
+    add(ParamID::LEAF_TRACKING_SPEED);
+    add(ParamID::LEAF_PUNCH_ENABLED);
+    add(ParamID::LEAF_PUNCH_AMOUNT);
+    add(ParamID::LEAF_SYNTH_BOOST_THRESHOLD);
+    add(ParamID::LEAF_SYNTH_BOOST_AMOUNT);
+    add(ParamID::LEAF_MIDI_TRIGGER_ENABLED);
+    add(ParamID::LEAF_MIDI_GATE_RELEASE);
+}
+
+const DualEngineHost::CachedLeaf& DualEngineHost::findCached(
+    const std::vector<CachedLeaf>& cache, const char* leaf) const noexcept
+{
+    // Linear scan — ~38 entries, all-pointer-compare, ~40 ns total.
+    // (Linker-deduped string literals: ParamID::LEAF_FOO == ParamID::LEAF_FOO
+    // by pointer, so this is a strict-pointer-equality lookup.)
+    for (const auto& c : cache)
+        if (c.leafKey == leaf) return c;
+    static const CachedLeaf empty;
+    jassertfalse;   // unknown leaf — buildParamCache missing an entry
+    return empty;
 }
 
 void DualEngineHost::setModulationEngines(kaigen::phantom::ModulationEngine* a,
@@ -15,6 +90,48 @@ void DualEngineHost::setModulationEngines(kaigen::phantom::ModulationEngine* a,
 {
     modA.store(a, std::memory_order_release);
     modB.store(b, std::memory_order_release);
+}
+
+bool DualEngineHost::validateParamCachesCoverAPVTS(juce::StringArray& missing) const
+{
+    missing.clear();
+
+    // Per-engine APVTS params that the audio thread does NOT read via the
+    // cache — these are intentionally absent from buildParamCache. If you add
+    // a new UI-only per-engine param, list its leaf here so the validator
+    // doesn't flag it. Anything ELSE missing is a real bug.
+    static const std::array<const char*, 1> kAudioThreadExclusions = {
+        ParamID::LEAF_RECIPE_PRESET,    // editor applies preset by writing H2..H8
+    };
+
+    auto isExcluded = [](const juce::String& id) {
+        for (auto* leaf : kAudioThreadExclusions)
+            if (id == juce::String("a_") + leaf || id == juce::String("b_") + leaf)
+                return true;
+        return false;
+    };
+
+    auto inCache = [](const std::vector<CachedLeaf>& cache, const juce::String& fullId) {
+        for (const auto& c : cache)
+            if (c.fullId == fullId && c.baseAtom != nullptr) return true;
+        return false;
+    };
+
+    for (const auto& id : getAllParameterIDs())
+    {
+        if (isExcluded(id)) continue;
+
+        if (id.startsWith("a_"))
+        {
+            if (! inCache(cacheA, id)) missing.add(id);
+        }
+        else if (id.startsWith("b_"))
+        {
+            if (! inCache(cacheB, id)) missing.add(id);
+        }
+    }
+
+    return missing.isEmpty();
 }
 
 void DualEngineHost::prepareToPlay(double sampleRate, int blockSize, int numChannels)
@@ -50,18 +167,17 @@ void DualEngineHost::setInputDetectionGain(float gainLin)
     engineB.setInputDetectionGain(gainLin);
 }
 
-void DualEngineHost::syncEngineFromPrefix(PhantomEngine& target, const char* prefix)
+void DualEngineHost::syncEngineFromPrefix(PhantomEngine& target,
+                                            const std::vector<CachedLeaf>& cache,
+                                            kaigen::phantom::ModulationEngine* modEng)
 {
-    // Capture by-value: prefix is a string literal at all call sites
-    // (see process()), so its lifetime is fine for the duration of this lambda.
-    auto* modEng = (juce::String(prefix) == "a_") ? modA.load(std::memory_order_acquire)
-                 : (juce::String(prefix) == "b_") ? modB.load(std::memory_order_acquire)
-                 : nullptr;
-
-    auto valueFor = [this, prefix, modEng](const char* leaf) -> float {
-        const auto id = juce::String(prefix) + leaf;
-        const float base = apvts.getRawParameterValue(id)->load();
-        return modEng ? modEng->getModulatedValue(id, base) : base;
+    // Hot path. Zero string allocations, zero APVTS hash lookups per call.
+    // Each leaf lookup is a pointer-equality scan over ~38 entries (~40ns)
+    // plus a pre-resolved atomic<float> load + an early-out modulation check.
+    auto valueFor = [&cache, modEng, this](const char* leaf) -> float {
+        const auto& c = findCached(cache, leaf);
+        const float base = c.baseAtom->load(std::memory_order_relaxed);
+        return modEng ? modEng->getModulatedValue(c.fullId, c.param, base) : base;
     };
 
     target.setCrossoverHz    (valueFor(ParamID::LEAF_PHANTOM_THRESHOLD));
@@ -136,9 +252,10 @@ void DualEngineHost::process(juce::AudioBuffer<float>& buffer,
     const bool bypassA = bypassIdle && morphAmt >= 1.0f - MorphCrossfader::kBypassEpsilon;
     const bool bypassB = bypassIdle && morphAmt <= 0.0f + MorphCrossfader::kBypassEpsilon;
 
-    // Sync params from APVTS into each engine.
-    syncEngineFromPrefix(engineA, "a_");
-    syncEngineFromPrefix(engineB, "b_");
+    // Sync params from APVTS into each engine. Cache + modEng are passed
+    // explicitly so the hot path does no string compare to pick which side.
+    syncEngineFromPrefix(engineA, cacheA, modA.load(std::memory_order_acquire));
+    syncEngineFromPrefix(engineB, cacheB, modB.load(std::memory_order_acquire));
 
     // Both engines process the same input. We snapshot the input into
     // aScratch (in-place processing target for engine A) AND bScratch

@@ -79,13 +79,23 @@ std::vector<Routing> ModulationEngine::getRoutings() const
 
 float ModulationEngine::getModulatedValue(const juce::String& paramId, float base) const
 {
-    auto* paramPtr = apvts.getParameter(paramId);
-    if (paramPtr == nullptr) return base;
-    const auto& range = paramPtr->getNormalisableRange();
-    const float span = range.end - range.start;
+    return getModulatedValue(paramId, apvts.getParameter(paramId), base);
+}
 
+float ModulationEngine::getModulatedValue(const juce::String& paramId,
+                                            juce::RangedAudioParameter* param,
+                                            float base) const noexcept
+{
+    if (param == nullptr) return base;
+
+    // Cheap early-out when no routings exist (the COMMON case). Avoids
+    // dereferencing range + iterating an empty list — the snapshot load is
+    // a single atomic shared_ptr load, ~10ns.
     auto snapshot = routingsAtomic.load();
     if (! snapshot || snapshot->empty()) return base;
+
+    const auto& range = param->getNormalisableRange();
+    const float span  = range.end - range.start;
 
     float modulated = base;
     for (const auto& r : *snapshot)

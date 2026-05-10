@@ -67,6 +67,13 @@ public:
      *  routings match, returns base unchanged. */
     float getModulatedValue(const juce::String& paramId, float base) const;
 
+    /** Hot-path overload: caller has already resolved the param pointer
+     *  (avoids the apvts.getParameter() hash lookup per call). Used by
+     *  DualEngineHost's cached-pointer sync path. */
+    float getModulatedValue(const juce::String& paramId,
+                            juce::RangedAudioParameter* param,
+                            float base) const noexcept;
+
     /** Persistence: writes <Engine prefix="a_">[modulators...][routings...]</Engine>. */
     juce::ValueTree toValueTree() const;
     void fromValueTree(const juce::ValueTree& engineNode);
