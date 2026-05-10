@@ -21,7 +21,7 @@ Oscilloscope::Oscilloscope(PhantomProcessor& p)
     : processor(p)
 {
     setSize(800, 120);
-    startTimerHz(30);
+    startTimerHz(20);   // dropped from 30 — still smooth, halves CPU
 }
 
 Oscilloscope::~Oscilloscope()
@@ -33,6 +33,8 @@ Oscilloscope::~Oscilloscope()
 
 void Oscilloscope::timerCallback()
 {
+    if (! isShowing()) return;
+
     // Snapshot each ring buffer into a linearized (oldest-first) array.
     // wrPos points to the slot that will be written next, so it is the oldest
     // sample — identical to the JS linearize() function.

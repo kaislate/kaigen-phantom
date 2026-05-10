@@ -19,7 +19,7 @@ Spectrum::Spectrum(PhantomProcessor& p,
                    juce::AudioProcessorValueTreeState& vts)
     : processor(p), apvts(vts)
 {
-    startTimerHz(30);
+    startTimerHz(20);   // dropped from 30 — visualizers stay smooth at 20 Hz
 }
 
 Spectrum::~Spectrum()
@@ -31,6 +31,9 @@ Spectrum::~Spectrum()
 
 void Spectrum::timerCallback()
 {
+    // Skip work entirely when the editor isn't on screen.
+    if (! isShowing()) return;
+
     // Pull raw bins (pre-smoothed on the audio thread as plain float arrays;
     // single-float reads are effectively atomic on x86/ARM at this visualization rate).
     smoothBins(processor.spectrumData.data(),       smoothedIn);

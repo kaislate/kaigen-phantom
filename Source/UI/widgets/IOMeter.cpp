@@ -21,7 +21,7 @@ IOMeter::IOMeter(const std::atomic<float>& src)
     : peakSource(src)
 {
     setSize(14, 90);
-    startTimerHz(30);
+    startTimerHz(20);   // dropped from 30 — meter responsiveness still feels fine
 }
 
 IOMeter::~IOMeter()
@@ -31,6 +31,8 @@ IOMeter::~IOMeter()
 
 void IOMeter::timerCallback()
 {
+    if (! isShowing()) return;
+
     const float raw = peakSource.load(std::memory_order_relaxed);
 
     // Attack-fast / release-slow on the smoothed level.

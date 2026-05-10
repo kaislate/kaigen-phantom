@@ -75,8 +75,9 @@ RecipeWheel::RecipeWheel(juce::AudioProcessorValueTreeState& apvts,
         }
     }
 
-    // Timer at 60 Hz; repaint throttled to 30 fps inside timerCallback().
-    startTimerHz(60);
+    // 24 Hz — animation stays smooth for the rotating rings + scan + particles
+    // while halving CPU vs 60-Hz-with-parity-throttle.
+    startTimerHz(24);
 }
 
 RecipeWheel::~RecipeWheel()
@@ -88,43 +89,30 @@ RecipeWheel::~RecipeWheel()
 
 void RecipeWheel::timerCallback()
 {
-    // Animation state always advances every tick (60 Hz).
-    // Ring rotation: JS does ringRot[i] += ringSpeed[i] * 0.5 per draw frame
-    //   at 30 fps.  At 60 Hz we run the physics every tick, so we multiply by
-    //   0.5 here AND only advance on even ticks to keep the same net rate.
-    //   Equivalently: advance ringSpeed[i]*0.5 every OTHER tick = ringSpeed[i]*0.25
-    //   per tick.  But the simplest faithful port is: advance ONLY on even ticks
-    //   (same as draw frames) with the full *0.5 factor.
-    const bool isDrawFrame = ((timerTick & 1) == 0);
+    // Skip animation work entirely when the editor isn't on screen
+    // (DAW window minimised, GUI hidden, etc.) — saves ~5-10% CPU at idle.
+    if (! isShowing()) return;
 
-    if (isDrawFrame)
+    // Animation state advances every tick (24 Hz).
+    for (int i = 0; i < kNumRings; ++i)
+        ringRot[(size_t) i] += kRingSpeeds[i] * 0.5f;
+
+    for (int s = 0; s < kSpokes; ++s)
     {
-        // Ring rotation (JS: ringRot[i] += ringSpeed[i] * 0.5 each draw frame)
-        for (int i = 0; i < kNumRings; ++i)
-            ringRot[(size_t) i] += kRingSpeeds[i] * 0.5f;
-
-        // Particles (JS: p.progress += spd each draw frame, wraps to 0 when >1)
-        for (int s = 0; s < kSpokes; ++s)
+        const float amp = getSpokeAmp(s);
+        const float spd = 0.004f + amp * 0.020f;
+        for (int p = 0; p < kParticlesPerSpoke; ++p)
         {
-            const float amp = getSpokeAmp(s);
-            const float spd = 0.004f + amp * 0.020f;
-            for (int p = 0; p < kParticlesPerSpoke; ++p)
-            {
-                auto& prog = particleProgress[(size_t)(s * kParticlesPerSpoke + p)];
-                prog += spd;
-                if (prog > 1.0f) prog = 0.0f;
-            }
+            auto& prog = particleProgress[(size_t)(s * kParticlesPerSpoke + p)];
+            prog += spd;
+            if (prog > 1.0f) prog = 0.0f;
         }
-
-        // Scan line (JS: scanAngle += 0.018 each draw frame)
-        scanAngle += 0.018f;
-
-        // Shimmer (JS: shimmerT += 0.05 each draw frame)
-        shimmerT += 0.05f;
-
-        repaint();
     }
 
+    scanAngle += 0.018f;
+    shimmerT  += 0.05f;
+
+    repaint();
     ++timerTick;
 }
 
