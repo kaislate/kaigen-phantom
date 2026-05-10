@@ -36,10 +36,10 @@ void ModSlot::paint(juce::Graphics& g)
     bool isPlaceholder = (type == Type::Lfo || type == Type::Random) && hiddenSlider == nullptr;
     switch (type)
     {
-        case Type::Macro:  fillColour = Theme::macroTeal;    break;
-        case Type::Morph:  fillColour = Theme::morphWhite;   break;
-        case Type::Lfo:    fillColour = Theme::lfoBlue;      break;
-        case Type::Random: fillColour = Theme::randomPurple; break;
+        case Type::Macro:  fillColour = Theme::accentBlue;    break;   // steel blue
+        case Type::Morph:  fillColour = Theme::morphWhite;    break;
+        case Type::Lfo:    fillColour = Theme::lfoBlue;       break;
+        case Type::Random: fillColour = Theme::randomPurple;  break;
     }
 
     // ── Macros + Morph: arc-only with center (or beside) label ──────────
@@ -58,14 +58,17 @@ void ModSlot::paint(juce::Graphics& g)
         const float arcR        = arcDiameter * 0.5f;
         const float arcThick    = 2.5f;
 
-        // Arc track (faint).
+        // Arc track — visible even at value 0 so the slot reads as a control.
+        // Uses a tinted version of the fill colour at low alpha against the
+        // silver background.
         const float startA = juce::degreesToRadians(235.0f);   // matches PhantomKnob
         const float sweep  = juce::degreesToRadians(250.0f);
         juce::Path bgArc;
         bgArc.addCentredArc(arcCentre.x, arcCentre.y, arcR, arcR, 0.0f,
                              startA, startA + sweep, true);
-        g.setColour(juce::Colour(0x14000000));
-        g.strokePath(bgArc, juce::PathStrokeType(arcThick + 1.0f));
+        g.setColour(fillColour.withAlpha(0.22f));   // tinted track, always visible
+        g.strokePath(bgArc, juce::PathStrokeType(arcThick + 1.0f,
+            juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
         // Active arc — type-color, scaled by slider value.
         const float val = (float) hiddenSlider->getValue();
