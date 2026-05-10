@@ -127,17 +127,25 @@ void PresetSelector::saveDialog()
 
 void PresetSelector::paint(juce::Graphics& g)
 {
-    // The TopBar paints the strip background — we only paint the glass pill
-    // and the preset name on top of it.
     Theme::paintGlassPill(g, pillBounds.toFloat());
 
-    // Preset name centered inside the pill (between heart on left and any
-    // future modified-asterisk on the right). Etched dark on the glass.
-    const auto pillTextArea = pillBounds.reduced(28, 0);
-    g.setFont(juce::FontOptions("Space Grotesk", 12.0f, juce::Font::plain));
-    g.setColour(juce::Colour(0xbf000000));   // ~75% black, matches CSS rgba(0,0,0,0.75)
+    // Preset name centered inside the pill (between heart on left and the
+    // modified asterisk on the right). Slightly off-white on the dark glass
+    // so it reads clearly without being harsh.
+    const auto pillTextArea = pillBounds.reduced(26, 0);
+    g.setFont(juce::FontOptions("Space Grotesk", 11.0f, juce::Font::plain));
+    g.setColour(juce::Colour(0xd0e8e8ec));
     const auto display = currentPresetName.isEmpty() ? juce::String("Default") : currentPresetName;
     g.drawText(display, pillTextArea, juce::Justification::centred, true);
+
+    // Modified-state asterisk on the right edge of the pill — visual placeholder
+    // (always shown for now; will be conditional once modified-tracking lands).
+    // Red matches the CSS #c74a4a.
+    auto asteriskArea = juce::Rectangle<int>(pillBounds.getRight() - 18, pillBounds.getY(),
+                                              14, pillBounds.getHeight());
+    g.setFont(juce::FontOptions("Space Grotesk", 13.0f, juce::Font::bold));
+    g.setColour(juce::Colour(0xffc74a4a));
+    g.drawText("*", asteriskArea, juce::Justification::centred, false);
 }
 
 void PresetSelector::mouseDown(const juce::MouseEvent& e)
@@ -149,32 +157,42 @@ void PresetSelector::mouseDown(const juce::MouseEvent& e)
 
 void PresetSelector::resized()
 {
-    // Layout left → right: ||| [♡  Name  *] ▲ ▼ 💾
-    auto area = getLocalBounds().reduced(0, 4);
+    // Layout left → right, all vertically centered in the strip:
+    //   |||  [♡  Name  *]  ▲ ▼  💾
+    // The whole group has a fixed compact width (no stretching to fill);
+    // it's centered horizontally within the slot allocated by TopBar.
+    const auto strip = getLocalBounds();
 
-    constexpr int glyphW       = 26;
-    constexpr int gapAroundPill =  6;
-    constexpr int heartW       = 18;
-    constexpr int pillMinW     = 220;
+    constexpr int pillH      = 26;
+    constexpr int glyphW     = 22;
+    constexpr int gapWide    =  8;
+    constexpr int gapTight   =  2;
+    constexpr int heartW     = 16;
+    constexpr int pillW      = 240;
 
-    libraryButton.setBounds(area.removeFromLeft(glyphW));
-    area.removeFromLeft(gapAroundPill);
+    const int totalW = glyphW + gapWide                    // ||| + gap
+                     + pillW  + gapWide                    // pill + gap
+                     + glyphW + gapTight + glyphW          // ▲ ▼
+                     + gapWide + glyphW;                   // gap + 💾
 
-    // Save sits at the right end; prev/next sit to its left.
-    saveButton.setBounds(area.removeFromRight(glyphW));
-    area.removeFromRight(2);
-    nextButton.setBounds(area.removeFromRight(glyphW));
-    prevButton.setBounds(area.removeFromRight(glyphW));
-    area.removeFromRight(gapAroundPill);
+    const int y      = (strip.getHeight() - pillH) / 2;
+    int       x      = (strip.getWidth()  - totalW) / 2;
 
-    // Whatever's left is the glass pill (with a sensible minimum).
-    auto pill = area;
-    if (pill.getWidth() < pillMinW)
-        pill.setWidth(pillMinW);
-    pillBounds = pill;
+    libraryButton.setBounds(x, y, glyphW, pillH);
+    x += glyphW + gapWide;
 
-    // Heart sits inside the pill on the left.
-    heartButton.setBounds(pill.getX() + 6, pill.getY(), heartW, pill.getHeight());
+    pillBounds = juce::Rectangle<int>(x, y, pillW, pillH);
+    x += pillW + gapWide;
+
+    prevButton.setBounds(x, y, glyphW, pillH);
+    x += glyphW + gapTight;
+    nextButton.setBounds(x, y, glyphW, pillH);
+    x += glyphW + gapWide;
+
+    saveButton.setBounds(x, y, glyphW, pillH);
+
+    // Heart sits centered inside the left edge of the pill.
+    heartButton.setBounds(pillBounds.getX() + 6, pillBounds.getY(), heartW, pillBounds.getHeight());
 }
 
 } // namespace kaigen::phantom

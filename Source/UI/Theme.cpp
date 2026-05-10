@@ -256,33 +256,34 @@ namespace kaigen::phantom::Theme
         if (bounds.isEmpty()) return;
         const float corner = bounds.getHeight() * 0.5f;
 
-        // Body: vertical gradient matching CSS
-        // linear-gradient(180deg, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.02) 100%).
-        juce::ColourGradient body(juce::Colour(0x0f000000), bounds.getX(), bounds.getY(),
-                                   juce::Colour(0x05000000), bounds.getX(), bounds.getBottom(),
+        // Body — slightly darker than the strip with a subtle vertical gradient.
+        // Webview spec assumed a light silver strip; on the native dark strip,
+        // we keep the same direction (top darker, bottom lighter) but bump the
+        // alphas so the pill reads as a depressed shape, not a flat tint.
+        juce::ColourGradient body(juce::Colour(0x33000000), bounds.getX(), bounds.getY(),
+                                   juce::Colour(0x14000000), bounds.getX(), bounds.getBottom(),
                                    false);
         g.setGradientFill(body);
         g.fillRoundedRectangle(bounds, corner);
 
-        // Outer "lifted" highlight 1px below — CSS: 0 1px 2px rgba(255,255,255,0.6).
-        // Approximated as a soft light line just below the bottom edge.
-        g.setColour(juce::Colour(0x70FFFFFF));
+        // Outer "lifted" highlight just below the pill — gives the floating glass feel.
+        g.setColour(juce::Colour(0x60FFFFFF));
         g.drawLine(bounds.getX() + corner * 0.6f, bounds.getBottom() + 0.5f,
-                    bounds.getRight() - corner * 0.6f, bounds.getBottom() + 0.5f, 0.6f);
+                    bounds.getRight() - corner * 0.6f, bounds.getBottom() + 0.5f, 0.7f);
 
-        // Inset top dark line — CSS: inset 0 2px 4px rgba(0,0,0,0.10).
-        g.setColour(juce::Colour(0x1a000000));
-        g.drawLine(bounds.getX() + corner * 0.6f, bounds.getY() + 0.5f,
-                    bounds.getRight() - corner * 0.6f, bounds.getY() + 0.5f, 0.7f);
+        // Inset top shadow — depressed-edge feel.
+        g.setColour(juce::Colour(0x55000000));
+        g.drawLine(bounds.getX() + corner * 0.6f, bounds.getY() + 0.6f,
+                    bounds.getRight() - corner * 0.6f, bounds.getY() + 0.6f, 0.9f);
 
-        // Inset bottom white highlight — CSS: inset 0 -1px 2px rgba(255,255,255,0.3).
-        g.setColour(juce::Colour(0x4dFFFFFF));
-        g.drawLine(bounds.getX() + corner * 0.6f, bounds.getBottom() - 0.7f,
-                    bounds.getRight() - corner * 0.6f, bounds.getBottom() - 0.7f, 0.5f);
+        // Inset bottom white highlight.
+        g.setColour(juce::Colour(0x55FFFFFF));
+        g.drawLine(bounds.getX() + corner * 0.6f, bounds.getBottom() - 1.0f,
+                    bounds.getRight() - corner * 0.6f, bounds.getBottom() - 1.0f, 0.6f);
 
-        // Subtle outer outline so the pill has a defined edge against the strip.
-        g.setColour(juce::Colour(0x14000000));
-        g.drawRoundedRectangle(bounds.reduced(0.25f), corner, 0.5f);
+        // Defined outer edge — keeps the pill readable on dark strips.
+        g.setColour(juce::Colour(0x33000000));
+        g.drawRoundedRectangle(bounds.reduced(0.25f), corner, 0.6f);
     }
 
     void paintVisualizerInset(juce::Graphics& g, juce::Rectangle<int> bounds, float cornerRadius)
