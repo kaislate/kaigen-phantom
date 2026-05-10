@@ -36,10 +36,10 @@ private:
     WordSelector recipePresetSelector;
 
     // Ghost section
-    PhantomKnob ghostAmountKnob;
-    PhantomKnob crossoverKnob;
-    PhantomKnob strengthKnob;
-    ToggleGroup ghostModeToggle;
+    PhantomKnob  ghostAmountKnob;
+    PhantomKnob  crossoverKnob;
+    PhantomKnob  strengthKnob;
+    WordSelector ghostModeToggle;
 
     // Filter section
     PhantomKnob lpfKnob;

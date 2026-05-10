@@ -121,10 +121,11 @@ void PhantomKnob::paint(juce::Graphics& g)
     const float oledR  = sz * 0.5f - in;
     const float arcR   = oledR - 4.0f;
 
-    // Arc starts bottom-LEFT (225° in JUCE = 7:30 position) and sweeps clockwise
-    // through left, top, right, ending bottom-RIGHT (135° in JUCE = 4:30
-    // position). Total sweep 250° leaves a ~110° gap at the bottom.
-    const float arcStart = juce::degreesToRadians(225.0f);
+    // Arc symmetric across the vertical axis through the knob centre.
+    // Sweep 250° (a bit shorter than the CSS 270°) with start 235° (just past
+    // 7:30) and end 125° (just past 4:30) — both 125° from the top so the
+    // gap at the bottom is centered.
+    const float arcStart = juce::degreesToRadians(235.0f);
     const float arcSweep = juce::degreesToRadians(250.0f);
 
     // Normalized value [0,1].

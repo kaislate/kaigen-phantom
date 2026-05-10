@@ -131,24 +131,25 @@ namespace kaigen::phantom::Theme
             const float cx = x + w * 0.5f;
             const float maxNotchHalf = juce::jmax(0.0f, w * 0.5f - corner - 4.0f);
             const float notchHalf    = juce::jmin(notchW * 0.5f, maxNotchHalf);
-            const float sideR        = juce::jmin(6.0f, dipDepth * 0.5f);   // corner radius at the dip edges
+            // Wider taper distance — slope ~equal to dip depth so the side
+            // angles ~45° and the silver bezel reads as gently curving into
+            // the tray rather than dropping abruptly.
+            const float taper        = juce::jmin(dipDepth * 1.5f, notchHalf * 0.5f);
 
             p.startNewSubPath(x + corner, y);
             p.lineTo(cx - notchHalf, y);
-            // Steep curve DOWN into the notch (small radius transition).
-            p.quadraticTo(cx - notchHalf + sideR, y,
-                          cx - notchHalf + sideR, y + sideR);
-            p.lineTo(cx - notchHalf + sideR, y + dipDepth - sideR);
-            p.quadraticTo(cx - notchHalf + sideR, y + dipDepth,
-                          cx - notchHalf + sideR * 2.0f, y + dipDepth);
+            // Gentle curve DOWN into the notch — control point biased toward
+            // the cardTop so the slope eases out near the top edge then
+            // accelerates downward.
+            p.cubicTo(cx - notchHalf + taper * 0.4f, y,
+                      cx - notchHalf + taper * 0.6f, y + dipDepth,
+                      cx - notchHalf + taper,        y + dipDepth);
             // Flat bottom of the notch.
-            p.lineTo(cx + notchHalf - sideR * 2.0f, y + dipDepth);
-            // Steep curve UP out of the notch.
-            p.quadraticTo(cx + notchHalf - sideR, y + dipDepth,
-                          cx + notchHalf - sideR, y + dipDepth - sideR);
-            p.lineTo(cx + notchHalf - sideR, y + sideR);
-            p.quadraticTo(cx + notchHalf - sideR, y,
-                          cx + notchHalf, y);
+            p.lineTo(cx + notchHalf - taper, y + dipDepth);
+            // Gentle curve UP out of the notch (mirror of the down-curve).
+            p.cubicTo(cx + notchHalf - taper * 0.6f, y + dipDepth,
+                      cx + notchHalf - taper * 0.4f, y,
+                      cx + notchHalf,                y);
             p.lineTo(x + w - corner, y);
             p.quadraticTo(x + w, y, x + w, y + corner);
             p.lineTo(x + w, y + h - corner);
@@ -181,13 +182,14 @@ namespace kaigen::phantom::Theme
         const float depth = 14.0f;
         const juce::Colour silver = juce::Colour::fromRGB(220, 222, 226);
 
-        // Top — dark inset shadow.
+        // Top — dark inset shadow. Extended height through the notch depth so
+        // the dip floor reads as the deepest part of the depression.
         {
-            juce::ColourGradient grad(juce::Colour(0x33000000), fb.getX(), fb.getY(),
-                                       juce::Colour(0x00000000), fb.getX(), fb.getY() + depth + notchDepth,
+            juce::ColourGradient grad(juce::Colour(0x4D000000), fb.getX(), fb.getY(),    // 30% black
+                                       juce::Colour(0x00000000), fb.getX(), fb.getY() + depth + notchDepth + 2.0f,
                                        false);
             g.setGradientFill(grad);
-            g.fillRect(fb.withHeight(depth + notchDepth));
+            g.fillRect(fb.withHeight(depth + notchDepth + 4.0f));
         }
         // Left — dark.
         {

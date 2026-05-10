@@ -153,7 +153,11 @@ void LeftPanel::resized()
     gx += kMedium - ghostOverlap;
     strengthKnob.setBounds(gx, ghostY, kMedium, kMedium);
 
-    ghostModeToggle.setBounds(12, ghostY + kLarge + 4, panelW - 24, 26);
+    // Ghost mode words (Replace / Combine / Phantom Only) — under the
+    // Amount + Crossover knobs, no background pill (text-only).
+    const int ghostToggleX = 8;
+    const int ghostToggleW = (kLarge - ghostOverlap) + kMedium;
+    ghostModeToggle.setBounds(ghostToggleX, ghostY + kLarge + 4, ghostToggleW, 22);
 
     // ── Filter section (more vertical gap from Ghost) ──────────────────
     constexpr int filterY = 660;   // was 600 — bumped down for breathing room
