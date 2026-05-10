@@ -30,10 +30,13 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
+    void mouseMove(const juce::MouseEvent& e) override;
+    void mouseExit(const juce::MouseEvent& e) override;
     void visibilityChanged() override;
 
 private:
     void loadPresetAt(int rowIndex);
+    juce::Rectangle<int> cardBounds() const;
 
     struct Row { juce::String name; juce::String pack; bool isHeader { false }; };
     std::vector<Row> rows;
@@ -42,12 +45,16 @@ private:
     PhantomProcessor& processor;
     juce::AudioProcessorValueTreeState& apvts;
 
-    juce::TextButton closeButton { "X" };
+    juce::TextButton closeButton;
 
-    static constexpr int kRowHeight     = 24;
+    // Webview spec: card is 90% × 90% of parent (capped). 3-column layout:
+    //   [sidebar 160] [middle flex] [preview 180]
+    static constexpr int kRowHeight     = 26;
     static constexpr int kHeaderHeight  = 28;
-    static constexpr int kCardWidthPx   = 600;
-    static constexpr int kCardMargin    = 40;
+    static constexpr int kSidebarW      = 160;
+    static constexpr int kPreviewW      = 180;
+    static constexpr int kHeaderBarH    = 44;
+    static constexpr int kSearchBarH    = 36;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PresetBrowser)
 };
