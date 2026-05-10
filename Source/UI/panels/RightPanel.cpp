@@ -28,7 +28,7 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
       inMeter       (p.peakInL),
       outMeter      (p.peakOutL),
       oscilloscope  (p),
-      spectrum      (p)
+      spectrum      (p, a)
 {
     addAndMakeVisible(saturationKnob);
     addAndMakeVisible(shapeKnob);
