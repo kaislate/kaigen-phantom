@@ -61,6 +61,17 @@ private:
 
     juce::String formatValue();
 
+    // ── Static layer cache (shared per size variant) ───────────────────────
+    /** Returns the cached "static layers" image for `size`: body + offset
+     *  shadow + OLED bezel + arc track. Lazy-initialised on first call.
+     *  Drawn via g.drawImageAt() on every paint() — replaces the per-frame
+     *  re-render of those layers (which was the source of drag stutter). */
+    static const juce::Image& getCachedStaticLayers(Size size);
+
+    /** Invalidate the static-layer cache (call if Theme tokens change at
+     *  runtime — currently never happens, but kept as a hook). */
+    static void clearStaticLayersCache();
+
     // ── State ──────────────────────────────────────────────────────────────
     Size        sizeVariant;
     juce::String labelText;

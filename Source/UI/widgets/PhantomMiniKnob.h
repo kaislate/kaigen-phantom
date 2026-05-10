@@ -39,6 +39,10 @@ private:
 
     juce::String formatValue();
 
+    /** Cached static layers (body + shadow + OLED bezel + arc track), shared
+     *  across all PhantomMiniKnob instances. Built lazily on first paint. */
+    static const juce::Image& getCachedStaticLayers();
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomMiniKnob)
 };
 

@@ -63,7 +63,6 @@ juce::String PhantomMiniKnob::formatValue()
 void PhantomMiniKnob::paint(juce::Graphics& g)
 {
     // Body sits in the upper portion of the bounds (above the label).
-    // 17px shadow padding on top + sides; label area below.
     constexpr int kShadowPad = 17;
     auto bodyArea = juce::Rectangle<float>((float) (getWidth() - kBodySize) * 0.5f,
                                             (float) kShadowPad,
@@ -75,62 +74,12 @@ void PhantomMiniKnob::paint(juce::Graphics& g)
     const float oledR  = radius - kInset;
     const float arcR   = oledR - 3.0f;
 
-    // ── Layer 1: neumorphic raised body (DropShadow + transparent-stop gradient) ─
-    {
-        juce::Path circle;
-        circle.addEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre));
-
-        // CSS small-knob shadow recipe per knob.js (offsets 2/3, 3/5; blurs 10/17).
-        juce::DropShadow brB { juce::Colour(0x24000000), 17, juce::Point<int>(3, 5) };
-        brB.drawForPath(g, circle);
-        juce::DropShadow brA { juce::Colour(0x4D000000), 10, juce::Point<int>(2, 3) };
-        brA.drawForPath(g, circle);
-        juce::DropShadow tlB { juce::Colour(0x4DFFFFFF), 17, juce::Point<int>(-3, -5) };
-        tlB.drawForPath(g, circle);
-        juce::DropShadow tlA { juce::Colour(0xa8FFFFFF), 10, juce::Point<int>(-2, -3) };
-        tlA.drawForPath(g, circle);
-
-        // Transparent-stop radial gradient — bezel shows through at outer edge
-        // so there's no hard knob boundary (icy-redesign breakthrough).
-        const juce::Point<float> gradOrigin {
-            centre.x - radius * 0.30f,
-            centre.y - radius * 0.40f
-        };
-        juce::ColourGradient body(juce::Colour(0x3DFFFFFF), gradOrigin,   // rgba(255,255,255,0.24)
-                                    juce::Colour(0x12000000),              // rgba(0,0,0,0.07)
-                                    { centre.x + radius, centre.y + radius },
-                                    true);
-        body.addColour(0.22, juce::Colour(0x1FFFFFFF));   // rgba(255,255,255,0.12)
-        body.addColour(0.60, juce::Colour(0x05000000));   // rgba(0,0,0,0.02)
-        g.setGradientFill(body);
-        g.fillEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre));
-    }
-
-    // ── Layer 2: OLED well + bezel rings ───────────────────────────────────
-    {
-        const auto rect = juce::Rectangle<float>(oledR * 2, oledR * 2).withCentre(centre);
-        g.setColour(juce::Colours::black);
-        g.fillEllipse(rect);
-
-        g.setColour(juce::Colour(0x47FFFFFF));
-        g.drawEllipse(rect.reduced(0.5f), 0.75f);
-
-        g.setColour(juce::Colour(0xeb000000));
-        g.drawEllipse(rect.expanded(0.75f), 0.75f);
-
-        g.setColour(juce::Colour(0x1aFFFFFF));
-        g.drawEllipse(rect.expanded(1.5f), 0.5f);
-    }
-
-    // ── Layer 3: arc track ─────────────────────────────────────────────────
-    {
-        juce::Path track;
-        track.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f,
-                             kArcStartRad, kArcStartRad + kArcSweepRad, true);
-        g.setColour(juce::Colour(0x0fFFFFFF));
-        g.strokePath(track, juce::PathStrokeType(2.5f, juce::PathStrokeType::curved,
-                                                    juce::PathStrokeType::butt));
-    }
+    // ── Static layers (body + shadows + OLED bezel + arc track) ────────
+    // Cached image, blitted at the body's top-left so it lines up with the
+    // bodyArea. The cache is one-time-built shared across all instances.
+    const auto& cached = getCachedStaticLayers();
+    const int cacheX = (getWidth() - cached.getWidth()) / 2;
+    g.drawImageAt(cached, cacheX, 0);
 
     // ── Layers 4-5: indicator arc (glow halo + sharp white) ────────────────
     {
@@ -158,7 +107,8 @@ void PhantomMiniKnob::paint(juce::Graphics& g)
         const auto text = formatValue();
         const float maxW = oledR * 1.7f;
 
-        float fontPx = isDragging ? 11.0f : 8.5f;
+        // Bumped from 8.5/11 → 11/13 so advanced row values are legible.
+        float fontPx = isDragging ? 13.0f : 11.0f;
         juce::Font font(juce::FontOptions("Courier New", fontPx, juce::Font::bold));
         while (fontPx > 5.0f && (float) juce::GlyphArrangement::getStringWidthInt(font, text) > maxW)
         {
@@ -198,6 +148,86 @@ void PhantomMiniKnob::paint(juce::Graphics& g)
 void PhantomMiniKnob::resized()
 {
     slider.setBounds(0, 0, 0, 0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Static-layer cache (single-size, shared across all instances).
+//  Mirrors the body+shadow+OLED+arc-track paint code the per-frame paint()
+//  used to do; rendered ONCE at first use.
+// ─────────────────────────────────────────────────────────────────────────────
+
+namespace
+{
+    juce::Image gMiniStaticCache;
+}
+
+const juce::Image& PhantomMiniKnob::getCachedStaticLayers()
+{
+    if (gMiniStaticCache.isValid()) return gMiniStaticCache;
+
+    constexpr int kShadowPad = 17;
+    constexpr int imageW = kBodySize + kShadowPad * 2;   // square; height matches.
+    gMiniStaticCache = juce::Image(juce::Image::ARGB, imageW, imageW + kShadowPad, true);
+    juce::Graphics g(gMiniStaticCache);
+
+    const auto centre = juce::Point<float>((float) imageW * 0.5f,
+                                             (float) (kShadowPad + kBodySize / 2));
+    const float radius = (float) kBodySize * 0.5f;
+    const float oledR  = radius - kInset;
+    const float arcR   = oledR - 3.0f;
+
+    // Body — DropShadows + transparent radial gradient.
+    {
+        juce::Path circle;
+        circle.addEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre));
+
+        juce::DropShadow brB { juce::Colour(0x24000000), 17, juce::Point<int>(3, 5) };
+        brB.drawForPath(g, circle);
+        juce::DropShadow brA { juce::Colour(0x4D000000), 10, juce::Point<int>(2, 3) };
+        brA.drawForPath(g, circle);
+        juce::DropShadow tlB { juce::Colour(0x4DFFFFFF), 17, juce::Point<int>(-3, -5) };
+        tlB.drawForPath(g, circle);
+        juce::DropShadow tlA { juce::Colour(0xa8FFFFFF), 10, juce::Point<int>(-2, -3) };
+        tlA.drawForPath(g, circle);
+
+        const juce::Point<float> gradOrigin {
+            centre.x - radius * 0.30f,
+            centre.y - radius * 0.40f
+        };
+        juce::ColourGradient body(juce::Colour(0x3DFFFFFF), gradOrigin,
+                                    juce::Colour(0x12000000),
+                                    { centre.x + radius, centre.y + radius },
+                                    true);
+        body.addColour(0.22, juce::Colour(0x1FFFFFFF));
+        body.addColour(0.60, juce::Colour(0x05000000));
+        g.setGradientFill(body);
+        g.fillEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre));
+    }
+
+    // OLED bezel.
+    {
+        const auto rect = juce::Rectangle<float>(oledR * 2, oledR * 2).withCentre(centre);
+        g.setColour(juce::Colours::black);
+        g.fillEllipse(rect);
+        g.setColour(juce::Colour(0x47FFFFFF));
+        g.drawEllipse(rect.reduced(0.5f), 0.75f);
+        g.setColour(juce::Colour(0xeb000000));
+        g.drawEllipse(rect.expanded(0.75f), 0.75f);
+        g.setColour(juce::Colour(0x1aFFFFFF));
+        g.drawEllipse(rect.expanded(1.5f), 0.5f);
+    }
+
+    // Arc track.
+    {
+        juce::Path track;
+        track.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f,
+                             kArcStartRad, kArcStartRad + kArcSweepRad, true);
+        g.setColour(juce::Colour(0x1AFFFFFF));
+        g.strokePath(track, juce::PathStrokeType(2.5f, juce::PathStrokeType::curved,
+                                                    juce::PathStrokeType::butt));
+    }
+
+    return gMiniStaticCache;
 }
 
 void PhantomMiniKnob::mouseDown(const juce::MouseEvent& e)

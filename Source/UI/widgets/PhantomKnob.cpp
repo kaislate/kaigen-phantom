@@ -121,22 +121,129 @@ void PhantomKnob::paint(juce::Graphics& g)
     const float oledR  = sz * 0.5f - in;
     const float arcR   = oledR - 4.0f;
 
-    // Arc symmetric across the vertical axis through the knob centre.
-    // Sweep 250° (a bit shorter than the CSS 270°) with start 235° (just past
-    // 7:30) and end 125° (just past 4:30) — both 125° from the top so the
-    // gap at the bottom is centered.
     const float arcStart = juce::degreesToRadians(235.0f);
     const float arcSweep = juce::degreesToRadians(250.0f);
 
-    // Normalized value [0,1].
     const auto& range    = slider.getNormalisableRange();
     const float normVal  = (float) range.convertTo0to1(slider.getValue());
 
-    paintBody          (g, centre, sz * 0.5f);
-    paintOLED          (g, centre, oledR);
-    paintArcTrack      (g, centre, arcR, arcStart, arcSweep);
-    paintIndicatorArc  (g, centre, arcR, arcStart, arcSweep, normVal);
-    paintValueText     (g, centre, formatValue(), oledR);
+    // ── Static layers (body + offset shadows + OLED bezel + arc track) ─
+    // Drawn ONCE per size variant into a shared cache, blitted here.
+    // This is the load-bearing perf optimisation: the 4 DropShadow blurs
+    // would otherwise re-render every drag tick on every knob.
+    g.drawImageAt(getCachedStaticLayers(sizeVariant), 0, 0);
+
+    // ── Dynamic layers (re-rendered each frame) ────────────────────────
+    paintIndicatorArc(g, centre, arcR, arcStart, arcSweep, normVal);
+    paintValueText   (g, centre, formatValue(), oledR);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Static-layer cache — one image per Size variant, lazily built on first use.
+//  Key insight: every Medium knob renders an identical body+shadow+OLED, so
+//  there's no reason to re-render those layers per-instance OR per-frame.
+// ─────────────────────────────────────────────────────────────────────────────
+
+namespace
+{
+    // 3 cache slots: Large=0, Medium=1, Small=2 (matches enum order).
+    juce::Image gKnobStaticCache[3];
+}
+
+const juce::Image& PhantomKnob::getCachedStaticLayers(Size size)
+{
+    auto& slot = gKnobStaticCache[(int) size];
+    if (slot.isValid()) return slot;
+
+    // Determine geometry for this size variant (mirrors diameter()/inset()/shadowPadding()).
+    const int d   = (size == Size::Large ? 114 : (size == Size::Small ? 56  : 88));
+    const int ins = (size == Size::Large ?   6 : (size == Size::Small ?  3  :  5));
+    const int pad = (size == Size::Large ?  32 : (size == Size::Small ? 17  : 24));
+    const int componentSize = d + pad * 2;
+
+    slot = juce::Image(juce::Image::ARGB, componentSize, componentSize, true);
+    juce::Graphics g(slot);
+
+    // Recreate the same paint operations PhantomKnob would do for body+OLED+track,
+    // but inline (we can't call instance methods from a static context, so the
+    // logic is duplicated here — kept faithful to the instance versions).
+    const float sz    = (float) d;
+    const float bodyR = sz * 0.5f;
+    const float oledR = sz * 0.5f - (float) ins;
+    const float arcR  = oledR - 4.0f;
+    const auto  centre = juce::Point<float>((float) componentSize * 0.5f,
+                                              (float) componentSize * 0.5f);
+
+    // ── Body — radial gradient + 4 offset DropShadows (CSS-spec values) ──
+    {
+        juce::Path circle;
+        circle.addEllipse(juce::Rectangle<float>(bodyR * 2, bodyR * 2).withCentre(centre));
+
+        struct ShadowParams { int ox, oy, blurA, ox2, oy2, blurB; };
+        const ShadowParams sp = (size == Size::Large) ? ShadowParams{ 4, 5, 18, 7, 9, 32 }
+                              : (size == Size::Small) ? ShadowParams{ 2, 3, 10, 3, 5, 17 }
+                                                       : ShadowParams{ 3, 4, 14, 5, 7, 24 };
+
+        // BR shadows.
+        juce::DropShadow brB { juce::Colour(0x29000000), sp.blurB, { sp.ox2, sp.oy2 } };
+        brB.drawForPath(g, circle);
+        juce::DropShadow brA { juce::Colour(0x57000000), sp.blurA, { sp.ox, sp.oy } };
+        brA.drawForPath(g, circle);
+        // TL highlights.
+        juce::DropShadow tlB { juce::Colour(0x57FFFFFF), sp.blurB, { -sp.ox2, -sp.oy2 } };
+        tlB.drawForPath(g, circle);
+        juce::DropShadow tlA { juce::Colour(0xb3FFFFFF), sp.blurA, { -sp.ox, -sp.oy } };
+        tlA.drawForPath(g, circle);
+
+        // Transparent-stop radial gradient body.
+        const juce::Point<float> gradOrigin {
+            centre.x - bodyR * 0.30f,
+            centre.y - bodyR * 0.40f
+        };
+        juce::ColourGradient body(
+            juce::Colour(0x3DFFFFFF), gradOrigin,
+            juce::Colour(0x12000000),
+            { centre.x + bodyR, centre.y + bodyR },
+            true);
+        body.addColour(0.22, juce::Colour(0x1FFFFFFF));
+        body.addColour(0.60, juce::Colour(0x05000000));
+        g.setGradientFill(body);
+        g.fillEllipse(juce::Rectangle<float>(bodyR * 2, bodyR * 2).withCentre(centre));
+    }
+
+    // ── OLED well + 3 bezel rings ──────────────────────────────────────
+    {
+        const auto rect = juce::Rectangle<float>(oledR * 2, oledR * 2).withCentre(centre);
+        g.setColour(juce::Colours::black);
+        g.fillEllipse(rect);
+
+        g.setColour(juce::Colour(0x47FFFFFF));
+        g.drawEllipse(rect.reduced(0.5f), 0.75f);
+        g.setColour(juce::Colour(0xeb000000));
+        g.drawEllipse(rect.expanded(0.75f), 0.75f);
+        g.setColour(juce::Colour(0x1aFFFFFF));
+        g.drawEllipse(rect.expanded(1.5f), 0.5f);
+    }
+
+    // ── Arc track (faint background, full sweep) ──────────────────────
+    {
+        const float arcStart = juce::degreesToRadians(235.0f);
+        const float arcSweep = juce::degreesToRadians(250.0f);
+        juce::Path track;
+        track.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f,
+                             arcStart, arcStart + arcSweep, true);
+        g.setColour(juce::Colour(0x1AFFFFFF));   // ~10% white track (matches arcTrack alpha)
+        g.strokePath(track, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved,
+                                                    juce::PathStrokeType::butt));
+    }
+
+    return slot;
+}
+
+void PhantomKnob::clearStaticLayersCache()
+{
+    for (auto& img : gKnobStaticCache)
+        img = juce::Image{};
 }
 
 void PhantomKnob::resized()

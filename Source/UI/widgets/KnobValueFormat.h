@@ -37,9 +37,13 @@ inline juce::String formatKnobValue(juce::RangedAudioParameter* param, double cu
         else
             num = juce::String((int) std::round(v));
     }
-    else if (unit == "%" || unit == "smp")
+    else if (unit == "smp")
     {
-        // Sample counts and percentages are always whole numbers.
+        // Sample counts: integer with no unit suffix (the "smp" was visual noise).
+        return juce::String((int) std::round(v));
+    }
+    else if (unit == "%")
+    {
         num = juce::String((int) std::round(v));
     }
     else if (unit.isEmpty())
