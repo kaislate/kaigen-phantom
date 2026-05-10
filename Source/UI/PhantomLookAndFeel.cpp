@@ -41,8 +41,34 @@ void PhantomLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& b
     const float corner = juce::jmin(bounds.getHeight() * 0.5f, 16.0f);
 
     const bool isOn = b.getToggleState() || shouldDrawButtonAsDown;
-    const bool isHeaderRaised = b.getProperties().getWithDefault("phantom-style", "")
-                                    == juce::var("header-raised");
+    const auto styleHint = b.getProperties().getWithDefault("phantom-style", "");
+    const bool isHeaderRaised = styleHint == juce::var("header-raised");
+    const bool isMtSegment    = styleHint == juce::var("mt-segment");
+
+    if (isMtSegment)
+    {
+        // .mt mode-toggle segment: inactive = no bg (the container pill shows
+        // through); active = white-55% raised pill with subtle shadow.
+        if (isOn)
+        {
+            g.setColour(juce::Colour(0x8cFFFFFF));   // 55% white
+            g.fillRoundedRectangle(bounds, corner);
+
+            // Soft drop shadow + top hairline highlight (matches CSS active).
+            g.setColour(juce::Colour(0x1F000000));
+            g.drawRoundedRectangle(bounds, corner, 0.6f);
+            g.setColour(juce::Colour(0xa6FFFFFF));
+            g.drawLine(bounds.getX() + corner, bounds.getY() + 0.5f,
+                        bounds.getRight() - corner, bounds.getY() + 0.5f, 0.5f);
+        }
+        // Hover overlay (visible only when inactive).
+        else if (shouldDrawButtonAsHighlighted)
+        {
+            g.setColour(juce::Colour(0x14FFFFFF));
+            g.fillRoundedRectangle(bounds, corner);
+        }
+        return;
+    }
 
     if (isHeaderRaised)
     {
@@ -126,19 +152,26 @@ void PhantomLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& b,
                                           bool shouldDrawButtonAsDown)
 {
     const bool isOn = b.getToggleState() || shouldDrawButtonAsDown;
-    const bool isHeaderRaised = b.getProperties().getWithDefault("phantom-style", "")
-                                    == juce::var("header-raised");
+    const auto styleHint = b.getProperties().getWithDefault("phantom-style", "");
+    const bool isHeaderRaised = styleHint == juce::var("header-raised");
+    const bool isMtSegment    = styleHint == juce::var("mt-segment");
 
     juce::Colour colour;
     if (isHeaderRaised)
         colour = Theme::textOnLightActive;   // ~62% black, readable on the silver pill
+    else if (isMtSegment)
+        colour = isOn ? juce::Colour(0x94000000)    // ~58% black active (CSS spec)
+                      : juce::Colour(0x38000000);   // ~22% black inactive
     else
         colour = isOn ? b.findColour(juce::TextButton::textColourOnId)
                       : b.findColour(juce::TextButton::textColourOffId);
 
-    juce::Font font(juce::FontOptions("Space Grotesk", juce::jmin(13.0f, b.getHeight() * 0.50f),
-                                        juce::Font::bold));
-    font.setExtraKerningFactor(0.10f);   // approximate 1-2 px letter-spacing
+    // Smaller font + wider kerning for .mt segments.
+    const float fontPx   = isMtSegment ? juce::jmin(10.0f, b.getHeight() * 0.50f)
+                                        : juce::jmin(13.0f, b.getHeight() * 0.50f);
+    const float kerning  = isMtSegment ? 0.25f : 0.10f;
+    juce::Font font(juce::FontOptions("Space Grotesk", fontPx, juce::Font::bold));
+    font.setExtraKerningFactor(kerning);
 
     // Etched: shadow below glyph + foreground.
     g.setFont(font);

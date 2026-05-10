@@ -4,6 +4,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "../widgets/PhantomKnob.h"
 #include "../widgets/ToggleGroup.h"
+#include "../widgets/WordSelector.h"
 #include "../widgets/LinkButton.h"
 #include "../widgets/RecipeWheel.h"
 
@@ -31,8 +32,8 @@ private:
     juce::Rectangle<int> filterCardBounds;
 
     // Recipe wheel + preset selector
-    RecipeWheel recipeWheel;
-    ToggleGroup recipePresetSelector;
+    RecipeWheel  recipeWheel;
+    WordSelector recipePresetSelector;
 
     // Ghost section
     PhantomKnob ghostAmountKnob;

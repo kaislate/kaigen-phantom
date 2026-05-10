@@ -44,6 +44,7 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
     addAndMakeVisible(spectrum);
 
     autoGainButton.setClickingTogglesState(true);
+    autoGainButton.getProperties().set("phantom-style", "header-raised");
     addAndMakeVisible(autoGainButton);
     if (auto* param = apvts.getParameter("input_gain_auto"))
         autoGainAttachment = std::make_unique<juce::ButtonParameterAttachment>(*param, autoGainButton);

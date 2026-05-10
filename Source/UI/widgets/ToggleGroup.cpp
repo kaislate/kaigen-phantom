@@ -25,6 +25,9 @@ ToggleGroup::ToggleGroup(juce::AudioProcessorValueTreeState& apvts,
         auto* b = new juce::TextButton(labels[i]);
         b->setClickingTogglesState(false);
         b->onClick = [this, i] { buttonClicked(i); };
+        // Tag for the LookAndFeel so it knows to render the .mt mode-toggle
+        // segment style (lighter touch than the .hdr-btn raised pill).
+        b->getProperties().set("phantom-style", "mt-segment");
         addAndMakeVisible(*b);
         buttons.add(b);
     }
@@ -37,22 +40,28 @@ ToggleGroup::~ToggleGroup()
 
 void ToggleGroup::paint(juce::Graphics& g)
 {
-    // Highlight the active button. Active = combo.getSelectedItemIndex().
-    const int active = combo.getSelectedItemIndex();
-    for (int i = 0; i < buttons.size(); ++i)
-    {
-        auto bounds = buttons[i]->getBounds().toFloat();
-        if (i == active)
-        {
-            g.setColour(Theme::activeGlow);
-            g.fillRoundedRectangle(bounds.expanded(2.0f), 4.0f);
-        }
-    }
+    // ── .mt container pill ───────────────────────────────────────────────
+    // CSS: background rgba(0,0,0,0.08), border-radius 20px, neumorphic inset
+    // shadows: inset 1.5px 1.5px 5px rgba(0,0,0,0.14) +
+    //          inset -1.5px -1.5px 4px rgba(255,255,255,0.50)
+    const auto bounds = getLocalBounds().toFloat();
+    const float corner = bounds.getHeight() * 0.5f;
+
+    g.setColour(juce::Colour(0x14000000));    // 8% black bg
+    g.fillRoundedRectangle(bounds, corner);
+
+    // Top-left inset dark line.
+    g.setColour(juce::Colour(0x24000000));
+    g.drawRoundedRectangle(bounds.reduced(0.5f), corner - 0.5f, 0.7f);
+    // Bottom-right white hairline highlight.
+    g.setColour(juce::Colour(0x80FFFFFF));
+    g.drawLine(bounds.getX() + corner, bounds.getBottom() - 0.5f,
+                bounds.getRight() - corner, bounds.getBottom() - 0.5f, 0.5f);
 }
 
 void ToggleGroup::resized()
 {
-    auto area = getLocalBounds();
+    auto area = getLocalBounds().reduced(3);   // 3 px inner padding
     if (buttons.isEmpty()) return;
     const int btnWidth = area.getWidth() / buttons.size();
     for (int i = 0; i < buttons.size(); ++i)
@@ -66,7 +75,12 @@ void ToggleGroup::buttonClicked(int index)
 
 void ToggleGroup::comboBoxChanged(juce::ComboBox*)
 {
-    repaint();  // active highlight follows the combo
+    // Sync each button's toggle state to the active selection so the
+    // LookAndFeel can paint the active segment correctly.
+    const int active = combo.getSelectedItemIndex();
+    for (int i = 0; i < buttons.size(); ++i)
+        buttons[i]->setToggleState(i == active, juce::dontSendNotification);
+    repaint();
 }
 
 } // namespace kaigen::phantom
