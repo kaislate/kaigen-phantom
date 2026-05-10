@@ -88,19 +88,9 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
         topBar.getPresetSelector().setCurrentPreset(name, pack);
     };
 
-    // Slot-click → matrix handoff: clicking a macro slot opens the matrix view.
-    for (auto* slot : modulationPanel.getSlots())
-    {
-        slot->onSlotClicked = [this, persistMatrixMode](juce::String slotId) {
-            if (! slotId.startsWith("macro")) return;
-            if (matrixView.isVisible()) return;
-            if (presetBrowser.isVisible()) presetBrowser.setVisible(false);
-            matrixView.setVisible(true);
-            matrixView.toFront(false);
-            resized();
-            persistMatrixMode(true);
-        };
-    }
+    // (Slot-click → matrix handoff removed — macros are always visible in
+    // the footer now, so a click should drag the value, not open matrix.
+    // Use the MATRIX button to toggle the overlay.)
 
     // Restore persisted matrix mode.
     const auto persisted = processor.getMatrixView();

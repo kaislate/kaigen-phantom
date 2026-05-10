@@ -30,109 +30,93 @@ ModSlot::~ModSlot() = default;
 void ModSlot::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds();
-    auto labelArea = bounds.removeFromBottom(14);
-    auto dotArea   = bounds.reduced(2);
 
     // Pick type-colors.
-    juce::Colour fillColour, borderColour, glowColour;
-    bool hasValueRing = false;
+    juce::Colour fillColour;
     bool isPlaceholder = (type == Type::Lfo || type == Type::Random) && hiddenSlider == nullptr;
     switch (type)
     {
-        case Type::Macro:
-            fillColour   = Theme::macroTeal;
-            borderColour = Theme::macroTeal;
-            glowColour   = Theme::macroTeal.withAlpha(0.5f);
-            hasValueRing = true;
-            break;
-        case Type::Morph:
-            fillColour   = Theme::morphWhite;
-            borderColour = Theme::morphWhite;
-            glowColour   = Theme::morphWhite.withAlpha(0.5f);
-            hasValueRing = true;
-            break;
-        case Type::Lfo:
-            fillColour   = Theme::lfoBlue;
-            borderColour = Theme::lfoBlue;
-            glowColour   = Theme::lfoBlue.withAlpha(0.5f);
-            break;
-        case Type::Random:
-            fillColour   = Theme::randomPurple;
-            borderColour = Theme::randomPurple;
-            glowColour   = Theme::randomPurple.withAlpha(0.5f);
-            break;
+        case Type::Macro:  fillColour = Theme::macroTeal;    break;
+        case Type::Morph:  fillColour = Theme::morphWhite;   break;
+        case Type::Lfo:    fillColour = Theme::lfoBlue;      break;
+        case Type::Random: fillColour = Theme::randomPurple; break;
     }
 
-    // Fit a 28x28 dot centered in the dot area (or smaller if bounds are tight).
-    // 28 px ceiling (was 36) prevents horizontal clipping in narrow slot widths.
+    // ── Macros + Morph: arc-only with center (or beside) label ──────────
+    if ((type == Type::Macro || type == Type::Morph) && hiddenSlider != nullptr)
+    {
+        // Morph: arc on the LEFT, label "Morph" to the right of the arc.
+        // Macro: arc fills the slot, label "m1".."m4" centered inside the arc.
+        juce::Rectangle<int> arcArea;
+        if (type == Type::Morph)
+            arcArea = bounds.removeFromLeft(juce::jmin(bounds.getHeight(), 36));
+        else
+            arcArea = bounds;
+
+        const float arcDiameter = (float) juce::jmin(arcArea.getWidth(), arcArea.getHeight()) - 4.0f;
+        const auto  arcCentre   = arcArea.getCentre().toFloat();
+        const float arcR        = arcDiameter * 0.5f;
+        const float arcThick    = 2.5f;
+
+        // Arc track (faint).
+        const float startA = juce::degreesToRadians(235.0f);   // matches PhantomKnob
+        const float sweep  = juce::degreesToRadians(250.0f);
+        juce::Path bgArc;
+        bgArc.addCentredArc(arcCentre.x, arcCentre.y, arcR, arcR, 0.0f,
+                             startA, startA + sweep, true);
+        g.setColour(juce::Colour(0x14000000));
+        g.strokePath(bgArc, juce::PathStrokeType(arcThick + 1.0f));
+
+        // Active arc — type-color, scaled by slider value.
+        const float val = (float) hiddenSlider->getValue();
+        if (val > 0.001f)
+        {
+            juce::Path fgArc;
+            fgArc.addCentredArc(arcCentre.x, arcCentre.y, arcR, arcR, 0.0f,
+                                 startA, startA + sweep * val, true);
+            g.setColour(fillColour);
+            g.strokePath(fgArc, juce::PathStrokeType(arcThick,
+                juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+
+        // Label.
+        if (type == Type::Macro)
+        {
+            // "m1".."m4" centered IN the arc.
+            g.setFont(juce::Font(juce::FontOptions("Space Grotesk", 12.0f, juce::Font::bold)));
+            g.setColour(juce::Colour(0xb3000000));   // 70% black on silver
+            g.drawText(label, arcArea, juce::Justification::centred, false);
+        }
+        else   // Morph
+        {
+            // Label "Morph" beside the arc (right side).
+            g.setFont(juce::Font(juce::FontOptions("Space Grotesk", 11.0f, juce::Font::italic)));
+            g.setColour(juce::Colour(0xb3000000));
+            g.drawText(label, bounds, juce::Justification::centredLeft, false);
+        }
+        return;
+    }
+
+    // ── LFO/Random placeholders (only in expanded mode) ────────────────
+    auto labelArea = bounds.toFloat().removeFromBottom(14.0f);
+    auto dotArea   = bounds.reduced(2);
     const float dotDiameter = juce::jmin(28.0f, (float) juce::jmin(dotArea.getWidth(), dotArea.getHeight() - 2));
     const auto dotCentre = juce::Point<float> { (float) dotArea.getCentreX(), (float) dotArea.getCentreY() };
     const auto dotRect = juce::Rectangle<float>(dotDiameter, dotDiameter).withCentre(dotCentre);
 
-    // Optional value ring (macro/morph) — draw BEHIND the dot.
-    if (hasValueRing && hiddenSlider != nullptr)
+    g.setColour(fillColour.withAlpha(0.40f));
+    g.fillEllipse(dotRect);
+    g.setColour(fillColour.withAlpha(0.70f));
+    g.drawEllipse(dotRect, 2.0f);
+    if (placeholder.isNotEmpty())
     {
-        const float ringRadius    = dotDiameter * 0.5f + 4.0f;
-        const float ringThickness = 2.0f;
-
-        // Background track (faint white).
-        const float ringStartAngle = -juce::MathConstants<float>::pi * 0.75f;   // ~ -135°
-        const float ringEndAngle   =  juce::MathConstants<float>::pi * 0.75f;   // ~ +135°  (270° sweep)
-        juce::Path bgArc;
-        bgArc.addCentredArc(dotCentre.x, dotCentre.y, ringRadius, ringRadius, 0.0f,
-                             ringStartAngle, ringEndAngle, true);
-        g.setColour(Theme::ringTrack);
-        g.strokePath(bgArc, juce::PathStrokeType(ringThickness));
-
-        // Foreground active arc.
-        const float val       = (float) hiddenSlider->getValue();   // 0..1
-        const float fgEndAngle = ringStartAngle + val * (ringEndAngle - ringStartAngle);
-        juce::Path fgArc;
-        fgArc.addCentredArc(dotCentre.x, dotCentre.y, ringRadius, ringRadius, 0.0f,
-                             ringStartAngle, fgEndAngle, true);
-        g.setColour(fillColour);
-        g.strokePath(fgArc, juce::PathStrokeType(ringThickness));
+        g.setColour(juce::Colour(0x66ffffff));
+        g.setFont(juce::FontOptions("Space Grotesk", 7.0f, juce::Font::bold));
+        g.drawText(placeholder, dotRect, juce::Justification::centred, false);
     }
-
-    if (isPlaceholder)
-    {
-        // Faint dot for LFO/Random placeholders (PR4/PR5).
-        g.setColour(fillColour.withAlpha(0.40f));
-        g.fillEllipse(dotRect);
-        g.setColour(borderColour.withAlpha(0.70f));
-        g.drawEllipse(dotRect, 2.0f);
-        // Stub label inside the dot.
-        if (placeholder.isNotEmpty())
-        {
-            g.setColour(juce::Colour(0x66ffffff));
-            g.setFont(juce::FontOptions("Space Grotesk", 7.0f, juce::Font::bold));
-            g.drawText(placeholder, dotRect, juce::Justification::centred, false);
-        }
-    }
-    else
-    {
-        // Active radial gradient body — type-color at center, dark slot-dot inner at edge.
-        juce::ColourGradient body(fillColour, dotCentre,
-                                   Theme::slotDotInner,
-                                   juce::Point<float>(dotCentre.x + dotDiameter * 0.5f,
-                                                       dotCentre.y + dotDiameter * 0.5f),
-                                   true);
-        body.addColour(0.30, fillColour);       // sharp edge at 30%
-        body.addColour(0.70, Theme::slotDotInner);
-        g.setGradientFill(body);
-        g.fillEllipse(dotRect);
-
-        // Border ring + glow.
-        g.setColour(glowColour);
-        g.drawEllipse(dotRect.expanded(1.0f), 2.0f);  // outer glow
-        g.setColour(borderColour);
-        g.drawEllipse(dotRect, 2.0f);
-    }
-
-    // Label below the dot.
     g.setFont(juce::FontOptions("Space Grotesk", 9.0f, juce::Font::bold));
-    g.setColour(fillColour.withAlpha(isPlaceholder ? 0.65f : 1.0f));
-    g.drawText(label, labelArea, juce::Justification::centred, false);
+    g.setColour(fillColour.withAlpha(0.65f));
+    g.drawText(label, labelArea.toNearestInt(), juce::Justification::centred, false);
 }
 
 void ModSlot::resized()

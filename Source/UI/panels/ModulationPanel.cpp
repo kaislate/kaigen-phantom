@@ -59,11 +59,11 @@ ModulationPanel::ModulationPanel(PhantomProcessor& p, juce::AudioProcessorValueT
         { ModSlot::Type::Lfo,    "lfo1",    "",             "LFO 1", "PR4" },
         { ModSlot::Type::Lfo,    "lfo2",    "",             "LFO 2", "PR4" },
         { ModSlot::Type::Random, "randomA", "",             "RAND",  "PR5" },
-        { ModSlot::Type::Macro,  "macro1",  "macro1",       "MAC 1", "" },
-        { ModSlot::Type::Macro,  "macro2",  "macro2",       "MAC 2", "" },
-        { ModSlot::Type::Morph,  "morph",   "morph_amount", "MORPH", "" },
-        { ModSlot::Type::Macro,  "macro3",  "macro3",       "MAC 3", "" },
-        { ModSlot::Type::Macro,  "macro4",  "macro4",       "MAC 4", "" },
+        { ModSlot::Type::Macro,  "macro1",  "macro1",       "m1",    "" },
+        { ModSlot::Type::Macro,  "macro2",  "macro2",       "m2",    "" },
+        { ModSlot::Type::Morph,  "morph",   "morph_amount", "Morph", "" },
+        { ModSlot::Type::Macro,  "macro3",  "macro3",       "m3",    "" },
+        { ModSlot::Type::Macro,  "macro4",  "macro4",       "m4",    "" },
         { ModSlot::Type::Random, "randomB", "",             "RAND",  "PR5" },
         { ModSlot::Type::Lfo,    "lfo3",    "",             "LFO 3", "PR4" },
         { ModSlot::Type::Lfo,    "lfo4",    "",             "LFO 4", "PR4" },
@@ -109,9 +109,9 @@ void ModulationPanel::resized()
     // Order in the grouped cluster: Mac1 Mac2 Mac3 Mac4 [gap] Morph.
     if (slots.size() >= 8)   // sanity
     {
-        constexpr int kMacroW    = 38;
-        constexpr int kMorphW    = 48;   // slightly wider so morph reads as more prominent
-        constexpr int kSlotGap   = 2;
+        constexpr int kMacroW    = 44;   // arc + center label "m1".."m4"
+        constexpr int kMorphW    = 92;   // arc + label "Morph" beside it
+        constexpr int kSlotGap   = 4;
         constexpr int kMorphGap  = 12;   // extra gap before morph to set it apart
 
         // Slot indices in `slots`: macro1=3, macro2=4, morph=5, macro3=6, macro4=7.
