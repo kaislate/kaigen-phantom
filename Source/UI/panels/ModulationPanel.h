@@ -26,10 +26,16 @@ public:
     /** Fires when the user clicks MATRIX. Boolean argument: new active state. */
     std::function<void(bool)> onMatrixToggle;
 
+    /** Fires when the slot row is shown/hidden via the Modulations toggle. */
+    std::function<void(bool)> onSlotsExpandedChanged;
+
     /** True if MATRIX mode is active (slot row collapsed, mode bar only). */
     bool isMatrixActive() const noexcept { return matrixActive; }
 
-    /** Mode-bar-only height when slot row is collapsed (matrix mode). */
+    /** True if the Modulations slot row is expanded (visible). Default false. */
+    bool isSlotsExpanded() const noexcept { return slotsExpanded; }
+
+    /** Mode-bar-only height when slot row is collapsed. */
     static constexpr int kCollapsedHeight = 38;
 
     /** Update the routing counter (called by NativePluginEditor on state change). */
@@ -46,10 +52,11 @@ private:
     PhantomProcessor& processor;
     juce::AudioProcessorValueTreeState& apvts;
 
-    juce::TextButton slotsButton  { "SLOTS"  };
-    juce::TextButton matrixButton { "MATRIX" };
+    juce::TextButton slotsButton  { "MODULATIONS" };
+    juce::TextButton matrixButton { "MATRIX"      };
     juce::Label      counterLabel;
-    bool matrixActive { false };
+    bool matrixActive  { false };
+    bool slotsExpanded { false };   // hidden into footer by default
 
     juce::OwnedArray<ModSlot> slots;
 

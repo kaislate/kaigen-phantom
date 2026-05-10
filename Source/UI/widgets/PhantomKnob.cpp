@@ -360,17 +360,21 @@ void PhantomKnob::paintValueText(juce::Graphics& g, juce::Point<float> centre,
     g.setColour(juce::Colours::white);
     g.drawText(text, rect, juce::Justification::centred, false);
 
-    // ── Knob label below the value text (cursive, only Large + Medium) ──
+    // ── Knob label below the value text (only Large + Medium) ──────────
     if (labelText.isNotEmpty() && sizeVariant != Size::Small)
     {
-        const float labelPx = (sizeVariant == Size::Large) ? 11.0f : 9.0f;
-        const auto labelFont = juce::Font(juce::FontOptions("Segoe Script", labelPx,
-                                                              juce::Font::italic));
+        // Bigger, simpler font than Segoe Script (which was nearly unreadable
+        // at small sizes). Space Grotesk italic is the same family as the
+        // section headers so it composes visually.
+        const float labelPx = (sizeVariant == Size::Large) ? 13.0f : 11.0f;
+        const auto labelFont = juce::Font(juce::FontOptions("Space Grotesk", labelPx,
+                                                              juce::Font::italic))
+                                    .withExtraKerningFactor(0.04f);
         g.setFont(labelFont);
-        const auto labelY = centre.y + yOffset + textH * 0.5f + 2.0f;
+        const auto labelY = centre.y + yOffset + textH * 0.5f + 1.0f;
         const juce::Rectangle<float> lblRect(centre.x - maxW * 0.5f, labelY,
                                               maxW, labelPx + 4.0f);
-        g.setColour(juce::Colour(0xCCFFFFFF));   // ~80% white
+        g.setColour(juce::Colour(0xD9FFFFFF));   // ~85% white
         g.drawText(labelText.toLowerCase(), lblRect, juce::Justification::centred, false);
     }
 }

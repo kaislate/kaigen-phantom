@@ -62,6 +62,9 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
         persistMatrixMode(false);
     };
 
+    // Modulations toggle → relayout (panel grows/shrinks for the slot row).
+    modulationPanel.onSlotsExpandedChanged = [this](bool) { resized(); };
+
     // Browser is added but starts hidden; clicked-to-show by Browse button.
     addAndMakeVisible(presetBrowser);
     presetBrowser.setVisible(false);
@@ -128,9 +131,12 @@ void NativePluginEditor::resized()
     auto topBarArea = area.removeFromTop(topBarHeight);
     topBar.setBounds(topBarArea);
 
-    const int currentModPanelHeight = modulationPanel.isMatrixActive()
-        ? ModulationPanel::kCollapsedHeight
-        : modPanelHeight;
+    // Mod panel is its collapsed mode-bar-only height unless the user has
+    // explicitly expanded the slot row via the MODULATIONS button.
+    const bool modExpanded = modulationPanel.isSlotsExpanded() && ! modulationPanel.isMatrixActive();
+    const int currentModPanelHeight = modExpanded
+        ? modPanelHeight
+        : ModulationPanel::kCollapsedHeight;
     auto modPanelArea = area.removeFromBottom(currentModPanelHeight);
     modulationPanel.setBounds(modPanelArea);
 

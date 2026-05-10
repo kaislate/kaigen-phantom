@@ -227,7 +227,8 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
 
         params.push_back(std::make_unique<APC>(
             pid("recipe_preset"), disp("Recipe Preset"),
-            juce::StringArray{ "Warm", "Aggressive", "Hollow", "Dense", "Stable", "Weird", "Custom" }, 4));
+            juce::StringArray{ "Warm", "Aggressive", "Hollow", "Dense", "Stable", "Weird",
+                               "Custom 1", "Custom 2", "Custom 3" }, 4));
         params.push_back(std::make_unique<APF>(
             pid("harmonic_saturation"), disp("Harmonic Saturation"),
             juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f,

@@ -24,7 +24,9 @@ LeftPanel::LeftPanel(juce::AudioProcessorValueTreeState& a)
                       "a_recipe_h5", "a_recipe_h6", "a_recipe_h7", "a_recipe_h8"
                   }),
       recipePresetSelector(apvts, "a_recipe_preset",
-                           { "Warm", "Aggr", "Hollow", "Dense", "Stable", "Weird", "Custom" },
+                           { "Warm", "Aggr", "Hollow",
+                             "Dense", "Stable", "Weird",
+                             "Cust 1", "Cust 2", "Cust 3" },
                            /*numRows*/ 3),
       ghostAmountKnob  (apvts, "a_ghost",              PhantomKnob::Size::Large,  "Amount"),
       crossoverKnob    (apvts, "a_phantom_threshold",  PhantomKnob::Size::Medium, "Crossover"),
@@ -146,7 +148,9 @@ void LeftPanel::resized()
     constexpr int kMedium = 136;
 
     // ── Ghost section ──────────────────────────────────────────────────
-    constexpr int ghostY  = 392;   // knob component top
+    // Pushed down to clear the 3-row recipe preset selector below the wheel
+    // (wheelTop 8 + wheelSize 320 + gap 6 + presetH 66 = 400).
+    constexpr int ghostY  = 420;   // knob component top
     const int ghostTotal  = kLarge + kMedium + kMedium;
     const int ghostOverlap = (ghostTotal - panelW + 16) / 2;
     int gx = 8;
@@ -161,7 +165,7 @@ void LeftPanel::resized()
     ghostModeToggle.setBounds(12, ghostY + kLarge + 4, panelW - 24, 22);
 
     // ── Filter section (more vertical gap from Ghost) ──────────────────
-    constexpr int filterY = 660;   // was 600 — bumped down for breathing room
+    constexpr int filterY = 690;   // tracks the bumped Ghost Y
     const int filterTotal = kMedium + 40 + kMedium;
     int fx = (panelW - filterTotal) / 2;
     lpfKnob.setBounds(fx, filterY, kMedium, kMedium);

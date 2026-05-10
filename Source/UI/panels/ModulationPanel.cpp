@@ -9,22 +9,38 @@ ModulationPanel::ModulationPanel(PhantomProcessor& p, juce::AudioProcessorValueT
     : processor(p), apvts(a)
 {
     slotsButton .setClickingTogglesState(true);
-    slotsButton .setToggleState(true, juce::dontSendNotification);
+    slotsButton .setToggleState(false, juce::dontSendNotification);   // hidden by default
     matrixButton.setClickingTogglesState(true);
 
+    // MODULATIONS toggles slot-row visibility. If MATRIX is active, also
+    // close it so the slot row can show.
     slotsButton.onClick = [this] {
-        slotsButton.setToggleState(true, juce::dontSendNotification);
-        // Slot view is the default; SLOTS button only deactivates matrix.
-        if (matrixActive) {
+        slotsExpanded = ! slotsExpanded;
+        slotsButton.setToggleState(slotsExpanded, juce::dontSendNotification);
+        if (slotsExpanded && matrixActive)
+        {
             matrixActive = false;
             matrixButton.setToggleState(false, juce::dontSendNotification);
             if (onMatrixToggle) onMatrixToggle(false);
         }
+        for (auto* slot : slots)
+            slot->setVisible(slotsExpanded);
+        if (onSlotsExpandedChanged) onSlotsExpandedChanged(slotsExpanded);
+        resized();
     };
+
+    // MATRIX toggles the matrix overlay. If slot row is open, hide it.
     matrixButton.onClick = [this] {
         matrixActive = ! matrixActive;
         matrixButton.setToggleState(matrixActive, juce::dontSendNotification);
-        slotsButton .setToggleState(! matrixActive, juce::dontSendNotification);
+        if (matrixActive && slotsExpanded)
+        {
+            slotsExpanded = false;
+            slotsButton.setToggleState(false, juce::dontSendNotification);
+            for (auto* slot : slots)
+                slot->setVisible(false);
+            if (onSlotsExpandedChanged) onSlotsExpandedChanged(false);
+        }
         if (onMatrixToggle) onMatrixToggle(matrixActive);
     };
 
@@ -55,7 +71,7 @@ ModulationPanel::ModulationPanel(PhantomProcessor& p, juce::AudioProcessorValueT
     for (const auto& def : defs)
     {
         auto* slot = new ModSlot(apvts, def.type, def.slotId, def.paramID, def.label, def.placeholder);
-        addAndMakeVisible(*slot);
+        addChildComponent(*slot);   // hidden by default; slotsExpanded toggles visibility
         slots.add(slot);
     }
 }
@@ -88,8 +104,9 @@ void ModulationPanel::resized()
     matrixButton.setBounds(modeBar.removeFromLeft(64));
     counterLabel.setBounds(modeBar.removeFromRight(140));
 
-    // Slot row collapses when MATRIX mode is active.
-    const bool slotRowVisible = ! matrixActive;
+    // Slot row visible only when MODULATIONS toggle is expanded (and matrix
+    // mode is off).
+    const bool slotRowVisible = slotsExpanded && ! matrixActive;
     for (auto* slot : slots)
         slot->setVisible(slotRowVisible);
 
