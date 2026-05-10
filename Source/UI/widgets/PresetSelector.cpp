@@ -130,11 +130,10 @@ void PresetSelector::paint(juce::Graphics& g)
     Theme::paintGlassPill(g, pillBounds.toFloat());
 
     // Preset name centered inside the pill (between heart on left and the
-    // modified asterisk on the right). Slightly off-white on the dark glass
-    // so it reads clearly without being harsh.
+    // modified asterisk on the right). Dark-on-light per CSS rgba(0,0,0,0.75).
     const auto pillTextArea = pillBounds.reduced(26, 0);
     g.setFont(juce::FontOptions("Space Grotesk", 11.0f, juce::Font::plain));
-    g.setColour(juce::Colour(0xd0e8e8ec));
+    g.setColour(juce::Colour(0xbf000000));
     const auto display = currentPresetName.isEmpty() ? juce::String("Default") : currentPresetName;
     g.drawText(display, pillTextArea, juce::Justification::centred, true);
 

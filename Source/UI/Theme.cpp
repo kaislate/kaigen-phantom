@@ -222,16 +222,12 @@ namespace kaigen::phantom::Theme
         const auto fb = bounds.toFloat();
         if (fb.isEmpty()) return;
 
-        // Strip base — medium charcoal so the strip reads as its own surface
-        // rather than inheriting the editor's near-black background. Matches
-        // the reference (~RGB 60-70 mid, slight warm tint).
-        g.setColour(juce::Colour(0xff3a3c40));
-        g.fillRect(fb);
-
-        // Subtle light highlight gradient on top of the base — gives the
-        // strip a faint top-lit feel without making it look bright.
-        juce::ColourGradient grad(juce::Colour(0x33ffffff), fb.getX(), fb.getY(),
-                                   juce::Colour(0x05ffffff), fb.getX(), fb.getBottom(), false);
+        // Light silver base — #d6d7d9 (the webview's `--bg`). Subtle white
+        // top-highlight, no bottom darkening — gives the strip a faint
+        // top-lit feel while keeping the surface tone consistent with the
+        // rest of the silver chassis.
+        juce::ColourGradient grad(juce::Colour(0xffe4e5e7), fb.getX(), fb.getY(),
+                                   juce::Colour(0xffd6d7d9), fb.getX(), fb.getBottom(), false);
         g.setGradientFill(grad);
         g.fillRect(fb);
 
@@ -263,34 +259,33 @@ namespace kaigen::phantom::Theme
         if (bounds.isEmpty()) return;
         const float corner = bounds.getHeight() * 0.5f;
 
-        // Body — slightly darker than the strip with a subtle vertical gradient.
-        // Webview spec assumed a light silver strip; on the native dark strip,
-        // we keep the same direction (top darker, bottom lighter) but bump the
-        // alphas so the pill reads as a depressed shape, not a flat tint.
-        juce::ColourGradient body(juce::Colour(0x33000000), bounds.getX(), bounds.getY(),
-                                   juce::Colour(0x14000000), bounds.getX(), bounds.getBottom(),
+        // Body: subtle dark vertical gradient — matches CSS
+        // linear-gradient(180deg, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.02) 100%).
+        juce::ColourGradient body(juce::Colour(0x14000000), bounds.getX(), bounds.getY(),
+                                   juce::Colour(0x08000000), bounds.getX(), bounds.getBottom(),
                                    false);
         g.setGradientFill(body);
         g.fillRoundedRectangle(bounds, corner);
 
-        // Outer "lifted" highlight just below the pill — gives the floating glass feel.
-        g.setColour(juce::Colour(0x60FFFFFF));
+        // Outer "lifted" white highlight just below the pill (CSS 0 1px 2px
+        // rgba(255,255,255,0.6)).
+        g.setColour(juce::Colour(0x99FFFFFF));
         g.drawLine(bounds.getX() + corner * 0.6f, bounds.getBottom() + 0.5f,
                     bounds.getRight() - corner * 0.6f, bounds.getBottom() + 0.5f, 0.7f);
 
-        // Inset top shadow — depressed-edge feel.
-        g.setColour(juce::Colour(0x55000000));
+        // Inset top shadow (CSS inset 0 2px 4px rgba(0,0,0,0.10)).
+        g.setColour(juce::Colour(0x33000000));
         g.drawLine(bounds.getX() + corner * 0.6f, bounds.getY() + 0.6f,
-                    bounds.getRight() - corner * 0.6f, bounds.getY() + 0.6f, 0.9f);
+                    bounds.getRight() - corner * 0.6f, bounds.getY() + 0.6f, 0.8f);
 
-        // Inset bottom white highlight.
-        g.setColour(juce::Colour(0x55FFFFFF));
+        // Inset bottom white highlight (CSS inset 0 -1px 2px rgba(255,255,255,0.3)).
+        g.setColour(juce::Colour(0x66FFFFFF));
         g.drawLine(bounds.getX() + corner * 0.6f, bounds.getBottom() - 1.0f,
                     bounds.getRight() - corner * 0.6f, bounds.getBottom() - 1.0f, 0.6f);
 
-        // Defined outer edge — keeps the pill readable on dark strips.
-        g.setColour(juce::Colour(0x33000000));
-        g.drawRoundedRectangle(bounds.reduced(0.25f), corner, 0.6f);
+        // Subtle outer edge.
+        g.setColour(juce::Colour(0x1f000000));
+        g.drawRoundedRectangle(bounds.reduced(0.25f), corner, 0.5f);
     }
 
     void paintVisualizerInset(juce::Graphics& g, juce::Rectangle<int> bounds, float cornerRadius)
