@@ -82,26 +82,18 @@ void ModSlot::paint(juce::Graphics& g)
                 juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
 
-        // Label — etched (dark text + 1 px white shadow below) for the
-        // engraved-into-silver look matching the section headings.
+        // Label — plain steel white (matches the lit-meter / active-button
+        // accent), no etched shadow.
         if (type == Type::Macro)
         {
-            const auto font = juce::Font(juce::FontOptions("Space Grotesk", 12.0f, juce::Font::bold));
-            // White shadow below.
-            g.setFont(font);
-            g.setColour(juce::Colour(0x80FFFFFF));
-            g.drawText(label, arcArea.translated(0, 1), juce::Justification::centred, false);
-            // Foreground — slightly brighter than 70% black per request.
-            g.setColour(juce::Colour(0xc8000000));   // ~78% black
+            g.setFont(juce::Font(juce::FontOptions("Space Grotesk", 12.0f, juce::Font::bold)));
+            g.setColour(juce::Colour(0xfff5f8fb));   // steel white
             g.drawText(label, arcArea, juce::Justification::centred, false);
         }
         else   // Morph
         {
-            const auto font = juce::Font(juce::FontOptions("Space Grotesk", 11.0f, juce::Font::italic));
-            g.setFont(font);
-            g.setColour(juce::Colour(0x80FFFFFF));
-            g.drawText(label, bounds.translated(0, 1), juce::Justification::centredLeft, false);
-            g.setColour(juce::Colour(0xc8000000));
+            g.setFont(juce::Font(juce::FontOptions("Space Grotesk", 11.0f, juce::Font::italic)));
+            g.setColour(juce::Colour(0xfff5f8fb));
             g.drawText(label, bounds, juce::Justification::centredLeft, false);
         }
         return;
