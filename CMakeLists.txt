@@ -137,6 +137,10 @@ target_compile_definitions(KaigenPhantom PUBLIC
     JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
+    # Enable JUCE 8's Direct2D renderer on Windows. Produces softer ClearType
+    # text + smoother sub-pixel positioning, matching what Chromium gives the
+    # webview side. No effect on non-Windows builds.
+    JUCE_DIRECT2D=1
 )
 
 target_link_libraries(KaigenPhantom
