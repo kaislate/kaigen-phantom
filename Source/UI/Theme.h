@@ -124,6 +124,25 @@ namespace kaigen::phantom::Theme
      *  passes the rect; corner radius is half the height (full pill). */
     void paintGlassPill(juce::Graphics& g, juce::Rectangle<float> bounds);
 
+    /** Preset harmonic-fingerprint spectrum graph. JUCE port of the webview's
+     *  PresetSpectrum.render — sums Gaussian peaks at H2..H8 (centered at
+     *  k * fundamental for k=2..8) on a log-frequency axis 30Hz–10kHz, fills
+     *  beneath the curve, draws the curve, and overlays a dashed crossover
+     *  marker. If the effective fundamental drops below 6Hz, renders a muted
+     *  "SUB BASS" label instead.
+     *
+     *  Variants:
+     *    Thumbnail — used in browser row SHAPE column (170×26 in webview)
+     *    Preview   — used in the right-pane preview (280×56 in webview, with
+     *                guide lines and Hz axis labels)
+     *
+     *  Inputs: harmonic amplitudes 0..1 for H2..H8, crossover Hz, integer
+     *  octave skip 0..8. */
+    enum class PresetSpectrumVariant { Thumbnail, Preview };
+    void paintPresetSpectrum(juce::Graphics& g, juce::Rectangle<float> bounds,
+                              const float h[7], float crossoverHz, int skip,
+                              PresetSpectrumVariant variant);
+
     /** Paints a pitch-black inset surface for visualizers (hard inner shadow). */
     void paintVisualizerInset(juce::Graphics& g, juce::Rectangle<int> bounds, float cornerRadius = 6.0f);
 

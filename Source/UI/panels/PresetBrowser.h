@@ -47,6 +47,8 @@ private:
         juce::String pack;
         juce::String type;          // "Synth" / "Bass" / "Experimental" / ...
         juce::String designer;
+        float        h[7]      { 0, 0, 0, 0, 0, 0, 0 };  // recipe_h2..h8 (0..1)
+        float        crossover { 120.0f };               // phantom_threshold Hz
         int          skip      { 0 };
         bool         isFavorite{ false };
         bool         isHeader  { false };

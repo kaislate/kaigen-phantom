@@ -119,6 +119,8 @@ void PresetBrowser::rebuildRows()
             r.pack       = packName;
             r.type       = p.metadata.type;
             r.designer   = p.metadata.designer;
+            for (int hi = 0; hi < 7; ++hi) r.h[hi] = p.preview.h[hi];
+            r.crossover  = p.preview.crossover;
             r.skip       = p.preview.skip;
             r.isFavorite = p.metadata.isFavorite;
             r.isHeader   = false;
@@ -384,11 +386,11 @@ void PresetBrowser::paint(juce::Graphics& g)
                 g.drawText(r.type,     typeCol,     juce::Justification::centredLeft, true);
                 g.drawText(r.designer, designerCol, juce::Justification::centredLeft, true);
 
-                // SHAPE — placeholder thin horizontal line. Spectrum thumbnail
-                // lands in commit 6.
-                g.setColour(juce::Colour(0x33000000));
-                g.drawLine((float) shapeCol.getX() + 4, (float) shapeCol.getCentreY(),
-                            (float) shapeCol.getRight() - 4, (float) shapeCol.getCentreY(), 0.8f);
+                // SHAPE — harmonic spectrum thumbnail.
+                Theme::paintPresetSpectrum(g,
+                    shapeCol.reduced(2, 1).toFloat(),
+                    r.h, r.crossover, r.skip,
+                    Theme::PresetSpectrumVariant::Thumbnail);
 
                 // SKIP — tabular numerics. Em-dash when skip == 0 (matches the
                 // webview's display rule for "no skip set").

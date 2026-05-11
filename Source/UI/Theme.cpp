@@ -329,6 +329,146 @@ namespace kaigen::phantom::Theme
         // Adding a stroke makes the pill look stamped rather than recessed.
     }
 
+    void paintPresetSpectrum(juce::Graphics& g, juce::Rectangle<float> bounds,
+                              const float h[7], float crossoverHz, int skip,
+                              PresetSpectrumVariant variant)
+    {
+        if (bounds.isEmpty() || h == nullptr) return;
+
+        constexpr float kFreqLow       = 30.0f;
+        constexpr float kFreqHigh      = 10000.0f;
+        constexpr float kSigma         = 0.04f;     // Gaussian peak width in log10(Hz)
+        constexpr int   kSamples       = 48;
+        constexpr float kSubBassCutoff = 6.0f;
+
+        const bool isThumbnail = variant == PresetSpectrumVariant::Thumbnail;
+
+        const float cross = juce::jmax(10.0f, crossoverHz);
+        const int   sk    = juce::jmax(0, skip);
+        const float fundamentalHz = cross / std::pow(2.0f, (float) sk);
+
+        if (fundamentalHz < kSubBassCutoff)
+        {
+            g.setColour(juce::Colour(0x38000000));   // 22% black, matches CSS spec
+            g.setFont(juce::FontOptions(uiFontFamily(),
+                                         isThumbnail ? 10.0f : 20.0f,
+                                         juce::Font::bold));
+            g.drawText("SUB BASS", bounds, juce::Justification::centred, false);
+            return;
+        }
+
+        const float logLo = std::log10(kFreqLow);
+        const float logHi = std::log10(kFreqHigh);
+
+        auto freqToX = [&](float f) -> float {
+            const float ff = juce::jmax(f, kFreqLow);
+            return bounds.getX() + ((std::log10(ff) - logLo) / (logHi - logLo)) * bounds.getWidth();
+        };
+
+        auto evaluate = [&](float freq) -> float {
+            const float logF = std::log10(freq);
+            float s = 0.0f;
+            for (int i = 0; i < 7; ++i)
+            {
+                const float centerHz = (float) (i + 2) * fundamentalHz;
+                const float d = (logF - std::log10(centerHz)) / kSigma;
+                s += h[i] * std::exp(-d * d);
+            }
+            return juce::jlimit(0.0f, 1.0f, s);
+        };
+
+        // Sample log-spaced points across the display range.
+        std::vector<juce::Point<float>> pts;
+        pts.reserve((size_t) kSamples);
+        for (int i = 0; i < kSamples; ++i)
+        {
+            const float t = (float) i / (float) (kSamples - 1);
+            const float f = std::pow(10.0f, logLo + (logHi - logLo) * t);
+            const float x = freqToX(f);
+            const float y = bounds.getY() + bounds.getHeight() * (1.0f - evaluate(f));
+            pts.emplace_back(x, y);
+        }
+
+        // Smooth curve via quadratic-to between consecutive midpoints.
+        juce::Path curve;
+        if (pts.size() >= 2)
+        {
+            curve.startNewSubPath(pts[0]);
+            for (size_t i = 1; i + 1 < pts.size(); ++i)
+            {
+                const auto xc = (pts[i].x + pts[i + 1].x) * 0.5f;
+                const auto yc = (pts[i].y + pts[i + 1].y) * 0.5f;
+                curve.quadraticTo(pts[i].x, pts[i].y, xc, yc);
+            }
+            curve.lineTo(pts.back());
+        }
+
+        // Guide lines (preview variant only).
+        if (! isThumbnail)
+        {
+            g.setColour(juce::Colour(0x0d000000));   // 5% black
+            for (auto frac : { 0.25f, 0.5f, 0.75f })
+            {
+                const float y = bounds.getY() + bounds.getHeight() * frac;
+                g.drawLine(bounds.getX(), y, bounds.getRight(), y, 1.0f);
+            }
+        }
+
+        // Crossover marker — vertical dashed line.
+        const bool xoverInRange = crossoverHz >= kFreqLow && crossoverHz <= kFreqHigh;
+        if (xoverInRange)
+        {
+            const float xoverX = freqToX(crossoverHz);
+            const float dashLen = isThumbnail ? 1.5f : 2.0f;
+            const float dashes[2] = { dashLen, dashLen };
+            const float yTop = bounds.getY()      + (isThumbnail ? 1.0f : 2.0f);
+            const float yBot = bounds.getBottom() - (isThumbnail ? 1.0f : 6.0f);
+            juce::Path dashLine;
+            dashLine.startNewSubPath(xoverX, yTop);
+            dashLine.lineTo(xoverX, yBot);
+            juce::Path dashed;
+            juce::PathStrokeType stroke(isThumbnail ? 0.5f : 0.6f);
+            stroke.createDashedStroke(dashed, dashLine, dashes, 2);
+            g.setColour(juce::Colour(isThumbnail ? 0x47000000 : 0x4d000000));
+            g.fillPath(dashed);
+        }
+
+        // Filled area under the curve.
+        juce::Path filled = curve;
+        filled.lineTo(bounds.getRight(), bounds.getBottom());
+        filled.lineTo(bounds.getX(),     bounds.getBottom());
+        filled.closeSubPath();
+
+        juce::ColourGradient fillGrad(juce::Colour(0x38000000), bounds.getX(), bounds.getY(),
+                                       juce::Colour(0x05000000), bounds.getX(), bounds.getBottom(),
+                                       false);
+        g.setGradientFill(fillGrad);
+        g.fillPath(filled);
+
+        // Curve outline.
+        g.setColour(juce::Colour(0xb8000000));
+        g.strokePath(curve,
+                     juce::PathStrokeType(isThumbnail ? 1.0f : 1.2f,
+                                           juce::PathStrokeType::curved,
+                                           juce::PathStrokeType::rounded));
+
+        // Hz axis labels (preview variant only).
+        if (! isThumbnail)
+        {
+            struct Axis { float hz; const char* label; };
+            const Axis axes[] = { { 30.0f, "30" }, { 300.0f, "300" }, { 3000.0f, "3k" } };
+            g.setColour(juce::Colour(0x60000000));
+            g.setFont(juce::FontOptions("monospace", 6.0f, juce::Font::plain));
+            for (auto& a : axes)
+            {
+                const float ax = freqToX(a.hz);
+                g.drawText(a.label,
+                           juce::Rectangle<float>(ax - 12.0f, bounds.getBottom() - 8.0f, 24.0f, 8.0f),
+                           juce::Justification::centred, false);
+            }
+        }
+    }
+
     void paintVisualizerInset(juce::Graphics& g, juce::Rectangle<int> bounds, float cornerRadius)
     {
         const auto fb = bounds.toFloat();
