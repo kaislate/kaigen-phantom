@@ -37,6 +37,8 @@ public:
 private:
     void loadPresetAt(int rowIndex);
     juce::Rectangle<int> cardBounds() const;
+    juce::Rectangle<int> searchBarBounds() const;
+    void rebuildRows();          // (re)compute `rows` from preset list + search
 
     struct Row { juce::String name; juce::String pack; bool isHeader { false }; };
     std::vector<Row> rows;
@@ -46,6 +48,7 @@ private:
     juce::AudioProcessorValueTreeState& apvts;
 
     juce::TextButton closeButton;
+    juce::TextEditor searchField;
 
     // Webview spec: card is 90% × 90% of parent (capped). 3-column layout:
     //   [sidebar 160] [middle flex] [preview 180]

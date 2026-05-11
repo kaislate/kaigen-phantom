@@ -40,6 +40,22 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
     closeButton.getProperties().set("phantom-style", "header-glyph");
     closeButton.onClick = [this] { setVisible(false); };
     addAndMakeVisible(closeButton);
+
+    // Search field — live filter. Light "glass" surface (matches the
+    // placeholder paint that was here in commit 1).
+    searchField.setTextToShowWhenEmpty("Search presets…", juce::Colour(0x66000000));
+    searchField.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0x99FFFFFF));
+    searchField.setColour(juce::TextEditor::outlineColourId,    juce::Colour(0x1f000000));
+    searchField.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(0x33000000));
+    searchField.setColour(juce::TextEditor::textColourId,       juce::Colour(0xb3000000));
+    searchField.setColour(juce::TextEditor::highlightColourId,  juce::Colour(0x334a90e2));
+    searchField.setColour(juce::TextEditor::highlightedTextColourId, juce::Colour(0xd9000000));
+    searchField.setColour(juce::TextEditor::shadowColourId,     juce::Colour(0));
+    searchField.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(0x33000000));
+    searchField.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::plain));
+    searchField.setBorder(juce::BorderSize<int>(4, 8, 4, 8));
+    searchField.onTextChange = [this] { rebuildRows(); repaint(); };
+    addAndMakeVisible(searchField);
 }
 
 PresetBrowser::~PresetBrowser() = default;
@@ -50,18 +66,37 @@ void PresetBrowser::visibilityChanged()
     {
         rows.clear();
         hoverRow = -1;
+        searchField.setText("", juce::dontSendNotification);
         return;
     }
+    rebuildRows();
+    repaint();
+}
 
+void PresetBrowser::rebuildRows()
+{
     rows.clear();
+    hoverRow = -1;
+    const auto query = searchField.getText().trim().toLowerCase();
+    const bool hasQuery = query.isNotEmpty();
+
     const auto all = processor.getPresetManager().getAllPresets();
     for (const auto& [packName, presets] : all)
     {
-        rows.push_back({ {}, packName, true });
+        // Build the pack's filtered preset list first so we can skip emitting
+        // an orphan header row if the search drops every preset in the pack.
+        std::vector<juce::String> matched;
         for (const auto& p : presets)
-            rows.push_back({ p.metadata.name, packName, false });
+        {
+            if (! hasQuery || p.metadata.name.toLowerCase().contains(query))
+                matched.push_back(p.metadata.name);
+        }
+        if (matched.empty()) continue;
+
+        rows.push_back({ {}, packName, true });
+        for (const auto& n : matched)
+            rows.push_back({ n, packName, false });
     }
-    repaint();
 }
 
 juce::Rectangle<int> PresetBrowser::cardBounds() const
@@ -200,20 +235,8 @@ void PresetBrowser::paint(juce::Graphics& g)
     g.drawLine((float) headerBar.getX(), (float) headerBar.getBottom(),
                 (float) headerBar.getRight(), (float) headerBar.getBottom(), 1.0f);
 
-    // Search bar — placeholder input field, wired in commit 2.
-    {
-        auto field = searchBar.reduced(12, 6);
-        g.setColour(juce::Colour(0x99FFFFFF));
-        g.fillRoundedRectangle(field.toFloat(), 3.0f);
-        g.setColour(juce::Colour(kBorderSoft));
-        g.drawRoundedRectangle(field.toFloat().reduced(0.5f), 3.0f, 1.0f);
-
-        g.setColour(juce::Colour(kTextDim));
-        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::plain));
-        g.drawText("Search presets…", field.reduced(8, 0),
-                    juce::Justification::centredLeft, false);
-    }
-
+    // Search bar — separator below; the input itself is a real
+    // juce::TextEditor (positioned in resized()) painted on top.
     g.setColour(juce::Colour(kBorderSoft));
     g.drawLine((float) searchBar.getX(), (float) searchBar.getBottom(),
                 (float) searchBar.getRight(), (float) searchBar.getBottom(), 1.0f);
@@ -257,10 +280,21 @@ void PresetBrowser::paint(juce::Graphics& g)
     }
 }
 
+juce::Rectangle<int> PresetBrowser::searchBarBounds() const
+{
+    auto card = cardBounds();
+    auto inner = card;
+    inner.removeFromLeft(kSidebarW);
+    inner.removeFromRight(kPreviewW);
+    inner.removeFromTop(kHeaderBarH);   // skip the title bar
+    return inner.removeFromTop(kSearchBarH);
+}
+
 void PresetBrowser::resized()
 {
     const auto card = cardBounds();
     closeButton.setBounds(card.getRight() - 38, card.getY() + 8, 28, 24);
+    searchField.setBounds(searchBarBounds().reduced(12, 6));
 }
 
 void PresetBrowser::mouseMove(const juce::MouseEvent& e)
