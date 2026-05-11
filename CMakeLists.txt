@@ -109,6 +109,11 @@ juce_add_binary_data(PhantomNativeAssets
         Source/Assets/svg/knob_small.svg
         Source/Assets/svg/knob_mini.svg
         Source/Assets/svg/link_icon.svg
+        Source/Assets/fonts/SpaceGrotesk-Light.ttf
+        Source/Assets/fonts/SpaceGrotesk-Regular.ttf
+        Source/Assets/fonts/SpaceGrotesk-Medium.ttf
+        Source/Assets/fonts/SpaceGrotesk-SemiBold.ttf
+        Source/Assets/fonts/SpaceGrotesk-Bold.ttf
 )
 
 # Factory presets (optional, for Phase 2 implementation)

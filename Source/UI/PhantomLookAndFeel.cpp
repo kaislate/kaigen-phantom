@@ -1,6 +1,7 @@
 // Source/UI/PhantomLookAndFeel.cpp
 #include "PhantomLookAndFeel.h"
 #include "Theme.h"
+#include "PhantomNativeAssets.h"
 #include <juce_graphics/juce_graphics.h>
 
 namespace kaigen::phantom
@@ -8,6 +9,29 @@ namespace kaigen::phantom
 
 PhantomLookAndFeel::PhantomLookAndFeel()
 {
+    // Load all bundled Space Grotesk weight variants once at startup. They
+    // persist for the LookAndFeel's lifetime; getTypefaceForFont picks among
+    // them based on the requested style.
+    lightTypeface    = juce::Typeface::createSystemTypefaceFor(
+        PhantomNativeAssets::SpaceGroteskLight_ttf,
+        PhantomNativeAssets::SpaceGroteskLight_ttfSize);
+    regularTypeface  = juce::Typeface::createSystemTypefaceFor(
+        PhantomNativeAssets::SpaceGroteskRegular_ttf,
+        PhantomNativeAssets::SpaceGroteskRegular_ttfSize);
+    mediumTypeface   = juce::Typeface::createSystemTypefaceFor(
+        PhantomNativeAssets::SpaceGroteskMedium_ttf,
+        PhantomNativeAssets::SpaceGroteskMedium_ttfSize);
+    semiBoldTypeface = juce::Typeface::createSystemTypefaceFor(
+        PhantomNativeAssets::SpaceGroteskSemiBold_ttf,
+        PhantomNativeAssets::SpaceGroteskSemiBold_ttfSize);
+    boldTypeface     = juce::Typeface::createSystemTypefaceFor(
+        PhantomNativeAssets::SpaceGroteskBold_ttf,
+        PhantomNativeAssets::SpaceGroteskBold_ttfSize);
+
+    // Make Space Grotesk the project-wide default sans-serif. Any code path
+    // that doesn't explicitly name a typeface picks this up.
+    setDefaultSansSerifTypeface(regularTypeface);
+
     // Default ColourId palette — widgets that don't get custom-painted still
     // pick up reasonable colors via these defaults.
     setColour(juce::Slider::rotarySliderFillColourId,    Theme::accentBlue);
@@ -255,6 +279,24 @@ void PhantomLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Rectan
     g.setColour(textColour);
     g.setFont(juce::FontOptions("Space Grotesk", 10.0f, juce::Font::bold));
     g.drawText(text, area.reduced(8, 0), juce::Justification::centredLeft, true);
+}
+
+juce::Typeface::Ptr PhantomLookAndFeel::getTypefaceForFont(const juce::Font& font)
+{
+    const auto name = font.getTypefaceName();
+    // Only intercept requests for Space Grotesk; everything else (Courier
+    // New, monospace, system-ui, etc.) falls through to the base.
+    if (name == "Space Grotesk" || name == juce::Font::getDefaultSansSerifFontName())
+    {
+        const auto style = font.getTypefaceStyle();
+        if (style == "Light")    return lightTypeface;
+        if (style == "Medium")   return mediumTypeface;
+        if (style == "SemiBold") return semiBoldTypeface;
+        if (style == "Bold")     return boldTypeface;
+        if (font.isBold())       return boldTypeface;
+        return regularTypeface;
+    }
+    return juce::LookAndFeel_V4::getTypefaceForFont(font);
 }
 
 } // namespace kaigen::phantom

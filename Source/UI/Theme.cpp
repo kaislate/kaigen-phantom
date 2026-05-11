@@ -219,14 +219,10 @@ namespace kaigen::phantom::Theme
 
     const juce::String& uiFontFamily()
     {
-        static const juce::String picked = []()
-        {
-            const auto names = juce::Font::findAllTypefaceNames();
-            for (auto* candidate : { "Space Grotesk", "Segoe UI Variable",
-                                     "Segoe UI", "Inter", "Helvetica Neue" })
-                if (names.contains(candidate)) return juce::String(candidate);
-            return juce::Font::getDefaultSansSerifFontName();
-        }();
+        // Space Grotesk is bundled (registered via PhantomLookAndFeel's
+        // getTypefaceForFont override). Always use it — no system fallback
+        // needed.
+        static const juce::String picked { "Space Grotesk" };
         return picked;
     }
 

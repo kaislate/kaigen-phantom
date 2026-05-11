@@ -40,7 +40,19 @@ public:
                            const juce::String& shortcutKeyText,
                            const juce::Drawable* icon, const juce::Colour* textColour) override;
 
+    /** Typeface routing for the bundled Space Grotesk family. When a Font
+     *  asks for "Space Grotesk" we pick the right weight variant based on
+     *  font.getTypefaceStyle() ("Light", "Medium", "SemiBold", "Bold") or
+     *  font.isBold(). Anything else falls through to JUCE's default. */
+    juce::Typeface::Ptr getTypefaceForFont(const juce::Font& font) override;
+
 private:
+    juce::Typeface::Ptr lightTypeface;
+    juce::Typeface::Ptr regularTypeface;
+    juce::Typeface::Ptr mediumTypeface;
+    juce::Typeface::Ptr semiBoldTypeface;
+    juce::Typeface::Ptr boldTypeface;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomLookAndFeel)
 };
 
