@@ -65,12 +65,29 @@ void PresetBrowser::visibilityChanged()
     if (! isVisible())
     {
         rows.clear();
+        categories.clear();
         hoverRow = -1;
+        hoverCategoryIdx = -1;
         searchField.setText("", juce::dontSendNotification);
         return;
     }
+    rebuildCategories();
     rebuildRows();
     repaint();
+}
+
+void PresetBrowser::rebuildCategories()
+{
+    categories.clear();
+    categories.push_back({ CategoryKind::Explore,   "Explore",   {} });
+    categories.push_back({ CategoryKind::Favorites, "Favorites", {} });
+
+    const auto all = processor.getPresetManager().getAllPresets();
+    for (const auto& [packName, presets] : all)
+        categories.push_back({ CategoryKind::Pack, packName, packName });
+
+    if (activeCategoryIdx >= (int) categories.size())
+        activeCategoryIdx = 0;
 }
 
 void PresetBrowser::rebuildRows()
@@ -80,16 +97,24 @@ void PresetBrowser::rebuildRows()
     const auto query = searchField.getText().trim().toLowerCase();
     const bool hasQuery = query.isNotEmpty();
 
+    if (categories.empty()) return;
+    const auto& active = categories[(size_t) activeCategoryIdx];
+
     const auto all = processor.getPresetManager().getAllPresets();
     for (const auto& [packName, presets] : all)
     {
-        // Build the pack's filtered preset list first so we can skip emitting
-        // an orphan header row if the search drops every preset in the pack.
+        // Skip whole packs that don't match the active category filter.
+        if (active.kind == CategoryKind::Pack && active.packFilter != packName)
+            continue;
+
         std::vector<juce::String> matched;
         for (const auto& p : presets)
         {
-            if (! hasQuery || p.metadata.name.toLowerCase().contains(query))
-                matched.push_back(p.metadata.name);
+            if (active.kind == CategoryKind::Favorites && ! p.metadata.isFavorite)
+                continue;
+            if (hasQuery && ! p.metadata.name.toLowerCase().contains(query))
+                continue;
+            matched.push_back(p.metadata.name);
         }
         if (matched.empty()) continue;
 
@@ -164,20 +189,31 @@ void PresetBrowser::paint(juce::Graphics& g)
                sidebarBounds.reduced(10, 8).removeFromTop(12),
                juce::Justification::topLeft, false);
 
-    // Placeholder "All" entry — wired in commit 3.
+    // Category rows.
+    for (size_t i = 0; i < categories.size(); ++i)
     {
-        auto allRow = sidebarBounds.reduced(6, 0)
-                                    .withY(sidebarBounds.getY() + 28)
-                                    .withHeight(24);
-        // Active state (border-left + background) — for now "All" is permanent.
-        g.setColour(juce::Colour(kRowActive));
-        g.fillRoundedRectangle(allRow.toFloat(), 3.0f);
-        g.setColour(juce::Colour(0x4d000000));
-        g.fillRect(juce::Rectangle<float>((float) allRow.getX(), (float) allRow.getY(),
-                                           3.0f, (float) allRow.getHeight()));
-        g.setColour(juce::Colour(kTextStrong));
-        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::bold));
-        g.drawText("All", allRow.reduced(10, 0), juce::Justification::centredLeft, false);
+        const auto& c = categories[i];
+        const auto rowBounds = sidebarRowBounds((int) i);
+        const bool isActive = ((int) i == activeCategoryIdx);
+        const bool isHover  = ((int) i == hoverCategoryIdx);
+
+        if (isActive || isHover)
+        {
+            g.setColour(juce::Colour(isActive ? kRowActive : kRowHover));
+            g.fillRoundedRectangle(rowBounds.toFloat(), 3.0f);
+        }
+        if (isActive)
+        {
+            g.setColour(juce::Colour(0x4d000000));
+            g.fillRect(juce::Rectangle<float>((float) rowBounds.getX(), (float) rowBounds.getY(),
+                                               3.0f, (float) rowBounds.getHeight()));
+        }
+        g.setColour(juce::Colour(isActive ? kTextStrong : kTextBody));
+        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f,
+                                     isActive ? juce::Font::bold : juce::Font::plain));
+        g.drawText(c.label,
+                   rowBounds.reduced(10, 0),
+                   juce::Justification::centredLeft, false);
     }
 
     // ── Preview pane (right) ────────────────────────────────────────────
@@ -213,19 +249,22 @@ void PresetBrowser::paint(juce::Graphics& g)
     auto searchBar = middleBounds.removeFromTop(kSearchBarH);
     auto listArea  = middleBounds;
 
-    // Header — title + count.
+    // Header — title (active category) + total count.
     {
         const auto totalPresets = (int) std::count_if(rows.begin(), rows.end(),
                                     [](const Row& r) { return ! r.isHeader; });
+        const auto title = (! categories.empty() && activeCategoryIdx >= 0
+                            && activeCategoryIdx < (int) categories.size())
+                            ? categories[(size_t) activeCategoryIdx].label
+                            : juce::String("All Presets");
         auto h = headerBar.reduced(14, 0);
         g.setColour(juce::Colour(kTextStrong));
         g.setFont(juce::FontOptions(Theme::uiFontFamily(), 18.0f, juce::Font::bold));
-        g.drawText("All Presets", h.toFloat(), juce::Justification::centredLeft, false);
+        g.drawText(title, h.toFloat(), juce::Justification::centredLeft, false);
 
         const auto countText = juce::String(totalPresets) + " preset" + (totalPresets == 1 ? "" : "s");
         g.setColour(juce::Colour(kTextLabel));
         g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::plain));
-        // Reserve 80px on the right for the close button.
         g.drawText(countText, h.withTrimmedRight(36).toFloat(),
                     juce::Justification::centredRight, false);
     }
@@ -290,6 +329,18 @@ juce::Rectangle<int> PresetBrowser::searchBarBounds() const
     return inner.removeFromTop(kSearchBarH);
 }
 
+juce::Rectangle<int> PresetBrowser::sidebarRowBounds(int categoryIdx) const
+{
+    constexpr int kSidebarTopOffset = 28;   // below the "CATEGORIES" label
+    constexpr int kSidebarRowH      = 24;
+    const auto card = cardBounds();
+    auto sidebar = card.withWidth(kSidebarW).reduced(6, 0);
+    return { sidebar.getX(),
+             card.getY() + kSidebarTopOffset + categoryIdx * kSidebarRowH,
+             sidebar.getWidth(),
+             kSidebarRowH };
+}
+
 void PresetBrowser::resized()
 {
     const auto card = cardBounds();
@@ -305,7 +356,7 @@ void PresetBrowser::mouseMove(const juce::MouseEvent& e)
     inner.removeFromRight(kPreviewW);
     auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH).reduced(8, 4);
 
-    int newHover = -1;
+    int newRowHover = -1;
     int y = listArea.getY();
     for (size_t i = 0; i < rows.size(); ++i)
     {
@@ -316,23 +367,36 @@ void PresetBrowser::mouseMove(const juce::MouseEvent& e)
             && e.x >= listArea.getX() && e.x < listArea.getRight()
             && e.y >= y               && e.y < y + h)
         {
-            newHover = (int) i;
+            newRowHover = (int) i;
             break;
         }
         y += h;
     }
-    if (newHover != hoverRow)
+
+    int newCatHover = -1;
+    for (size_t i = 0; i < categories.size(); ++i)
     {
-        hoverRow = newHover;
+        if (sidebarRowBounds((int) i).contains(e.getPosition()))
+        {
+            newCatHover = (int) i;
+            break;
+        }
+    }
+
+    if (newRowHover != hoverRow || newCatHover != hoverCategoryIdx)
+    {
+        hoverRow = newRowHover;
+        hoverCategoryIdx = newCatHover;
         repaint();
     }
 }
 
 void PresetBrowser::mouseExit(const juce::MouseEvent&)
 {
-    if (hoverRow != -1)
+    if (hoverRow != -1 || hoverCategoryIdx != -1)
     {
         hoverRow = -1;
+        hoverCategoryIdx = -1;
         repaint();
     }
 }
@@ -348,7 +412,22 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
         return;
     }
 
-    // Hit-test: list area only (sidebar/preview/header inert in commit 1).
+    // Sidebar category click → switch active category and refilter.
+    for (size_t i = 0; i < categories.size(); ++i)
+    {
+        if (sidebarRowBounds((int) i).contains(e.getPosition()))
+        {
+            if ((int) i != activeCategoryIdx)
+            {
+                activeCategoryIdx = (int) i;
+                rebuildRows();
+                repaint();
+            }
+            return;
+        }
+    }
+
+    // List area only (preview/header inert until commits 7-8).
     auto inner = card;
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);

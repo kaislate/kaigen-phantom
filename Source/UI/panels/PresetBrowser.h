@@ -38,11 +38,28 @@ private:
     void loadPresetAt(int rowIndex);
     juce::Rectangle<int> cardBounds() const;
     juce::Rectangle<int> searchBarBounds() const;
-    void rebuildRows();          // (re)compute `rows` from preset list + search
+    juce::Rectangle<int> sidebarRowBounds(int categoryIdx) const;
+    void rebuildCategories();    // build sidebar entries from preset packs
+    void rebuildRows();          // build the visible row list for the active category
 
     struct Row { juce::String name; juce::String pack; bool isHeader { false }; };
     std::vector<Row> rows;
     int hoverRow { -1 };
+
+    /** Sidebar entries. `Explore` is a special view (pack-card grid in
+     *  commit 8); for now treats as "show all presets in list mode".
+     *  `Favorites` filters by metadata.isFavorite. Otherwise `packFilter`
+     *  matches against PresetMetadata.packName. */
+    enum class CategoryKind { Explore, Favorites, Pack };
+    struct Category
+    {
+        CategoryKind kind;
+        juce::String label;
+        juce::String packFilter;   // valid when kind == Pack
+    };
+    std::vector<Category> categories;
+    int activeCategoryIdx { 0 };   // 0 = Explore by default
+    int hoverCategoryIdx  { -1 };
 
     PhantomProcessor& processor;
     juce::AudioProcessorValueTreeState& apvts;
