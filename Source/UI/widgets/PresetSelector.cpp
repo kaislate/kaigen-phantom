@@ -132,10 +132,11 @@ void PresetSelector::paint(juce::Graphics& g)
     // Preset name centered inside the pill (between heart on left and the
     // modified asterisk on the right). Dark-on-light per CSS rgba(0,0,0,0.75).
     const auto pillTextArea = pillBounds.reduced(26, 0);
-    // Plain weight: browsers fall back from CSS font-weight:500 to regular
-    // (400) when a Medium variant isn't installed, so the webview renders this
-    // plain even though the spec says 500. Matching that.
-    g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::plain));
+    // CSS spec: font-weight: 500 (Medium). With Space Grotesk bundled the
+    // Medium variant is available, so use it directly via typeface style.
+    auto pillFont = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::plain));
+    pillFont.setTypefaceStyle("Medium");
+    g.setFont(pillFont);
     g.setColour(juce::Colour(0xbf000000));
     const auto display = currentPresetName.isEmpty() ? juce::String("Default") : currentPresetName;
     g.drawText(display, pillTextArea, juce::Justification::centred, true);
