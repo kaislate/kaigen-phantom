@@ -75,7 +75,10 @@ void PresetBrowser::visibilityChanged()
         categories.clear();
         hoverRow = -1;
         hoverCategoryIdx = -1;
+        hoverPackCardIdx = -1;
         selectedPreviewRow = -1;
+        sidebarScrollY = 0;
+        listScrollY = 0;
         deleteButton.setVisible(false);
         searchField.setText("", juce::dontSendNotification);
         return;
@@ -230,11 +233,15 @@ void PresetBrowser::paint(juce::Graphics& g)
                sidebarBounds.reduced(10, 8).removeFromTop(12),
                juce::Justification::topLeft, false);
 
-    // Category rows.
+    // Category rows — clipped to the sidebar area below the header label so
+    // scroll-out-of-view rows don't bleed into the rest of the chrome.
+    {
+    juce::Graphics::ScopedSaveState saveSidebar(g);
+    g.reduceClipRegion(sidebarBounds.withTrimmedTop(28));
     for (size_t i = 0; i < categories.size(); ++i)
     {
         const auto& c = categories[i];
-        const auto rowBounds = sidebarRowBounds((int) i);
+        const auto rowBounds = sidebarRowBounds((int) i).translated(0, -sidebarScrollY);
         const bool isActive = ((int) i == activeCategoryIdx);
         const bool isHover  = ((int) i == hoverCategoryIdx);
 
@@ -256,6 +263,7 @@ void PresetBrowser::paint(juce::Graphics& g)
                    rowBounds.reduced(10, 0),
                    juce::Justification::centredLeft, false);
     }
+    }   // end sidebar clip
 
     // ── Preview pane (right) ────────────────────────────────────────────
     g.setGradientFill(sidebarGradient(previewBounds.toFloat()));
@@ -383,14 +391,19 @@ void PresetBrowser::paint(juce::Graphics& g)
     g.drawLine((float) searchBar.getX(), (float) searchBar.getBottom(),
                 (float) searchBar.getRight(), (float) searchBar.getBottom(), 1.0f);
 
-    // Explore mode: pack-card grid replaces the table.
+    // Explore mode: pack-card grid replaces the table. Clipped to the
+    // middle column area + offset by listScrollY for vertical scrolling.
     if (isExploreActive())
     {
+        juce::Graphics::ScopedSaveState saveExplore(g);
+        g.reduceClipRegion(listArea);
         for (size_t i = 0; i < packCards.size(); ++i)
         {
             const auto& pc = packCards[i];
-            auto card = packCardBounds((int) i);
+            auto card = packCardBounds((int) i).translated(0, -listScrollY);
             if (card.isEmpty()) continue;
+            if (card.getBottom() <= listArea.getY() || card.getY() >= listArea.getBottom())
+                continue;
             const auto cardOuter = card;   // unmodified copy for hover/border
 
             // Initial-letter art square.
@@ -480,15 +493,21 @@ void PresetBrowser::paint(juce::Graphics& g)
                     (float) colHeaderBar.getRight(), (float) colHeaderBar.getBottom(), 1.0f);
     }
 
-    // List rows.
+    // List rows. Clipped to the rows area + offset by listScrollY so rows
+    // scrolled out of view don't bleed into adjacent chrome.
     {
         const auto rowsArea = listArea.reduced(8, 4);
-        int y = rowsArea.getY();
+        juce::Graphics::ScopedSaveState saveList(g);
+        g.reduceClipRegion(rowsArea);
+        int y = rowsArea.getY() - listScrollY;
         for (size_t i = 0; i < rows.size(); ++i)
         {
             const auto& r = rows[i];
             const int h = r.isHeader ? kHeaderHeight : kRowHeight;
-            if (y + h > rowsArea.getBottom()) break;     // commit 9 adds scroll
+            // Skip rows entirely above the viewport, stop after the first
+            // entirely below.
+            if (y + h <= rowsArea.getY()) { y += h; continue; }
+            if (y >= rowsArea.getBottom()) break;
 
             const auto rowBounds = juce::Rectangle<int>(rowsArea.getX(), y,
                                                          rowsArea.getWidth(), h);
@@ -609,6 +628,79 @@ juce::Rectangle<int> PresetBrowser::previewDeleteButtonBounds() const
     return juce::Rectangle<int>(box.getX(), box.getBottom() - 24, 80, 22);
 }
 
+int PresetBrowser::contentHeightForList() const
+{
+    if (isExploreActive())
+    {
+        if (packCards.empty()) return 0;
+        // Reverse-engineer rows in the grid from packCardBounds(0..n).
+        int maxBottom = 0;
+        for (size_t i = 0; i < packCards.size(); ++i)
+        {
+            const auto b = packCardBounds((int) i);
+            if (! b.isEmpty()) maxBottom = juce::jmax(maxBottom, b.getBottom());
+        }
+        // packCardBounds returns the on-screen rect (already offset by
+        // listArea.getY()), so subtract the listArea origin to get content
+        // height. Approximate by using the inner trim width.
+        const auto card = cardBounds();
+        auto inner = card;
+        inner.removeFromLeft(kSidebarW);
+        inner.removeFromRight(kPreviewW);
+        const auto listOriginY = inner.withTrimmedTop(kHeaderBarH + kSearchBarH).reduced(16, 16).getY();
+        return juce::jmax(0, maxBottom - listOriginY);
+    }
+    int total = 0;
+    for (const auto& r : rows) total += (r.isHeader ? kHeaderHeight : kRowHeight);
+    return total;
+}
+
+int PresetBrowser::contentHeightForSidebar() const
+{
+    constexpr int kSidebarRowH = 24;
+    return (int) categories.size() * kSidebarRowH;
+}
+
+void PresetBrowser::mouseWheelMove(const juce::MouseEvent& e,
+                                     const juce::MouseWheelDetails& wheel)
+{
+    const auto card = cardBounds();
+    if (! card.contains(e.getPosition())) return;
+
+    const int dy = juce::roundToInt(wheel.deltaY * 60.0f
+                                     * (wheel.isReversed ? 1.0f : -1.0f));
+    if (dy == 0) return;
+
+    // Sidebar vs. list: pick by where the cursor is.
+    auto sidebar = card.withWidth(kSidebarW);
+    auto inner   = card;
+    inner.removeFromLeft(kSidebarW);
+    inner.removeFromRight(kPreviewW);
+    const auto listView = inner.withTrimmedTop(kHeaderBarH + kSearchBarH
+                                                + (isExploreActive() ? 0 : kColHeaderH))
+                                .reduced(8, 4);
+
+    auto clamp = [](int& scroll, int contentH, int viewH) {
+        const int maxScroll = juce::jmax(0, contentH - viewH);
+        scroll = juce::jlimit(0, maxScroll, scroll);
+    };
+
+    if (sidebar.contains(e.getPosition()))
+    {
+        sidebarScrollY += dy;
+        clamp(sidebarScrollY, contentHeightForSidebar(), sidebar.getHeight() - 28);
+        repaint();
+        return;
+    }
+    if (listView.contains(e.getPosition()))
+    {
+        listScrollY += dy;
+        clamp(listScrollY, contentHeightForList(), listView.getHeight());
+        repaint();
+        return;
+    }
+}
+
 void PresetBrowser::deleteSelectedPreset()
 {
     if (selectedPreviewRow < 0 || selectedPreviewRow >= (int) rows.size()) return;
@@ -655,12 +747,13 @@ void PresetBrowser::mouseMove(const juce::MouseEvent& e)
     auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + kColHeaderH).reduced(8, 4);
 
     int newRowHover = -1;
-    int y = listArea.getY();
+    int y = listArea.getY() - listScrollY;
     for (size_t i = 0; i < rows.size(); ++i)
     {
         const auto& r = rows[i];
         const int h = r.isHeader ? kHeaderHeight : kRowHeight;
-        if (y + h > listArea.getBottom()) break;
+        if (y + h <= listArea.getY()) { y += h; continue; }
+        if (y >= listArea.getBottom()) break;
         if (! r.isHeader
             && e.x >= listArea.getX() && e.x < listArea.getRight()
             && e.y >= y               && e.y < y + h)
@@ -674,7 +767,8 @@ void PresetBrowser::mouseMove(const juce::MouseEvent& e)
     int newCatHover = -1;
     for (size_t i = 0; i < categories.size(); ++i)
     {
-        if (sidebarRowBounds((int) i).contains(e.getPosition()))
+        if (sidebarRowBounds((int) i).translated(0, -sidebarScrollY)
+                .contains(e.getPosition()))
         {
             newCatHover = (int) i;
             break;
@@ -686,7 +780,8 @@ void PresetBrowser::mouseMove(const juce::MouseEvent& e)
     {
         for (size_t i = 0; i < packCards.size(); ++i)
         {
-            if (packCardBounds((int) i).contains(e.getPosition()))
+            if (packCardBounds((int) i).translated(0, -listScrollY)
+                    .contains(e.getPosition()))
             {
                 newPackHover = (int) i;
                 break;
@@ -741,11 +836,13 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
     // Sidebar category click → switch active category and refilter.
     for (size_t i = 0; i < categories.size(); ++i)
     {
-        if (sidebarRowBounds((int) i).contains(e.getPosition()))
+        if (sidebarRowBounds((int) i).translated(0, -sidebarScrollY)
+                .contains(e.getPosition()))
         {
             if ((int) i != activeCategoryIdx)
             {
                 activeCategoryIdx = (int) i;
+                listScrollY = 0;
                 rebuildRows();
                 repaint();
             }
@@ -759,7 +856,8 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
     {
         for (size_t i = 0; i < packCards.size(); ++i)
         {
-            if (packCardBounds((int) i).contains(e.getPosition()))
+            if (packCardBounds((int) i).translated(0, -listScrollY)
+                    .contains(e.getPosition()))
             {
                 const auto& pc = packCards[i];
                 for (size_t ci = 0; ci < categories.size(); ++ci)

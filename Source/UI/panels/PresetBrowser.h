@@ -32,6 +32,8 @@ public:
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseMove(const juce::MouseEvent& e) override;
     void mouseExit(const juce::MouseEvent& e) override;
+    void mouseWheelMove(const juce::MouseEvent& e,
+                        const juce::MouseWheelDetails& wheel) override;
     void visibilityChanged() override;
 
 private:
@@ -91,6 +93,15 @@ private:
     std::vector<Category> categories;
     int activeCategoryIdx { 0 };   // 0 = Explore by default
     int hoverCategoryIdx  { -1 };
+
+    // Scroll offsets in pixels for the sidebar and the main list/grid. Both
+    // are hard-clamped to [0, max(0, contentHeight - viewHeight)] when the
+    // mouse wheel changes them.
+    int sidebarScrollY { 0 };
+    int listScrollY    { 0 };
+
+    int contentHeightForList() const;
+    int contentHeightForSidebar() const;
 
     PhantomProcessor& processor;
     juce::AudioProcessorValueTreeState& apvts;
