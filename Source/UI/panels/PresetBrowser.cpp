@@ -107,20 +107,31 @@ void PresetBrowser::rebuildRows()
         if (active.kind == CategoryKind::Pack && active.packFilter != packName)
             continue;
 
-        std::vector<juce::String> matched;
+        std::vector<Row> matched;
         for (const auto& p : presets)
         {
             if (active.kind == CategoryKind::Favorites && ! p.metadata.isFavorite)
                 continue;
             if (hasQuery && ! p.metadata.name.toLowerCase().contains(query))
                 continue;
-            matched.push_back(p.metadata.name);
+            Row r;
+            r.name       = p.metadata.name;
+            r.pack       = packName;
+            r.type       = p.metadata.type;
+            r.designer   = p.metadata.designer;
+            r.skip       = p.preview.skip;
+            r.isFavorite = p.metadata.isFavorite;
+            r.isHeader   = false;
+            matched.push_back(std::move(r));
         }
         if (matched.empty()) continue;
 
-        rows.push_back({ {}, packName, true });
-        for (const auto& n : matched)
-            rows.push_back({ n, packName, false });
+        Row header;
+        header.pack     = packName;
+        header.isHeader = true;
+        rows.push_back(std::move(header));
+        for (auto& m : matched)
+            rows.push_back(std::move(m));
     }
 }
 
@@ -280,6 +291,42 @@ void PresetBrowser::paint(juce::Graphics& g)
     g.drawLine((float) searchBar.getX(), (float) searchBar.getBottom(),
                 (float) searchBar.getRight(), (float) searchBar.getBottom(), 1.0f);
 
+    // Column header bar — labels above the list (NAME | TYPE | DESIGNER |
+    // SHAPE | SKIP | ♥). Sortable indicators arrive in commit 10.
+    auto colHeaderBar = listArea.removeFromTop(kColHeaderH);
+    {
+        const auto cells = listArea.getX() + 12;   // matches row x padding
+        const auto right = listArea.getRight() - 12;
+        int x = right;
+
+        auto col = [&](int w) {
+            const juce::Rectangle<int> r { x - w, colHeaderBar.getY(), w, colHeaderBar.getHeight() };
+            x = r.getX() - kColGap;
+            return r;
+        };
+
+        const auto heartCol    = col(kColHeartW);
+        const auto skipCol     = col(kColSkipW);
+        const auto shapeCol    = col(kColShapeW);
+        const auto designerCol = col(kColDesignerW);
+        const auto typeCol     = col(kColTypeW);
+        const juce::Rectangle<int> nameCol { cells, colHeaderBar.getY(),
+                                              x - cells, colHeaderBar.getHeight() };
+
+        g.setColour(juce::Colour(kTextLabel));
+        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 9.0f, juce::Font::bold));
+        g.drawText("NAME",     nameCol,     juce::Justification::centredLeft, false);
+        g.drawText("TYPE",     typeCol,     juce::Justification::centredLeft, false);
+        g.drawText("DESIGNER", designerCol, juce::Justification::centredLeft, false);
+        g.drawText("SHAPE",    shapeCol,    juce::Justification::centredLeft, false);
+        g.drawText("SKIP",     skipCol,     juce::Justification::centredRight, false);
+        juce::ignoreUnused(heartCol);
+
+        g.setColour(juce::Colour(kBorderSoft));
+        g.drawLine((float) colHeaderBar.getX(), (float) colHeaderBar.getBottom(),
+                    (float) colHeaderBar.getRight(), (float) colHeaderBar.getBottom(), 1.0f);
+    }
+
     // List rows.
     {
         const auto rowsArea = listArea.reduced(8, 4);
@@ -288,7 +335,7 @@ void PresetBrowser::paint(juce::Graphics& g)
         {
             const auto& r = rows[i];
             const int h = r.isHeader ? kHeaderHeight : kRowHeight;
-            if (y + h > rowsArea.getBottom()) break;     // commit 5 adds scroll
+            if (y + h > rowsArea.getBottom()) break;     // commit 9 adds scroll
 
             const auto rowBounds = juce::Rectangle<int>(rowsArea.getX(), y,
                                                          rowsArea.getWidth(), h);
@@ -308,11 +355,54 @@ void PresetBrowser::paint(juce::Graphics& g)
                     g.setColour(juce::Colour(kRowHover));
                     g.fillRoundedRectangle(rowBounds.toFloat(), 3.0f);
                 }
+
+                // Lay columns out right-to-left so NAME flexes to fill what
+                // remains. Mirrors the column-header computation above.
+                int x = rowBounds.getRight() - 4;
+                auto cellRight = [&](int w) {
+                    const juce::Rectangle<int> r2 { x - w, rowBounds.getY(), w, rowBounds.getHeight() };
+                    x = r2.getX() - kColGap;
+                    return r2;
+                };
+
+                const auto heartCol    = cellRight(kColHeartW);
+                const auto skipCol     = cellRight(kColSkipW);
+                const auto shapeCol    = cellRight(kColShapeW);
+                const auto designerCol = cellRight(kColDesignerW);
+                const auto typeCol     = cellRight(kColTypeW);
+                const juce::Rectangle<int> nameCol { rowBounds.getX() + 12, rowBounds.getY(),
+                                                      x - (rowBounds.getX() + 12), rowBounds.getHeight() };
+
+                // NAME — stronger weight per CSS spec.
                 g.setColour(juce::Colour(kTextStrong));
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::bold));
+                g.drawText(r.name, nameCol, juce::Justification::centredLeft, true);
+
+                // TYPE / DESIGNER — body text.
+                g.setColour(juce::Colour(kTextBody));
                 g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::plain));
-                g.drawText(r.name,
-                           rowBounds.reduced(12, 0),
-                           juce::Justification::centredLeft, false);
+                g.drawText(r.type,     typeCol,     juce::Justification::centredLeft, true);
+                g.drawText(r.designer, designerCol, juce::Justification::centredLeft, true);
+
+                // SHAPE — placeholder thin horizontal line. Spectrum thumbnail
+                // lands in commit 6.
+                g.setColour(juce::Colour(0x33000000));
+                g.drawLine((float) shapeCol.getX() + 4, (float) shapeCol.getCentreY(),
+                            (float) shapeCol.getRight() - 4, (float) shapeCol.getCentreY(), 0.8f);
+
+                // SKIP — tabular numerics. Em-dash when skip == 0 (matches the
+                // webview's display rule for "no skip set").
+                g.setColour(juce::Colour(kTextBody));
+                const auto skipText = r.skip > 0 ? juce::String(r.skip)
+                                                  : juce::String(juce::CharPointer_UTF8("\xE2\x80\x94"));
+                g.drawText(skipText, skipCol, juce::Justification::centredRight, false);
+
+                // ♥ — visual placeholder. Active red if favorited (data is in
+                // place; toggle UI lands in commit 11/12).
+                g.setColour(juce::Colour(r.isFavorite ? 0xffc74a4a : 0x33000000));
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::plain));
+                g.drawText(juce::String(juce::CharPointer_UTF8(r.isFavorite ? "\xE2\x99\xA5" : "\xE2\x99\xA1")),
+                           heartCol, juce::Justification::centred, false);
             }
             y += h;
         }
@@ -354,7 +444,7 @@ void PresetBrowser::mouseMove(const juce::MouseEvent& e)
     auto inner = card;
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
-    auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH).reduced(8, 4);
+    auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + kColHeaderH).reduced(8, 4);
 
     int newRowHover = -1;
     int y = listArea.getY();
@@ -431,7 +521,7 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
     auto inner = card;
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
-    const auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH).reduced(8, 4);
+    const auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + kColHeaderH).reduced(8, 4);
     if (! listArea.contains(e.getPosition())) return;
 
     int y = listArea.getY();

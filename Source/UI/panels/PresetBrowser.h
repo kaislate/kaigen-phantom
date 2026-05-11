@@ -42,7 +42,15 @@ private:
     void rebuildCategories();    // build sidebar entries from preset packs
     void rebuildRows();          // build the visible row list for the active category
 
-    struct Row { juce::String name; juce::String pack; bool isHeader { false }; };
+    struct Row {
+        juce::String name;
+        juce::String pack;
+        juce::String type;          // "Synth" / "Bass" / "Experimental" / ...
+        juce::String designer;
+        int          skip      { 0 };
+        bool         isFavorite{ false };
+        bool         isHeader  { false };
+    };
     std::vector<Row> rows;
     int hoverRow { -1 };
 
@@ -71,10 +79,20 @@ private:
     //   [sidebar 160] [middle flex] [preview 180]
     static constexpr int kRowHeight     = 26;
     static constexpr int kHeaderHeight  = 28;
+    static constexpr int kColHeaderH    = 22;
     static constexpr int kSidebarW      = 160;
     static constexpr int kPreviewW      = 180;
     static constexpr int kHeaderBarH    = 44;
     static constexpr int kSearchBarH    = 36;
+
+    // Webview spec: grid-template-columns: 1fr 72px 72px 140px 40px 30px
+    // Same widths here; NAME flexes to fill leftover middle-column space.
+    static constexpr int kColTypeW      = 72;
+    static constexpr int kColDesignerW  = 72;
+    static constexpr int kColShapeW     = 140;
+    static constexpr int kColSkipW      = 40;
+    static constexpr int kColHeartW     = 30;
+    static constexpr int kColGap        = 8;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PresetBrowser)
 };
