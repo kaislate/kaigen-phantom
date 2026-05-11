@@ -17,6 +17,7 @@ static const char* getMimeForExtension(const juce::String& extension)
         { "json", "application/json" },
         { "png",  "image/png" },  { "jpg",  "image/jpeg" },
         { "svg",  "image/svg+xml" }, { "woff2","font/woff2" },
+        { "ttf",  "font/ttf" },   { "otf",  "font/otf" },
     };
     if (const auto it = mimeMap.find(extension.toLowerCase()); it != mimeMap.end())
         return it->second;
