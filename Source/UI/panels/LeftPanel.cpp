@@ -98,7 +98,7 @@ void LeftPanel::paint(juce::Graphics& g)
 
     // Section titles — centered in the flat-bottomed notch (vertical centre
     // of the dip is at cardY + dipDepth/2 = cardY + 8).
-    drawSectionHeader(g, juce::Rectangle<int>(recipeCardBounds.getX(), recipeCardBounds.getY() + 1, recipeCardBounds.getWidth(), 14), "Recipe");
+    drawSectionHeader(g, juce::Rectangle<int>(recipeCardBounds.getX(), recipeCardBounds.getY() + 1, recipeCardBounds.getWidth(), 14), "Modes");
     drawSectionHeader(g, juce::Rectangle<int>(ghostCardBounds.getX(),  ghostCardBounds.getY() + 1, ghostCardBounds.getWidth(),  14), "Ghost");
     drawSectionHeader(g, juce::Rectangle<int>(filterCardBounds.getX(), filterCardBounds.getY() + 1, filterCardBounds.getWidth(), 14), "Filter");
 
@@ -155,8 +155,8 @@ void LeftPanel::resized()
     constexpr int kMedium = 136;
 
     // ── Ghost section ──────────────────────────────────────────────────
-    // Pushed down a hair to clear the new recipe preset card below the wheel.
-    constexpr int ghostY  = 426;   // was 420 (+6 to clear the recipe tray below)
+    // Pushed down to give the Modes tray comfortable breathing room above.
+    constexpr int ghostY  = 446;   // was 426 (+20 for Modes-tray spacing)
     const int ghostTotal  = kLarge + kMedium + kMedium;
     const int ghostOverlap = (ghostTotal - panelW + 16) / 2;
     int gx = 8;
@@ -171,7 +171,7 @@ void LeftPanel::resized()
     ghostModeToggle.setBounds(12, ghostY + kLarge + 4, panelW - 24, 22);
 
     // ── Filter section (more vertical gap from Ghost) ──────────────────
-    constexpr int filterY = 696;   // tracks the bumped Ghost Y (was 690, +6)
+    constexpr int filterY = 716;   // tracks the bumped Ghost Y (was 696, +20)
     const int filterTotal = kMedium + 40 + kMedium;
     int fx = (panelW - filterTotal) / 2;
     lpfKnob.setBounds(fx, filterY, kMedium, kMedium);

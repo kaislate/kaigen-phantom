@@ -77,17 +77,23 @@ private:
 
     void rebuildPackCards();
     juce::Rectangle<int> packCardBounds(int idx) const;
-    bool isExploreActive() const noexcept;
 
-    /** Sidebar entries. `Explore` is a special view (pack-card grid in
-     *  commit 8); for now treats as "show all presets in list mode".
-     *  `Favorites` filters by metadata.isFavorite. Otherwise `packFilter`
-     *  matches against PresetMetadata.packName. */
-    enum class CategoryKind { Explore, Favorites, Pack };
+    /** True when the active category is "Packs" — the middle column shows
+     *  the pack-card grid instead of the preset table. */
+    bool isPacksMode() const noexcept;
+
+    /** Sidebar entries.
+     *    Explore   — every preset across every pack, list-mode table.
+     *    Favorites — filter to PresetMetadata.isFavorite.
+     *    Packs     — special view that swaps the table for the pack-card grid.
+     *    Pack      — direct drill-in to a single pack (Factory, User, ...).
+     */
+    enum class CategoryKind { Explore, Favorites, Packs, Pack };
     struct Category
     {
         CategoryKind kind;
         juce::String label;
+        juce::String glyph;        // small icon shown left of the label
         juce::String packFilter;   // valid when kind == Pack
     };
     std::vector<Category> categories;

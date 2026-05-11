@@ -94,17 +94,17 @@ void PresetBrowser::visibilityChanged()
     rebuildPackCards();
     rebuildRows();
     searchField.setTextToShowWhenEmpty(
-        isExploreActive() ? "Search packs\xe2\x80\xa6" : "Search presets\xe2\x80\xa6",
+        isPacksMode() ? "Search packs\xe2\x80\xa6" : "Search presets\xe2\x80\xa6",
         juce::Colour(0x66000000));
     repaint();
 }
 
-bool PresetBrowser::isExploreActive() const noexcept
+bool PresetBrowser::isPacksMode() const noexcept
 {
     return ! categories.empty()
         && activeCategoryIdx >= 0
         && activeCategoryIdx < (int) categories.size()
-        && categories[(size_t) activeCategoryIdx].kind == CategoryKind::Explore;
+        && categories[(size_t) activeCategoryIdx].kind == CategoryKind::Packs;
 }
 
 void PresetBrowser::rebuildPackCards()
@@ -128,12 +128,16 @@ void PresetBrowser::rebuildPackCards()
 void PresetBrowser::rebuildCategories()
 {
     categories.clear();
-    categories.push_back({ CategoryKind::Explore,   "Explore",   {} });
-    categories.push_back({ CategoryKind::Favorites, "Favorites", {} });
+    // Top-level entries — every preset, favorites filter, pack-card grid.
+    // Glyphs are unicode chars that render via Segoe UI Symbol on Windows.
+    categories.push_back({ CategoryKind::Explore,   "Explore",   "\xe2\x8a\x95", {} });   // ⊕
+    categories.push_back({ CategoryKind::Favorites, "Favorites", "\xe2\x99\xa5", {} });   // ♥
+    categories.push_back({ CategoryKind::Packs,     "Packs",     "\xe2\x96\xa6", {} });   // ▦
 
+    // Direct pack drill-ins below — same data, scoped to a single pack.
     const auto all = processor.getPresetManager().getAllPresets();
     for (const auto& [packName, presets] : all)
-        categories.push_back({ CategoryKind::Pack, packName, packName });
+        categories.push_back({ CategoryKind::Pack, packName, {}, packName });
 
     if (activeCategoryIdx >= (int) categories.size())
         activeCategoryIdx = 0;
@@ -257,12 +261,26 @@ void PresetBrowser::paint(juce::Graphics& g)
             g.fillRect(juce::Rectangle<float>((float) rowBounds.getX(), (float) rowBounds.getY(),
                                                3.0f, (float) rowBounds.getHeight()));
         }
+
+        // Two-column layout inside the row: [glyph] [label].
+        constexpr int kGlyphW = 26;
+        const auto glyphCol = juce::Rectangle<int>(rowBounds.getX() + 8, rowBounds.getY(),
+                                                    kGlyphW, rowBounds.getHeight());
+        const auto labelCol = juce::Rectangle<int>(glyphCol.getRight() + 4, rowBounds.getY(),
+                                                    rowBounds.getRight() - glyphCol.getRight() - 8,
+                                                    rowBounds.getHeight());
+
+        if (c.glyph.isNotEmpty())
+        {
+            g.setColour(juce::Colour(isActive ? kTextStrong : kTextBody));
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 16.0f, juce::Font::plain));
+            g.drawText(c.glyph, glyphCol, juce::Justification::centred, false);
+        }
+
         g.setColour(juce::Colour(isActive ? kTextStrong : kTextBody));
-        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 13.0f,
+        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 14.0f,
                                      isActive ? juce::Font::bold : juce::Font::plain));
-        g.drawText(c.label,
-                   rowBounds.reduced(12, 0),
-                   juce::Justification::centredLeft, false);
+        g.drawText(c.label, labelCol, juce::Justification::centredLeft, false);
     }
     }   // end sidebar clip
 
@@ -361,7 +379,7 @@ void PresetBrowser::paint(juce::Graphics& g)
     // Header — title (active category) + total count.
     {
         int totalPresets = 0;
-        if (isExploreActive())
+        if (isPacksMode())
             for (const auto& pc : packCards) totalPresets += pc.presetCount;
         else
             totalPresets = (int) std::count_if(rows.begin(), rows.end(),
@@ -395,7 +413,7 @@ void PresetBrowser::paint(juce::Graphics& g)
 
     // Explore mode: pack-card grid replaces the table. Clipped to the
     // middle column area + offset by listScrollY for vertical scrolling.
-    if (isExploreActive())
+    if (isPacksMode())
     {
         juce::Graphics::ScopedSaveState saveExplore(g);
         g.reduceClipRegion(listArea);
@@ -631,7 +649,7 @@ juce::Rectangle<int> PresetBrowser::previewDeleteButtonBounds() const
 
 int PresetBrowser::contentHeightForList() const
 {
-    if (isExploreActive())
+    if (isPacksMode())
     {
         if (packCards.empty()) return 0;
         // Reverse-engineer rows in the grid from packCardBounds(0..n).
@@ -658,7 +676,7 @@ int PresetBrowser::contentHeightForList() const
 
 int PresetBrowser::contentHeightForSidebar() const
 {
-    constexpr int kSidebarRowH = 24;
+    constexpr int kSidebarRowH = 30;   // matches sidebarRowBounds
     return (int) categories.size() * kSidebarRowH;
 }
 
@@ -678,7 +696,7 @@ void PresetBrowser::mouseWheelMove(const juce::MouseEvent& e,
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
     const auto listView = inner.withTrimmedTop(kHeaderBarH + kSearchBarH
-                                                + (isExploreActive() ? 0 : kColHeaderH))
+                                                + (isPacksMode() ? 0 : kColHeaderH))
                                 .reduced(8, 4);
 
     auto clamp = [](int& scroll, int contentH, int viewH) {
@@ -720,10 +738,10 @@ void PresetBrowser::deleteSelectedPreset()
 
 juce::Rectangle<int> PresetBrowser::sidebarRowBounds(int categoryIdx) const
 {
-    constexpr int kSidebarTopOffset = 28;   // below the "CATEGORIES" label
-    constexpr int kSidebarRowH      = 24;
+    constexpr int kSidebarTopOffset = 36;   // below the "CATEGORIES" label
+    constexpr int kSidebarRowH      = 30;
     const auto card = cardBounds();
-    auto sidebar = card.withWidth(kSidebarW).reduced(6, 0);
+    auto sidebar = card.withWidth(kSidebarW).reduced(8, 0);
     return { sidebar.getX(),
              card.getY() + kSidebarTopOffset + categoryIdx * kSidebarRowH,
              sidebar.getWidth(),
@@ -777,7 +795,7 @@ void PresetBrowser::mouseMove(const juce::MouseEvent& e)
     }
 
     int newPackHover = -1;
-    if (isExploreActive())
+    if (isPacksMode())
     {
         for (size_t i = 0; i < packCards.size(); ++i)
         {
@@ -841,7 +859,7 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
                 listScrollY = 0;
                 rebuildRows();
                 searchField.setTextToShowWhenEmpty(
-                    isExploreActive() ? "Search packs\xe2\x80\xa6"
+                    isPacksMode() ? "Search packs\xe2\x80\xa6"
                                        : "Search presets\xe2\x80\xa6",
                     juce::Colour(0x66000000));
                 repaint();
@@ -852,7 +870,7 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
 
     // Explore mode: clicking a pack card → switch sidebar to that pack's
     // category and rebuild as a list view.
-    if (isExploreActive())
+    if (isPacksMode())
     {
         for (size_t i = 0; i < packCards.size(); ++i)
         {
