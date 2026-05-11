@@ -19,9 +19,11 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void mouseDown(const juce::MouseEvent& e) override;
 
 private:
     PresetSelector presetSelector;
+    PhantomProcessor& processor;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TopBar)
 };

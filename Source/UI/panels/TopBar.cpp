@@ -1,12 +1,13 @@
 // Source/UI/panels/TopBar.cpp
 #include "TopBar.h"
 #include "../Theme.h"
+#include "../../PluginProcessor.h"
 
 namespace kaigen::phantom
 {
 
 TopBar::TopBar(PhantomProcessor& p, juce::AudioProcessorValueTreeState& a)
-    : presetSelector(p, a)
+    : presetSelector(p, a), processor(p)
 {
     addAndMakeVisible(presetSelector);
 }
@@ -57,6 +58,26 @@ void TopBar::resized()
     const int selectorW = juce::jmin(600, area.getWidth() - 200);
     const int selectorX = (area.getWidth() - selectorW) / 2;
     presetSelector.setBounds(selectorX, 0, selectorW, area.getHeight());
+}
+
+void TopBar::mouseDown(const juce::MouseEvent& e)
+{
+    // Dev toggle: shift+click PHANTOM logo switches back to the webview
+    // editor. Mirrors the webview-side shift+click that switches TO native
+    // (Source/WebUI/phantom.js setupNativeUIToggle). Removed in Phase 6.
+    const auto phantomLogoBounds = juce::Rectangle<int>(16, 0, 240, getHeight());
+    if (! e.mods.isShiftDown()) return;
+    if (! phantomLogoBounds.contains(e.getPosition())) return;
+
+    auto state = processor.getEditorView();
+    state.useNativeEditor = false;
+    processor.setEditorView(state);
+    processor.updateHostDisplay();
+
+    juce::AlertWindow::showMessageBoxAsync(
+        juce::MessageBoxIconType::InfoIcon,
+        "WebView UI enabled",
+        "Close and reopen the plugin window to see the WebView UI.");
 }
 
 } // namespace kaigen::phantom
