@@ -98,14 +98,6 @@ juce_add_binary_data(PhantomWebUI SOURCES
     Source/WebUI/modulation-panel.js
     Source/WebUI/live-modulation.js
     Source/WebUI/matrix.js
-    # Bundled fonts served to the webview via @font-face so it renders the
-    # same Space Grotesk variants the native UI uses (rather than falling
-    # back to system Segoe UI when Space Grotesk isn't installed).
-    Source/Assets/fonts/SpaceGrotesk-Light.ttf
-    Source/Assets/fonts/SpaceGrotesk-Regular.ttf
-    Source/Assets/fonts/SpaceGrotesk-Medium.ttf
-    Source/Assets/fonts/SpaceGrotesk-SemiBold.ttf
-    Source/Assets/fonts/SpaceGrotesk-Bold.ttf
 )
 
 juce_add_binary_data(PhantomNativeAssets

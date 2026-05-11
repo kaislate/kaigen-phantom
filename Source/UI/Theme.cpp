@@ -219,10 +219,19 @@ namespace kaigen::phantom::Theme
 
     const juce::String& uiFontFamily()
     {
-        // Space Grotesk is bundled (registered via PhantomLookAndFeel's
-        // getTypefaceForFont override). Always use it — no system fallback
-        // needed.
-        static const juce::String picked { "Space Grotesk" };
+        // Match the webview's effective rendering: webview CSS asks for
+        // Space Grotesk but falls back to system Segoe UI on Windows when
+        // SG isn't installed. Native uses Segoe UI directly so both sides
+        // render the same humanist sans-serif. Falls through to other
+        // system sans-serifs on non-Windows platforms.
+        static const juce::String picked = []()
+        {
+            const auto names = juce::Font::findAllTypefaceNames();
+            for (auto* candidate : { "Segoe UI Variable", "Segoe UI",
+                                     "SF Pro Text", "Helvetica Neue", "Inter" })
+                if (names.contains(candidate)) return juce::String(candidate);
+            return juce::Font::getDefaultSansSerifFontName();
+        }();
         return picked;
     }
 
