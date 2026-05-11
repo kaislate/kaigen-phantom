@@ -54,7 +54,14 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
     searchField.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(0x33000000));
     searchField.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::plain));
     searchField.setBorder(juce::BorderSize<int>(4, 8, 4, 8));
-    searchField.onTextChange = [this] { rebuildRows(); repaint(); };
+    searchField.onTextChange = [this] {
+        // In Explore mode the search filters pack cards; otherwise it
+        // filters preset rows. Rebuilding both is cheap and keeps state
+        // consistent if the user switches modes after typing.
+        rebuildPackCards();
+        rebuildRows();
+        repaint();
+    };
     addAndMakeVisible(searchField);
 
     // Delete button (shown only when a User-pack preset is selected in the
@@ -86,6 +93,9 @@ void PresetBrowser::visibilityChanged()
     rebuildCategories();
     rebuildPackCards();
     rebuildRows();
+    searchField.setTextToShowWhenEmpty(
+        isExploreActive() ? "Search packs\xe2\x80\xa6" : "Search presets\xe2\x80\xa6",
+        juce::Colour(0x66000000));
     repaint();
 }
 
@@ -100,10 +110,19 @@ bool PresetBrowser::isExploreActive() const noexcept
 void PresetBrowser::rebuildPackCards()
 {
     packCards.clear();
+    const auto query = searchField.getText().trim().toLowerCase();
+    const bool hasQuery = query.isNotEmpty();
+
     for (const auto& p : processor.getPresetManager().getAllPacks())
-        packCards.push_back({ p.name,
-                              p.displayName.isNotEmpty() ? p.displayName : p.name,
-                              p.presetCount });
+    {
+        const auto display = p.displayName.isNotEmpty() ? p.displayName : p.name;
+        if (hasQuery
+            && ! display.toLowerCase().contains(query)
+            && ! p.name.toLowerCase().contains(query))
+            continue;
+        packCards.push_back({ p.name, display, p.presetCount });
+    }
+    hoverPackCardIdx = -1;
 }
 
 void PresetBrowser::rebuildCategories()
@@ -170,13 +189,9 @@ void PresetBrowser::rebuildRows()
 
 juce::Rectangle<int> PresetBrowser::cardBounds() const
 {
-    const auto bounds = getLocalBounds();
-    // 90% × 90% of the editor, capped so the card doesn't get unwieldy.
-    const int w = juce::jmin((int) (bounds.getWidth()  * 0.90f), 920);
-    const int h = juce::jmin((int) (bounds.getHeight() * 0.90f), 640);
-    return { (bounds.getWidth()  - w) / 2,
-             (bounds.getHeight() - h) / 2,
-             w, h };
+    // Full-screen browser — the webview did this so text/columns/spectra get
+    // maximum resolution. The compact dropdown handles the quick-pick case.
+    return getLocalBounds();
 }
 
 void PresetBrowser::loadPresetAt(int rowIndex)
@@ -193,25 +208,11 @@ void PresetBrowser::loadPresetAt(int rowIndex)
 
 void PresetBrowser::paint(juce::Graphics& g)
 {
-    // Backdrop scrim — CSS: rgba(0,0,0,0.4).
-    g.fillAll(juce::Colour(0x66000000));
-
-    const auto card = cardBounds();
+    // Full-bleed silver background — fills the editor.
+    const auto card  = cardBounds();
     const auto cardF = card.toFloat();
-    constexpr float corner = 8.0f;
-
-    // Card body — silver gradient (CSS 135deg #BBBDBF → #AEAFB1).
     g.setGradientFill(cardGradient(cardF));
-    g.fillRoundedRectangle(cardF, corner);
-
-    // 1px outline (CSS rgba(0,0,0,0.15)).
-    g.setColour(juce::Colour(0x26000000));
-    g.drawRoundedRectangle(cardF.reduced(0.5f), corner, 1.0f);
-
-    // Inset top highlight for the lifted-card feel.
-    g.setColour(juce::Colour(0x99FFFFFF));
-    g.drawLine(cardF.getX() + corner, cardF.getY() + 1.0f,
-                cardF.getRight() - corner, cardF.getY() + 1.0f, 1.0f);
+    g.fillRect(card);
 
     // Layout slots inside the card.
     auto inner = card;
@@ -824,14 +825,9 @@ void PresetBrowser::mouseExit(const juce::MouseEvent&)
 
 void PresetBrowser::mouseDown(const juce::MouseEvent& e)
 {
-    const auto card = cardBounds();
-
-    // Click outside the card → dismiss.
-    if (! card.contains(e.getPosition()))
-    {
-        setVisible(false);
-        return;
-    }
+    // Browser fills the editor; the only way to dismiss is the ✕ button or
+    // the back-to-webview shift+click on the PHANTOM logo (TopBar).
+    juce::ignoreUnused(e);
 
     // Sidebar category click → switch active category and refilter.
     for (size_t i = 0; i < categories.size(); ++i)
@@ -844,6 +840,10 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
                 activeCategoryIdx = (int) i;
                 listScrollY = 0;
                 rebuildRows();
+                searchField.setTextToShowWhenEmpty(
+                    isExploreActive() ? "Search packs\xe2\x80\xa6"
+                                       : "Search presets\xe2\x80\xa6",
+                    juce::Colour(0x66000000));
                 repaint();
             }
             return;
@@ -876,19 +876,20 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
         }
     }
 
-    // List area only (preview/header inert until commits 7-8).
-    auto inner = card;
+    // List area: hit test the preset rows (with scroll offset).
+    auto inner = cardBounds();
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
     const auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + kColHeaderH).reduced(8, 4);
     if (! listArea.contains(e.getPosition())) return;
 
-    int y = listArea.getY();
+    int y = listArea.getY() - listScrollY;
     for (size_t i = 0; i < rows.size(); ++i)
     {
         const auto& r = rows[i];
         const int h = r.isHeader ? kHeaderHeight : kRowHeight;
-        if (y + h > listArea.getBottom()) break;
+        if (y + h <= listArea.getY()) { y += h; continue; }
+        if (y >= listArea.getBottom()) break;
         if (e.y >= y && e.y < y + h)
         {
             loadPresetAt((int) i);
