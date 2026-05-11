@@ -62,6 +62,21 @@ private:
     juce::Rectangle<int> previewDeleteButtonBounds() const;
     void deleteSelectedPreset();
 
+    /** Visible pack cards in Explore mode. Computed in rebuildPackCards()
+     *  from PresetManager::getAllPacks(); updated whenever the row list
+     *  rebuilds so card hit-testing stays in sync with rendering. */
+    struct PackCard {
+        juce::String name;
+        juce::String displayName;
+        int          presetCount { 0 };
+    };
+    std::vector<PackCard> packCards;
+    int hoverPackCardIdx { -1 };
+
+    void rebuildPackCards();
+    juce::Rectangle<int> packCardBounds(int idx) const;
+    bool isExploreActive() const noexcept;
+
     /** Sidebar entries. `Explore` is a special view (pack-card grid in
      *  commit 8); for now treats as "show all presets in list mode".
      *  `Favorites` filters by metadata.isFavorite. Otherwise `packFilter`

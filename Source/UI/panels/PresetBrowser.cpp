@@ -81,8 +81,26 @@ void PresetBrowser::visibilityChanged()
         return;
     }
     rebuildCategories();
+    rebuildPackCards();
     rebuildRows();
     repaint();
+}
+
+bool PresetBrowser::isExploreActive() const noexcept
+{
+    return ! categories.empty()
+        && activeCategoryIdx >= 0
+        && activeCategoryIdx < (int) categories.size()
+        && categories[(size_t) activeCategoryIdx].kind == CategoryKind::Explore;
+}
+
+void PresetBrowser::rebuildPackCards()
+{
+    packCards.clear();
+    for (const auto& p : processor.getPresetManager().getAllPacks())
+        packCards.push_back({ p.name,
+                              p.displayName.isNotEmpty() ? p.displayName : p.name,
+                              p.presetCount });
 }
 
 void PresetBrowser::rebuildCategories()
@@ -332,7 +350,11 @@ void PresetBrowser::paint(juce::Graphics& g)
 
     // Header — title (active category) + total count.
     {
-        const auto totalPresets = (int) std::count_if(rows.begin(), rows.end(),
+        int totalPresets = 0;
+        if (isExploreActive())
+            for (const auto& pc : packCards) totalPresets += pc.presetCount;
+        else
+            totalPresets = (int) std::count_if(rows.begin(), rows.end(),
                                     [](const Row& r) { return ! r.isHeader; });
         const auto title = (! categories.empty() && activeCategoryIdx >= 0
                             && activeCategoryIdx < (int) categories.size())
@@ -360,6 +382,67 @@ void PresetBrowser::paint(juce::Graphics& g)
     g.setColour(juce::Colour(kBorderSoft));
     g.drawLine((float) searchBar.getX(), (float) searchBar.getBottom(),
                 (float) searchBar.getRight(), (float) searchBar.getBottom(), 1.0f);
+
+    // Explore mode: pack-card grid replaces the table.
+    if (isExploreActive())
+    {
+        for (size_t i = 0; i < packCards.size(); ++i)
+        {
+            const auto& pc = packCards[i];
+            auto card = packCardBounds((int) i);
+            if (card.isEmpty()) continue;
+            const auto cardOuter = card;   // unmodified copy for hover/border
+
+            // Initial-letter art square.
+            auto art = card.removeFromTop(card.getWidth());
+
+            // Deterministic warm/cool gradient seeded by the pack-name hash.
+            const auto seed = (juce::uint32) pc.name.hashCode();
+            const float hue = (float) (seed % 360) / 360.0f;
+            const auto colA = juce::Colour::fromHSV(hue,         0.55f, 0.80f, 1.0f);
+            const auto colB = juce::Colour::fromHSV(std::fmod(hue + 0.12f, 1.0f),
+                                                     0.45f, 0.55f, 1.0f);
+            juce::ColourGradient grad(colA, art.getX(), art.getY(),
+                                       colB, art.getRight(), art.getBottom(), false);
+            g.setGradientFill(grad);
+            g.fillRect(art);
+
+            // First letter of the display name, large and lightweight.
+            g.setColour(juce::Colour(0xd9FFFFFF));
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(),
+                                         (float) art.getHeight() * 0.55f,
+                                         juce::Font::plain));
+            g.drawText(pc.displayName.substring(0, 1).toUpperCase(),
+                       art, juce::Justification::centred, false);
+
+            // Card body — title + count.
+            auto body = card;
+            g.setColour(juce::Colour(0x4dFFFFFF));
+            g.fillRect(body);
+            g.setColour(juce::Colour(kBorderSoft));
+            g.drawRect(cardOuter, 1);
+
+            auto bodyInner = body.reduced(8, 6);
+            g.setColour(juce::Colour(kTextStrong));
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::bold));
+            g.drawText(pc.displayName, bodyInner.removeFromTop(14),
+                       juce::Justification::topLeft, true);
+            g.setColour(juce::Colour(kTextLabel));
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 9.0f, juce::Font::plain));
+            g.drawText(juce::String(pc.presetCount) + " preset"
+                        + (pc.presetCount == 1 ? "" : "s"),
+                       bodyInner.removeFromTop(12),
+                       juce::Justification::topLeft, false);
+
+            // Hover overlay over the entire card.
+            if ((int) i == hoverPackCardIdx)
+            {
+                g.setColour(juce::Colour(0x14000000));
+                g.fillRect(cardOuter);
+            }
+        }
+        return;   // skip the table rendering when in Explore.
+    }
 
     // Column header bar — labels above the list (NAME | TYPE | DESIGNER |
     // SHAPE | SKIP | ♥). Sortable indicators arrive in commit 10.
@@ -489,6 +572,30 @@ juce::Rectangle<int> PresetBrowser::searchBarBounds() const
     return inner.removeFromTop(kSearchBarH);
 }
 
+juce::Rectangle<int> PresetBrowser::packCardBounds(int idx) const
+{
+    auto card = cardBounds();
+    auto inner = card;
+    inner.removeFromLeft(kSidebarW);
+    inner.removeFromRight(kPreviewW);
+    auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH).reduced(16, 16);
+
+    constexpr int kCardW = 130;
+    constexpr int kArtH  = kCardW;
+    constexpr int kBodyH = 38;
+    constexpr int kCardH = kArtH + kBodyH;
+    constexpr int kGap   = 12;
+
+    if (listArea.getWidth() < kCardW) return {};
+    const int cols = juce::jmax(1, (listArea.getWidth() + kGap) / (kCardW + kGap));
+    const int row  = idx / cols;
+    const int col  = idx % cols;
+    const int x    = listArea.getX() + col * (kCardW + kGap);
+    const int y    = listArea.getY() + row * (kCardH + kGap);
+    if (y + kCardH > listArea.getBottom()) return {};
+    return { x, y, kCardW, kCardH };
+}
+
 juce::Rectangle<int> PresetBrowser::previewBounds() const
 {
     auto card = cardBounds();
@@ -574,8 +681,23 @@ void PresetBrowser::mouseMove(const juce::MouseEvent& e)
         }
     }
 
-    if (newRowHover != hoverRow || newCatHover != hoverCategoryIdx)
+    int newPackHover = -1;
+    if (isExploreActive())
     {
+        for (size_t i = 0; i < packCards.size(); ++i)
+        {
+            if (packCardBounds((int) i).contains(e.getPosition()))
+            {
+                newPackHover = (int) i;
+                break;
+            }
+        }
+    }
+
+    if (newRowHover != hoverRow || newCatHover != hoverCategoryIdx
+        || newPackHover != hoverPackCardIdx)
+    {
+        hoverPackCardIdx = newPackHover;
         hoverRow = newRowHover;
         hoverCategoryIdx = newCatHover;
         if (newRowHover >= 0)
@@ -596,10 +718,11 @@ void PresetBrowser::mouseMove(const juce::MouseEvent& e)
 
 void PresetBrowser::mouseExit(const juce::MouseEvent&)
 {
-    if (hoverRow != -1 || hoverCategoryIdx != -1)
+    if (hoverRow != -1 || hoverCategoryIdx != -1 || hoverPackCardIdx != -1)
     {
         hoverRow = -1;
         hoverCategoryIdx = -1;
+        hoverPackCardIdx = -1;
         repaint();
     }
 }
@@ -627,6 +750,31 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
                 repaint();
             }
             return;
+        }
+    }
+
+    // Explore mode: clicking a pack card → switch sidebar to that pack's
+    // category and rebuild as a list view.
+    if (isExploreActive())
+    {
+        for (size_t i = 0; i < packCards.size(); ++i)
+        {
+            if (packCardBounds((int) i).contains(e.getPosition()))
+            {
+                const auto& pc = packCards[i];
+                for (size_t ci = 0; ci < categories.size(); ++ci)
+                {
+                    if (categories[ci].kind == CategoryKind::Pack
+                        && categories[ci].packFilter == pc.name)
+                    {
+                        activeCategoryIdx = (int) ci;
+                        rebuildRows();
+                        repaint();
+                        break;
+                    }
+                }
+                return;
+            }
         }
     }
 
