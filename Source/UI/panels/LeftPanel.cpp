@@ -89,6 +89,8 @@ void LeftPanel::paint(juce::Graphics& g)
 
     // Sub-section inset cards with title-notch at top center. Notch width
     // sized to fully encompass the title text (with breathing room).
+    if (! recipeCardBounds.isEmpty())
+        Theme::paintInsetCardWithNotch(g, recipeCardBounds, 14.0f, 130.0f, 16.0f);
     if (! ghostCardBounds.isEmpty())
         Theme::paintInsetCardWithNotch(g, ghostCardBounds, 14.0f, 130.0f, 16.0f);
     if (! filterCardBounds.isEmpty())
@@ -96,6 +98,7 @@ void LeftPanel::paint(juce::Graphics& g)
 
     // Section titles — centered in the flat-bottomed notch (vertical centre
     // of the dip is at cardY + dipDepth/2 = cardY + 8).
+    drawSectionHeader(g, juce::Rectangle<int>(recipeCardBounds.getX(), recipeCardBounds.getY() + 1, recipeCardBounds.getWidth(), 14), "Recipe");
     drawSectionHeader(g, juce::Rectangle<int>(ghostCardBounds.getX(),  ghostCardBounds.getY() + 1, ghostCardBounds.getWidth(),  14), "Ghost");
     drawSectionHeader(g, juce::Rectangle<int>(filterCardBounds.getX(), filterCardBounds.getY() + 1, filterCardBounds.getWidth(), 14), "Filter");
 
@@ -135,11 +138,15 @@ void LeftPanel::resized()
     const int wheelX = (panelW - kWheelSize) / 2;
     recipeWheel.setBounds(wheelX, kWheelTop, kWheelSize, kWheelSize);
 
-    // Recipe preset selector: row of 7 buttons immediately below the wheel.
-    // 3 rows × ~22 px each = 66 px tall.
-    constexpr int kPresetRowH = 22;
-    constexpr int kPresetH    = kPresetRowH * 3;
-    recipePresetSelector.setBounds(8, kWheelTop + kWheelSize + 6, panelW - 16, kPresetH);
+    // Recipe preset selector — wrapped in its own inset card ("tray") to
+    // visually match the Ghost / Filter sections below. The card's content
+    // inset matches the Ghost / Filter pattern (8 px above the content,
+    // 8 px below).
+    constexpr int kPresetRowH    = 22;
+    constexpr int kPresetH       = kPresetRowH * 3;
+    constexpr int kRecipeCardTop  = 328;   // touches bottom of wheel
+    constexpr int kRecipeContentY = kRecipeCardTop + 8;
+    recipePresetSelector.setBounds(16, kRecipeContentY, panelW - 32, kPresetH);
 
     // Knob component natural sizes (body + shadow padding × 2).
     //   Large:  114 + 32*2 = 178
@@ -148,9 +155,8 @@ void LeftPanel::resized()
     constexpr int kMedium = 136;
 
     // ── Ghost section ──────────────────────────────────────────────────
-    // Pushed down to clear the 3-row recipe preset selector below the wheel
-    // (wheelTop 8 + wheelSize 320 + gap 6 + presetH 66 = 400).
-    constexpr int ghostY  = 420;   // knob component top
+    // Pushed down a hair to clear the new recipe preset card below the wheel.
+    constexpr int ghostY  = 426;   // was 420 (+6 to clear the recipe tray below)
     const int ghostTotal  = kLarge + kMedium + kMedium;
     const int ghostOverlap = (ghostTotal - panelW + 16) / 2;
     int gx = 8;
@@ -165,7 +171,7 @@ void LeftPanel::resized()
     ghostModeToggle.setBounds(12, ghostY + kLarge + 4, panelW - 24, 22);
 
     // ── Filter section (more vertical gap from Ghost) ──────────────────
-    constexpr int filterY = 690;   // tracks the bumped Ghost Y
+    constexpr int filterY = 696;   // tracks the bumped Ghost Y (was 690, +6)
     const int filterTotal = kMedium + 40 + kMedium;
     int fx = (panelW - filterTotal) / 2;
     lpfKnob.setBounds(fx, filterY, kMedium, kMedium);
@@ -176,6 +182,13 @@ void LeftPanel::resized()
 
     // ── Card bounds — title sits IN the notch above the card top ──────
     constexpr int cardPadX = 8;
+
+    // Recipe card wraps the preset selector below the wheel.
+    const int recipeCardBottom = kRecipeContentY + kPresetH + 8;
+    recipeCardBounds = juce::Rectangle<int>(cardPadX, kRecipeCardTop,
+                                             panelW - cardPadX * 2,
+                                             recipeCardBottom - kRecipeCardTop);
+
     const int ghostCardTop    = ghostY - 8;    // small inset above knobs
     const int ghostCardBottom = ghostY + kLarge + 4 + 26 + 8;
     ghostCardBounds = juce::Rectangle<int>(cardPadX, ghostCardTop,
