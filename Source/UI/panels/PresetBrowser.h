@@ -47,6 +47,7 @@ private:
         juce::String pack;
         juce::String type;          // "Synth" / "Bass" / "Experimental" / ...
         juce::String designer;
+        juce::String description;
         float        h[7]      { 0, 0, 0, 0, 0, 0, 0 };  // recipe_h2..h8 (0..1)
         float        crossover { 120.0f };               // phantom_threshold Hz
         int          skip      { 0 };
@@ -54,7 +55,12 @@ private:
         bool         isHeader  { false };
     };
     std::vector<Row> rows;
-    int hoverRow { -1 };
+    int hoverRow             { -1 };
+    int selectedPreviewRow   { -1 };   // last row hovered/clicked, drives preview pane
+
+    juce::Rectangle<int> previewBounds() const;
+    juce::Rectangle<int> previewDeleteButtonBounds() const;
+    void deleteSelectedPreset();
 
     /** Sidebar entries. `Explore` is a special view (pack-card grid in
      *  commit 8); for now treats as "show all presets in list mode".
@@ -75,6 +81,7 @@ private:
     juce::AudioProcessorValueTreeState& apvts;
 
     juce::TextButton closeButton;
+    juce::TextButton deleteButton { "Delete" };
     juce::TextEditor searchField;
 
     // Webview spec: card is 90% × 90% of parent (capped). 3-column layout:

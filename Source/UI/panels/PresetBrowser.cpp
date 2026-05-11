@@ -56,6 +56,13 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
     searchField.setBorder(juce::BorderSize<int>(4, 8, 4, 8));
     searchField.onTextChange = [this] { rebuildRows(); repaint(); };
     addAndMakeVisible(searchField);
+
+    // Delete button (shown only when a User-pack preset is selected in the
+    // preview pane).
+    deleteButton.getProperties().set("phantom-style", "header-raised");
+    deleteButton.onClick = [this] { deleteSelectedPreset(); };
+    deleteButton.setVisible(false);
+    addAndMakeVisible(deleteButton);
 }
 
 PresetBrowser::~PresetBrowser() = default;
@@ -68,6 +75,8 @@ void PresetBrowser::visibilityChanged()
         categories.clear();
         hoverRow = -1;
         hoverCategoryIdx = -1;
+        selectedPreviewRow = -1;
+        deleteButton.setVisible(false);
         searchField.setText("", juce::dontSendNotification);
         return;
     }
@@ -118,7 +127,8 @@ void PresetBrowser::rebuildRows()
             r.name       = p.metadata.name;
             r.pack       = packName;
             r.type       = p.metadata.type;
-            r.designer   = p.metadata.designer;
+            r.designer    = p.metadata.designer;
+            r.description = p.metadata.description;
             for (int hi = 0; hi < 7; ++hi) r.h[hi] = p.preview.h[hi];
             r.crossover  = p.preview.crossover;
             r.skip       = p.preview.skip;
@@ -251,10 +261,68 @@ void PresetBrowser::paint(juce::Graphics& g)
         g.setColour(juce::Colour(kBorderSoft));
         g.drawRoundedRectangle(previewBox.toFloat().reduced(0.5f), 3.0f, 1.0f);
 
-        g.setColour(juce::Colour(kTextDim));
-        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::plain));
-        g.drawText("Select a preset", previewBox.reduced(12),
-                    juce::Justification::centredTop, true);
+        const bool hasSelection = selectedPreviewRow >= 0
+                                && selectedPreviewRow < (int) rows.size()
+                                && ! rows[(size_t) selectedPreviewRow].isHeader;
+
+        if (! hasSelection)
+        {
+            g.setColour(juce::Colour(kTextDim));
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::plain));
+            g.drawText("Select a preset", previewBox.reduced(12),
+                        juce::Justification::centredTop, true);
+        }
+        else
+        {
+            const auto& r = rows[(size_t) selectedPreviewRow];
+            auto inner = previewBox.reduced(10, 10);
+
+            // Spectrum graph at the top — Preview variant (with guide lines + axis).
+            auto specBounds = inner.removeFromTop(56);
+            Theme::paintPresetSpectrum(g, specBounds.toFloat(),
+                                        r.h, r.crossover, r.skip,
+                                        Theme::PresetSpectrumVariant::Preview);
+            inner.removeFromTop(8);
+
+            // Name (bold).
+            g.setColour(juce::Colour(kTextStrong));
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::bold));
+            g.drawText(r.name, inner.removeFromTop(16),
+                       juce::Justification::topLeft, true);
+            inner.removeFromTop(6);
+
+            // Metadata key/value rows.
+            auto drawKV = [&](const juce::String& label, const juce::String& value) {
+                if (value.isEmpty()) return;
+                auto row = inner.removeFromTop(14);
+                g.setColour(juce::Colour(kTextLabel));
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 10.0f, juce::Font::plain));
+                const auto labelW = (int) g.getCurrentFont().getStringWidthFloat(label + " ") + 1;
+                g.drawText(label, row.removeFromLeft(labelW),
+                           juce::Justification::topLeft, false);
+                g.setColour(juce::Colour(kTextBody));
+                g.drawText(value, row, juce::Justification::topLeft, true);
+                inner.removeFromTop(2);
+            };
+            drawKV("Type:",     r.type);
+            drawKV("Designer:", r.designer);
+            drawKV("Pack:",     r.pack);
+
+            if (r.description.isNotEmpty())
+            {
+                inner.removeFromTop(8);
+                g.setColour(juce::Colour(kBorderSoft));
+                g.drawLine((float) inner.getX(), (float) inner.getY(),
+                            (float) inner.getRight(), (float) inner.getY(), 1.0f);
+                inner.removeFromTop(8);
+                g.setColour(juce::Colour(kTextBody));
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 10.0f, juce::Font::plain));
+                g.drawFittedText(r.description, inner, juce::Justification::topLeft, 6);
+            }
+            // The deleteButton positions itself in mouseMove (visible only
+            // for User-pack rows); resized() also positions it during layout
+            // changes.
+        }
     }
 
     // ── Middle: header + list ───────────────────────────────────────────
@@ -421,6 +489,35 @@ juce::Rectangle<int> PresetBrowser::searchBarBounds() const
     return inner.removeFromTop(kSearchBarH);
 }
 
+juce::Rectangle<int> PresetBrowser::previewBounds() const
+{
+    auto card = cardBounds();
+    return card.removeFromRight(kPreviewW);
+}
+
+juce::Rectangle<int> PresetBrowser::previewDeleteButtonBounds() const
+{
+    // Pin to the bottom-left of the preview panel's inner card.
+    auto box = previewBounds().reduced(10, 0).withTrimmedTop(28).withTrimmedBottom(10).reduced(10, 10);
+    return juce::Rectangle<int>(box.getX(), box.getBottom() - 24, 80, 22);
+}
+
+void PresetBrowser::deleteSelectedPreset()
+{
+    if (selectedPreviewRow < 0 || selectedPreviewRow >= (int) rows.size()) return;
+    const auto& r = rows[(size_t) selectedPreviewRow];
+    if (r.isHeader || r.pack != "User") return;
+
+    if (! processor.getPresetManager().deletePreset(r.name, r.pack)) return;
+
+    // Refresh — the deleted row is gone, so reset preview state.
+    selectedPreviewRow = -1;
+    deleteButton.setVisible(false);
+    rebuildCategories();
+    rebuildRows();
+    repaint();
+}
+
 juce::Rectangle<int> PresetBrowser::sidebarRowBounds(int categoryIdx) const
 {
     constexpr int kSidebarTopOffset = 28;   // below the "CATEGORIES" label
@@ -438,6 +535,8 @@ void PresetBrowser::resized()
     const auto card = cardBounds();
     closeButton.setBounds(card.getRight() - 38, card.getY() + 8, 28, 24);
     searchField.setBounds(searchBarBounds().reduced(12, 6));
+    if (deleteButton.isVisible())
+        deleteButton.setBounds(previewDeleteButtonBounds());
 }
 
 void PresetBrowser::mouseMove(const juce::MouseEvent& e)
@@ -479,6 +578,18 @@ void PresetBrowser::mouseMove(const juce::MouseEvent& e)
     {
         hoverRow = newRowHover;
         hoverCategoryIdx = newCatHover;
+        if (newRowHover >= 0)
+        {
+            // Hovering a preset row updates the preview pane. We keep the
+            // last hovered row "sticky" so the preview doesn't blank out
+            // when the cursor leaves the list area.
+            selectedPreviewRow = newRowHover;
+            const auto& r = rows[(size_t) newRowHover];
+            const bool isUserPreset = (r.pack == "User");
+            deleteButton.setVisible(isUserPreset);
+            if (isUserPreset)
+                deleteButton.setBounds(previewDeleteButtonBounds());
+        }
         repaint();
     }
 }
