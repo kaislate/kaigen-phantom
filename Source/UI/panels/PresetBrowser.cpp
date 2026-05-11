@@ -52,8 +52,8 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
     searchField.setColour(juce::TextEditor::highlightedTextColourId, juce::Colour(0xd9000000));
     searchField.setColour(juce::TextEditor::shadowColourId,     juce::Colour(0));
     searchField.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(0x33000000));
-    searchField.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::plain));
-    searchField.setBorder(juce::BorderSize<int>(4, 8, 4, 8));
+    searchField.setFont(juce::FontOptions(Theme::uiFontFamily(), 13.0f, juce::Font::plain));
+    searchField.setBorder(juce::BorderSize<int>(6, 12, 6, 12));
     searchField.onTextChange = [this] {
         // In Explore mode the search filters pack cards; otherwise it
         // filters preset rows. Rebuilding both is cheap and keeps state
@@ -228,10 +228,10 @@ void PresetBrowser::paint(juce::Graphics& g)
                 (float) sidebarBounds.getRight(), (float) sidebarBounds.getBottom(), 1.0f);
 
     // Sidebar label.
-    g.setFont(juce::FontOptions(Theme::uiFontFamily(), 9.0f, juce::Font::bold));
+    g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::bold));
     g.setColour(juce::Colour(kTextLabel));
     g.drawText("CATEGORIES",
-               sidebarBounds.reduced(10, 8).removeFromTop(12),
+               sidebarBounds.reduced(14, 12).removeFromTop(14),
                juce::Justification::topLeft, false);
 
     // Category rows — clipped to the sidebar area below the header label so
@@ -258,10 +258,10 @@ void PresetBrowser::paint(juce::Graphics& g)
                                                3.0f, (float) rowBounds.getHeight()));
         }
         g.setColour(juce::Colour(isActive ? kTextStrong : kTextBody));
-        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f,
+        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 13.0f,
                                      isActive ? juce::Font::bold : juce::Font::plain));
         g.drawText(c.label,
-                   rowBounds.reduced(10, 0),
+                   rowBounds.reduced(12, 0),
                    juce::Justification::centredLeft, false);
     }
     }   // end sidebar clip
@@ -273,10 +273,10 @@ void PresetBrowser::paint(juce::Graphics& g)
     g.drawLine((float) previewBounds.getX(), (float) previewBounds.getY(),
                 (float) previewBounds.getX(), (float) previewBounds.getBottom(), 1.0f);
 
-    g.setFont(juce::FontOptions(Theme::uiFontFamily(), 9.0f, juce::Font::bold));
+    g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::bold));
     g.setColour(juce::Colour(kTextLabel));
     g.drawText("PREVIEW",
-               previewBounds.reduced(12, 10).removeFromTop(12),
+               previewBounds.reduced(14, 12).removeFromTop(14),
                juce::Justification::topLeft, false);
 
     {
@@ -295,41 +295,42 @@ void PresetBrowser::paint(juce::Graphics& g)
         if (! hasSelection)
         {
             g.setColour(juce::Colour(kTextDim));
-            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::plain));
-            g.drawText("Select a preset", previewBox.reduced(12),
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 13.0f, juce::Font::plain));
+            g.drawText("Select a preset", previewBox.reduced(14),
                         juce::Justification::centredTop, true);
         }
         else
         {
             const auto& r = rows[(size_t) selectedPreviewRow];
-            auto inner = previewBox.reduced(10, 10);
+            auto inner = previewBox.reduced(14, 14);
 
-            // Spectrum graph at the top — Preview variant (with guide lines + axis).
-            auto specBounds = inner.removeFromTop(56);
+            // Spectrum graph at the top — Preview variant (larger to match the
+            // bigger pane). Width grows with the preview pane.
+            auto specBounds = inner.removeFromTop(72);
             Theme::paintPresetSpectrum(g, specBounds.toFloat(),
                                         r.h, r.crossover, r.skip,
                                         Theme::PresetSpectrumVariant::Preview);
+            inner.removeFromTop(12);
+
+            // Name (bold, large).
+            g.setColour(juce::Colour(kTextStrong));
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 16.0f, juce::Font::bold));
+            g.drawText(r.name, inner.removeFromTop(22),
+                       juce::Justification::topLeft, true);
             inner.removeFromTop(8);
 
-            // Name (bold).
-            g.setColour(juce::Colour(kTextStrong));
-            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::bold));
-            g.drawText(r.name, inner.removeFromTop(16),
-                       juce::Justification::topLeft, true);
-            inner.removeFromTop(6);
-
-            // Metadata key/value rows.
+            // Metadata key/value rows — bumped to 12 px for legibility.
             auto drawKV = [&](const juce::String& label, const juce::String& value) {
                 if (value.isEmpty()) return;
-                auto row = inner.removeFromTop(14);
+                auto row = inner.removeFromTop(18);
                 g.setColour(juce::Colour(kTextLabel));
-                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 10.0f, juce::Font::plain));
-                const auto labelW = (int) g.getCurrentFont().getStringWidthFloat(label + " ") + 1;
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::plain));
+                const auto labelW = (int) g.getCurrentFont().getStringWidthFloat(label + " ") + 2;
                 g.drawText(label, row.removeFromLeft(labelW),
                            juce::Justification::topLeft, false);
                 g.setColour(juce::Colour(kTextBody));
                 g.drawText(value, row, juce::Justification::topLeft, true);
-                inner.removeFromTop(2);
+                inner.removeFromTop(3);
             };
             drawKV("Type:",     r.type);
             drawKV("Designer:", r.designer);
@@ -337,14 +338,14 @@ void PresetBrowser::paint(juce::Graphics& g)
 
             if (r.description.isNotEmpty())
             {
-                inner.removeFromTop(8);
+                inner.removeFromTop(10);
                 g.setColour(juce::Colour(kBorderSoft));
                 g.drawLine((float) inner.getX(), (float) inner.getY(),
                             (float) inner.getRight(), (float) inner.getY(), 1.0f);
-                inner.removeFromTop(8);
+                inner.removeFromTop(10);
                 g.setColour(juce::Colour(kTextBody));
-                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 10.0f, juce::Font::plain));
-                g.drawFittedText(r.description, inner, juce::Justification::topLeft, 6);
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::plain));
+                g.drawFittedText(r.description, inner, juce::Justification::topLeft, 8);
             }
             // The deleteButton positions itself in mouseMove (visible only
             // for User-pack rows); resized() also positions it during layout
@@ -369,15 +370,15 @@ void PresetBrowser::paint(juce::Graphics& g)
                             && activeCategoryIdx < (int) categories.size())
                             ? categories[(size_t) activeCategoryIdx].label
                             : juce::String("All Presets");
-        auto h = headerBar.reduced(14, 0);
+        auto h = headerBar.reduced(18, 0);
         g.setColour(juce::Colour(kTextStrong));
-        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 18.0f, juce::Font::bold));
+        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 24.0f, juce::Font::bold));
         g.drawText(title, h.toFloat(), juce::Justification::centredLeft, false);
 
         const auto countText = juce::String(totalPresets) + " preset" + (totalPresets == 1 ? "" : "s");
         g.setColour(juce::Colour(kTextLabel));
-        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::plain));
-        g.drawText(countText, h.withTrimmedRight(36).toFloat(),
+        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 13.0f, juce::Font::plain));
+        g.drawText(countText, h.withTrimmedRight(48).toFloat(),
                     juce::Justification::centredRight, false);
     }
 
@@ -436,16 +437,16 @@ void PresetBrowser::paint(juce::Graphics& g)
             g.setColour(juce::Colour(kBorderSoft));
             g.drawRect(cardOuter, 1);
 
-            auto bodyInner = body.reduced(8, 6);
+            auto bodyInner = body.reduced(10, 8);
             g.setColour(juce::Colour(kTextStrong));
-            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::bold));
-            g.drawText(pc.displayName, bodyInner.removeFromTop(14),
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 13.0f, juce::Font::bold));
+            g.drawText(pc.displayName, bodyInner.removeFromTop(16),
                        juce::Justification::topLeft, true);
             g.setColour(juce::Colour(kTextLabel));
-            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 9.0f, juce::Font::plain));
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::plain));
             g.drawText(juce::String(pc.presetCount) + " preset"
                         + (pc.presetCount == 1 ? "" : "s"),
-                       bodyInner.removeFromTop(12),
+                       bodyInner.removeFromTop(13),
                        juce::Justification::topLeft, false);
 
             // Hover overlay over the entire card.
@@ -481,7 +482,7 @@ void PresetBrowser::paint(juce::Graphics& g)
                                               x - cells, colHeaderBar.getHeight() };
 
         g.setColour(juce::Colour(kTextLabel));
-        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 9.0f, juce::Font::bold));
+        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::bold));
         g.drawText("NAME",     nameCol,     juce::Justification::centredLeft, false);
         g.drawText("TYPE",     typeCol,     juce::Justification::centredLeft, false);
         g.drawText("DESIGNER", designerCol, juce::Justification::centredLeft, false);
@@ -516,9 +517,9 @@ void PresetBrowser::paint(juce::Graphics& g)
             if (r.isHeader)
             {
                 g.setColour(juce::Colour(kTextLabel));
-                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 10.0f, juce::Font::bold));
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::bold));
                 g.drawText(r.pack.toUpperCase(),
-                           rowBounds.reduced(8, 0),
+                           rowBounds.reduced(10, 0),
                            juce::Justification::centredLeft, false);
             }
             else
@@ -546,34 +547,33 @@ void PresetBrowser::paint(juce::Graphics& g)
                 const juce::Rectangle<int> nameCol { rowBounds.getX() + 12, rowBounds.getY(),
                                                       x - (rowBounds.getX() + 12), rowBounds.getHeight() };
 
-                // NAME — stronger weight per CSS spec.
+                // NAME — bold, larger for at-a-glance Arturia-style read.
                 g.setColour(juce::Colour(kTextStrong));
-                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::bold));
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 14.0f, juce::Font::bold));
                 g.drawText(r.name, nameCol, juce::Justification::centredLeft, true);
 
-                // TYPE / DESIGNER — body text.
+                // TYPE / DESIGNER — body text, bumped to 12 px.
                 g.setColour(juce::Colour(kTextBody));
-                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::plain));
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::plain));
                 g.drawText(r.type,     typeCol,     juce::Justification::centredLeft, true);
                 g.drawText(r.designer, designerCol, juce::Justification::centredLeft, true);
 
-                // SHAPE — harmonic spectrum thumbnail.
+                // SHAPE — harmonic spectrum thumbnail (column wider now).
                 Theme::paintPresetSpectrum(g,
-                    shapeCol.reduced(2, 1).toFloat(),
+                    shapeCol.reduced(2, 4).toFloat(),
                     r.h, r.crossover, r.skip,
                     Theme::PresetSpectrumVariant::Thumbnail);
 
-                // SKIP — tabular numerics. Em-dash when skip == 0 (matches the
-                // webview's display rule for "no skip set").
+                // SKIP — tabular numerics. Em-dash when skip == 0.
                 g.setColour(juce::Colour(kTextBody));
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 13.0f, juce::Font::plain));
                 const auto skipText = r.skip > 0 ? juce::String(r.skip)
                                                   : juce::String(juce::CharPointer_UTF8("\xE2\x80\x94"));
                 g.drawText(skipText, skipCol, juce::Justification::centredRight, false);
 
-                // ♥ — visual placeholder. Active red if favorited (data is in
-                // place; toggle UI lands in commit 11/12).
+                // ♥ — bigger heart glyph for clearer at-a-glance favorite state.
                 g.setColour(juce::Colour(r.isFavorite ? 0xffc74a4a : 0x33000000));
-                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::plain));
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 16.0f, juce::Font::plain));
                 g.drawText(juce::String(juce::CharPointer_UTF8(r.isFavorite ? "\xE2\x99\xA5" : "\xE2\x99\xA1")),
                            heartCol, juce::Justification::centred, false);
             }
@@ -600,11 +600,11 @@ juce::Rectangle<int> PresetBrowser::packCardBounds(int idx) const
     inner.removeFromRight(kPreviewW);
     auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH).reduced(16, 16);
 
-    constexpr int kCardW = 130;
+    constexpr int kCardW = 170;
     constexpr int kArtH  = kCardW;
-    constexpr int kBodyH = 38;
+    constexpr int kBodyH = 48;
     constexpr int kCardH = kArtH + kBodyH;
-    constexpr int kGap   = 12;
+    constexpr int kGap   = 16;
 
     if (listArea.getWidth() < kCardW) return {};
     const int cols = juce::jmax(1, (listArea.getWidth() + kGap) / (kCardW + kGap));

@@ -112,22 +112,23 @@ private:
 
     // Webview spec: card is 90% × 90% of parent (capped). 3-column layout:
     //   [sidebar 160] [middle flex] [preview 180]
-    static constexpr int kRowHeight     = 26;
-    static constexpr int kHeaderHeight  = 28;
-    static constexpr int kColHeaderH    = 22;
-    static constexpr int kSidebarW      = 160;
-    static constexpr int kPreviewW      = 180;
-    static constexpr int kHeaderBarH    = 44;
-    static constexpr int kSearchBarH    = 36;
+    // Arturia-style proportions: taller rows + larger text for at-a-glance
+    // readability. The full-screen browser layout has plenty of room.
+    static constexpr int kRowHeight     = 36;
+    static constexpr int kHeaderHeight  = 32;
+    static constexpr int kColHeaderH    = 28;
+    static constexpr int kSidebarW      = 200;
+    static constexpr int kPreviewW      = 240;
+    static constexpr int kHeaderBarH    = 56;
+    static constexpr int kSearchBarH    = 44;
 
-    // Webview spec: grid-template-columns: 1fr 72px 72px 140px 40px 30px
-    // Same widths here; NAME flexes to fill leftover middle-column space.
-    static constexpr int kColTypeW      = 72;
-    static constexpr int kColDesignerW  = 72;
-    static constexpr int kColShapeW     = 140;
-    static constexpr int kColSkipW      = 40;
-    static constexpr int kColHeartW     = 30;
-    static constexpr int kColGap        = 8;
+    // Wider columns to match the bigger metadata text.
+    static constexpr int kColTypeW      = 110;
+    static constexpr int kColDesignerW  = 110;
+    static constexpr int kColShapeW     = 180;
+    static constexpr int kColSkipW      = 50;
+    static constexpr int kColHeartW     = 36;
+    static constexpr int kColGap        = 12;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PresetBrowser)
 };
