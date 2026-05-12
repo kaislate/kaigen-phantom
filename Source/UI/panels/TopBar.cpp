@@ -2,6 +2,7 @@
 #include "TopBar.h"
 #include "../Theme.h"
 #include "../../PluginProcessor.h"
+#include "../../Parameters.h"
 
 namespace kaigen::phantom
 {
@@ -12,6 +13,15 @@ TopBar::TopBar(PhantomProcessor& p, juce::AudioProcessorValueTreeState& a)
     addAndMakeVisible(presetSelector);
     addAndMakeVisible(engineTabs);
     addAndMakeVisible(modeToggle);
+
+    bypassBtn   = std::make_unique<HeaderButton>(a, ParamID::BYPASS,
+                                                  HeaderButton::Icon::Bypass);
+    settingsBtn = std::make_unique<HeaderButton>(HeaderButton::Icon::Settings);
+    advancedBtn = std::make_unique<HeaderButton>(a, ParamID::ADVANCED_OPEN,
+                                                  HeaderButton::Icon::AdvancedChevron);
+    addAndMakeVisible(*bypassBtn);
+    addAndMakeVisible(*settingsBtn);
+    addAndMakeVisible(*advancedBtn);
 }
 
 TopBar::~TopBar() = default;
@@ -70,6 +80,15 @@ void TopBar::resized()
     modeToggle.setBounds(modeX, rowY,
                           ModeTogglePill::kNaturalWidth,
                           ModeTogglePill::kNaturalHeight);
+
+    // Three circular header buttons (bypass / settings / advanced) sit to
+    // the right of the mode toggle.
+    const int btnSize = HeaderButton::kNaturalSize;
+    const int btnY    = (area.getHeight() - btnSize) / 2;
+    int       btnX    = modeX + ModeTogglePill::kNaturalWidth + 14;
+    if (bypassBtn)   { bypassBtn  ->setBounds(btnX, btnY, btnSize, btnSize); btnX += btnSize + 6; }
+    if (settingsBtn) { settingsBtn->setBounds(btnX, btnY, btnSize, btnSize); btnX += btnSize + 6; }
+    if (advancedBtn) { advancedBtn->setBounds(btnX, btnY, btnSize, btnSize); }
 }
 
 void TopBar::mouseDown(const juce::MouseEvent& e)

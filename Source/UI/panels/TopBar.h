@@ -5,6 +5,8 @@
 #include "../widgets/PresetSelector.h"
 #include "../widgets/EngineTabsWidget.h"
 #include "../widgets/ModeTogglePill.h"
+#include "../widgets/HeaderButton.h"
+#include <memory>
 
 class PhantomProcessor;
 
@@ -27,6 +29,9 @@ private:
     PresetSelector   presetSelector;
     EngineTabsWidget engineTabs;
     ModeTogglePill   modeToggle;
+    std::unique_ptr<HeaderButton> bypassBtn;
+    std::unique_ptr<HeaderButton> settingsBtn;
+    std::unique_ptr<HeaderButton> advancedBtn;
     PhantomProcessor& processor;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TopBar)
