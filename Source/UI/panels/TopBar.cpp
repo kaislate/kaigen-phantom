@@ -67,44 +67,48 @@ void TopBar::paint(juce::Graphics& g)
 void TopBar::resized()
 {
     auto area = getLocalBounds();
-
-    // Center the preset selector horizontally; ~600px wide.
-    const int selectorW = juce::jmin(600, area.getWidth() - 200);
-    const int selectorX = (area.getWidth() - selectorW) / 2;
-    presetSelector.setBounds(selectorX, 0, selectorW, area.getHeight());
-
-    // Engine tabs sit to the right of the preset selector, vertically
-    // centered in the strip. Mode toggle pill follows just to the right.
-    const int rowY  = (area.getHeight() - EngineTabsWidget::kNaturalHeight) / 2;
-    const int tabsX = selectorX + selectorW + 16;
-    engineTabs.setBounds(tabsX, rowY,
-                          EngineTabsWidget::kNaturalWidth,
-                          EngineTabsWidget::kNaturalHeight);
-
-    const int modeX = tabsX + EngineTabsWidget::kNaturalWidth + 10;
-    modeToggle.setBounds(modeX, rowY,
-                          ModeTogglePill::kNaturalWidth,
-                          ModeTogglePill::kNaturalHeight);
-
-    // Three circular header buttons (bypass / settings / advanced) sit to
-    // the right of the mode toggle.
+    const int rowY    = (area.getHeight() - EngineTabsWidget::kNaturalHeight) / 2;
     const int btnSize = HeaderButton::kNaturalSize;
     const int btnY    = (area.getHeight() - btnSize) / 2;
-    int       btnX    = modeX + ModeTogglePill::kNaturalWidth + 14;
-    if (bypassBtn)   { bypassBtn  ->setBounds(btnX, btnY, btnSize, btnSize); btnX += btnSize + 6; }
-    if (settingsBtn) { settingsBtn->setBounds(btnX, btnY, btnSize, btnSize); btnX += btnSize + 6; }
-    if (advancedBtn) { advancedBtn->setBounds(btnX, btnY, btnSize, btnSize); btnX += btnSize + 6; }
 
-    // Build tag pill — pinned just to the left of the KAIGEN logo
-    // (logo is painted at x = getWidth() - 120).
+    // ── Reserve the right-side chrome first, packed against the KAIGEN
+    //    logo at x = getWidth() - 120. Everything is positioned right-to-
+    //    left so the cluster stays glued to the KAIGEN edge as the editor
+    //    resizes; the preset selector then takes whatever middle space
+    //    remains.
+    constexpr int kKaigenReserve = 120;
+    int rx = area.getRight() - kKaigenReserve - 8;   // 8 px gap before KAIGEN
+
     if (buildTag)
     {
         const auto natural = buildTag->getNaturalBounds();
-        const int  bx      = juce::jmax(btnX,
-                                         area.getWidth() - 120 - natural.getWidth() - 8);
-        const int  by      = (area.getHeight() - natural.getHeight()) / 2;
-        buildTag->setBounds(bx, by, natural.getWidth(), natural.getHeight());
+        rx -= natural.getWidth();
+        buildTag->setBounds(rx, (area.getHeight() - natural.getHeight()) / 2,
+                             natural.getWidth(), natural.getHeight());
+        rx -= 10;
     }
+    if (advancedBtn) { rx -= btnSize; advancedBtn->setBounds(rx, btnY, btnSize, btnSize); rx -= 6; }
+    if (settingsBtn) { rx -= btnSize; settingsBtn->setBounds(rx, btnY, btnSize, btnSize); rx -= 6; }
+    if (bypassBtn)   { rx -= btnSize; bypassBtn  ->setBounds(rx, btnY, btnSize, btnSize); rx -= 12; }
+
+    rx -= ModeTogglePill::kNaturalWidth;
+    modeToggle.setBounds(rx, rowY,
+                          ModeTogglePill::kNaturalWidth,
+                          ModeTogglePill::kNaturalHeight);
+    rx -= 10;
+
+    rx -= EngineTabsWidget::kNaturalWidth;
+    engineTabs.setBounds(rx, rowY,
+                          EngineTabsWidget::kNaturalWidth,
+                          EngineTabsWidget::kNaturalHeight);
+
+    // ── Preset selector fills the middle space between the PHANTOM logo
+    //    (left, paints at x=16, w=240) and the right-side chrome cluster.
+    constexpr int kPhantomReserve = 240 + 16 + 12;   // logo bounds + 12 px gap
+    const int selectorLeft  = kPhantomReserve;
+    const int selectorRight = rx - 16;                // 16 px gap before engine tabs
+    const int selectorW     = juce::jmax(380, selectorRight - selectorLeft);
+    presetSelector.setBounds(selectorLeft, 0, selectorW, area.getHeight());
 }
 
 void TopBar::mouseDown(const juce::MouseEvent& e)
