@@ -22,6 +22,11 @@ TopBar::TopBar(PhantomProcessor& p, juce::AudioProcessorValueTreeState& a)
     addAndMakeVisible(*bypassBtn);
     addAndMakeVisible(*settingsBtn);
     addAndMakeVisible(*advancedBtn);
+
+    // Build identifier — ops/QA verify the right DLL is loaded by reading
+    // this tag. Bumped per release; this is the current dev tag.
+    buildTag = std::make_unique<BuildTagPill>("MORPH-9");
+    addAndMakeVisible(*buildTag);
 }
 
 TopBar::~TopBar() = default;
@@ -88,7 +93,18 @@ void TopBar::resized()
     int       btnX    = modeX + ModeTogglePill::kNaturalWidth + 14;
     if (bypassBtn)   { bypassBtn  ->setBounds(btnX, btnY, btnSize, btnSize); btnX += btnSize + 6; }
     if (settingsBtn) { settingsBtn->setBounds(btnX, btnY, btnSize, btnSize); btnX += btnSize + 6; }
-    if (advancedBtn) { advancedBtn->setBounds(btnX, btnY, btnSize, btnSize); }
+    if (advancedBtn) { advancedBtn->setBounds(btnX, btnY, btnSize, btnSize); btnX += btnSize + 6; }
+
+    // Build tag pill — pinned just to the left of the KAIGEN logo
+    // (logo is painted at x = getWidth() - 120).
+    if (buildTag)
+    {
+        const auto natural = buildTag->getNaturalBounds();
+        const int  bx      = juce::jmax(btnX,
+                                         area.getWidth() - 120 - natural.getWidth() - 8);
+        const int  by      = (area.getHeight() - natural.getHeight()) / 2;
+        buildTag->setBounds(bx, by, natural.getWidth(), natural.getHeight());
+    }
 }
 
 void TopBar::mouseDown(const juce::MouseEvent& e)

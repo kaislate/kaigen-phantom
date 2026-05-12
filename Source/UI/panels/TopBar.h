@@ -6,6 +6,7 @@
 #include "../widgets/EngineTabsWidget.h"
 #include "../widgets/ModeTogglePill.h"
 #include "../widgets/HeaderButton.h"
+#include "../widgets/BuildTagPill.h"
 #include <memory>
 
 class PhantomProcessor;
@@ -32,6 +33,7 @@ private:
     std::unique_ptr<HeaderButton> bypassBtn;
     std::unique_ptr<HeaderButton> settingsBtn;
     std::unique_ptr<HeaderButton> advancedBtn;
+    std::unique_ptr<BuildTagPill> buildTag;
     PhantomProcessor& processor;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TopBar)
