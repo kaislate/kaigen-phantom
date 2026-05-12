@@ -93,7 +93,6 @@ private:
     {
         CategoryKind kind;
         juce::String label;
-        juce::String glyph;        // small icon shown left of the label
         juce::String packFilter;   // valid when kind == Pack
     };
     std::vector<Category> categories;

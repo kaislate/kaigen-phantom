@@ -31,6 +31,87 @@ namespace
     constexpr juce::uint32 kRowHover    = 0x0f000000;   // ~6% black
     constexpr juce::uint32 kRowActive   = 0x1a000000;   // ~10% black
     constexpr juce::uint32 kBorderSoft  = 0x1f000000;   // ~12% black
+
+    // Line-art icons drawn as JUCE Paths. ~20×20 logical units, stroked
+    // at 1.5 px with rounded joins. Inspired by Arturia Analog Lab's
+    // sidebar (magnifying glass / heart / stacked-layers).
+    enum class SidebarIcon { Explore, Favorites, Packs };
+    void paintSidebarIcon(juce::Graphics& g, juce::Rectangle<float> bounds,
+                          SidebarIcon icon, juce::Colour stroke)
+    {
+        if (bounds.isEmpty()) return;
+        const auto inset = bounds.reduced(bounds.getWidth() * 0.18f,
+                                           bounds.getHeight() * 0.18f);
+        const float cx = inset.getCentreX();
+        const float cy = inset.getCentreY();
+        const float r  = juce::jmin(inset.getWidth(), inset.getHeight()) * 0.5f;
+
+        juce::Path p;
+        const juce::PathStrokeType strokeT(1.5f,
+                                            juce::PathStrokeType::curved,
+                                            juce::PathStrokeType::rounded);
+
+        switch (icon)
+        {
+            case SidebarIcon::Explore:
+            {
+                // Magnifying glass — circle in upper-left, diagonal handle.
+                const float circR  = r * 0.62f;
+                const float ccx    = cx - r * 0.18f;
+                const float ccy    = cy - r * 0.18f;
+                p.addEllipse(ccx - circR, ccy - circR, circR * 2.0f, circR * 2.0f);
+
+                // Handle from the circle's bottom-right tangent outward.
+                const float a = juce::MathConstants<float>::pi * 0.25f;
+                const float hx0 = ccx + std::cos(a) * circR;
+                const float hy0 = ccy + std::sin(a) * circR;
+                const float hx1 = ccx + std::cos(a) * (circR + r * 0.55f);
+                const float hy1 = ccy + std::sin(a) * (circR + r * 0.55f);
+                p.startNewSubPath(hx0, hy0);
+                p.lineTo(hx1, hy1);
+                break;
+            }
+            case SidebarIcon::Favorites:
+            {
+                // Heart outline. Two arcs over the top + V-bottom.
+                const float w = r * 1.4f;
+                const float h = r * 1.3f;
+                const float top    = cy - h * 0.45f;
+                const float bottom = cy + h * 0.55f;
+                p.startNewSubPath(cx, bottom);
+                // Right side up + over.
+                p.cubicTo(cx + w * 0.95f, cy + h * 0.10f,
+                          cx + w * 0.95f, top - h * 0.20f,
+                          cx,              cy - h * 0.10f);
+                // Left side mirror back to bottom.
+                p.cubicTo(cx - w * 0.95f, top - h * 0.20f,
+                          cx - w * 0.95f, cy + h * 0.10f,
+                          cx,              bottom);
+                p.closeSubPath();
+                break;
+            }
+            case SidebarIcon::Packs:
+            {
+                // Stacked layers — three flattened diamonds (Arturia-style).
+                const float layerW   = r * 1.7f;
+                const float layerH   = r * 0.55f;
+                const float layerGap = r * 0.32f;
+                for (int i = 0; i < 3; ++i)
+                {
+                    const float yc = cy - layerGap + i * layerGap;
+                    p.startNewSubPath(cx - layerW * 0.5f, yc);
+                    p.lineTo(cx,                          yc - layerH * 0.5f);
+                    p.lineTo(cx + layerW * 0.5f,          yc);
+                    p.lineTo(cx,                          yc + layerH * 0.5f);
+                    p.closeSubPath();
+                }
+                break;
+            }
+        }
+
+        g.setColour(stroke);
+        g.strokePath(p, strokeT);
+    }
 }
 
 PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeState& a)
@@ -132,18 +213,15 @@ void PresetBrowser::rebuildCategories()
 {
     categories.clear();
     // Top-level entries — every preset, favorites filter, pack-card grid.
-    // Glyph strings must be wrapped in CharPointer_UTF8 so JUCE decodes the
-    // raw bytes as UTF-8 rather than the system codepage (CP-1252 on
-    // Windows produces mojibake otherwise).
-    auto u8 = [](const char* s) { return juce::String(juce::CharPointer_UTF8(s)); };
-    categories.push_back({ CategoryKind::Explore,   "Explore",   u8("\xe2\x8a\x95"), {} });   // ⊕
-    categories.push_back({ CategoryKind::Favorites, "Favorites", u8("\xe2\x99\xa5"), {} });   // ♥
-    categories.push_back({ CategoryKind::Packs,     "Packs",     u8("\xe2\x96\xa6"), {} });   // ▦
+    // Icons are drawn from juce::Path in paintSidebarIcon, keyed by kind.
+    categories.push_back({ CategoryKind::Explore,   "Explore",   {} });
+    categories.push_back({ CategoryKind::Favorites, "Favorites", {} });
+    categories.push_back({ CategoryKind::Packs,     "Packs",     {} });
 
     // Direct pack drill-ins below — same data, scoped to a single pack.
     const auto all = processor.getPresetManager().getAllPresets();
     for (const auto& [packName, presets] : all)
-        categories.push_back({ CategoryKind::Pack, packName, {}, packName });
+        categories.push_back({ CategoryKind::Pack, packName, packName });
 
     if (activeCategoryIdx >= (int) categories.size())
         activeCategoryIdx = 0;
@@ -268,25 +346,34 @@ void PresetBrowser::paint(juce::Graphics& g)
                                                3.0f, (float) rowBounds.getHeight()));
         }
 
-        // Two-column layout inside the row: [glyph] [label].
-        constexpr int kGlyphW = 26;
-        const auto glyphCol = juce::Rectangle<int>(rowBounds.getX() + 8, rowBounds.getY(),
-                                                    kGlyphW, rowBounds.getHeight());
-        const auto labelCol = juce::Rectangle<int>(glyphCol.getRight() + 4, rowBounds.getY(),
-                                                    rowBounds.getRight() - glyphCol.getRight() - 8,
+        // Two-column layout inside the row: [icon] [label]. Top-level
+        // entries get a line-art icon; per-pack drill-ins get an indented
+        // label only.
+        constexpr int kIconW = 28;
+        const auto iconCol  = juce::Rectangle<int>(rowBounds.getX() + 8, rowBounds.getY(),
+                                                    kIconW, rowBounds.getHeight());
+        const auto labelCol = juce::Rectangle<int>(iconCol.getRight() + 6, rowBounds.getY(),
+                                                    rowBounds.getRight() - iconCol.getRight() - 8,
                                                     rowBounds.getHeight());
 
-        if (c.glyph.isNotEmpty())
-        {
-            g.setColour(juce::Colour(isActive ? kTextStrong : kTextBody));
-            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 16.0f, juce::Font::plain));
-            g.drawText(c.glyph, glyphCol, juce::Justification::centred, false);
-        }
+        const auto strokeColour = juce::Colour(isActive ? kTextStrong : kTextBody);
+        if (c.kind == CategoryKind::Explore)
+            paintSidebarIcon(g, iconCol.toFloat(), SidebarIcon::Explore, strokeColour);
+        else if (c.kind == CategoryKind::Favorites)
+            paintSidebarIcon(g, iconCol.toFloat(), SidebarIcon::Favorites, strokeColour);
+        else if (c.kind == CategoryKind::Packs)
+            paintSidebarIcon(g, iconCol.toFloat(), SidebarIcon::Packs, strokeColour);
+        // Per-pack entries have no icon; their label sits in the same column.
 
-        g.setColour(juce::Colour(isActive ? kTextStrong : kTextBody));
+        g.setColour(strokeColour);
         g.setFont(juce::FontOptions(Theme::uiFontFamily(), 14.0f,
                                      isActive ? juce::Font::bold : juce::Font::plain));
-        g.drawText(c.label, labelCol, juce::Justification::centredLeft, false);
+
+        // Indent per-pack labels so they read as sub-items under Packs.
+        const auto textArea = (c.kind == CategoryKind::Pack)
+                                ? rowBounds.withTrimmedLeft(20).withTrimmedRight(8)
+                                : labelCol;
+        g.drawText(c.label, textArea, juce::Justification::centredLeft, false);
     }
     }   // end sidebar clip
 
