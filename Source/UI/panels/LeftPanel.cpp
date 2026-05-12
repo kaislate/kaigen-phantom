@@ -138,14 +138,15 @@ void LeftPanel::resized()
     const int wheelX = (panelW - kWheelSize) / 2;
     recipeWheel.setBounds(wheelX, kWheelTop, kWheelSize, kWheelSize);
 
-    // Modes tray — wrapped in its own inset card to visually match the
-    // Ghost / Filter sections below. Bigger button rows than the original
-    // recipe selector so the labels (Warm / Aggr / Stable / ...) read
-    // comfortably.
-    constexpr int kPresetRowH    = 28;
-    constexpr int kPresetH       = kPresetRowH * 3;
-    constexpr int kRecipeCardTop  = 328;   // touches bottom of wheel
-    constexpr int kRecipeContentY = kRecipeCardTop + 8;
+    // Modes tray — wrapped in its own inset card. Content sits 24 px below
+    // the card top so it clears the 16-px notched title bar (Ghost / Filter
+    // cards get away with +8 because their knobs have built-in shadow
+    // padding above the visible disc; the WordSelector here doesn't).
+    constexpr int kPresetRowH     = 28;
+    constexpr int kPresetH        = kPresetRowH * 3;
+    constexpr int kRecipeCardTop  = 328;            // touches bottom of wheel
+    constexpr int kRecipeContentY = kRecipeCardTop + 24;
+    constexpr int kRecipeBottomPad = 16;            // extra room below buttons
     recipePresetSelector.setBounds(16, kRecipeContentY, panelW - 32, kPresetH);
 
     // Knob component natural sizes (body + shadow padding × 2).
@@ -155,10 +156,9 @@ void LeftPanel::resized()
     constexpr int kMedium = 136;
 
     // ── Ghost section ──────────────────────────────────────────────────
-    // Pushed further down — Modes tray is taller now (28-px rows × 3 + 16
-    // padding = 100 px card) and we want a comfortable gap below it before
-    // the Ghost card starts.
-    constexpr int ghostY  = 478;   // was 446 (+32 for taller Modes + extra gap)
+    // Modes card now spans 328 → ~452 (24 top + 84 content + 16 bottom),
+    // so Ghost shifts down to maintain a comfortable card-to-card gap.
+    constexpr int ghostY  = 502;   // was 478 (+24 for taller Modes)
     const int ghostTotal  = kLarge + kMedium + kMedium;
     const int ghostOverlap = (ghostTotal - panelW + 16) / 2;
     int gx = 8;
@@ -173,7 +173,7 @@ void LeftPanel::resized()
     ghostModeToggle.setBounds(12, ghostY + kLarge + 4, panelW - 24, 22);
 
     // ── Filter section (more vertical gap from Ghost) ──────────────────
-    constexpr int filterY = 748;   // tracks the bumped Ghost Y (was 716, +32)
+    constexpr int filterY = 772;   // tracks the bumped Ghost Y (was 748, +24)
     const int filterTotal = kMedium + 40 + kMedium;
     int fx = (panelW - filterTotal) / 2;
     lpfKnob.setBounds(fx, filterY, kMedium, kMedium);
@@ -186,7 +186,7 @@ void LeftPanel::resized()
     constexpr int cardPadX = 8;
 
     // Recipe card wraps the preset selector below the wheel.
-    const int recipeCardBottom = kRecipeContentY + kPresetH + 8;
+    const int recipeCardBottom = kRecipeContentY + kPresetH + kRecipeBottomPad;
     recipeCardBounds = juce::Rectangle<int>(cardPadX, kRecipeCardTop,
                                              panelW - cardPadX * 2,
                                              recipeCardBottom - kRecipeCardTop);

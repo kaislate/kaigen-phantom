@@ -35,7 +35,7 @@ namespace
     // Line-art icons drawn as JUCE Paths. ~20×20 logical units, stroked
     // at 1.5 px with rounded joins. Inspired by Arturia Analog Lab's
     // sidebar (magnifying glass / heart / stacked-layers).
-    enum class SidebarIcon { Explore, Favorites, Packs };
+    enum class SidebarIcon { Explore, Favorites, Packs, User };
     void paintSidebarIcon(juce::Graphics& g, juce::Rectangle<float> bounds,
                           SidebarIcon icon, juce::Colour stroke)
     {
@@ -73,20 +73,31 @@ namespace
             }
             case SidebarIcon::Favorites:
             {
-                // Heart outline. Two arcs over the top + V-bottom.
-                const float w = r * 1.4f;
-                const float h = r * 1.3f;
-                const float top    = cy - h * 0.45f;
-                const float bottom = cy + h * 0.55f;
-                p.startNewSubPath(cx, bottom);
-                // Right side up + over.
-                p.cubicTo(cx + w * 0.95f, cy + h * 0.10f,
-                          cx + w * 0.95f, top - h * 0.20f,
-                          cx,              cy - h * 0.10f);
-                // Left side mirror back to bottom.
-                p.cubicTo(cx - w * 0.95f, top - h * 0.20f,
-                          cx - w * 0.95f, cy + h * 0.10f,
-                          cx,              bottom);
+                // Heart with proper lobes — two top humps + a tapered bottom.
+                // Proportions tuned so it doesn't read as squished.
+                const float w = r * 1.55f;
+                const float h = r * 1.45f;
+                const float tip = cy + h * 0.55f;        // bottom point
+                const float topDip = cy - h * 0.20f;     // dip between lobes
+                const float lobeY  = cy - h * 0.40f;     // lobe top
+                const float lx = cx - w * 0.50f;
+                const float rx = cx + w * 0.50f;
+
+                p.startNewSubPath(cx, tip);
+                // Right side: tip → outer-right → right lobe top → dip.
+                p.cubicTo(cx + w * 0.35f, cy + h * 0.20f,
+                          rx,              cy - h * 0.05f,
+                          rx,              lobeY + h * 0.08f);
+                p.cubicTo(rx,              lobeY - h * 0.20f,
+                          cx + w * 0.10f,  lobeY - h * 0.22f,
+                          cx,              topDip);
+                // Left side mirror back to the tip.
+                p.cubicTo(cx - w * 0.10f,  lobeY - h * 0.22f,
+                          lx,              lobeY - h * 0.20f,
+                          lx,              lobeY + h * 0.08f);
+                p.cubicTo(lx,              cy - h * 0.05f,
+                          cx - w * 0.35f, cy + h * 0.20f,
+                          cx,              tip);
                 p.closeSubPath();
                 break;
             }
@@ -105,6 +116,24 @@ namespace
                     p.lineTo(cx,                          yc + layerH * 0.5f);
                     p.closeSubPath();
                 }
+                break;
+            }
+            case SidebarIcon::User:
+            {
+                // Person bust — circular head + U-shaped shoulders.
+                const float headR  = r * 0.35f;
+                const float headCY = cy - r * 0.38f;
+                p.addEllipse(cx - headR, headCY - headR, headR * 2.0f, headR * 2.0f);
+
+                // Shoulders: smooth arc from below the head out to the
+                // edges of the bust, open at the bottom.
+                const float shouldersTop    = headCY + headR + r * 0.10f;
+                const float shouldersBottom = cy + r * 0.80f;
+                const float shouldersHalfW  = r * 0.80f;
+                p.startNewSubPath(cx - shouldersHalfW, shouldersBottom);
+                p.cubicTo(cx - shouldersHalfW, shouldersTop,
+                          cx + shouldersHalfW, shouldersTop,
+                          cx + shouldersHalfW, shouldersBottom);
                 break;
             }
         }
@@ -357,20 +386,27 @@ void PresetBrowser::paint(juce::Graphics& g)
                                                     rowBounds.getHeight());
 
         const auto strokeColour = juce::Colour(isActive ? kTextStrong : kTextBody);
+        const bool isUserPackRow = (c.kind == CategoryKind::Pack
+                                    && c.packFilter == "User");
+
         if (c.kind == CategoryKind::Explore)
             paintSidebarIcon(g, iconCol.toFloat(), SidebarIcon::Explore, strokeColour);
         else if (c.kind == CategoryKind::Favorites)
             paintSidebarIcon(g, iconCol.toFloat(), SidebarIcon::Favorites, strokeColour);
         else if (c.kind == CategoryKind::Packs)
             paintSidebarIcon(g, iconCol.toFloat(), SidebarIcon::Packs, strokeColour);
-        // Per-pack entries have no icon; their label sits in the same column.
+        else if (isUserPackRow)
+            paintSidebarIcon(g, iconCol.toFloat(), SidebarIcon::User, strokeColour);
+        // Other per-pack entries (Factory, etc) have no icon — indented label only.
 
         g.setColour(strokeColour);
         g.setFont(juce::FontOptions(Theme::uiFontFamily(), 14.0f,
                                      isActive ? juce::Font::bold : juce::Font::plain));
 
-        // Indent per-pack labels so they read as sub-items under Packs.
-        const auto textArea = (c.kind == CategoryKind::Pack)
+        // User-pack uses the standard [icon][label] columns; other per-pack
+        // entries indent under the Packs row.
+        const bool indentSubPack = (c.kind == CategoryKind::Pack && ! isUserPackRow);
+        const auto textArea = indentSubPack
                                 ? rowBounds.withTrimmedLeft(20).withTrimmedRight(8)
                                 : labelCol;
         g.drawText(c.label, textArea, juce::Justification::centredLeft, false);
