@@ -65,6 +65,16 @@ private:
     int hoverRow             { -1 };
     int selectedPreviewRow   { -1 };   // last row hovered/clicked, drives preview pane
 
+    /** Column-header sort state. Clicking a header column sorts asc;
+     *  clicking the same column again flips direction. Persisted only for
+     *  the lifetime of the browser; reset on visibilityChanged. */
+    enum class SortColumn { None, Name, Type, Designer, Shape, Skip };
+    SortColumn sortColumn   { SortColumn::None };
+    bool       sortAscending{ true };
+    int        hoverHeaderColumn { -1 };
+
+    juce::Rectangle<int> columnHeaderBounds(SortColumn col) const;
+
     juce::Rectangle<int> previewBounds() const;
     juce::Rectangle<int> previewDeleteButtonBounds() const;
     void deleteSelectedPreset();

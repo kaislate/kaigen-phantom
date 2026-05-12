@@ -204,6 +204,8 @@ void PresetBrowser::visibilityChanged()
         selectedPreviewRow = -1;
         sidebarScrollY = 0;
         listScrollY = 0;
+        sortColumn = SortColumn::None;
+        sortAscending = true;
         deleteButton.setVisible(false);
         searchField.setText("", juce::dontSendNotification);
         return;
@@ -272,14 +274,15 @@ void PresetBrowser::rebuildRows()
     if (categories.empty()) return;
     const auto& active = categories[(size_t) activeCategoryIdx];
 
-    const auto all = processor.getPresetManager().getAllPresets();
-    for (const auto& [packName, presets] : all)
+    // Collect every matching row first; group-by-pack header insertion is
+    // applied at the end only when no column sort is active.
+    std::vector<Row> all;
+    const auto packs = processor.getPresetManager().getAllPresets();
+    for (const auto& [packName, presets] : packs)
     {
-        // Skip whole packs that don't match the active category filter.
         if (active.kind == CategoryKind::Pack && active.packFilter != packName)
             continue;
 
-        std::vector<Row> matched;
         for (const auto& p : presets)
         {
             if (active.kind == CategoryKind::Favorites && ! p.metadata.isFavorite)
@@ -287,26 +290,76 @@ void PresetBrowser::rebuildRows()
             if (hasQuery && ! p.metadata.name.toLowerCase().contains(query))
                 continue;
             Row r;
-            r.name       = p.metadata.name;
-            r.pack       = packName;
-            r.type       = p.metadata.type;
+            r.name        = p.metadata.name;
+            r.pack        = packName;
+            r.type        = p.metadata.type;
             r.designer    = p.metadata.designer;
             r.description = p.metadata.description;
             for (int hi = 0; hi < 7; ++hi) r.h[hi] = p.preview.h[hi];
-            r.crossover  = p.preview.crossover;
-            r.skip       = p.preview.skip;
-            r.isFavorite = p.metadata.isFavorite;
-            r.isHeader   = false;
-            matched.push_back(std::move(r));
+            r.crossover   = p.preview.crossover;
+            r.skip        = p.preview.skip;
+            r.isFavorite  = p.metadata.isFavorite;
+            r.isHeader    = false;
+            all.push_back(std::move(r));
         }
-        if (matched.empty()) continue;
+    }
+    if (all.empty()) return;
 
-        Row header;
-        header.pack     = packName;
-        header.isHeader = true;
-        rows.push_back(std::move(header));
-        for (auto& m : matched)
-            rows.push_back(std::move(m));
+    if (sortColumn != SortColumn::None)
+    {
+        // Spectral centroid for SHAPE sort — weighted-avg harmonic frequency.
+        auto centroid = [](const Row& r) {
+            const float fund = juce::jmax(0.01f, r.crossover / std::pow(2.0f, (float) r.skip));
+            float num = 0.0f, den = 0.0f;
+            for (int i = 0; i < 7; ++i) { num += r.h[i] * (float) (i + 2) * fund; den += r.h[i]; }
+            return den > 0.0f ? num / den : 0.0f;
+        };
+
+        const bool asc = sortAscending;
+        std::sort(all.begin(), all.end(), [&](const Row& a, const Row& b) {
+            int cmp = 0;
+            switch (sortColumn)
+            {
+                case SortColumn::Name:
+                    cmp = a.name.compareIgnoreCase(b.name); break;
+                case SortColumn::Type:
+                    cmp = a.type.compareIgnoreCase(b.type); break;
+                case SortColumn::Designer:
+                    cmp = a.designer.compareIgnoreCase(b.designer); break;
+                case SortColumn::Skip:
+                    cmp = (a.skip < b.skip) ? -1 : (a.skip > b.skip) ? 1 : 0; break;
+                case SortColumn::Shape:
+                {
+                    const float ca = centroid(a), cb = centroid(b);
+                    cmp = (ca < cb) ? -1 : (ca > cb) ? 1 : 0;
+                    break;
+                }
+                case SortColumn::None: break;
+            }
+            if (cmp == 0) cmp = a.name.compareIgnoreCase(b.name);   // stable secondary
+            return asc ? (cmp < 0) : (cmp > 0);
+        });
+
+        // Sorted view is flat — pack name becomes implicit via DESIGNER /
+        // metadata, no group headers.
+        rows.reserve(all.size());
+        for (auto& r : all) rows.push_back(std::move(r));
+        return;
+    }
+
+    // No sort active — re-group by pack with header rows above each block.
+    juce::String currentPack;
+    for (auto& r : all)
+    {
+        if (r.pack != currentPack)
+        {
+            currentPack = r.pack;
+            Row header;
+            header.pack     = currentPack;
+            header.isHeader = true;
+            rows.push_back(std::move(header));
+        }
+        rows.push_back(std::move(r));
     }
 }
 
@@ -634,13 +687,37 @@ void PresetBrowser::paint(juce::Graphics& g)
         const juce::Rectangle<int> nameCol { cells, colHeaderBar.getY(),
                                               x - cells, colHeaderBar.getHeight() };
 
-        g.setColour(juce::Colour(kTextLabel));
         g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::bold));
-        g.drawText("NAME",     nameCol,     juce::Justification::centredLeft, false);
-        g.drawText("TYPE",     typeCol,     juce::Justification::centredLeft, false);
-        g.drawText("DESIGNER", designerCol, juce::Justification::centredLeft, false);
-        g.drawText("SHAPE",    shapeCol,    juce::Justification::centredLeft, false);
-        g.drawText("SKIP",     skipCol,     juce::Justification::centredRight, false);
+
+        // Draw each header label; tint stronger if it's the active sort
+        // column, and append a small arrow indicating direction.
+        auto drawHeader = [&](const juce::String& label,
+                              juce::Rectangle<int> col,
+                              SortColumn which,
+                              juce::Justification just) {
+            const bool isActive = (sortColumn == which);
+            g.setColour(juce::Colour(isActive ? kTextStrong : kTextLabel));
+            g.drawText(label, col, just, false);
+            if (isActive)
+            {
+                const auto arrow = sortAscending
+                    ? juce::String(juce::CharPointer_UTF8("\xe2\x96\xb2"))    // ▲
+                    : juce::String(juce::CharPointer_UTF8("\xe2\x96\xbc"));   // ▼
+                const auto textW = (int) g.getCurrentFont().getStringWidthFloat(label) + 4;
+                auto arrowRect = (just == juce::Justification::centredRight)
+                    ? juce::Rectangle<int>(col.getRight() - textW - 10, col.getY(), 10, col.getHeight())
+                    : juce::Rectangle<int>(col.getX() + textW, col.getY(), 10, col.getHeight());
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 8.0f, juce::Font::plain));
+                g.drawText(arrow, arrowRect, juce::Justification::centred, false);
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(), 11.0f, juce::Font::bold));
+            }
+        };
+
+        drawHeader("NAME",     nameCol,     SortColumn::Name,     juce::Justification::centredLeft);
+        drawHeader("TYPE",     typeCol,     SortColumn::Type,     juce::Justification::centredLeft);
+        drawHeader("DESIGNER", designerCol, SortColumn::Designer, juce::Justification::centredLeft);
+        drawHeader("SHAPE",    shapeCol,    SortColumn::Shape,    juce::Justification::centredLeft);
+        drawHeader("SKIP",     skipCol,     SortColumn::Skip,     juce::Justification::centredRight);
         juce::ignoreUnused(heartCol);
 
         g.setColour(juce::Colour(kBorderSoft));
@@ -743,6 +820,42 @@ juce::Rectangle<int> PresetBrowser::searchBarBounds() const
     inner.removeFromRight(kPreviewW);
     inner.removeFromTop(kHeaderBarH);   // skip the title bar
     return inner.removeFromTop(kSearchBarH);
+}
+
+juce::Rectangle<int> PresetBrowser::columnHeaderBounds(SortColumn col) const
+{
+    auto card = cardBounds();
+    auto inner = card;
+    inner.removeFromLeft(kSidebarW);
+    inner.removeFromRight(kPreviewW);
+    auto middle = inner.withTrimmedTop(kHeaderBarH + kSearchBarH);
+    auto colBar = middle.removeFromTop(kColHeaderH);
+
+    const auto cells = colBar.getX() + 12;
+    int x = colBar.getRight() - 12;
+    auto take = [&](int w) {
+        const juce::Rectangle<int> r { x - w, colBar.getY(), w, colBar.getHeight() };
+        x = r.getX() - kColGap;
+        return r;
+    };
+    /* heartCol  = */ take(kColHeartW);
+    const auto skipCol     = take(kColSkipW);
+    const auto shapeCol    = take(kColShapeW);
+    const auto designerCol = take(kColDesignerW);
+    const auto typeCol     = take(kColTypeW);
+    const juce::Rectangle<int> nameCol { cells, colBar.getY(),
+                                          x - cells, colBar.getHeight() };
+
+    switch (col)
+    {
+        case SortColumn::Name:     return nameCol;
+        case SortColumn::Type:     return typeCol;
+        case SortColumn::Designer: return designerCol;
+        case SortColumn::Shape:    return shapeCol;
+        case SortColumn::Skip:     return skipCol;
+        case SortColumn::None:
+        default:                   return {};
+    }
 }
 
 juce::Rectangle<int> PresetBrowser::packCardBounds(int idx) const
@@ -1025,6 +1138,27 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
                         break;
                     }
                 }
+                return;
+            }
+        }
+    }
+
+    // Column-header click → toggle sort. Cycle per column:
+    //   None → Asc → Desc → None
+    {
+        struct H { SortColumn col; };
+        for (auto h : { H{ SortColumn::Name },     H{ SortColumn::Type },
+                        H{ SortColumn::Designer }, H{ SortColumn::Shape },
+                        H{ SortColumn::Skip } })
+        {
+            if (columnHeaderBounds(h.col).contains(e.getPosition()))
+            {
+                if (sortColumn != h.col)        { sortColumn = h.col; sortAscending = true; }
+                else if (sortAscending)         { sortAscending = false; }
+                else                            { sortColumn = SortColumn::None; }
+                listScrollY = 0;
+                rebuildRows();
+                repaint();
                 return;
             }
         }
