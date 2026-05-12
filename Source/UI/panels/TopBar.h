@@ -21,6 +21,7 @@ public:
     ~TopBar() override;
 
     PresetSelector& getPresetSelector() noexcept { return presetSelector; }
+    ModeTogglePill& getModeToggle()    noexcept { return modeToggle; }
 
     void paint(juce::Graphics& g) override;
     void resized() override;

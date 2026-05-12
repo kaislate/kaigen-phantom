@@ -66,9 +66,13 @@ void LeftPanel::setEnginePrefix(const juce::String& activePrefix,
     for (auto* k : { &ghostAmountKnob, &crossoverKnob, &strengthKnob,
                      &lpfKnob, &hpfKnob })
         k->setEnginePrefix(activePrefix, mirrorPrefix);
-    // ghostModeToggle / filterSlopeToggle are WordSelector; their
-    // per-engine rebinding lands in a follow-up commit alongside the
-    // other choice-param widgets.
+
+    ghostModeToggle  .setEnginePrefix(activePrefix, mirrorPrefix);
+    filterSlopeToggle.setEnginePrefix(activePrefix, mirrorPrefix);
+    // recipePresetSelector is a_recipe_preset — UI-only, excluded from
+    // per-engine sync at the audio level. Leaving it bound to A keeps
+    // the visual highlight reflecting the engine A recipe preset; if we
+    // want per-engine recipe-preset memory later, add it here.
 }
 
 void LeftPanel::sliderValueChanged(juce::Slider* s)

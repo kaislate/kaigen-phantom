@@ -28,12 +28,19 @@ public:
     static constexpr int kNaturalWidth  = 154;
     static constexpr int kNaturalHeight = 26;
 
+    /** Retarget to <activePrefix>mode. With mirror set (LINK mode), writes
+     *  also flow to the other engine's mode. */
+    void setEnginePrefix(const juce::String& activePrefix,
+                          const juce::String& mirrorPrefix = {});
+
 private:
     void parameterChanged(const juce::String& paramId, float newValue) override;
     juce::Rectangle<int> segmentBounds(int idx) const;
     int hitTest(juce::Point<int> p) const;        // 0 = EFFECT, 1 = RESYN, -1 = none
 
     juce::AudioProcessorValueTreeState& apvts;
+    juce::String activeParamId   { "a_mode" };
+    juce::String mirrorParamId;
     int hoverSegment { -1 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ModeTogglePill)

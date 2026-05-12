@@ -145,6 +145,7 @@ void NativePluginEditor::applyEngineFocus()
 
     leftPanel .setEnginePrefix(activePrefix, mirrorPrefix);
     rightPanel.setEnginePrefix(activePrefix, mirrorPrefix);
+    topBar.getModeToggle().setEnginePrefix(activePrefix, mirrorPrefix);
 }
 
 NativePluginEditor::~NativePluginEditor()

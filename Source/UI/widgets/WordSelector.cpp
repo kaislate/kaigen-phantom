@@ -16,8 +16,19 @@ WordSelector::WordSelector(juce::AudioProcessorValueTreeState& apvts,
                             juce::StringRef paramID,
                             const juce::StringArray& lbls,
                             int rows)
-    : labels(lbls), numRows(juce::jmax(1, rows))
+    : apvtsRef(&apvts), labels(lbls), numRows(juce::jmax(1, rows))
 {
+    const auto idStr = juce::String(paramID);
+    if (idStr.startsWith("a_") || idStr.startsWith("b_"))
+    {
+        enginePrefix = idStr.substring(0, 2);
+        leafName     = idStr.substring(2);
+    }
+    else
+    {
+        leafName = idStr;
+    }
+
     combo.setVisible(false);
     addChildComponent(combo);
     for (int i = 0; i < labels.size(); ++i)
@@ -28,6 +39,24 @@ WordSelector::WordSelector(juce::AudioProcessorValueTreeState& apvts,
         attachment = std::make_unique<juce::ComboBoxParameterAttachment>(*param, combo);
     else
         jassertfalse;
+}
+
+void WordSelector::setEnginePrefix(const juce::String& activePrefix,
+                                     const juce::String& newMirrorPrefix)
+{
+    if (! isPerEngine() || apvtsRef == nullptr) return;
+    if (activePrefix == enginePrefix && newMirrorPrefix == mirrorPrefix) return;
+
+    enginePrefix = activePrefix;
+    mirrorPrefix = newMirrorPrefix;
+
+    attachment.reset();
+    const auto fullId = enginePrefix + leafName;
+    if (auto* p = apvtsRef->getParameter(fullId))
+        attachment = std::make_unique<juce::ComboBoxParameterAttachment>(*p, combo);
+    else
+        jassertfalse;
+    repaint();
 }
 
 WordSelector::~WordSelector()
@@ -164,6 +193,18 @@ void WordSelector::mouseExit(const juce::MouseEvent&)
 void WordSelector::comboBoxChanged(juce::ComboBox*)
 {
     repaint();
+
+    // LINK mirror: write the same choice index to the other engine's param.
+    if (mirrorPrefix.isNotEmpty() && ! isMirroring && apvtsRef != nullptr)
+    {
+        if (auto* other = apvtsRef->getParameter(mirrorPrefix + leafName))
+        {
+            juce::ScopedValueSetter<bool> guard(isMirroring, true);
+            const int idx = combo.getSelectedItemIndex();
+            const float norm = (float) idx / (float) juce::jmax(1, other->getNumSteps() - 1);
+            other->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, norm));
+        }
+    }
 }
 
 } // namespace kaigen::phantom

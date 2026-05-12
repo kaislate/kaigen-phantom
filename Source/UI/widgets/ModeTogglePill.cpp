@@ -28,12 +28,27 @@ ModeTogglePill::ModeTogglePill(juce::AudioProcessorValueTreeState& a)
     : apvts(a)
 {
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
-    apvts.addParameterListener(ParamID::A_MODE, this);
+    apvts.addParameterListener(activeParamId, this);
 }
 
 ModeTogglePill::~ModeTogglePill()
 {
-    apvts.removeParameterListener(ParamID::A_MODE, this);
+    apvts.removeParameterListener(activeParamId, this);
+}
+
+void ModeTogglePill::setEnginePrefix(const juce::String& activePrefix,
+                                       const juce::String& mirrorPrefix)
+{
+    const auto newActive = activePrefix + "mode";
+    const auto newMirror = mirrorPrefix.isNotEmpty() ? (mirrorPrefix + "mode")
+                                                     : juce::String{};
+    if (newActive == activeParamId && newMirror == mirrorParamId) return;
+
+    apvts.removeParameterListener(activeParamId, this);
+    activeParamId = newActive;
+    mirrorParamId = newMirror;
+    apvts.addParameterListener(activeParamId, this);
+    repaint();
 }
 
 void ModeTogglePill::parameterChanged(const juce::String&, float)
@@ -93,7 +108,7 @@ void ModeTogglePill::paint(juce::Graphics& g)
                                            bounds.getWidth(), 3.0f));
     }
 
-    const auto modeIdx = (int) apvts.getRawParameterValue(ParamID::A_MODE)->load();
+    const auto modeIdx = (int) apvts.getRawParameterValue(activeParamId)->load();
 
     auto paintSegment = [&](int idx, const juce::String& label) {
         const auto seg  = segmentBounds(idx);
@@ -143,13 +158,18 @@ void ModeTogglePill::mouseDown(const juce::MouseEvent& e)
 {
     const int h = hitTest(e.getPosition());
     if (h < 0) return;
-    if (auto* p = apvts.getParameter(ParamID::A_MODE))
-    {
-        const auto normalized = (float) h / (float) juce::jmax(1, p->getNumSteps() - 1);
-        p->beginChangeGesture();
-        p->setValueNotifyingHost(normalized);
-        p->endChangeGesture();
-    }
+    auto write = [&](const juce::String& id) {
+        if (auto* p = apvts.getParameter(id))
+        {
+            const auto normalized = (float) h / (float) juce::jmax(1, p->getNumSteps() - 1);
+            p->beginChangeGesture();
+            p->setValueNotifyingHost(normalized);
+            p->endChangeGesture();
+        }
+    };
+    write(activeParamId);
+    if (mirrorParamId.isNotEmpty())   // LINK mode — also flip the other engine
+        write(mirrorParamId);
 }
 
 } // namespace kaigen::phantom

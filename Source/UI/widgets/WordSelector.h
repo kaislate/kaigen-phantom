@@ -25,11 +25,23 @@ public:
     void mouseMove(const juce::MouseEvent& e) override;
     void mouseExit(const juce::MouseEvent& e) override;
 
+    bool isPerEngine() const noexcept { return enginePrefix.isNotEmpty(); }
+
+    /** Rebind to <activePrefix><leaf>; mirror writes to <mirrorPrefix><leaf>
+     *  when set (LINK mode). No-op for non-per-engine params. */
+    void setEnginePrefix(const juce::String& activePrefix,
+                          const juce::String& mirrorPrefix = {});
+
 private:
     void comboBoxChanged(juce::ComboBox* c) override;
     int  hitWord(juce::Point<int> p) const;
 
     juce::ComboBox combo;
+    juce::AudioProcessorValueTreeState* apvtsRef { nullptr };
+    juce::String enginePrefix;
+    juce::String leafName;
+    juce::String mirrorPrefix;
+    bool         isMirroring { false };
     std::unique_ptr<juce::ComboBoxParameterAttachment> attachment;
     juce::StringArray labels;
     juce::Array<juce::Rectangle<int>> wordBounds;   // computed in resized()
