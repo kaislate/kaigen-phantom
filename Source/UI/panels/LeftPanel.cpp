@@ -138,11 +138,11 @@ void LeftPanel::resized()
     const int wheelX = (panelW - kWheelSize) / 2;
     recipeWheel.setBounds(wheelX, kWheelTop, kWheelSize, kWheelSize);
 
-    // Recipe preset selector — wrapped in its own inset card ("tray") to
-    // visually match the Ghost / Filter sections below. The card's content
-    // inset matches the Ghost / Filter pattern (8 px above the content,
-    // 8 px below).
-    constexpr int kPresetRowH    = 22;
+    // Modes tray — wrapped in its own inset card to visually match the
+    // Ghost / Filter sections below. Bigger button rows than the original
+    // recipe selector so the labels (Warm / Aggr / Stable / ...) read
+    // comfortably.
+    constexpr int kPresetRowH    = 28;
     constexpr int kPresetH       = kPresetRowH * 3;
     constexpr int kRecipeCardTop  = 328;   // touches bottom of wheel
     constexpr int kRecipeContentY = kRecipeCardTop + 8;
@@ -155,8 +155,10 @@ void LeftPanel::resized()
     constexpr int kMedium = 136;
 
     // ── Ghost section ──────────────────────────────────────────────────
-    // Pushed down to give the Modes tray comfortable breathing room above.
-    constexpr int ghostY  = 446;   // was 426 (+20 for Modes-tray spacing)
+    // Pushed further down — Modes tray is taller now (28-px rows × 3 + 16
+    // padding = 100 px card) and we want a comfortable gap below it before
+    // the Ghost card starts.
+    constexpr int ghostY  = 478;   // was 446 (+32 for taller Modes + extra gap)
     const int ghostTotal  = kLarge + kMedium + kMedium;
     const int ghostOverlap = (ghostTotal - panelW + 16) / 2;
     int gx = 8;
@@ -171,7 +173,7 @@ void LeftPanel::resized()
     ghostModeToggle.setBounds(12, ghostY + kLarge + 4, panelW - 24, 22);
 
     // ── Filter section (more vertical gap from Ghost) ──────────────────
-    constexpr int filterY = 716;   // tracks the bumped Ghost Y (was 696, +20)
+    constexpr int filterY = 748;   // tracks the bumped Ghost Y (was 716, +32)
     const int filterTotal = kMedium + 40 + kMedium;
     int fx = (panelW - filterTotal) / 2;
     lpfKnob.setBounds(fx, filterY, kMedium, kMedium);

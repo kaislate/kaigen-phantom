@@ -43,7 +43,9 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
 
     // Search field — live filter. Light "glass" surface (matches the
     // placeholder paint that was here in commit 1).
-    searchField.setTextToShowWhenEmpty("Search presets…", juce::Colour(0x66000000));
+    searchField.setTextToShowWhenEmpty(
+        juce::String(juce::CharPointer_UTF8("Search presets\xe2\x80\xa6")),
+        juce::Colour(0x66000000));
     searchField.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0x99FFFFFF));
     searchField.setColour(juce::TextEditor::outlineColourId,    juce::Colour(0x1f000000));
     searchField.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(0x33000000));
@@ -94,7 +96,8 @@ void PresetBrowser::visibilityChanged()
     rebuildPackCards();
     rebuildRows();
     searchField.setTextToShowWhenEmpty(
-        isPacksMode() ? "Search packs\xe2\x80\xa6" : "Search presets\xe2\x80\xa6",
+        juce::String(juce::CharPointer_UTF8(
+            isPacksMode() ? "Search packs\xe2\x80\xa6" : "Search presets\xe2\x80\xa6")),
         juce::Colour(0x66000000));
     repaint();
 }
@@ -129,10 +132,13 @@ void PresetBrowser::rebuildCategories()
 {
     categories.clear();
     // Top-level entries — every preset, favorites filter, pack-card grid.
-    // Glyphs are unicode chars that render via Segoe UI Symbol on Windows.
-    categories.push_back({ CategoryKind::Explore,   "Explore",   "\xe2\x8a\x95", {} });   // ⊕
-    categories.push_back({ CategoryKind::Favorites, "Favorites", "\xe2\x99\xa5", {} });   // ♥
-    categories.push_back({ CategoryKind::Packs,     "Packs",     "\xe2\x96\xa6", {} });   // ▦
+    // Glyph strings must be wrapped in CharPointer_UTF8 so JUCE decodes the
+    // raw bytes as UTF-8 rather than the system codepage (CP-1252 on
+    // Windows produces mojibake otherwise).
+    auto u8 = [](const char* s) { return juce::String(juce::CharPointer_UTF8(s)); };
+    categories.push_back({ CategoryKind::Explore,   "Explore",   u8("\xe2\x8a\x95"), {} });   // ⊕
+    categories.push_back({ CategoryKind::Favorites, "Favorites", u8("\xe2\x99\xa5"), {} });   // ♥
+    categories.push_back({ CategoryKind::Packs,     "Packs",     u8("\xe2\x96\xa6"), {} });   // ▦
 
     // Direct pack drill-ins below — same data, scoped to a single pack.
     const auto all = processor.getPresetManager().getAllPresets();
@@ -859,8 +865,9 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
                 listScrollY = 0;
                 rebuildRows();
                 searchField.setTextToShowWhenEmpty(
-                    isPacksMode() ? "Search packs\xe2\x80\xa6"
-                                       : "Search presets\xe2\x80\xa6",
+                    juce::String(juce::CharPointer_UTF8(
+                        isPacksMode() ? "Search packs\xe2\x80\xa6"
+                                       : "Search presets\xe2\x80\xa6")),
                     juce::Colour(0x66000000));
                 repaint();
             }

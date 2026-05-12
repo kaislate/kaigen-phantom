@@ -10,7 +10,7 @@ namespace
 {
     // Wireframe panel positions. Phase 1+ replaces these with real child Components.
     constexpr int editorWidth         = 1300;
-    constexpr int editorHeight        = 994;   // was 970 (+24 for taller LeftPanel sections)
+    constexpr int editorHeight        = 1026;  // 50 topbar + 48 modPanel + ~918 LeftPanel filter-bottom + margin
     constexpr int topBarHeight        = 50;
     constexpr int modPanelHeight      = 150;
     constexpr int leftPanelWidth      = 420;
