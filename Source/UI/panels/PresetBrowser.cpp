@@ -73,31 +73,23 @@ namespace
             }
             case SidebarIcon::Favorites:
             {
-                // Heart with proper lobes — two top humps + a tapered bottom.
-                // Proportions tuned so it doesn't read as squished.
-                const float w = r * 1.55f;
-                const float h = r * 1.45f;
-                const float tip = cy + h * 0.55f;        // bottom point
-                const float topDip = cy - h * 0.20f;     // dip between lobes
-                const float lobeY  = cy - h * 0.40f;     // lobe top
-                const float lx = cx - w * 0.50f;
-                const float rx = cx + w * 0.50f;
+                // Heart — direct translation of a clean Material-style heart
+                // SVG (100×100 viewBox, geometric centre ~(50, 47.5)). Six
+                // cubics close the path; gives proper rounded lobes + a
+                // tapered tip, matches typical heart-icon expectations.
+                const float u = r * 0.030f;
+                auto pt = [&](float px, float py) {
+                    return juce::Point<float>(cx + (px - 50.0f) * u,
+                                               cy + (py - 47.5f) * u);
+                };
 
-                p.startNewSubPath(cx, tip);
-                // Right side: tip → outer-right → right lobe top → dip.
-                p.cubicTo(cx + w * 0.35f, cy + h * 0.20f,
-                          rx,              cy - h * 0.05f,
-                          rx,              lobeY + h * 0.08f);
-                p.cubicTo(rx,              lobeY - h * 0.20f,
-                          cx + w * 0.10f,  lobeY - h * 0.22f,
-                          cx,              topDip);
-                // Left side mirror back to the tip.
-                p.cubicTo(cx - w * 0.10f,  lobeY - h * 0.22f,
-                          lx,              lobeY - h * 0.20f,
-                          lx,              lobeY + h * 0.08f);
-                p.cubicTo(lx,              cy - h * 0.05f,
-                          cx - w * 0.35f, cy + h * 0.20f,
-                          cx,              tip);
+                p.startNewSubPath(pt(50, 90));
+                p.cubicTo(pt(35,  80), pt(0,   55), pt(0,   30));
+                p.cubicTo(pt(0,   15), pt(12,   5), pt(25,   5));
+                p.cubicTo(pt(35,   5), pt(42,  12), pt(50,  25));
+                p.cubicTo(pt(58,  12), pt(65,   5), pt(75,   5));
+                p.cubicTo(pt(88,   5), pt(100, 15), pt(100, 30));
+                p.cubicTo(pt(100, 55), pt(65,  80), pt(50,  90));
                 p.closeSubPath();
                 break;
             }
