@@ -3,6 +3,8 @@
 #include "../Theme.h"
 #include "../../PluginProcessor.h"
 #include "../../PresetManager.h"
+#include <set>
+#include <map>
 
 namespace kaigen::phantom
 {
@@ -84,26 +86,44 @@ void PresetDropdown::rebuildList()
     allPresets.clear();
     categories.clear();
 
-    // "All" is always first.
-    Category all;
-    all.label = "All";
-    categories.push_back(all);
+    // Collect every preset + their unique types.
+    std::set<juce::String> typeSet;
+    int  totalCount      = 0;
+    int  favoritesCount  = 0;
+    std::map<juce::String, int> typeCounts;
+    std::map<juce::String, int> packCounts;
 
     const auto packs = processor.getPresetManager().getAllPresets();
     for (const auto& [packName, presets] : packs)
     {
-        Category c;
-        c.label      = packName;
-        c.packFilter = packName;
-        c.count      = (int) presets.size();
-        categories.push_back(c);
-
         for (const auto& p : presets)
-            allPresets.push_back({ p.metadata.name, packName });
-    }
-    categories[0].count = (int) allPresets.size();
+        {
+            PresetEntry e;
+            e.name       = p.metadata.name;
+            e.pack       = packName;
+            e.type       = p.metadata.type;
+            e.isFavorite = p.metadata.isFavorite;
+            allPresets.push_back(std::move(e));
 
-    // Clamp the active index in case the list shrank since last open.
+            ++totalCount;
+            if (p.metadata.isFavorite) ++favoritesCount;
+            if (p.metadata.type.isNotEmpty()) ++typeCounts[p.metadata.type];
+            ++packCounts[packName];
+            if (p.metadata.type.isNotEmpty()) typeSet.insert(p.metadata.type);
+        }
+    }
+
+    // All ↑ Favorites ↑ Types... ↑ Packs...
+    categories.push_back({ CategoryKind::All,       "All",       {},  totalCount });
+    if (favoritesCount > 0)
+        categories.push_back({ CategoryKind::Favorites, "Favorites", {}, favoritesCount });
+
+    for (const auto& t : typeSet)
+        categories.push_back({ CategoryKind::Type, t, t, typeCounts[t] });
+
+    for (const auto& [packName, presets] : packs)
+        categories.push_back({ CategoryKind::Pack, packName, packName, (int) presets.size() });
+
     if (activeCategoryIdx >= (int) categories.size())
         activeCategoryIdx = 0;
 }
@@ -112,19 +132,21 @@ void PresetDropdown::applyCategoryFilter()
 {
     filteredPresets.clear();
     if (activeCategoryIdx < 0 || activeCategoryIdx >= (int) categories.size()) return;
-
     const auto& c = categories[(size_t) activeCategoryIdx];
-    if (c.packFilter.isEmpty())
+
+    for (const auto& p : allPresets)
     {
-        filteredPresets = allPresets;
-    }
-    else
-    {
-        for (const auto& p : allPresets)
-            if (p.pack == c.packFilter)
-                filteredPresets.push_back(p);
+        switch (c.kind)
+        {
+            case CategoryKind::All:                                       break;
+            case CategoryKind::Favorites: if (! p.isFavorite) continue;   break;
+            case CategoryKind::Type:      if (p.type != c.filter) continue; break;
+            case CategoryKind::Pack:      if (p.pack != c.filter) continue; break;
+        }
+        filteredPresets.push_back(p);
     }
 }
+
 
 void PresetDropdown::loadPresetAt(int filteredIdx)
 {

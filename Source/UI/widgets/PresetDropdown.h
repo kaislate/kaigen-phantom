@@ -54,16 +54,25 @@ private:
     void applyCategoryFilter();
     void loadPresetAt(int filteredIdx);
 
+    /** Sidebar entry. Filtering happens by `kind`:
+     *    All        — every preset.
+     *    Favorites  — entries where metadata.isFavorite.
+     *    Type       — entries where metadata.type matches `filter`.
+     *    Pack       — entries where pack matches `filter`. */
+    enum class CategoryKind { All, Favorites, Type, Pack };
     struct Category
     {
-        juce::String label;            // displayed
-        juce::String packFilter;       // empty = "All", else matches pack name
+        CategoryKind kind { CategoryKind::All };
+        juce::String label;      // displayed
+        juce::String filter;     // type or pack name; empty for All / Favorites
         int          count { 0 };
     };
     struct PresetEntry
     {
         juce::String name;
         juce::String pack;
+        juce::String type;
+        bool         isFavorite { false };
     };
 
     std::vector<Category>    categories;
