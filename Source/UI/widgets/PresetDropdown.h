@@ -23,12 +23,16 @@ namespace kaigen::phantom
  *    presetDropdown.setBoundsAnchoredBelow(pillScreenBounds);
  *    presetDropdown.setVisible(true);
  */
-class PresetDropdown : public juce::Component
+class PresetDropdown : public juce::Component,
+                        public juce::ChangeListener
 {
 public:
     PresetDropdown(PhantomProcessor& processor,
                    juce::AudioProcessorValueTreeState& apvts);
     ~PresetDropdown() override;
+
+    /** Re-fetch the preset list when PresetManager broadcasts a change. */
+    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
 
     /** Fires when a preset row is clicked: (name, pack). */
     std::function<void(juce::String, juce::String)> onPresetSelected;

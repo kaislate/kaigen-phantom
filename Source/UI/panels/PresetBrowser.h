@@ -17,12 +17,17 @@ namespace kaigen::phantom
  *  When the user picks a preset, fires `onPresetSelected(name, pack)`
  *  callback (NativePluginEditor wires this to update the PresetSelector's
  *  current-preset display). */
-class PresetBrowser : public juce::Component
+class PresetBrowser : public juce::Component,
+                       public juce::ChangeListener
 {
 public:
     PresetBrowser(PhantomProcessor& processor,
                   juce::AudioProcessorValueTreeState& apvts);
     ~PresetBrowser() override;
+
+    /** Re-fetch the preset list when PresetManager broadcasts a change
+     *  (another instance saved / deleted, or a manual rescan). */
+    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
 
     /** Fires when a preset row is clicked: (name, pack). */
     std::function<void(juce::String, juce::String)> onPresetSelected;

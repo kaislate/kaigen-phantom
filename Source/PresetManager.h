@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include <juce_events/juce_events.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <vector>
 #include <map>
@@ -73,11 +74,12 @@ struct PackInfo
 // node holds name/type/designer. Favorites live in a separate
 // `favorites.index` JSON file at the presets root so favorites work even
 // when the preset lives in a read-only pack directory.
-class PresetManager
+class PresetManager : public juce::Timer,
+                       public juce::ChangeBroadcaster
 {
 public:
     PresetManager();
-    ~PresetManager() = default;
+    ~PresetManager() override;
 
     // Create directories, scan the disk, load favorites index.
     void initialize();
@@ -120,8 +122,15 @@ public:
     bool isFavorite(const juce::String& presetName,
                     const juce::String& packName) const;
 
-    // Rescan disk (call after external file changes).
+    // Rescan disk (call after external file changes). Sends a change
+    // notification if the preset list actually changed.
     void rescan();
+
+    /** Timer callback (every 2 s) — checks the modification times of each
+     *  pack directory and triggers a rescan + change notification when any
+     *  diff is detected. Catches presets saved/deleted by another instance
+     *  of the plugin without needing a project reload. */
+    void timerCallback() override;
 
     // Packs (including Factory and User, plus any third-party pack dirs).
     std::vector<PackInfo> getAllPacks() const;
@@ -159,6 +168,11 @@ private:
     std::map<juce::String, std::vector<PresetInfo>> allPresets;
     std::map<juce::String, PackInfo> packs;  // keyed by folder name
     std::set<juce::String> favorites;        // keys: "packName/presetName"
+
+    /** Snapshot of last-modified times per pack directory, used by the
+     *  filesystem-watcher Timer to detect external changes. */
+    std::map<juce::String, juce::Time> packModTimes;
+    void refreshPackModTimes();
 };
 
 } // namespace kaigen::phantom

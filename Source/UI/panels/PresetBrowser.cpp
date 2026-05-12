@@ -174,9 +174,23 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
     deleteButton.onClick = [this] { deleteSelectedPreset(); };
     deleteButton.setVisible(false);
     addAndMakeVisible(deleteButton);
+
+    processor.getPresetManager().addChangeListener(this);
 }
 
-PresetBrowser::~PresetBrowser() = default;
+PresetBrowser::~PresetBrowser()
+{
+    processor.getPresetManager().removeChangeListener(this);
+}
+
+void PresetBrowser::changeListenerCallback(juce::ChangeBroadcaster*)
+{
+    if (! isVisible()) return;
+    rebuildCategories();
+    rebuildPackCards();
+    rebuildRows();
+    repaint();
+}
 
 void PresetBrowser::visibilityChanged()
 {

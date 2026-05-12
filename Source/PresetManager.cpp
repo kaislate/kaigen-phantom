@@ -42,11 +42,22 @@ PresetKind presetKindFromString(const juce::String& /*s*/)
 
 PresetManager::PresetManager() = default;
 
+PresetManager::~PresetManager()
+{
+    stopTimer();
+}
+
 void PresetManager::initialize()
 {
     ensureDirectoryStructure();
     loadFavoritesIndex();
     scanPresetsFromDisk();
+    refreshPackModTimes();
+
+    // 2-second poll: cheap (a handful of stat() calls), and saving in another
+    // instance becomes visible to this one within ~2 s without needing a
+    // project reload.
+    startTimer(2000);
 }
 
 // ── Directory structure ────────────────────────────────────────────────
@@ -311,6 +322,45 @@ juce::File PresetManager::getPackCoverFile(const juce::String& packName) const
 void PresetManager::rescan()
 {
     scanPresetsFromDisk();
+    refreshPackModTimes();
+    sendChangeMessage();
+}
+
+void PresetManager::refreshPackModTimes()
+{
+    packModTimes.clear();
+    const auto root = getPresetsRootDirectory();
+    if (! root.isDirectory()) return;
+
+    for (auto& entry : juce::RangedDirectoryIterator(
+            root, /*recursive*/ false, "*", juce::File::findDirectories))
+    {
+        const auto dir = entry.getFile();
+        packModTimes[dir.getFileName()] = dir.getLastModificationTime();
+    }
+}
+
+void PresetManager::timerCallback()
+{
+    const auto root = getPresetsRootDirectory();
+    if (! root.isDirectory()) return;
+
+    // Build the current snapshot of pack-dir mod times and compare to the
+    // last one. Any add / remove / mod-time bump triggers a rescan.
+    std::map<juce::String, juce::Time> current;
+    for (auto& entry : juce::RangedDirectoryIterator(
+            root, /*recursive*/ false, "*", juce::File::findDirectories))
+    {
+        const auto dir = entry.getFile();
+        current[dir.getFileName()] = dir.getLastModificationTime();
+    }
+
+    if (current != packModTimes)
+    {
+        packModTimes = std::move(current);
+        scanPresetsFromDisk();
+        sendChangeMessage();
+    }
 }
 
 std::map<juce::String, std::vector<PresetInfo>> PresetManager::getAllPresets() const

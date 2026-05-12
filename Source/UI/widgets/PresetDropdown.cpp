@@ -37,9 +37,21 @@ PresetDropdown::PresetDropdown(PhantomProcessor& p, juce::AudioProcessorValueTre
     // of the editor stays visible behind the dropdown.
     setOpaque(false);
     setVisible(false);
+    processor.getPresetManager().addChangeListener(this);
 }
 
-PresetDropdown::~PresetDropdown() = default;
+PresetDropdown::~PresetDropdown()
+{
+    processor.getPresetManager().removeChangeListener(this);
+}
+
+void PresetDropdown::changeListenerCallback(juce::ChangeBroadcaster*)
+{
+    if (! isVisible()) return;
+    rebuildList();
+    applyCategoryFilter();
+    repaint();
+}
 
 void PresetDropdown::anchorBelow(juce::Rectangle<int> anchorInEditor)
 {
