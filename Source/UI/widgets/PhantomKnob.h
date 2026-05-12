@@ -20,7 +20,8 @@ namespace kaigen::phantom
  *  The internal juce::Slider is hidden (not rendered). It exists solely so that
  *  juce::SliderParameterAttachment can write to the APVTS parameter when the user
  *  drags or double-clicks.  All painting and mouse interaction is handled here.  */
-class PhantomKnob : public juce::Component
+class PhantomKnob : public juce::Component,
+                     public juce::Slider::Listener
 {
 public:
     enum class Size { Large, Medium, Small };
@@ -33,6 +34,19 @@ public:
 
     /** Returns the hidden slider — used by LeftPanel for filter-link mirroring. */
     juce::Slider& getSlider() noexcept { return slider; }
+
+    /** True iff this knob was constructed with an "a_" or "b_" prefixed
+     *  param ID — i.e., a per-engine parameter that can be retargeted at
+     *  runtime. Non-per-engine knobs (e.g., morph_amount) return false and
+     *  ignore setEnginePrefix(). */
+    bool isPerEngine() const noexcept { return enginePrefix.isNotEmpty(); }
+
+    /** Rebind the active SliderParameterAttachment to `<activePrefix><leaf>`,
+     *  and optionally mirror writes to `<mirrorPrefix><leaf>` (used for LINK
+     *  mode). Pass empty `mirrorPrefix` to disable mirroring.
+     *  No-op for non-per-engine knobs. */
+    void setEnginePrefix(const juce::String& activePrefix,
+                          const juce::String& mirrorPrefix = {});
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -77,8 +91,18 @@ private:
     juce::String labelText;
 
     juce::Slider slider;
-    juce::RangedAudioParameter* param { nullptr };  // non-owning; for getText() formatting
+    juce::AudioProcessorValueTreeState* apvtsRef { nullptr };   // for retargeting attachment
+    juce::String enginePrefix;                                  // "a_" / "b_" / "" (non-per-engine)
+    juce::String leafName;                                      // e.g. "ghost"
+    juce::String mirrorPrefix;                                  // "" when no LINK
+    juce::RangedAudioParameter* param { nullptr };              // non-owning; for getText() formatting
     std::unique_ptr<juce::SliderParameterAttachment> attachment;
+
+    // Slider::Listener: when LINK is on, mirror normalized value to the
+    // other engine's param. The attachment writes the active param; we
+    // write the mirror.
+    void sliderValueChanged(juce::Slider*) override;
+    bool isMirroring { false };   // recursion guard
 
     bool  isDragging    { false };
     float dragStartNorm { 0.0f };

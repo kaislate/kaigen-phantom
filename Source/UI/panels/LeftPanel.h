@@ -20,6 +20,12 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
+    /** Retarget every per-engine widget under this panel to the given engine
+     *  prefix ("a_" or "b_"). When `mirrorPrefix` is non-empty (LINK mode),
+     *  widget edits also mirror to the other engine's matching param. */
+    void setEnginePrefix(const juce::String& activePrefix,
+                          const juce::String& mirrorPrefix = {});
+
 private:
     void sliderValueChanged(juce::Slider* s) override;
 

@@ -118,6 +118,12 @@ public:
     EngineFocus getEngineFocus() const noexcept { return engineFocus; }
     void setEngineFocus(EngineFocus newFocus) noexcept;
 
+    /** Broadcaster fired (on the message thread) whenever the engine focus
+     *  changes — editor widgets that need to retarget their per-engine
+     *  APVTS attachments (PhantomKnob.setEnginePrefix etc.) subscribe here. */
+    juce::ChangeBroadcaster& getEngineFocusBroadcaster() noexcept
+        { return engineFocusBroadcaster; }
+
     // Spectrum view mode — editor-state, persisted in plugin state.
     using SpectrumViewMode = kaigen::phantom::SpectrumViewMode;
 
@@ -197,6 +203,7 @@ private:
     // Editor preference, not preset state — stored alongside APVTS in the
     // <PluginState> wrapper but outside of any preset.
     EngineFocus engineFocus;
+    juce::ChangeBroadcaster engineFocusBroadcaster;
 
     SpectrumViewMode spectrumViewMode { SpectrumViewMode::Split };
 

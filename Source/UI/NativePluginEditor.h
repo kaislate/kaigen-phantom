@@ -16,7 +16,8 @@ class PhantomProcessor;
 namespace kaigen::phantom
 {
 
-class NativePluginEditor : public juce::AudioProcessorEditor
+class NativePluginEditor : public juce::AudioProcessorEditor,
+                            public juce::ChangeListener
 {
 public:
     NativePluginEditor(PhantomProcessor& processor, juce::AudioProcessorValueTreeState& apvts);
@@ -25,7 +26,13 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
+    /** ChangeListener — fired when PhantomProcessor::engineFocus changes. */
+    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
+
 private:
+    void applyEngineFocus();        // pushes the current focus to all per-engine widgets
+
+
     PhantomProcessor& processor;
     juce::AudioProcessorValueTreeState& apvts;
     PhantomLookAndFeel lookAndFeel;

@@ -17,6 +17,18 @@ namespace
     }
 }
 
+void RightPanel::setEnginePrefix(const juce::String& activePrefix,
+                                    const juce::String& mirrorPrefix)
+{
+    // Skip inGainKnob — input_gain is global, not per-engine; its
+    // PhantomKnob.isPerEngine() returns false and setEnginePrefix is a no-op.
+    for (auto* k : { &saturationKnob, &shapeKnob, &skipKnob,
+                     &widthKnob, &outGainKnob })
+        k->setEnginePrefix(activePrefix, mirrorPrefix);
+    // miniKnobs (Advanced row) — PhantomMiniKnob upgrade lands in a
+    // follow-up commit alongside WordSelector / ToggleGroup.
+}
+
 RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& p)
     : apvts(a),
       saturationKnob(apvts, "a_harmonic_saturation", PhantomKnob::Size::Medium, "Saturation"),

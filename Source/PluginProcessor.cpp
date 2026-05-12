@@ -487,7 +487,12 @@ juce::AudioProcessorEditor* PhantomProcessor::createEditor()
 
 void PhantomProcessor::setEngineFocus(EngineFocus newFocus) noexcept
 {
+    const bool changed = (engineFocus.activeTab != newFocus.activeTab)
+                       || (engineFocus.linkOn != newFocus.linkOn);
     engineFocus = newFocus;
+    if (changed)
+        juce::MessageManager::callAsync(
+            [bc = &engineFocusBroadcaster]() { bc->sendChangeMessage(); });
 }
 
 void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)

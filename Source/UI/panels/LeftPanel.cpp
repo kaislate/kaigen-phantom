@@ -60,6 +60,17 @@ LeftPanel::~LeftPanel()
     hpfKnob.getSlider().removeListener(this);
 }
 
+void LeftPanel::setEnginePrefix(const juce::String& activePrefix,
+                                  const juce::String& mirrorPrefix)
+{
+    for (auto* k : { &ghostAmountKnob, &crossoverKnob, &strengthKnob,
+                     &lpfKnob, &hpfKnob })
+        k->setEnginePrefix(activePrefix, mirrorPrefix);
+    // ghostModeToggle / filterSlopeToggle are WordSelector; their
+    // per-engine rebinding lands in a follow-up commit alongside the
+    // other choice-param widgets.
+}
+
 void LeftPanel::sliderValueChanged(juce::Slider* s)
 {
     if (filterLinkUpdating) return;       // guard against recursion

@@ -15,19 +15,34 @@ PhantomKnob::PhantomKnob(juce::AudioProcessorValueTreeState& apvts,
                           juce::StringRef paramID,
                           Size sz,
                           const juce::String& lbl)
-    : sizeVariant(sz), labelText(lbl)
+    : sizeVariant(sz), labelText(lbl), apvtsRef(&apvts)
 {
+    // Split paramID into "<prefix><leaf>" if it's a per-engine param so
+    // setEnginePrefix() can retarget it later. Non-per-engine IDs (no
+    // a_/b_ prefix) keep enginePrefix empty and never get retargeted.
+    const auto idStr = juce::String(paramID);
+    if (idStr.startsWith("a_") || idStr.startsWith("b_"))
+    {
+        enginePrefix = idStr.substring(0, 2);
+        leafName     = idStr.substring(2);
+    }
+    else
+    {
+        enginePrefix = {};
+        leafName     = idStr;
+    }
+
     // Hidden slider — attached to APVTS; drives repaint via listener.
     slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     slider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
     slider.onValueChange = [this] { repaint(); };
     addChildComponent(slider);   // hidden — zero-sized below via resized()
+    slider.addListener(this);    // LINK mirror — fires AFTER the attachment's writer
 
     if (auto* p = apvts.getParameter(paramID))
     {
         param = p;
         attachment = std::make_unique<juce::SliderParameterAttachment>(*p, slider);
-        // Cache the default normalized value for double-click reset.
         defaultNorm = p->getDefaultValue();
     }
     else
@@ -35,10 +50,6 @@ PhantomKnob::PhantomKnob(juce::AudioProcessorValueTreeState& apvts,
         jassertfalse;   // unknown paramID
     }
 
-    // Widget size: diameter + shadow padding on all sides so the DropShadow
-    // halos can render without being clipped at the component bounds. The
-    // body is centered within the bounds; hitTest() restricts clicks to the
-    // body region so adjacent overlapping shadow areas don't steal clicks.
     const int d = diameter();
     const int pad = shadowPadding();
     setSize(d + pad * 2, d + pad * 2);
@@ -65,7 +76,55 @@ bool PhantomKnob::hitTest(int x, int y)
     return (dx * dx + dy * dy) <= (bodyR * bodyR);
 }
 
-PhantomKnob::~PhantomKnob() = default;
+PhantomKnob::~PhantomKnob()
+{
+    slider.removeListener(this);
+}
+
+void PhantomKnob::setEnginePrefix(const juce::String& activePrefix,
+                                    const juce::String& newMirrorPrefix)
+{
+    if (! isPerEngine() || apvtsRef == nullptr) return;
+    if (activePrefix == enginePrefix && newMirrorPrefix == mirrorPrefix) return;
+
+    enginePrefix = activePrefix;
+    mirrorPrefix = newMirrorPrefix;
+
+    // Tear down the existing attachment and rebuild against the new active
+    // param. Slider's current value is preserved by the attachment's
+    // initial sync, so the visual doesn't snap.
+    attachment.reset();
+
+    const auto fullId = enginePrefix + leafName;
+    if (auto* p = apvtsRef->getParameter(fullId))
+    {
+        param = p;
+        attachment = std::make_unique<juce::SliderParameterAttachment>(*p, slider);
+        defaultNorm = p->getDefaultValue();
+    }
+    else
+    {
+        jassertfalse;   // bad prefix/leaf combo
+    }
+    repaint();
+}
+
+void PhantomKnob::sliderValueChanged(juce::Slider*)
+{
+    // LINK mirror: write the same normalized value to the OTHER engine's
+    // param. Recursion guard prevents the mirror's write from triggering
+    // a callback that mirrors back.
+    if (mirrorPrefix.isEmpty() || isMirroring || apvtsRef == nullptr) return;
+    auto* otherParam = apvtsRef->getParameter(mirrorPrefix + leafName);
+    if (otherParam == nullptr || param == nullptr) return;
+
+    juce::ScopedValueSetter<bool> guard(isMirroring, true);
+    const auto& srcRange = param     ->getNormalisableRange();
+    const auto& dstRange = otherParam->getNormalisableRange();
+    const float norm = srcRange.convertTo0to1((float) slider.getValue());
+    otherParam->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, norm));
+    juce::ignoreUnused(dstRange);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Geometry helpers

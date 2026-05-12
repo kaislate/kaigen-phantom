@@ -122,10 +122,34 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
         matrixView.toFront(false);
         resized();
     }
+
+    // Engine focus — apply persisted state on open + subscribe for future
+    // changes from the EngineTabsWidget / WebView bindings.
+    processor.getEngineFocusBroadcaster().addChangeListener(this);
+    applyEngineFocus();
+}
+
+void NativePluginEditor::changeListenerCallback(juce::ChangeBroadcaster* source)
+{
+    if (source == &processor.getEngineFocusBroadcaster())
+        applyEngineFocus();
+}
+
+void NativePluginEditor::applyEngineFocus()
+{
+    const auto focus = processor.getEngineFocus();
+    const auto activePrefix = (focus.activeTab == kaigen::phantom::ActiveTab::B) ? "b_" : "a_";
+    const auto mirrorPrefix = focus.linkOn
+        ? juce::String((focus.activeTab == kaigen::phantom::ActiveTab::B) ? "a_" : "b_")
+        : juce::String{};
+
+    leftPanel .setEnginePrefix(activePrefix, mirrorPrefix);
+    rightPanel.setEnginePrefix(activePrefix, mirrorPrefix);
 }
 
 NativePluginEditor::~NativePluginEditor()
 {
+    processor.getEngineFocusBroadcaster().removeChangeListener(this);
     setLookAndFeel(nullptr);
 }
 

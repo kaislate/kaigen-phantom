@@ -23,6 +23,10 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
+    /** Retarget per-engine knobs under this panel. See LeftPanel::setEnginePrefix. */
+    void setEnginePrefix(const juce::String& activePrefix,
+                          const juce::String& mirrorPrefix = {});
+
 private:
     juce::AudioProcessorValueTreeState& apvts;
 
