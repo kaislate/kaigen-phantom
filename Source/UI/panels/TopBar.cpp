@@ -7,9 +7,10 @@ namespace kaigen::phantom
 {
 
 TopBar::TopBar(PhantomProcessor& p, juce::AudioProcessorValueTreeState& a)
-    : presetSelector(p, a), processor(p)
+    : presetSelector(p, a), engineTabs(p), processor(p)
 {
     addAndMakeVisible(presetSelector);
+    addAndMakeVisible(engineTabs);
 }
 
 TopBar::~TopBar() = default;
@@ -55,6 +56,14 @@ void TopBar::resized()
     const int selectorW = juce::jmin(600, area.getWidth() - 200);
     const int selectorX = (area.getWidth() - selectorW) / 2;
     presetSelector.setBounds(selectorX, 0, selectorW, area.getHeight());
+
+    // Engine tabs sit to the right of the preset selector, vertically
+    // centered in the strip.
+    const int tabsX = selectorX + selectorW + 16;
+    const int tabsY = (area.getHeight() - EngineTabsWidget::kNaturalHeight) / 2;
+    engineTabs.setBounds(tabsX, tabsY,
+                          EngineTabsWidget::kNaturalWidth,
+                          EngineTabsWidget::kNaturalHeight);
 }
 
 void TopBar::mouseDown(const juce::MouseEvent& e)

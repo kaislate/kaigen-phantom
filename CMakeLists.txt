@@ -54,6 +54,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/widgets/RecipeWheel.cpp
     Source/UI/widgets/PresetSelector.cpp
     Source/UI/widgets/PresetDropdown.cpp
+    Source/UI/widgets/EngineTabsWidget.cpp
     Source/UI/widgets/ModSlot.cpp
     Source/UI/widgets/MatrixModRow.cpp
     Source/UI/widgets/MatrixCell.cpp
