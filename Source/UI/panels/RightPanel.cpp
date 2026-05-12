@@ -25,8 +25,13 @@ void RightPanel::setEnginePrefix(const juce::String& activePrefix,
     for (auto* k : { &saturationKnob, &shapeKnob, &skipKnob,
                      &widthKnob, &outGainKnob })
         k->setEnginePrefix(activePrefix, mirrorPrefix);
-    // miniKnobs (Advanced row) — PhantomMiniKnob upgrade lands in a
-    // follow-up commit alongside WordSelector / ToggleGroup.
+
+    // Advanced-row mini knobs — all per-engine.
+    for (auto& mk : miniKnobs)
+        if (mk) mk->setEnginePrefix(activePrefix, mirrorPrefix);
+
+    // WordSelector / ToggleGroup choice-param widgets still bound to a_*;
+    // their setEnginePrefix lands in the next sub-commit.
 }
 
 RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& p)

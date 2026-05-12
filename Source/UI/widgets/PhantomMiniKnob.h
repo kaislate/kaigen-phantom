@@ -10,7 +10,8 @@ namespace kaigen::phantom
  *  stack to PhantomKnob (neumorphic body + OLED + arc indicator + value text)
  *  but at a smaller size (~36 px) with an external label rendered below the
  *  body. */
-class PhantomMiniKnob : public juce::Component
+class PhantomMiniKnob : public juce::Component,
+                         public juce::Slider::Listener
 {
 public:
     PhantomMiniKnob(juce::AudioProcessorValueTreeState& apvts,
@@ -26,11 +27,25 @@ public:
     void mouseUp(const juce::MouseEvent& e) override;
     void mouseDoubleClick(const juce::MouseEvent& e) override;
 
+    bool isPerEngine() const noexcept { return enginePrefix.isNotEmpty(); }
+
+    /** See PhantomKnob::setEnginePrefix. Mirror prefix triggers LINK mode
+     *  (writes flow to both engines' matching param). */
+    void setEnginePrefix(const juce::String& activePrefix,
+                          const juce::String& mirrorPrefix = {});
+
 private:
     juce::Slider slider;
+    juce::AudioProcessorValueTreeState* apvtsRef { nullptr };
+    juce::String enginePrefix;
+    juce::String leafName;
+    juce::String mirrorPrefix;
     juce::RangedAudioParameter* param { nullptr };  // non-owning
     std::unique_ptr<juce::SliderParameterAttachment> attachment;
     juce::String label;
+
+    void sliderValueChanged(juce::Slider*) override;
+    bool isMirroring { false };
 
     bool  isDragging    { false };
     float dragStartNorm { 0.0f };

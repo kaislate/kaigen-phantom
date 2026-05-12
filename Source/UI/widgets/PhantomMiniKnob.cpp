@@ -17,13 +17,25 @@ namespace
 PhantomMiniKnob::PhantomMiniKnob(juce::AudioProcessorValueTreeState& apvts,
                                   juce::StringRef paramID,
                                   const juce::String& lbl)
-    : label(lbl)
+    : apvtsRef(&apvts), label(lbl)
 {
+    const auto idStr = juce::String(paramID);
+    if (idStr.startsWith("a_") || idStr.startsWith("b_"))
+    {
+        enginePrefix = idStr.substring(0, 2);
+        leafName     = idStr.substring(2);
+    }
+    else
+    {
+        leafName = idStr;
+    }
+
     slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     slider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
     slider.onValueChange = [this] { repaint(); };
     addChildComponent(slider);  // hidden — we paint everything ourselves
     slider.setBounds(0, 0, 0, 0);
+    slider.addListener(this);   // LINK mirror
 
     if (auto* p = apvts.getParameter(paramID))
     {
@@ -53,7 +65,46 @@ bool PhantomMiniKnob::hitTest(int x, int y)
     return (dx * dx + dy * dy) <= (r * r);
 }
 
-PhantomMiniKnob::~PhantomMiniKnob() = default;
+PhantomMiniKnob::~PhantomMiniKnob()
+{
+    slider.removeListener(this);
+}
+
+void PhantomMiniKnob::setEnginePrefix(const juce::String& activePrefix,
+                                        const juce::String& newMirrorPrefix)
+{
+    if (! isPerEngine() || apvtsRef == nullptr) return;
+    if (activePrefix == enginePrefix && newMirrorPrefix == mirrorPrefix) return;
+
+    enginePrefix = activePrefix;
+    mirrorPrefix = newMirrorPrefix;
+
+    attachment.reset();
+    const auto fullId = enginePrefix + leafName;
+    if (auto* p = apvtsRef->getParameter(fullId))
+    {
+        param = p;
+        attachment = std::make_unique<juce::SliderParameterAttachment>(*p, slider);
+        defaultNorm = p->getDefaultValue();
+    }
+    else
+    {
+        jassertfalse;
+    }
+    repaint();
+}
+
+void PhantomMiniKnob::sliderValueChanged(juce::Slider*)
+{
+    if (mirrorPrefix.isEmpty() || isMirroring || apvtsRef == nullptr) return;
+    auto* otherParam = apvtsRef->getParameter(mirrorPrefix + leafName);
+    if (otherParam == nullptr || param == nullptr) return;
+
+    juce::ScopedValueSetter<bool> guard(isMirroring, true);
+    const auto& srcRange = param->getNormalisableRange();
+    const float norm = srcRange.convertTo0to1((float) slider.getValue());
+    otherParam->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, norm));
+}
 
 juce::String PhantomMiniKnob::formatValue()
 {
