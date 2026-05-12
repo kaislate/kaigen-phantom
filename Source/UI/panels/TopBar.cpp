@@ -7,10 +7,11 @@ namespace kaigen::phantom
 {
 
 TopBar::TopBar(PhantomProcessor& p, juce::AudioProcessorValueTreeState& a)
-    : presetSelector(p, a), engineTabs(p), processor(p)
+    : presetSelector(p, a), engineTabs(p), modeToggle(a), processor(p)
 {
     addAndMakeVisible(presetSelector);
     addAndMakeVisible(engineTabs);
+    addAndMakeVisible(modeToggle);
 }
 
 TopBar::~TopBar() = default;
@@ -58,12 +59,17 @@ void TopBar::resized()
     presetSelector.setBounds(selectorX, 0, selectorW, area.getHeight());
 
     // Engine tabs sit to the right of the preset selector, vertically
-    // centered in the strip.
+    // centered in the strip. Mode toggle pill follows just to the right.
+    const int rowY  = (area.getHeight() - EngineTabsWidget::kNaturalHeight) / 2;
     const int tabsX = selectorX + selectorW + 16;
-    const int tabsY = (area.getHeight() - EngineTabsWidget::kNaturalHeight) / 2;
-    engineTabs.setBounds(tabsX, tabsY,
+    engineTabs.setBounds(tabsX, rowY,
                           EngineTabsWidget::kNaturalWidth,
                           EngineTabsWidget::kNaturalHeight);
+
+    const int modeX = tabsX + EngineTabsWidget::kNaturalWidth + 10;
+    modeToggle.setBounds(modeX, rowY,
+                          ModeTogglePill::kNaturalWidth,
+                          ModeTogglePill::kNaturalHeight);
 }
 
 void TopBar::mouseDown(const juce::MouseEvent& e)

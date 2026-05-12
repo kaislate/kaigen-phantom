@@ -1,0 +1,42 @@
+// Source/UI/widgets/ModeTogglePill.h
+#pragma once
+#include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_audio_processors/juce_audio_processors.h>
+
+namespace kaigen::phantom
+{
+
+/** Two-segment neumorphic pill toggle for the engine mode (EFFECT / RESYN).
+ *  Matches the webview .mt / .mb CSS spec — depressed black-tinted track,
+ *  active segment is a raised white pill.
+ *
+ *  Currently bound to a_mode only; task #14 (A/B engine rebinding) will
+ *  swap to a_mode / b_mode based on the active engine tab.
+ */
+class ModeTogglePill : public juce::Component,
+                        private juce::AudioProcessorValueTreeState::Listener
+{
+public:
+    explicit ModeTogglePill(juce::AudioProcessorValueTreeState& apvts);
+    ~ModeTogglePill() override;
+
+    void paint(juce::Graphics& g) override;
+    void mouseMove(const juce::MouseEvent& e) override;
+    void mouseExit(const juce::MouseEvent& e) override;
+    void mouseDown(const juce::MouseEvent& e) override;
+
+    static constexpr int kNaturalWidth  = 154;
+    static constexpr int kNaturalHeight = 26;
+
+private:
+    void parameterChanged(const juce::String& paramId, float newValue) override;
+    juce::Rectangle<int> segmentBounds(int idx) const;
+    int hitTest(juce::Point<int> p) const;        // 0 = EFFECT, 1 = RESYN, -1 = none
+
+    juce::AudioProcessorValueTreeState& apvts;
+    int hoverSegment { -1 };
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ModeTogglePill)
+};
+
+} // namespace kaigen::phantom

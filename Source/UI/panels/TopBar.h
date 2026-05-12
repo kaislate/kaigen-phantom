@@ -4,6 +4,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "../widgets/PresetSelector.h"
 #include "../widgets/EngineTabsWidget.h"
+#include "../widgets/ModeTogglePill.h"
 
 class PhantomProcessor;
 
@@ -25,6 +26,7 @@ public:
 private:
     PresetSelector   presetSelector;
     EngineTabsWidget engineTabs;
+    ModeTogglePill   modeToggle;
     PhantomProcessor& processor;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TopBar)
