@@ -36,7 +36,7 @@ public:
     void mouseExit(const juce::MouseEvent&) override;
     void mouseDown(const juce::MouseEvent& e) override;
 
-    static constexpr int kNaturalSize = 30;
+    static constexpr int kNaturalSize = 36;
 
 private:
     void parameterChanged(const juce::String& paramId, float newValue) override;

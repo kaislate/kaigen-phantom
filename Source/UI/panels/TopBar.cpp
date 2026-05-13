@@ -44,11 +44,13 @@ void TopBar::paint(juce::Graphics& g)
         g.drawText("PHANTOM", logoBounds, juce::Justification::centredLeft, false);
     }
 
-    // KAIGEN logo — right side. CSS spec is font-weight: 400 (Regular).
+    // KAIGEN logo — right side. Bumped from 13 px plain to 16 px bold so it
+    // reads with more presence (CSS spec was 13 px / 400 but the webview's
+    // rendered KAIGEN looks closer to 16 / semibold in practice).
     {
-        const auto logoBounds = juce::Rectangle<int>(getWidth() - 120, 0, 104, getHeight());
-        const auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 13.0f, juce::Font::plain))
-                              .withExtraKerningFactor(0.46f);
+        const auto logoBounds = juce::Rectangle<int>(getWidth() - 130, 0, 114, getHeight());
+        const auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 16.0f, juce::Font::bold))
+                              .withExtraKerningFactor(0.42f);
         // White shadow below (60% white, CSS: 0 1px 0 rgba(255,255,255,0.60))
         g.setFont(font);
         g.setColour(juce::Colour(0x99FFFFFF));
@@ -67,8 +69,8 @@ void TopBar::resized()
     const int btnY    = (area.getHeight() - btnSize) / 2;
 
     // ── Right-side chrome packs against the KAIGEN logo at
-    //    getWidth() - 120.
-    constexpr int kKaigenReserve = 120;
+    //    getWidth() - 130 (KAIGEN bounds widened for the bolder/larger font).
+    constexpr int kKaigenReserve = 130;
     int rx = area.getRight() - kKaigenReserve - 8;
 
     if (advancedBtn) { rx -= btnSize; advancedBtn->setBounds(rx, btnY, btnSize, btnSize); rx -= 6; }

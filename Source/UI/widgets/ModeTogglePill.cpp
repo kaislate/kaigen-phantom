@@ -19,8 +19,8 @@ namespace
     constexpr juce::uint32 kSegActiveBg      = 0x8cFFFFFF;   // 55% white
     constexpr juce::uint32 kSegActiveShadow  = 0x1f000000;   // 12% black
 
-    constexpr int kTrackRadius = 13;   // half of natural height
-    constexpr int kSegRadius   = 11;
+    constexpr int kTrackRadius = 16;   // half of natural height (32)
+    constexpr int kSegRadius   = 14;
     constexpr int kPad         = 3;
 }
 
@@ -147,7 +147,7 @@ void ModeTogglePill::paint(juce::Graphics& g)
                           : isHover  ? juce::Colour(kSegHoverText)
                                       : juce::Colour(kSegIdleText);
         g.setColour(colour);
-        auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 10.0f,
+        auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 12.0f,
                                                   juce::Font::bold))
                        .withExtraKerningFactor(0.25f);
         g.setFont(font);

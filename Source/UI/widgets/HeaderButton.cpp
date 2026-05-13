@@ -7,14 +7,14 @@ namespace kaigen::phantom
 
 namespace
 {
-    constexpr juce::uint32 kBodyBg          = 0x17000000;   // ~9% black — gentle darkening of the silver
+    constexpr juce::uint32 kBodyBg          = 0x12000000;   // ~7% black — barely-there darkening of the silver
     constexpr juce::uint32 kIconIdle        = 0x47000000;   // rgba(0,0,0,0.28)
     constexpr juce::uint32 kIconHover       = 0x8c000000;   // rgba(0,0,0,0.55)
     constexpr juce::uint32 kIconActive      = 0xe03773c3;   // rgba(55,115,195,0.88)
-    constexpr juce::uint32 kInsetShadowTop  = 0x2e000000;   // ~18% black — softened from 30%
-    constexpr juce::uint32 kInsetHighlight  = 0x80ffffff;   // ~50% white — softened from 70%
-    constexpr juce::uint32 kOuterRimLight   = 0x66ffffff;   // ~40% white — softer lip
-    constexpr juce::uint32 kTopRimEdge      = 0x28000000;   // ~16% black — top rim arc, softened from 30%
+    constexpr juce::uint32 kInsetShadowTop  = 0x1f000000;   // ~12% black — soft inset shadow
+    constexpr juce::uint32 kInsetHighlight  = 0x66ffffff;   // ~40% white — soft inset highlight
+    constexpr juce::uint32 kOuterRimLight   = 0x4dffffff;   // ~30% white — gentle lip
+    constexpr juce::uint32 kTopRimEdge      = 0x1a000000;   // ~10% black — top rim is almost imperceptible
     constexpr juce::uint32 kActiveGlow      = 0x474682d2;   // rgba(70,130,210,0.28)
 
     void paintIcon(juce::Graphics& g, juce::Rectangle<float> bounds,
@@ -25,7 +25,7 @@ namespace
         const auto r  = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f * 0.6f;
 
         juce::Path p;
-        const juce::PathStrokeType strokeT(1.7f,
+        const juce::PathStrokeType strokeT(1.9f,
                                             juce::PathStrokeType::curved,
                                             juce::PathStrokeType::rounded);
 
