@@ -36,14 +36,17 @@ namespace
         {
             case HeaderButton::Icon::Bypass:
             {
-                // Power symbol — open circle with a vertical notch at top.
-                const float gap = r * 0.35f;
-                const float startAngle = juce::MathConstants<float>::pi * 1.5f + gap;
-                const float endAngle   = juce::MathConstants<float>::pi * 1.5f
-                                          - gap + juce::MathConstants<float>::twoPi;
+                // Power symbol — open circle with a small gap at the TOP +
+                // a vertical bar from center up through the gap.
+                // JUCE addCentredArc: angle 0 is at 12 o'clock and
+                // increases clockwise; the previous code computed `gap`
+                // from r (pixels-as-radians) and used 1.5π (left side),
+                // producing a 140° notch in the wrong location.
+                constexpr float kGapHalf = 0.42f;   // ~24 ° on each side of top
                 p.addCentredArc(cx, cy, r * 0.85f, r * 0.85f, 0.0f,
-                                startAngle, endAngle, true);
-                // Vertical bar from centre up through the notch.
+                                 kGapHalf,
+                                 juce::MathConstants<float>::twoPi - kGapHalf,
+                                 true);
                 p.startNewSubPath(cx, cy - r * 0.95f);
                 p.lineTo(cx, cy - r * 0.15f);
                 break;
