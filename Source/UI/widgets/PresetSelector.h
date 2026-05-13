@@ -22,7 +22,8 @@ namespace kaigen::phantom
  *
  *  Owns the `currentPresetName` and `currentPresetPack` state — the C++
  *  PresetManager doesn't track which preset is currently loaded. */
-class PresetSelector : public juce::Component
+class PresetSelector : public juce::Component,
+                        private juce::ValueTree::Listener
 {
 public:
     PresetSelector(PhantomProcessor& processor,
@@ -58,6 +59,12 @@ private:
 
     juce::String currentPresetName;
     juce::String currentPresetPack;
+    bool         currentPresetModified { false };   // any APVTS change since last load/save
+
+    // ValueTree::Listener — fires when any APVTS param changes. Sets the
+    // modified flag and triggers a repaint so the red asterisk appears.
+    void valueTreePropertyChanged(juce::ValueTree& tree,
+                                   const juce::Identifier& property) override;
 
     // Glyph buttons — etched, no background (phantom-style "header-glyph").
     // Glyph text assigned in the ctor body so we can use UTF-8 for the unicode

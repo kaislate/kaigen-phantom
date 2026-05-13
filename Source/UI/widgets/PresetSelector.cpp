@@ -66,14 +66,31 @@ PresetSelector::PresetSelector(PhantomProcessor& p, juce::AudioProcessorValueTre
     prevButton   .setTooltip("Previous preset");
     nextButton   .setTooltip("Next preset");
     saveButton   .setTooltip("Save preset");
+
+    // Listen for any APVTS state change so we can flip the modified flag.
+    apvts.state.addListener(this);
 }
 
-PresetSelector::~PresetSelector() = default;
+PresetSelector::~PresetSelector()
+{
+    apvts.state.removeListener(this);
+}
+
+void PresetSelector::valueTreePropertyChanged(juce::ValueTree&,
+                                                const juce::Identifier&)
+{
+    if (! currentPresetModified)
+    {
+        currentPresetModified = true;
+        repaint();
+    }
+}
 
 void PresetSelector::setCurrentPreset(const juce::String& name, const juce::String& pack)
 {
-    currentPresetName = name;
-    currentPresetPack = pack;
+    currentPresetName     = name;
+    currentPresetPack     = pack;
+    currentPresetModified = false;   // fresh load / save snapshot
     repaint();
 }
 
@@ -138,8 +155,16 @@ void PresetSelector::paint(juce::Graphics& g)
     g.drawText(display, pillTextArea, juce::Justification::centred, true);
 
     // Modified-state asterisk — CSS spec hides this until the preset has
-    // unsaved changes. Modified-state tracking isn't wired yet, so it stays
-    // hidden for now. (Was previously always-shown as a placeholder.)
+    // unsaved changes. The flag flips when any APVTS param changes after
+    // a load/save (valueTreePropertyChanged → currentPresetModified=true).
+    if (currentPresetModified)
+    {
+        auto asteriskArea = juce::Rectangle<int>(pillBounds.getRight() - 18, pillBounds.getY(),
+                                                  14, pillBounds.getHeight());
+        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 13.0f, juce::Font::bold));
+        g.setColour(juce::Colour(0xffc74a4a));
+        g.drawText("*", asteriskArea, juce::Justification::centred, false);
+    }
 }
 
 void PresetSelector::mouseDown(const juce::MouseEvent& e)
