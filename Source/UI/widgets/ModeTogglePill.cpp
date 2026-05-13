@@ -19,9 +19,9 @@ namespace
     constexpr juce::uint32 kSegActiveBg      = 0x8cFFFFFF;   // 55% white
     constexpr juce::uint32 kSegActiveShadow  = 0x1f000000;   // 12% black
 
-    constexpr int kTrackRadius = 16;   // half of natural height (32)
-    constexpr int kSegRadius   = 14;
-    constexpr int kPad         = 3;
+    constexpr int kTrackRadius = 13;   // half of natural height (26) — full pill
+    constexpr int kSegRadius   = 10;   // CSS spec 16, capped by half segment height (~20)
+    constexpr int kPad         = 3;    // CSS .mt padding 3 px
 }
 
 ModeTogglePill::ModeTogglePill(juce::AudioProcessorValueTreeState& a)
@@ -147,8 +147,10 @@ void ModeTogglePill::paint(juce::Graphics& g)
                           : isHover  ? juce::Colour(kSegHoverText)
                                       : juce::Colour(kSegIdleText);
         g.setColour(colour);
-        auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 12.0f,
-                                                  juce::Font::bold))
+        // CSS .mb: font-size 10 px, weight 400 (Regular), letter-spacing
+        // 2.5 px → kerning factor 0.25 at 10 px.
+        auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 10.0f,
+                                                  juce::Font::plain))
                        .withExtraKerningFactor(0.25f);
         g.setFont(font);
         g.drawText(label, seg, juce::Justification::centred, false);

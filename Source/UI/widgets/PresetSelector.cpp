@@ -139,14 +139,9 @@ void PresetSelector::paint(juce::Graphics& g)
     const auto display = currentPresetName.isEmpty() ? juce::String("Default") : currentPresetName;
     g.drawText(display, pillTextArea, juce::Justification::centred, true);
 
-    // Modified-state asterisk on the right edge of the pill — visual placeholder
-    // (always shown for now; will be conditional once modified-tracking lands).
-    // Red matches the CSS #c74a4a.
-    auto asteriskArea = juce::Rectangle<int>(pillBounds.getRight() - 18, pillBounds.getY(),
-                                              14, pillBounds.getHeight());
-    g.setFont(juce::FontOptions(Theme::uiFontFamily(), 13.0f, juce::Font::bold));
-    g.setColour(juce::Colour(0xffc74a4a));
-    g.drawText("*", asteriskArea, juce::Justification::centred, false);
+    // Modified-state asterisk — CSS spec hides this until the preset has
+    // unsaved changes. Modified-state tracking isn't wired yet, so it stays
+    // hidden for now. (Was previously always-shown as a placeholder.)
 }
 
 void PresetSelector::mouseDown(const juce::MouseEvent& e)
@@ -171,7 +166,7 @@ void PresetSelector::resized()
     constexpr int gapWide    =  8;
     constexpr int gapTight   =  2;
     constexpr int heartW     = 16;
-    constexpr int pillW      = 240;
+    constexpr int pillW      = 260;   // CSS spec min-width
 
     const int totalW = glyphW + gapWide                    // ||| + gap
                      + pillW  + gapWide                    // pill + gap
