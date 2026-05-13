@@ -55,6 +55,7 @@ public:
     void setMaxPeriodSamples(float samples);   // max waveset length [100–8000 samples]
     void setH1Amplitude(float amp);        // RESYN only: H1 level [0–2]
     void setSubAmplitude(float amp);       // RESYN only: sub-harmonic level [0–2]
+    void setSynthTrim(float gain);         // post-envelope synth output gain [0–4]
     void setUsePunch(bool on);             // enable per-wavelet peak amplitude modulation
     void setPunchAmount(float amount);     // [0–1]: 0 = pure envelope, 1 = pure wavelet peak
     void setBoostThreshold(float thr);     // RESYN only: upward expansion threshold [0–1]
@@ -124,6 +125,7 @@ private:
     float ghostAmount     = 1.0f;
     int   ghostMode       = 0;  // 0=Replace, 1=Combine, 2=Phantom Only
     float phantomStrength = 0.8f;
+    float synthTrim       = 1.0f;   // post-envelope multiplier on phantomOut (0..4)
     float outputGainLin   = 1.0f;
     float stereoWidth     = 1.0f;
     int envSource = 0;  // 0 = main input bass band, 1 = sidechain

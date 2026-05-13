@@ -244,6 +244,11 @@ void PhantomEngine::setSubAmplitude(float amp)
     resynR.setSubAmplitude(amp);
 }
 
+void PhantomEngine::setSynthTrim(float gain)
+{
+    synthTrim = juce::jlimit(0.0f, 4.0f, gain);
+}
+
 void PhantomEngine::setUsePunch(bool on)          { usePunch    = on; }
 void PhantomEngine::setPunchAmount(float amount)  { punchAmount = juce::jlimit(0.0f, 1.0f, amount); }
 
@@ -401,8 +406,9 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
                 level = juce::jlimit(0.0f, 1.0f, level);
             }
 
-            // Scale by envelope so phantom tracks input dynamics
-            const float phantomOut = phantomSample * level * phantomStrength;
+            // Scale by envelope so phantom tracks input dynamics, then
+            // apply the user-controlled synth trim (post-envelope gain).
+            const float phantomOut = phantomSample * level * phantomStrength * synthTrim;
 
             // Oscilloscope capture (left channel only)
             if (ch == 0)

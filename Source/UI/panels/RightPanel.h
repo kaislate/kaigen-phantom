@@ -40,6 +40,7 @@ private:
     PhantomKnob saturationKnob;
     PhantomKnob shapeKnob;
     PhantomKnob skipKnob;
+    PhantomKnob trimKnob;
 
     // Stereo section
     PhantomKnob widthKnob;

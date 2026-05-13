@@ -61,6 +61,7 @@ void DualEngineHost::buildParamCache(std::vector<CachedLeaf>& cache, const char*
     add(ParamID::LEAF_SYNTH_GATE_THRESHOLD);
     add(ParamID::LEAF_SYNTH_H1);
     add(ParamID::LEAF_SYNTH_SUB);
+    add(ParamID::LEAF_SYNTH_TRIM);
     add(ParamID::LEAF_SYNTH_MIN_SAMPLES);
     add(ParamID::LEAF_SYNTH_MAX_SAMPLES);
     add(ParamID::LEAF_TRACKING_SPEED);
@@ -217,6 +218,7 @@ void DualEngineHost::syncEngineFromPrefix(PhantomEngine& target,
     target.setGateThreshold  (valueFor(ParamID::LEAF_SYNTH_GATE_THRESHOLD) / 100.0f);
     target.setH1Amplitude    (valueFor(ParamID::LEAF_SYNTH_H1) / 100.0f);
     target.setSubAmplitude   (valueFor(ParamID::LEAF_SYNTH_SUB) / 100.0f);
+    target.setSynthTrim      (valueFor(ParamID::LEAF_SYNTH_TRIM) / 100.0f);
     target.setMinPeriodSamples(valueFor(ParamID::LEAF_SYNTH_MIN_SAMPLES));
     target.setMaxPeriodSamples(valueFor(ParamID::LEAF_SYNTH_MAX_SAMPLES));
     target.setTrackingSpeed  (valueFor(ParamID::LEAF_TRACKING_SPEED) / 100.0f);

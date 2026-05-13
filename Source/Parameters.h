@@ -57,6 +57,7 @@ namespace ParamID
     KAIGEN_PER_ENGINE(SYNTH_GATE_THRESHOLD, "synth_gate_threshold")
     KAIGEN_PER_ENGINE(SYNTH_H1, "synth_h1")
     KAIGEN_PER_ENGINE(SYNTH_SUB, "synth_sub")
+    KAIGEN_PER_ENGINE(SYNTH_TRIM, "synth_trim")
 
     // ── Crossing detection / pitch ────────────────────────────────────
     KAIGEN_PER_ENGINE(SYNTH_MIN_SAMPLES, "synth_min_samples")
@@ -151,6 +152,7 @@ inline std::vector<juce::String> getAllParameterIDs()
     addAB(ParamID::A_SYNTH_GATE_THRESHOLD, ParamID::B_SYNTH_GATE_THRESHOLD);
     addAB(ParamID::A_SYNTH_H1, ParamID::B_SYNTH_H1);
     addAB(ParamID::A_SYNTH_SUB, ParamID::B_SYNTH_SUB);
+    addAB(ParamID::A_SYNTH_TRIM, ParamID::B_SYNTH_TRIM);
     addAB(ParamID::A_SYNTH_MIN_SAMPLES, ParamID::B_SYNTH_MIN_SAMPLES);
     addAB(ParamID::A_SYNTH_MAX_SAMPLES, ParamID::B_SYNTH_MAX_SAMPLES);
     addAB(ParamID::A_TRACKING_SPEED, ParamID::B_TRACKING_SPEED);
@@ -294,6 +296,14 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         params.push_back(std::make_unique<APF>(
             pid("synth_sub"), disp("Sub Amp"),
             juce::NormalisableRange<float>(0.0f, 200.0f), 0.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+
+        // Synth trim — post-envelope multiplier on the synth output. Lets the
+        // user push the synth above the input's natural amplitude (the
+        // envelope follower otherwise anchors synth loudness to the input).
+        params.push_back(std::make_unique<APF>(
+            pid("synth_trim"), disp("Synth Trim"),
+            juce::NormalisableRange<float>(0.0f, 400.0f), 100.0f,
             juce::AudioParameterFloatAttributes().withLabel("%")));
 
         // ── Crossing detection ────────────────────────────────────────
