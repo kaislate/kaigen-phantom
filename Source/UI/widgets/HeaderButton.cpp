@@ -7,13 +7,14 @@ namespace kaigen::phantom
 
 namespace
 {
-    constexpr juce::uint32 kBodyBg          = 0x1f000000;   // ~12% black — slightly deeper than CSS so the well reads
+    constexpr juce::uint32 kBodyBg          = 0x17000000;   // ~9% black — gentle darkening of the silver
     constexpr juce::uint32 kIconIdle        = 0x47000000;   // rgba(0,0,0,0.28)
     constexpr juce::uint32 kIconHover       = 0x8c000000;   // rgba(0,0,0,0.55)
     constexpr juce::uint32 kIconActive      = 0xe03773c3;   // rgba(55,115,195,0.88)
-    constexpr juce::uint32 kInsetShadowTop  = 0x4d000000;   // ~30% black — deeper inset shadow
-    constexpr juce::uint32 kInsetHighlight  = 0xb3ffffff;   // ~70% white — brighter inset highlight
-    constexpr juce::uint32 kOuterRimLight   = 0x99ffffff;   // ~60% white — light "lip" above the recess
+    constexpr juce::uint32 kInsetShadowTop  = 0x2e000000;   // ~18% black — softened from 30%
+    constexpr juce::uint32 kInsetHighlight  = 0x80ffffff;   // ~50% white — softened from 70%
+    constexpr juce::uint32 kOuterRimLight   = 0x66ffffff;   // ~40% white — softer lip
+    constexpr juce::uint32 kTopRimEdge      = 0x28000000;   // ~16% black — top rim arc, softened from 30%
     constexpr juce::uint32 kActiveGlow      = 0x474682d2;   // rgba(70,130,210,0.28)
 
     void paintIcon(juce::Graphics& g, juce::Rectangle<float> bounds,
@@ -148,17 +149,17 @@ void HeaderButton::paint(juce::Graphics& g)
         g.setGradientFill(btmHigh);
         g.fillRect(bounds);
 
-        // Sharp dark rim along the top arc — the actual "edge" where the
-        // surrounding silver lips over into the well.
+        // Soft dark rim along the top arc — softened from a sharp stroke
+        // to a thinner one so the lip reads but doesn't draw the eye.
         const auto rim = bounds.reduced(0.5f);
-        g.setColour(juce::Colour(0x4d000000));
+        g.setColour(juce::Colour(kTopRimEdge));
         juce::Path topRim;
         topRim.addCentredArc(rim.getCentreX(), rim.getCentreY(),
                               rim.getWidth() * 0.5f, rim.getHeight() * 0.5f,
                               0.0f,
                               juce::MathConstants<float>::pi * 1.15f,
                               juce::MathConstants<float>::pi * 1.85f, true);
-        g.strokePath(topRim, juce::PathStrokeType(1.2f));
+        g.strokePath(topRim, juce::PathStrokeType(0.7f));
     }
 
     // Outer "lip" — a faint white crescent JUST OUTSIDE the bottom-right

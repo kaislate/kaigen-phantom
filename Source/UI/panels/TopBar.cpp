@@ -22,11 +22,6 @@ TopBar::TopBar(PhantomProcessor& p, juce::AudioProcessorValueTreeState& a)
     addAndMakeVisible(*bypassBtn);
     addAndMakeVisible(*settingsBtn);
     addAndMakeVisible(*advancedBtn);
-
-    // Build identifier — ops/QA verify the right DLL is loaded by reading
-    // this tag. Bumped per release; this is the current dev tag.
-    buildTag = std::make_unique<BuildTagPill>("MORPH-9");
-    addAndMakeVisible(*buildTag);
 }
 
 TopBar::~TopBar() = default;
@@ -49,13 +44,9 @@ void TopBar::paint(juce::Graphics& g)
         g.drawText("PHANTOM", logoBounds, juce::Justification::centredLeft, false);
     }
 
-    // KAIGEN logo — shifted left to leave space for the MORPH-9 build tag
-    // and any future right-edge status tags (matches the webview layout
-    // where MORPH-9 sits to the right of KAIGEN).
+    // KAIGEN logo — right side. CSS spec is font-weight: 400 (Regular).
     {
-        constexpr int kRightReserve = 80;   // room for MORPH-9 to the right
-        const auto logoBounds = juce::Rectangle<int>(getWidth() - kRightReserve - 104,
-                                                      0, 104, getHeight());
+        const auto logoBounds = juce::Rectangle<int>(getWidth() - 120, 0, 104, getHeight());
         const auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 13.0f, juce::Font::plain))
                               .withExtraKerningFactor(0.46f);
         // White shadow below (60% white, CSS: 0 1px 0 rgba(255,255,255,0.60))
@@ -75,20 +66,9 @@ void TopBar::resized()
     const int btnSize = HeaderButton::kNaturalSize;
     const int btnY    = (area.getHeight() - btnSize) / 2;
 
-    // ── MORPH-9 build tag — pinned to the very right edge, matching the
-    //    webview's "tag after KAIGEN" position.
-    if (buildTag)
-    {
-        const auto natural = buildTag->getNaturalBounds();
-        buildTag->setBounds(area.getRight() - natural.getWidth() - 6,
-                             (area.getHeight() - natural.getHeight()) / 2,
-                             natural.getWidth(), natural.getHeight());
-    }
-
-    // ── Right-side chrome packs against the KAIGEN logo. KAIGEN's paint
-    //    now sits at getWidth() - 80 - 104 (see paint()), so reserve 80 +
-    //    104 = 184 + a small gap.
-    constexpr int kKaigenReserve = 184;
+    // ── Right-side chrome packs against the KAIGEN logo at
+    //    getWidth() - 120.
+    constexpr int kKaigenReserve = 120;
     int rx = area.getRight() - kKaigenReserve - 8;
 
     if (advancedBtn) { rx -= btnSize; advancedBtn->setBounds(rx, btnY, btnSize, btnSize); rx -= 6; }

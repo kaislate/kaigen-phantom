@@ -84,28 +84,47 @@ void ModeTogglePill::paint(juce::Graphics& g)
     g.setColour(juce::Colour(kTrackBg));
     g.fillRoundedRectangle(bounds, (float) kTrackRadius);
 
-    // Soft inset top shadow + inset bottom highlight (clipped to the
-    // rounded pill so the bands don't bleed past the corners).
+    // Soft recessed-well shadows — same family as HeaderButton so the
+    // chrome reads as one consistent design language. Soft gradients,
+    // not hard bands.
     {
         juce::Path clip; clip.addRoundedRectangle(bounds, (float) kTrackRadius);
         juce::Graphics::ScopedSaveState save(g);
         g.reduceClipRegion(clip);
 
-        juce::ColourGradient topShadow(juce::Colour(kInsetShadowTop),
+        // Top inset shadow — 18% black at the top edge, fading over
+        // ~60% of the pill height. Gives "light fell into the well" cue.
+        juce::ColourGradient topShadow(juce::Colour(0x2e000000),
                                         0.0f, bounds.getY(),
                                         juce::Colour(0x00000000),
-                                        0.0f, bounds.getY() + 4.0f, false);
+                                        0.0f, bounds.getY() + bounds.getHeight() * 0.6f,
+                                        false);
         g.setGradientFill(topShadow);
-        g.fillRect(juce::Rectangle<float>(bounds.getX(), bounds.getY(),
-                                           bounds.getWidth(), 5.0f));
+        g.fillRect(bounds);
 
+        // Bottom inset highlight — 50% white at the bottom edge, fading up.
         juce::ColourGradient botHigh(juce::Colour(0x00FFFFFF),
-                                      0.0f, bounds.getBottom() - 3.0f,
-                                      juce::Colour(kInsetHighlightBot),
-                                      0.0f, bounds.getBottom(), false);
+                                      0.0f, bounds.getY() + bounds.getHeight() * 0.6f,
+                                      juce::Colour(0x80FFFFFF),
+                                      0.0f, bounds.getBottom(),
+                                      false);
         g.setGradientFill(botHigh);
-        g.fillRect(juce::Rectangle<float>(bounds.getX(), bounds.getBottom() - 3.0f,
-                                           bounds.getWidth(), 3.0f));
+        g.fillRect(bounds);
+
+        // Faint dark line along the very top — the "lip" where the
+        // surrounding surface curves down into the pill.
+        g.setColour(juce::Colour(0x28000000));
+        g.drawLine(bounds.getX() + (float) kTrackRadius * 0.6f, bounds.getY() + 0.6f,
+                    bounds.getRight() - (float) kTrackRadius * 0.6f, bounds.getY() + 0.6f, 0.7f);
+    }
+
+    // Outer "lip" highlight just below the bottom of the pill — surface
+    // catches light on its raised edge, reinforcing the recess illusion.
+    {
+        const float xL = bounds.getX() + (float) kTrackRadius * 0.5f;
+        const float xR = bounds.getRight() - (float) kTrackRadius * 0.5f;
+        g.setColour(juce::Colour(0x66ffffff));
+        g.drawLine(xL, bounds.getBottom() + 0.5f, xR, bounds.getBottom() + 0.5f, 0.7f);
     }
 
     const auto modeIdx = (int) apvts.getRawParameterValue(activeParamId)->load();
