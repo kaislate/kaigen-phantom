@@ -7,13 +7,13 @@ namespace kaigen::phantom
 
 namespace
 {
-    constexpr juce::uint32 kBodyBg          = 0x17000000;   // rgba(0,0,0,0.09)
+    constexpr juce::uint32 kBodyBg          = 0x1f000000;   // ~12% black — slightly deeper than CSS so the well reads
     constexpr juce::uint32 kIconIdle        = 0x47000000;   // rgba(0,0,0,0.28)
     constexpr juce::uint32 kIconHover       = 0x8c000000;   // rgba(0,0,0,0.55)
     constexpr juce::uint32 kIconActive      = 0xe03773c3;   // rgba(55,115,195,0.88)
-    constexpr juce::uint32 kInsetShadowTop  = 0x24000000;   // ~14% black
-    constexpr juce::uint32 kInsetHighlight  = 0x7affffff;   // ~48% white
-    constexpr juce::uint32 kOuterShadow     = 0x12000000;   // ~7% black
+    constexpr juce::uint32 kInsetShadowTop  = 0x4d000000;   // ~30% black — deeper inset shadow
+    constexpr juce::uint32 kInsetHighlight  = 0xb3ffffff;   // ~70% white — brighter inset highlight
+    constexpr juce::uint32 kOuterRimLight   = 0x99ffffff;   // ~60% white — light "lip" above the recess
     constexpr juce::uint32 kActiveGlow      = 0x474682d2;   // rgba(70,130,210,0.28)
 
     void paintIcon(juce::Graphics& g, juce::Rectangle<float> bounds,
@@ -24,7 +24,7 @@ namespace
         const auto r  = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f * 0.6f;
 
         juce::Path p;
-        const juce::PathStrokeType strokeT(1.4f,
+        const juce::PathStrokeType strokeT(1.7f,
                                             juce::PathStrokeType::curved,
                                             juce::PathStrokeType::rounded);
 
@@ -117,18 +117,16 @@ void HeaderButton::paint(juce::Graphics& g)
     const auto bounds = getLocalBounds().toFloat().reduced(1.0f);
     const auto active = isActive();
 
-    // Outer drop shadow (subtle).
-    {
-        juce::DropShadow ds(juce::Colour(kOuterShadow), 3, { 1, 1 });
-        juce::Path p; p.addEllipse(bounds);
-        ds.drawForPath(g, p);
-    }
-
-    // Body fill.
+    // Body fill — slightly darker than the surrounding silver to suggest
+    // a pocket cut into the surface.
     g.setColour(juce::Colour(kBodyBg));
     g.fillEllipse(bounds);
 
-    // Inset shadow (top-left dark) + highlight (bottom-right light).
+    // Inset shadow + highlight — stronger gradients than before so the
+    // well reads as recessed. Top-left dark crescent (light "falls in"
+    // from above), bottom-right light crescent (reflects off the back
+    // wall). No outer drop shadow — that was making the button read as
+    // raised instead of recessed.
     {
         juce::Path clip; clip.addEllipse(bounds);
         juce::Graphics::ScopedSaveState save(g);
@@ -137,25 +135,53 @@ void HeaderButton::paint(juce::Graphics& g)
         juce::ColourGradient topShadow(juce::Colour(kInsetShadowTop),
                                         bounds.getX(),     bounds.getY(),
                                         juce::Colour(0x00000000),
-                                        bounds.getX() + 5, bounds.getY() + 5,
+                                        bounds.getCentreX(), bounds.getCentreY(),
                                         false);
         g.setGradientFill(topShadow);
         g.fillRect(bounds);
 
         juce::ColourGradient btmHigh(juce::Colour(0x00FFFFFF),
-                                      bounds.getRight() - 5, bounds.getBottom() - 5,
+                                      bounds.getCentreX(), bounds.getCentreY(),
                                       juce::Colour(kInsetHighlight),
-                                      bounds.getRight(),     bounds.getBottom(),
+                                      bounds.getRight(),   bounds.getBottom(),
                                       false);
         g.setGradientFill(btmHigh);
         g.fillRect(bounds);
+
+        // Sharp dark rim along the top arc — the actual "edge" where the
+        // surrounding silver lips over into the well.
+        const auto rim = bounds.reduced(0.5f);
+        g.setColour(juce::Colour(0x4d000000));
+        juce::Path topRim;
+        topRim.addCentredArc(rim.getCentreX(), rim.getCentreY(),
+                              rim.getWidth() * 0.5f, rim.getHeight() * 0.5f,
+                              0.0f,
+                              juce::MathConstants<float>::pi * 1.15f,
+                              juce::MathConstants<float>::pi * 1.85f, true);
+        g.strokePath(topRim, juce::PathStrokeType(1.2f));
     }
 
-    // Active glow ring.
+    // Outer "lip" — a faint white crescent JUST OUTSIDE the bottom-right
+    // of the well. The surrounding silver appears to catch light on its
+    // raised edge, reinforcing the recess-into-the-surface illusion.
+    {
+        const auto outer = bounds.expanded(0.5f);
+        juce::Path lip;
+        lip.addCentredArc(outer.getCentreX(), outer.getCentreY(),
+                           outer.getWidth() * 0.5f, outer.getHeight() * 0.5f,
+                           0.0f,
+                           juce::MathConstants<float>::pi * 0.10f,
+                           juce::MathConstants<float>::pi * 0.85f, true);
+        g.setColour(juce::Colour(kOuterRimLight));
+        g.strokePath(lip, juce::PathStrokeType(0.8f));
+    }
+
+    // Active glow ring stays outside the well — visual marker that the
+    // toggle is on (bypass, advanced).
     if (active)
     {
         g.setColour(juce::Colour(kActiveGlow));
-        g.drawEllipse(bounds.expanded(1.0f), 1.2f);
+        g.drawEllipse(bounds.expanded(1.0f), 1.4f);
     }
 
     // Icon stroke.
