@@ -50,7 +50,13 @@ PresetSelector::PresetSelector(PhantomProcessor& p, juce::AudioProcessorValueTre
     saveButton   .setButtonText(glyphSave());
 
     libraryButton.onClick = [this] { if (onBrowseRequested) onBrowseRequested(); };
-    heartButton  .onClick = [] { /* favorites — wired in a follow-up */ };
+    heartButton  .onClick = [this] {
+        if (currentPresetName.isEmpty()) return;
+        auto& pm = processor.getPresetManager();
+        const bool now = pm.isFavorite(currentPresetName, currentPresetPack);
+        pm.setFavorite(currentPresetName, currentPresetPack, ! now);
+        // setFavorite broadcasts → changeListenerCallback updates the glyph.
+    };
     prevButton   .onClick = [this] { prevPreset(); };
     nextButton   .onClick = [this] { nextPreset(); };
     saveButton   .onClick = [this] { saveDialog(); };
@@ -62,18 +68,39 @@ PresetSelector::PresetSelector(PhantomProcessor& p, juce::AudioProcessorValueTre
     }
 
     libraryButton.setTooltip("Open preset browser");
-    heartButton  .setTooltip("Favorite (coming soon)");
+    heartButton  .setTooltip("Toggle favorite");
     prevButton   .setTooltip("Previous preset");
     nextButton   .setTooltip("Next preset");
     saveButton   .setTooltip("Save preset");
 
     // Listen for any APVTS state change so we can flip the modified flag.
     apvts.state.addListener(this);
+    processor.getPresetManager().addChangeListener(this);
 }
 
 PresetSelector::~PresetSelector()
 {
     apvts.state.removeListener(this);
+    processor.getPresetManager().removeChangeListener(this);
+}
+
+void PresetSelector::changeListenerCallback(juce::ChangeBroadcaster*)
+{
+    refreshHeartGlyph();
+    repaint();
+}
+
+void PresetSelector::refreshHeartGlyph()
+{
+    const bool fav = currentPresetName.isNotEmpty()
+                  && processor.getPresetManager()
+                       .isFavorite(currentPresetName, currentPresetPack);
+    heartButton.setButtonText(fav ? glyphHeart() + " "       // placeholder; filled glyph below
+                                   : glyphHeart());
+    // The unicode "♡" (U+2661) and "♥" (U+2665) — outline vs filled.
+    heartButton.setButtonText(juce::String(juce::CharPointer_UTF8(
+        fav ? "\xE2\x99\xA5" : "\xE2\x99\xA1")));
+    heartButton.repaint();
 }
 
 void PresetSelector::valueTreePropertyChanged(juce::ValueTree&,
@@ -91,6 +118,7 @@ void PresetSelector::setCurrentPreset(const juce::String& name, const juce::Stri
     currentPresetName     = name;
     currentPresetPack     = pack;
     currentPresetModified = false;   // fresh load / save snapshot
+    refreshHeartGlyph();
     repaint();
 }
 

@@ -554,7 +554,10 @@ void PresetManager::setFavorite(const juce::String& presetName,
     }
 
     if (changed)
+    {
         saveFavoritesIndex();
+        sendChangeMessage();   // refresh any UI showing favorite state
+    }
 }
 
 bool PresetManager::isFavorite(const juce::String& presetName,

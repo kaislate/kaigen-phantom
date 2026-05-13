@@ -23,7 +23,8 @@ namespace kaigen::phantom
  *  Owns the `currentPresetName` and `currentPresetPack` state — the C++
  *  PresetManager doesn't track which preset is currently loaded. */
 class PresetSelector : public juce::Component,
-                        private juce::ValueTree::Listener
+                        private juce::ValueTree::Listener,
+                        private juce::ChangeListener
 {
 public:
     PresetSelector(PhantomProcessor& processor,
@@ -65,6 +66,12 @@ private:
     // modified flag and triggers a repaint so the red asterisk appears.
     void valueTreePropertyChanged(juce::ValueTree& tree,
                                    const juce::Identifier& property) override;
+
+    // ChangeListener — fires when PresetManager state changes (favorite
+    // toggled, new file watched in). Refreshes heart glyph + repaints.
+    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
+
+    void refreshHeartGlyph();   // updates heartButton text from isFavorite
 
     // Glyph buttons — etched, no background (phantom-style "header-glyph").
     // Glyph text assigned in the ctor body so we can use UTF-8 for the unicode

@@ -1171,6 +1171,15 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
     const auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + kColHeaderH).reduced(8, 4);
     if (! listArea.contains(e.getPosition())) return;
 
+    // The heart column sits at the rightmost ~30 px of each row; clicks
+    // there toggle the favorite for that preset instead of loading it.
+    const auto heartColRect = columnHeaderBounds(SortColumn::Skip).isEmpty()
+        ? juce::Rectangle<int>()
+        : juce::Rectangle<int>(listArea.getRight() - kColHeartW,
+                                listArea.getY(),
+                                kColHeartW,
+                                listArea.getHeight());
+
     int y = listArea.getY() - listScrollY;
     for (size_t i = 0; i < rows.size(); ++i)
     {
@@ -1180,6 +1189,16 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
         if (y >= listArea.getBottom()) break;
         if (e.y >= y && e.y < y + h)
         {
+            if (! r.isHeader
+                && heartColRect.getX() <= e.x
+                && e.x <  heartColRect.getRight())
+            {
+                processor.getPresetManager()
+                    .setFavorite(r.name, r.pack, ! r.isFavorite);
+                // PresetManager broadcasts → changeListenerCallback rebuilds
+                // rows + repaints with the updated heart.
+                return;
+            }
             loadPresetAt((int) i);
             return;
         }
