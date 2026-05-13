@@ -25,8 +25,10 @@ public:
     void mouseExit(const juce::MouseEvent& e) override;
     void mouseDown(const juce::MouseEvent& e) override;
 
-    static constexpr int kNaturalWidth  = 182;   // CSS-derived: 2*(14+letterW+14) + 3*2 padding
-    static constexpr int kNaturalHeight = 26;   // CSS .mt + .mb derived
+    // Scaled ~1.4× from CSS spec so the pill matches the webview's
+    // rendered size at Live's plugin-window scaling.
+    static constexpr int kNaturalWidth  = 240;
+    static constexpr int kNaturalHeight = 36;
 
     /** Retarget to <activePrefix>mode. With mirror set (LINK mode), writes
      *  also flow to the other engine's mode. */

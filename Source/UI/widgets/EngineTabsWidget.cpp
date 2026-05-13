@@ -40,7 +40,7 @@ juce::Rectangle<int> EngineTabsWidget::tabRect(Hit which) const
 {
     const auto inner = getLocalBounds().reduced(kPadX, kPadY);
     // Equal-width A / B / LINK with the link-divider gap before LINK.
-    const int linkW = 50;
+    const int linkW = 64;   // bumped from 50 to fit the larger LINK glyph
     const int abW   = (inner.getWidth() - linkW - kLinkGap - kTabGap) / 2;
     const int ax    = inner.getX();
     const int bx    = ax + abW + kTabGap;
@@ -99,7 +99,8 @@ void EngineTabsWidget::paint(juce::Graphics& g)
                           : isHover  ? juce::Colour(kTabHoverText)
                                       : juce::Colour(kTabIdleText);
         g.setColour(colour);
-        auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 11.0f,
+        // Tab label scaled ~1.4× from CSS spec (11 → 15 px) to match webview.
+        auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 15.0f,
                                                   juce::Font::bold))
                        .withExtraKerningFactor(0.15f);
         g.setFont(font);

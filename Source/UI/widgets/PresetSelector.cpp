@@ -131,10 +131,10 @@ void PresetSelector::paint(juce::Graphics& g)
 
     // Preset name centered inside the pill (between heart on left and the
     // modified asterisk on the right). Dark-on-light per CSS rgba(0,0,0,0.75).
-    const auto pillTextArea = pillBounds.reduced(26, 0);
-    // Plain weight Segoe UI (the same effective rendering the webview gets,
-    // since its CSS falls back to system Segoe UI).
-    g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::plain));
+    // Bumped 12 → 16 px to match the webview's rendered size at Live's
+    // plugin-window scale.
+    const auto pillTextArea = pillBounds.reduced(28, 0);
+    g.setFont(juce::FontOptions(Theme::uiFontFamily(), 16.0f, juce::Font::plain));
     g.setColour(juce::Colour(0xbf000000));
     const auto display = currentPresetName.isEmpty() ? juce::String("Default") : currentPresetName;
     g.drawText(display, pillTextArea, juce::Justification::centred, true);
@@ -161,12 +161,13 @@ void PresetSelector::resized()
     // it's centered horizontally within the slot allocated by TopBar.
     const auto strip = getLocalBounds();
 
-    constexpr int pillH      = 26;
-    constexpr int glyphW     = 22;
-    constexpr int gapWide    =  8;
-    constexpr int gapTight   =  2;
-    constexpr int heartW     = 16;
-    constexpr int pillW      = 260;   // CSS spec min-width
+    // Scaled ~1.4× from CSS spec to match webview's rendered size.
+    constexpr int pillH      = 36;     // CSS 26 → 36
+    constexpr int glyphW     = 30;     // 22 → 30
+    constexpr int gapWide    = 10;
+    constexpr int gapTight   =  3;
+    constexpr int heartW     = 22;     // 16 → 22
+    constexpr int pillW      = 340;    // CSS 260 → 340
 
     const int totalW = glyphW + gapWide                    // ||| + gap
                      + pillW  + gapWide                    // pill + gap

@@ -10,8 +10,8 @@ namespace
 {
     // Wireframe panel positions. Phase 1+ replaces these with real child Components.
     constexpr int editorWidth         = 1300;
-    constexpr int editorHeight        = 1050;  // 50 topbar + 48 modPanel + ~942 LeftPanel filter-bottom + margin
-    constexpr int topBarHeight        = 50;
+    constexpr int editorHeight        = 1070;  // 70 topbar + 48 modPanel + ~942 LeftPanel filter-bottom + margin
+    constexpr int topBarHeight        = 70;   // bumped 50 → 70 so the webview-scaled chrome breathes
     constexpr int modPanelHeight      = 150;
     constexpr int leftPanelWidth      = 420;
 
