@@ -61,20 +61,16 @@ void TopBar::paint(juce::Graphics& g)
         g.drawText(label, bounds, just, false);
     };
 
-    // Sizes scaled ~1.4× from the CSS spec (22 → 30, 13 → 18) so the
-    // native top bar reads at the same on-screen size as the webview when
-    // Live's plugin-window scaling is applied. CSS-strict 22/13 reads
-    // visibly smaller than what the webview renders on the same display.
     paintEtchedLogo("PHANTOM",
-                     juce::Rectangle<int>(20, 0, 320, getHeight()),
-                     30.0f, 0.45f, Theme::logoPhantom,
+                     juce::Rectangle<int>(16, 0, 240, getHeight()),
+                     22.0f, 0.45f, Theme::logoPhantom,
                      juce::Colour(0xb8FFFFFF),   // 72% white
                      juce::Colour(0x1a000000),   // 10% black
                      juce::Justification::centredLeft);
 
     paintEtchedLogo("KAIGEN",
-                     juce::Rectangle<int>(getWidth() - 160, 0, 144, getHeight()),
-                     18.0f, 0.46f, Theme::logoKaigen,
+                     juce::Rectangle<int>(getWidth() - 120, 0, 104, getHeight()),
+                     13.0f, 0.46f, Theme::logoKaigen,
                      juce::Colour(0x99FFFFFF),   // 60% white
                      juce::Colour(0x14000000),   // 8% black
                      juce::Justification::centredRight);
@@ -87,9 +83,8 @@ void TopBar::resized()
     const int btnSize = HeaderButton::kNaturalSize;
     const int btnY    = (area.getHeight() - btnSize) / 2;
 
-    // ── Right-side chrome packs against the KAIGEN logo at
-    //    getWidth() - 160 (KAIGEN bumped to 18 px / wider bounds).
-    constexpr int kKaigenReserve = 160;
+    // ── Right-side chrome packs against the KAIGEN logo at getWidth() - 120.
+    constexpr int kKaigenReserve = 120;
     int rx = area.getRight() - kKaigenReserve - 8;
 
     if (advancedBtn) { rx -= btnSize; advancedBtn->setBounds(rx, btnY, btnSize, btnSize); rx -= 6; }

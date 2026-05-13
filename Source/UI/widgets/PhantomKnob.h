@@ -49,10 +49,15 @@ public:
                           const juce::String& mirrorPrefix = {});
 
     /** Override the OLED-interior paint with a custom callback. Receives
-     *  the OLED rect + the current normalized value [0..1]. Used by the
-     *  Shape knob to render a sine→square waveform morph instead of the
-     *  numeric value text. */
-    std::function<void(juce::Graphics&, juce::Rectangle<float>, float)> paintOLEDContents;
+     *  the OLED rect, the current normalized value [0..1], and the
+     *  formatted value text. The callback paints *everything* inside the
+     *  OLED — no default value-text rendering happens when this is set.
+     *  Used by the Shape knob to render a waveform in the top half and
+     *  the numeric value in the bottom half. */
+    std::function<void(juce::Graphics&,
+                       juce::Rectangle<float>,
+                       float,
+                       const juce::String&)> paintOLEDContents;
 
     void paint(juce::Graphics& g) override;
     void resized() override;

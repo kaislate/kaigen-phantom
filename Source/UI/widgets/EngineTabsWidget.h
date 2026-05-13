@@ -29,9 +29,8 @@ public:
 
     /** Caller-defined natural width for layout. Container is sized
      *  generously so labels (A / B / LINK) breathe at the bumped font. */
-    // Scaled ~1.4× from CSS spec so it matches the webview's rendered size.
-    static constexpr int kNaturalWidth  = 188;
-    static constexpr int kNaturalHeight = 36;
+    static constexpr int kNaturalWidth  = 138;
+    static constexpr int kNaturalHeight = 26;
 
 private:
     enum class Hit { None, TabA, TabB, Link };

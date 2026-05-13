@@ -198,7 +198,7 @@ void PhantomKnob::paint(juce::Graphics& g)
     {
         const juce::Rectangle<float> oledRect(centre.x - oledR, centre.y - oledR,
                                                oledR * 2.0f, oledR * 2.0f);
-        paintOLEDContents(g, oledRect, normVal);
+        paintOLEDContents(g, oledRect, normVal, formatValue());
     }
     else
     {

@@ -207,10 +207,8 @@ void PhantomLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& b,
         colour = isOn ? b.findColour(juce::TextButton::textColourOnId)
                       : b.findColour(juce::TextButton::textColourOffId);
 
-    // Header-glyph font bumped 13 → 18 px so the |||, ♡, ▲, ▼, 💾, ✕
-    // glyphs match the webview's rendered scale (~1.4× CSS spec).
     const float fontPx  = isMtSegment    ? juce::jmin(10.0f, b.getHeight() * 0.50f)
-                        : isHeaderGlyph  ? juce::jmin(18.0f, b.getHeight() * 0.60f)
+                        : isHeaderGlyph  ? juce::jmin(13.0f, b.getHeight() * 0.65f)
                                           : juce::jmin(13.0f, b.getHeight() * 0.50f);
     const float kerning  = isMtSegment ? 0.25f : 0.10f;
     juce::Font font(juce::FontOptions(Theme::uiFontFamily(), fontPx,

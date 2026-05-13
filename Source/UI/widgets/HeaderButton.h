@@ -36,7 +36,7 @@ public:
     void mouseExit(const juce::MouseEvent&) override;
     void mouseDown(const juce::MouseEvent& e) override;
 
-    static constexpr int kNaturalSize = 42;   // CSS 30 × 1.4 for webview-scale parity
+    static constexpr int kNaturalSize = 30;   // CSS spec
 
 private:
     void parameterChanged(const juce::String& paramId, float newValue) override;
