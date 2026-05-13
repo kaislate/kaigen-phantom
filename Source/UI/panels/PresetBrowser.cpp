@@ -451,7 +451,14 @@ void PresetBrowser::paint(juce::Graphics& g)
         if (c.kind == CategoryKind::Explore)
             paintSidebarIcon(g, iconCol.toFloat(), SidebarIcon::Explore, strokeColour);
         else if (c.kind == CategoryKind::Favorites)
-            paintSidebarIcon(g, iconCol.toFloat(), SidebarIcon::Favorites, strokeColour);
+        {
+            // Favorites uses the same unicode heart glyph as the pill, so
+            // both places read as one "heart = favorite" affordance.
+            g.setColour(strokeColour);
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 18.0f, juce::Font::plain));
+            g.drawText(juce::String(juce::CharPointer_UTF8("\xE2\x99\xA5")),
+                        iconCol, juce::Justification::centred, false);
+        }
         else if (c.kind == CategoryKind::Packs)
             paintSidebarIcon(g, iconCol.toFloat(), SidebarIcon::Packs, strokeColour);
         else if (isUserPackRow)

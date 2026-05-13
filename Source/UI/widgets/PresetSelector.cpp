@@ -66,6 +66,10 @@ PresetSelector::PresetSelector(PhantomProcessor& p, juce::AudioProcessorValueTre
         b->getProperties().set("phantom-style", "header-glyph");
         addAndMakeVisible(b);
     }
+    // Heart wants to render larger than the other glyph buttons —
+    // matches the webview where the heart is the most prominent
+    // affordance inside the pill.
+    heartButton.getProperties().set("phantom-glyph-size", 18.0f);
 
     libraryButton.setTooltip("Open preset browser");
     heartButton  .setTooltip("Toggle favorite");
@@ -216,7 +220,7 @@ void PresetSelector::resized()
     constexpr int glyphW     = 22;
     constexpr int gapWide    =  8;
     constexpr int gapTight   =  2;
-    constexpr int heartW     = 16;
+    constexpr int heartW     = 22;   // bumped 16 → 22 to fit the larger heart glyph
     constexpr int pillW      = 260;    // CSS spec min-width
 
     const int totalW = glyphW + gapWide                    // ||| + gap
