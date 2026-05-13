@@ -99,7 +99,7 @@ void EngineTabsWidget::paint(juce::Graphics& g)
                           : isHover  ? juce::Colour(kTabHoverText)
                                       : juce::Colour(kTabIdleText);
         g.setColour(colour);
-        auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 11.0f,
+        auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 12.0f,
                                                   juce::Font::bold))
                        .withExtraKerningFactor(0.15f);
         g.setFont(font);

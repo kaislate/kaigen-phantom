@@ -25,8 +25,8 @@ public:
     void mouseExit(const juce::MouseEvent& e) override;
     void mouseDown(const juce::MouseEvent& e) override;
 
-    static constexpr int kNaturalWidth  = 182;
-    static constexpr int kNaturalHeight = 26;
+    static constexpr int kNaturalWidth  = 200;
+    static constexpr int kNaturalHeight = 30;
 
     /** Retarget to <activePrefix>mode. With mirror set (LINK mode), writes
      *  also flow to the other engine's mode. */

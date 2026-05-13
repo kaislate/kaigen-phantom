@@ -29,8 +29,8 @@ public:
 
     /** Caller-defined natural width for layout. Container is sized
      *  generously so labels (A / B / LINK) breathe at the bumped font. */
-    static constexpr int kNaturalWidth  = 138;
-    static constexpr int kNaturalHeight = 26;
+    static constexpr int kNaturalWidth  = 152;
+    static constexpr int kNaturalHeight = 30;
 
 private:
     enum class Hit { None, TabA, TabB, Link };

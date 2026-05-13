@@ -36,7 +36,7 @@ public:
     void mouseExit(const juce::MouseEvent&) override;
     void mouseDown(const juce::MouseEvent& e) override;
 
-    static constexpr int kNaturalSize = 30;   // CSS spec
+    static constexpr int kNaturalSize = 32;   // CSS spec was 30; +2 to align with the 30-tall pills next door
 
 private:
     void parameterChanged(const juce::String& paramId, float newValue) override;

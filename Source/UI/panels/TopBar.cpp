@@ -61,16 +61,18 @@ void TopBar::paint(juce::Graphics& g)
         g.drawText(label, bounds, just, false);
     };
 
+    // Logo sizes nudged up from CSS spec (22 → 25, 13 → 15) for stronger
+    // on-screen presence without affecting the right-side chrome layout.
     paintEtchedLogo("PHANTOM",
-                     juce::Rectangle<int>(16, 0, 240, getHeight()),
-                     22.0f, 0.45f, Theme::logoPhantom,
+                     juce::Rectangle<int>(16, 0, 260, getHeight()),
+                     25.0f, 0.45f, Theme::logoPhantom,
                      juce::Colour(0xb8FFFFFF),   // 72% white
                      juce::Colour(0x1a000000),   // 10% black
                      juce::Justification::centredLeft);
 
     paintEtchedLogo("KAIGEN",
-                     juce::Rectangle<int>(getWidth() - 120, 0, 104, getHeight()),
-                     13.0f, 0.46f, Theme::logoKaigen,
+                     juce::Rectangle<int>(getWidth() - 124, 0, 108, getHeight()),
+                     15.0f, 0.46f, Theme::logoKaigen,
                      juce::Colour(0x99FFFFFF),   // 60% white
                      juce::Colour(0x14000000),   // 8% black
                      juce::Justification::centredRight);
@@ -83,8 +85,9 @@ void TopBar::resized()
     const int btnSize = HeaderButton::kNaturalSize;
     const int btnY    = (area.getHeight() - btnSize) / 2;
 
-    // ── Right-side chrome packs against the KAIGEN logo at getWidth() - 120.
-    constexpr int kKaigenReserve = 120;
+    // ── Right-side chrome packs against the KAIGEN logo at getWidth() - 124
+    //    (KAIGEN bumped to 15 px / wider bounds).
+    constexpr int kKaigenReserve = 124;
     int rx = area.getRight() - kKaigenReserve - 8;
 
     if (advancedBtn) { rx -= btnSize; advancedBtn->setBounds(rx, btnY, btnSize, btnSize); rx -= 6; }
