@@ -49,9 +49,13 @@ void TopBar::paint(juce::Graphics& g)
         g.drawText("PHANTOM", logoBounds, juce::Justification::centredLeft, false);
     }
 
-    // KAIGEN logo — right side. CSS spec is font-weight: 400 (Regular).
+    // KAIGEN logo — shifted left to leave space for the MORPH-9 build tag
+    // and any future right-edge status tags (matches the webview layout
+    // where MORPH-9 sits to the right of KAIGEN).
     {
-        const auto logoBounds = juce::Rectangle<int>(getWidth() - 120, 0, 104, getHeight());
+        constexpr int kRightReserve = 80;   // room for MORPH-9 to the right
+        const auto logoBounds = juce::Rectangle<int>(getWidth() - kRightReserve - 104,
+                                                      0, 104, getHeight());
         const auto font = juce::Font(juce::FontOptions(Theme::uiFontFamily(), 13.0f, juce::Font::plain))
                               .withExtraKerningFactor(0.46f);
         // White shadow below (60% white, CSS: 0 1px 0 rgba(255,255,255,0.60))
@@ -71,22 +75,22 @@ void TopBar::resized()
     const int btnSize = HeaderButton::kNaturalSize;
     const int btnY    = (area.getHeight() - btnSize) / 2;
 
-    // ── Reserve the right-side chrome first, packed against the KAIGEN
-    //    logo at x = getWidth() - 120. Everything is positioned right-to-
-    //    left so the cluster stays glued to the KAIGEN edge as the editor
-    //    resizes; the preset selector then takes whatever middle space
-    //    remains.
-    constexpr int kKaigenReserve = 120;
-    int rx = area.getRight() - kKaigenReserve - 8;   // 8 px gap before KAIGEN
-
+    // ── MORPH-9 build tag — pinned to the very right edge, matching the
+    //    webview's "tag after KAIGEN" position.
     if (buildTag)
     {
         const auto natural = buildTag->getNaturalBounds();
-        rx -= natural.getWidth();
-        buildTag->setBounds(rx, (area.getHeight() - natural.getHeight()) / 2,
+        buildTag->setBounds(area.getRight() - natural.getWidth() - 6,
+                             (area.getHeight() - natural.getHeight()) / 2,
                              natural.getWidth(), natural.getHeight());
-        rx -= 10;
     }
+
+    // ── Right-side chrome packs against the KAIGEN logo. KAIGEN's paint
+    //    now sits at getWidth() - 80 - 104 (see paint()), so reserve 80 +
+    //    104 = 184 + a small gap.
+    constexpr int kKaigenReserve = 184;
+    int rx = area.getRight() - kKaigenReserve - 8;
+
     if (advancedBtn) { rx -= btnSize; advancedBtn->setBounds(rx, btnY, btnSize, btnSize); rx -= 6; }
     if (settingsBtn) { rx -= btnSize; settingsBtn->setBounds(rx, btnY, btnSize, btnSize); rx -= 6; }
     if (bypassBtn)   { rx -= btnSize; bypassBtn  ->setBounds(rx, btnY, btnSize, btnSize); rx -= 12; }

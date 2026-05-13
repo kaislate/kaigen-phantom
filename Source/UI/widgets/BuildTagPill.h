@@ -16,7 +16,11 @@ namespace kaigen::phantom
 class BuildTagPill : public juce::Component
 {
 public:
-    explicit BuildTagPill(juce::String tagText);
+    /** Background colour override — the MORPH build tag uses the
+     *  webview's blue (#4A8DD5); the DSP status tag uses green (#0a0).
+     *  Default is the blue variant. */
+    explicit BuildTagPill(juce::String tagText,
+                          juce::Colour bg = juce::Colour(0xff4a8dd5));
     ~BuildTagPill() override = default;
 
     /** Natural size for the configured text, used by the parent's layout
@@ -28,6 +32,7 @@ public:
 
 private:
     juce::String text;
+    juce::Colour bgColour;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BuildTagPill)
 };

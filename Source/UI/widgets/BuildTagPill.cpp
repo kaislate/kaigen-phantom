@@ -12,7 +12,7 @@ namespace
     constexpr juce::uint32 kPillShadow   = 0x4d000000;   // ~30% black
     constexpr juce::uint32 kTextShadow   = 0x40000000;   // ~25% black
     constexpr float        kCorner       = 3.0f;
-    constexpr int          kPadX         = 7;
+    constexpr int          kPadX         = 9;   // bumped from 7 so antialiased glyph edges don't clip
     constexpr int          kPadY         = 2;
 
     juce::Font tagFont()
@@ -23,7 +23,8 @@ namespace
     }
 }
 
-BuildTagPill::BuildTagPill(juce::String t) : text(std::move(t)) {}
+BuildTagPill::BuildTagPill(juce::String t, juce::Colour bg)
+    : text(std::move(t)), bgColour(bg) {}
 
 juce::Rectangle<int> BuildTagPill::getNaturalBounds() const
 {
@@ -43,8 +44,8 @@ void BuildTagPill::paint(juce::Graphics& g)
         ds.drawForPath(g, p);
     }
 
-    // Blue body.
-    g.setColour(juce::Colour(kPillBg));
+    // Pill body — color set at construction (blue MORPH / green DSP).
+    g.setColour(bgColour);
     g.fillRoundedRectangle(bounds, kCorner);
 
     // Inset top highlight — 1 px white line just inside the top edge.

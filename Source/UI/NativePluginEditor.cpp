@@ -127,6 +127,14 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
     // changes from the EngineTabsWidget / WebView bindings.
     processor.getEngineFocusBroadcaster().addChangeListener(this);
     applyEngineFocus();
+
+    // DSP status tag — small green badge in the top-right corner. Matches
+    // the webview's position:fixed top:2 right:2 #0a0 marker. Overlays
+    // everything so it stays visible whatever else is on screen.
+    dspStatusTag = std::make_unique<BuildTagPill>("DSP-11",
+                                                    juce::Colour(0xff00aa00));
+    addAndMakeVisible(*dspStatusTag);
+    dspStatusTag->toFront(false);
 }
 
 void NativePluginEditor::changeListenerCallback(juce::ChangeBroadcaster* source)
@@ -186,6 +194,15 @@ void NativePluginEditor::resized()
     presetBrowser.setBounds(getLocalBounds());
     presetDropdown.setBounds(getLocalBounds());
     matrixView.setBounds(getLocalBounds());
+
+    // DSP status tag overlay at top-right corner — 2 px from the edges.
+    if (dspStatusTag)
+    {
+        const auto natural = dspStatusTag->getNaturalBounds();
+        dspStatusTag->setBounds(getWidth()  - natural.getWidth()  - 2, 2,
+                                 natural.getWidth(), natural.getHeight());
+        dspStatusTag->toFront(false);
+    }
 }
 
 } // namespace kaigen::phantom

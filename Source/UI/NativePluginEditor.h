@@ -8,6 +8,8 @@
 #include "panels/TopBar.h"
 #include "panels/PresetBrowser.h"
 #include "widgets/PresetDropdown.h"
+#include "widgets/BuildTagPill.h"
+#include <memory>
 #include "panels/ModulationPanel.h"
 #include "panels/MatrixView.h"
 
@@ -42,6 +44,7 @@ private:
     PresetBrowser presetBrowser;
     PresetDropdown presetDropdown;
     ModulationPanel modulationPanel;
+    std::unique_ptr<BuildTagPill> dspStatusTag;   // top-right corner overlay
     MatrixView matrixView;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NativePluginEditor)
