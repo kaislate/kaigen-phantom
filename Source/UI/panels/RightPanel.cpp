@@ -50,6 +50,47 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
     addAndMakeVisible(saturationKnob);
     addAndMakeVisible(shapeKnob);
     addAndMakeVisible(skipKnob);
+
+    // Shape knob OLED morphs from sine (value=0) to square (value=1) as
+    // the user turns it — clearer than a numeric % for a waveform-shaping
+    // control. Linear blend between sin() and sign(sin()) sampled at 64
+    // points across one period.
+    shapeKnob.paintOLEDContents = [](juce::Graphics& g,
+                                      juce::Rectangle<float> oled,
+                                      float v01)
+    {
+        constexpr int kSamples = 64;
+        const float w  = oled.getWidth()  * 0.78f;
+        const float h  = oled.getHeight() * 0.48f;
+        const float cx = oled.getCentreX();
+        const float cy = oled.getCentreY();
+        const float xL = cx - w * 0.5f;
+        const float blend = juce::jlimit(0.0f, 1.0f, v01);
+
+        juce::Path wave;
+        for (int i = 0; i < kSamples; ++i)
+        {
+            const float t     = (float) i / (float) (kSamples - 1);
+            const float phase = t * juce::MathConstants<float>::twoPi;
+            const float s     = std::sin(phase);
+            const float sq    = (s > 0.0f) ? 1.0f : (s < 0.0f) ? -1.0f : 0.0f;
+            const float y     = s * (1.0f - blend) + sq * blend;
+            const float px    = xL + t * w;
+            const float py    = cy - y * h;
+            if (i == 0) wave.startNewSubPath(px, py);
+            else        wave.lineTo(px, py);
+        }
+
+        // Subtle baseline (0 V line) behind the waveform for reference.
+        g.setColour(juce::Colour(0x33FFFFFF));
+        g.drawHorizontalLine((int) std::round(cy), xL, xL + w);
+
+        g.setColour(juce::Colour(0xe6FFFFFF));    // ~90% white
+        g.strokePath(wave, juce::PathStrokeType(1.2f,
+                                                  juce::PathStrokeType::curved,
+                                                  juce::PathStrokeType::rounded));
+    };
+
     addAndMakeVisible(widthKnob);
     addAndMakeVisible(inGainKnob);
     addAndMakeVisible(outGainKnob);

@@ -194,7 +194,16 @@ void PhantomKnob::paint(juce::Graphics& g)
 
     // ── Dynamic layers (re-rendered each frame) ────────────────────────
     paintIndicatorArc(g, centre, arcR, arcStart, arcSweep, normVal);
-    paintValueText   (g, centre, formatValue(), oledR);
+    if (paintOLEDContents)
+    {
+        const juce::Rectangle<float> oledRect(centre.x - oledR, centre.y - oledR,
+                                               oledR * 2.0f, oledR * 2.0f);
+        paintOLEDContents(g, oledRect, normVal);
+    }
+    else
+    {
+        paintValueText(g, centre, formatValue(), oledR);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

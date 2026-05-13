@@ -48,6 +48,12 @@ public:
     void setEnginePrefix(const juce::String& activePrefix,
                           const juce::String& mirrorPrefix = {});
 
+    /** Override the OLED-interior paint with a custom callback. Receives
+     *  the OLED rect + the current normalized value [0..1]. Used by the
+     *  Shape knob to render a sine→square waveform morph instead of the
+     *  numeric value text. */
+    std::function<void(juce::Graphics&, juce::Rectangle<float>, float)> paintOLEDContents;
+
     void paint(juce::Graphics& g) override;
     void resized() override;
     bool hitTest(int x, int y) override;
