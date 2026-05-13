@@ -7,25 +7,28 @@ namespace kaigen::phantom
 
 namespace
 {
-    // CSS .hdr-btn / .hdr-btn.active (Source/WebUI/styles.css).
-    constexpr juce::uint32 kBodyBg          = 0x17000000;   // 9% black
-    constexpr juce::uint32 kIconIdle        = 0x47000000;   // 28% black
-    constexpr juce::uint32 kIconHover       = 0x8c000000;   // 55% black (hover)
+    // Recess + etched-icon palette.
+    constexpr juce::uint32 kBodyBg          = 0x14000000;   // ~8% black — gentle darkening
+    constexpr juce::uint32 kIconIdle        = 0x70000000;   // ~44% black — etched foreground
+    constexpr juce::uint32 kIconHover       = 0xa0000000;   // ~62% black — hover
     constexpr juce::uint32 kIconActive      = 0xe03773c3;   // rgba(55,115,195,0.88)
-    constexpr juce::uint32 kInsetShadowTop  = 0x24000000;   // 14% black (inset 1.5 1.5 4)
-    constexpr juce::uint32 kInsetHighlight  = 0x7affffff;   // 48% white (inset -1.5 -1.5 3)
-    constexpr juce::uint32 kOuterShadow     = 0x12000000;   //  7% black (0 1px 3px drop)
+    constexpr juce::uint32 kIconEtchHigh    = 0x80FFFFFF;   // ~50% white — etched shadow-below
+    constexpr juce::uint32 kInsetShadowTop  = 0x33000000;   // ~20% black — top inset
+    constexpr juce::uint32 kInsetHighlight  = 0x8cffffff;   // ~55% white — bottom inset
+    constexpr juce::uint32 kOuterTopLight   = 0x66ffffff;   // ~40% white — surface lip above the well
     constexpr juce::uint32 kActiveGlow      = 0x474682d2;   // rgba(70,130,210,0.28)
 
     void paintIcon(juce::Graphics& g, juce::Rectangle<float> bounds,
-                   HeaderButton::Icon icon, juce::Colour stroke)
+                   HeaderButton::Icon icon, juce::Colour stroke, juce::Colour etchHighlight)
     {
         const auto cx = bounds.getCentreX();
         const auto cy = bounds.getCentreY();
-        const auto r  = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f * 0.6f;
+        // Smaller icon — 48 % of button radius (was 60 %) so it sits cleanly
+        // inside the recessed well.
+        const auto r  = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f * 0.48f;
 
         juce::Path p;
-        const juce::PathStrokeType strokeT(1.8f,
+        const juce::PathStrokeType strokeT(1.3f,
                                             juce::PathStrokeType::curved,
                                             juce::PathStrokeType::rounded);
 
@@ -71,6 +74,12 @@ namespace
                 break;
             }
         }
+
+        // Etched look — white catch-light 1 px below the path, dark stroke
+        // on top. Matches the etched-text effect we use elsewhere
+        // (Theme::drawEtchedText).
+        g.setColour(etchHighlight);
+        g.strokePath(p, strokeT, juce::AffineTransform::translation(0.0f, 1.0f));
 
         g.setColour(stroke);
         g.strokePath(p, strokeT);
@@ -118,25 +127,22 @@ void HeaderButton::paint(juce::Graphics& g)
     const auto bounds = getLocalBounds().toFloat().reduced(1.0f);
     const auto active = isActive();
 
-    // CSS .hdr-btn paint order:
-    //   1) outer drop shadow (1px 1px 3px black 7%)
-    //   2) body fill (9% black)
-    //   3) inset top-left shadow (1.5 1.5 4 black 14%)
-    //   4) inset bottom-right highlight (-1.5 -1.5 3 white 48%)
-    //   When .active: replace the outer drop shadow with a 6 px blue glow
-    //   (0 0 6 rgba(70,130,210,0.28)).
+    // Smooth recess paint: a subtle "surface lip" highlight just OUTSIDE
+    // the top of the button (the surrounding silver catching the light
+    // from above) + inset shadows + highlights INSIDE the button (the
+    // pocket walls). No outer drop shadow — that fights the recess.
 
-    if (! active)
+    // Outer top-edge highlight — surface lip catching light above the well.
     {
-        juce::DropShadow ds(juce::Colour(kOuterShadow), 3, { 1, 1 });
-        juce::Path p; p.addEllipse(bounds);
-        ds.drawForPath(g, p);
-    }
-    else
-    {
-        juce::DropShadow glow(juce::Colour(kActiveGlow), 6, { 0, 0 });
-        juce::Path p; p.addEllipse(bounds);
-        glow.drawForPath(g, p);
+        const auto outer = bounds.expanded(0.6f);
+        juce::Path lip;
+        lip.addCentredArc(outer.getCentreX(), outer.getCentreY(),
+                           outer.getWidth() * 0.5f, outer.getHeight() * 0.5f,
+                           0.0f,
+                           juce::MathConstants<float>::pi * 1.10f,
+                           juce::MathConstants<float>::pi * 1.90f, true);
+        g.setColour(juce::Colour(kOuterTopLight));
+        g.strokePath(lip, juce::PathStrokeType(0.8f));
     }
 
     g.setColour(juce::Colour(kBodyBg));
@@ -147,30 +153,40 @@ void HeaderButton::paint(juce::Graphics& g)
         juce::Graphics::ScopedSaveState save(g);
         g.reduceClipRegion(clip);
 
-        // Inset top-left dark: linear gradient over ~5 px (1.5 offset + 4 blur).
+        // Inset top-left shadow — soft gradient reaching ~60 % across the
+        // button so the well reads smoothly. Stronger than CSS spec to
+        // compensate for JUCE's linear-band approximation of a Gaussian blur.
         juce::ColourGradient topShadow(juce::Colour(kInsetShadowTop),
                                         bounds.getX(), bounds.getY(),
                                         juce::Colour(0x00000000),
-                                        bounds.getX() + 5.0f, bounds.getY() + 5.0f,
+                                        bounds.getCentreX(), bounds.getCentreY(),
                                         false);
         g.setGradientFill(topShadow);
         g.fillRect(bounds);
 
-        // Inset bottom-right light: linear gradient over ~4 px (1.5 + 3).
+        // Inset bottom-right highlight — soft gradient reaching ~60 %
+        // back the other way.
         juce::ColourGradient btmHigh(juce::Colour(0x00FFFFFF),
-                                      bounds.getRight()  - 4.0f, bounds.getBottom() - 4.0f,
+                                      bounds.getCentreX(), bounds.getCentreY(),
                                       juce::Colour(kInsetHighlight),
-                                      bounds.getRight(),         bounds.getBottom(),
+                                      bounds.getRight(),   bounds.getBottom(),
                                       false);
         g.setGradientFill(btmHigh);
         g.fillRect(bounds);
     }
 
-    // Icon stroke.
+    if (active)
+    {
+        juce::DropShadow glow(juce::Colour(kActiveGlow), 6, { 0, 0 });
+        juce::Path p; p.addEllipse(bounds);
+        glow.drawForPath(g, p);
+    }
+
+    // Etched icon — dark stroke with a 1 px white catch-light below.
     const auto strokeColour = active ? juce::Colour(kIconActive)
                             : hover  ? juce::Colour(kIconHover)
                                       : juce::Colour(kIconIdle);
-    paintIcon(g, bounds, icon, strokeColour);
+    paintIcon(g, bounds, icon, strokeColour, juce::Colour(kIconEtchHigh));
 }
 
 void HeaderButton::mouseEnter(const juce::MouseEvent&)
