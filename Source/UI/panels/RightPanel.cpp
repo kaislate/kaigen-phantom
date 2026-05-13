@@ -51,50 +51,60 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
     addAndMakeVisible(shapeKnob);
     addAndMakeVisible(skipKnob);
 
-    // Shape knob OLED: waveform in the upper half (sine→square morph as the
-    // knob turns), numeric value in the lower half. The waveform is the
-    // primary at-a-glance cue; the number is the precise readout.
+    // Shape knob OLED: small waveform in the upper portion (sine→square
+    // morph), numeric value in the lower portion. The OLED itself is a
+    // CIRCLE, so all content stays inside an inscribed-square safe area
+    // (~65 % of the OLED diameter) to avoid clipping at the edges.
     shapeKnob.paintOLEDContents = [](juce::Graphics& g,
                                       juce::Rectangle<float> oled,
                                       float v01,
                                       const juce::String& valueText)
     {
-        constexpr int kSamples = 64;
-        const float blend = juce::jlimit(0.0f, 1.0f, v01);
+        const float diameter = juce::jmin(oled.getWidth(), oled.getHeight());
+        const float safeW    = diameter * 0.55f;
+        const float cx       = oled.getCentreX();
+        const float cy       = oled.getCentreY();
 
-        // Upper half — waveform.
-        auto upper = oled.withTrimmedBottom(oled.getHeight() * 0.45f).reduced(4.0f, 2.0f);
-        const float w  = upper.getWidth();
-        const float h  = upper.getHeight() * 0.42f;
-        const float cx = upper.getCentreX();
-        const float cy = upper.getCentreY();
-        const float xL = cx - w * 0.5f;
-
-        juce::Path wave;
-        for (int i = 0; i < kSamples; ++i)
+        // Upper portion — waveform centred above the OLED midline.
         {
-            const float t     = (float) i / (float) (kSamples - 1);
-            const float phase = t * juce::MathConstants<float>::twoPi;
-            const float s     = std::sin(phase);
-            const float sq    = (s > 0.0f) ? 1.0f : (s < 0.0f) ? -1.0f : 0.0f;
-            const float y     = s * (1.0f - blend) + sq * blend;
-            const float px    = xL + t * w;
-            const float py    = cy - y * h;
-            if (i == 0) wave.startNewSubPath(px, py);
-            else        wave.lineTo(px, py);
-        }
-        g.setColour(juce::Colour(0xe6FFFFFF));   // ~90% white
-        g.strokePath(wave, juce::PathStrokeType(1.4f,
-                                                  juce::PathStrokeType::curved,
-                                                  juce::PathStrokeType::rounded));
+            const float waveW    = safeW;
+            const float waveAmp  = diameter * 0.075f;   // peak Y excursion
+            const float waveCY   = cy - diameter * 0.16f;
+            const float xL       = cx - waveW * 0.5f;
+            const float blend    = juce::jlimit(0.0f, 1.0f, v01);
 
-        // Lower half — formatted value (matches the default paintValueText
-        // styling so it reads like the other knobs' OLED numbers).
-        auto lower = oled.withTrimmedTop(oled.getHeight() * 0.55f);
-        const float textPx = oled.getHeight() * 0.32f;
-        g.setFont(juce::FontOptions("Courier New", textPx, juce::Font::bold));
-        g.setColour(juce::Colour(0xe6FFFFFF));
-        g.drawText(valueText, lower, juce::Justification::centred, false);
+            constexpr int kSamples = 40;
+            juce::Path wave;
+            for (int i = 0; i < kSamples; ++i)
+            {
+                const float t     = (float) i / (float) (kSamples - 1);
+                const float phase = t * juce::MathConstants<float>::twoPi;
+                const float s     = std::sin(phase);
+                const float sq    = (s > 0.0f) ? 1.0f : (s < 0.0f) ? -1.0f : 0.0f;
+                const float y     = s * (1.0f - blend) + sq * blend;
+                const float px    = xL + t * waveW;
+                const float py    = waveCY - y * waveAmp;
+                if (i == 0) wave.startNewSubPath(px, py);
+                else        wave.lineTo(px, py);
+            }
+            g.setColour(juce::Colour(0xe6FFFFFF));
+            g.strokePath(wave, juce::PathStrokeType(1.0f,
+                                                      juce::PathStrokeType::curved,
+                                                      juce::PathStrokeType::rounded));
+        }
+
+        // Lower portion — formatted value at the default OLED text size
+        // for this knob variant (Medium = 12 px). Sized off the diameter
+        // so it stays proportional if the knob's size changes.
+        {
+            const float textPx = diameter * 0.16f;      // ~12 px on a ~75 px OLED
+            const auto textRect = juce::Rectangle<float>(
+                cx - safeW * 0.5f, cy + diameter * 0.04f,
+                safeW,             diameter * 0.32f);
+            g.setFont(juce::FontOptions("Courier New", textPx, juce::Font::bold));
+            g.setColour(juce::Colour(0xe6FFFFFF));
+            g.drawText(valueText, textRect, juce::Justification::centred, false);
+        }
     };
 
     addAndMakeVisible(widthKnob);
