@@ -239,39 +239,36 @@ void RightPanel::resized()
     // by 2 px each (closer to the centre of the section) and tightened
     // against the In/Out knobs.
     const int levelsCardX = x - 4;
-    constexpr int kMeterW = 12;          // wider (was 8)
-    constexpr int kMeterInset = 8;       // meters sit further inward toward the knobs
+    constexpr int kMeterW = 12;
+    constexpr int kMeterInset = 4;      // tightened from 8 to make room for Trim in the row
+    constexpr int kMedSmallOverlap = 30;  // Medium↔Small halo overlap (keeps body gap ~11 px)
+    constexpr int kSmallSide = 90;        // PhantomKnob::Small natural size
+
     inMeter.setBounds(x + kMeterInset, knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
     x += kMeterInset + kMeterW + 2;
-    const int inGainX = x;
     inGainKnob .setBounds(x, knobRowTop, kMedium, kMedium);
-    x += kMedium - knobOverlap;
+    x += kMedium - kMedSmallOverlap;
+
+    // Small Trim knob inline between In and Out. y-offset aligns its body
+    // centre with the larger knobs' body centres (Small has less shadow
+    // padding above, so we shift it down by half the body-height delta).
+    const int trimY = knobRowTop + (kMedium - kSmallSide) / 2 + 1;
+    trimKnob.setBounds(x, trimY, kSmallSide, kSmallSide);
+    x += kSmallSide - kMedSmallOverlap;
+
     outGainKnob.setBounds(x, knobRowTop, kMedium, kMedium);
-    const int outGainX = x;
     x += kMedium + 2;
     outMeter.setBounds(x, knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
     x += kMeterW + kMeterInset;
     const int levelsCardRight = x + 4;
-
-    // Small Trim knob in a 2nd row, centred horizontally between the In and
-    // Out medium knobs and sitting just below them.
-    constexpr int kSmallSide = 90;              // PhantomKnob::Small natural size
-    const int trimRowTop = knobRowTop + kMedium - 16;    // overlap shadow halos
-    const int trimCentre = (inGainX + (kMedium / 2) + outGainX + (kMedium / 2)) / 2;
-    trimKnob.setBounds(trimCentre - kSmallSide / 2, trimRowTop, kSmallSide, kSmallSide);
-
-    // Grow the Levels card to encompass the Trim knob's visible body.
-    const int levelsCardBottom = trimRowTop + kSmallSide - 8;
     levelsCardBounds = juce::Rectangle<int>(levelsCardX, cardTop,
-                                             levelsCardRight - levelsCardX,
-                                             levelsCardBottom - cardTop);
+                                             levelsCardRight - levelsCardX, cardHeight);
 
-    // Reserve area below the (now taller) Levels card for advanced + visualizers.
-    area.removeFromTop(levelsCardBottom + cardPadY);
+    // Reserve area below the top knob row for advanced + visualizers.
+    area.removeFromTop(knobRowTop + knobRowHeight + cardPadY);
 
     // --- Advanced section: toggle ABOVE the mini knob row ---
-    // Pushed down to clear the taller Levels card.
-    const int advancedToggleY = levelsCardBottom + 16;
+    constexpr int advancedToggleY = 220;
     constexpr int advancedToggleH = 20;
     advancedToggle.setBounds(12, advancedToggleY, 100, advancedToggleH);
 
