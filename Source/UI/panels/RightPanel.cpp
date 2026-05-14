@@ -43,8 +43,8 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
       widthKnob     (apvts, "a_stereo_width",        PhantomKnob::Size::Medium, "Width"),
       inGainKnob    (apvts, "input_gain",            PhantomKnob::Size::Medium, "In"),
       outGainKnob   (apvts, "a_output_gain",         PhantomKnob::Size::Medium, "Out"),
-      inMeter       (p.peakInL),
-      outMeter      (p.peakOutL),
+      inMeter       (p.peakInL,  p.peakInR),
+      outMeter      (p.peakOutL, p.peakOutR),
       oscilloscope  (p),
       spectrum      (p, a)
 {
@@ -224,10 +224,12 @@ void RightPanel::resized()
     const int levelsCardRight = getWidth() - kAdvancedSidePad;
     const int levelsCardW     = levelsCardRight - levelsCardX;
 
-    constexpr int kMeterW          = 12;
+    constexpr int kMeterW          = 20;   // stereo meter — 2 bars + small gap
     constexpr int kMedSmallOverlap = 30;
     constexpr int kSmallSide       = 90;
     constexpr int kKnobShadowPad   = 24;
+    constexpr int kMeterEdgeMargin = 6;    // breathing room from the section card edge
+    constexpr int kMeterKnobGap    = 6;    // gap between meter and knob shadow halo
 
     // --- Harmonic Engine: 3 medium knobs, fit into harmonicCardW ──────
     // Adaptive overlap so 3 mediums fit the card's content area exactly.
@@ -255,12 +257,16 @@ void RightPanel::resized()
     // --- Levels: In + Trim + Out, content centred in the card ─────────
     // Meters tuck inside the In/Out shadow halos so the section can
     // remain narrow without losing visible body sizes.
+    // The In/Out/Trim trio sits in the centre of the card; the meters sit
+    // OUTSIDE the knobs' shadow halos with a small margin from the card edge.
     const int levelsContentW = kMedium
                               + (kSmallSide - kMedSmallOverlap)
                               + (kMedium    - kMedSmallOverlap);
     const int inGainX = levelsCardX + (levelsCardW - levelsContentW) / 2;
     inGainKnob.setBounds(inGainX, knobRowTop, kMedium, kMedium);
-    inMeter.setBounds(inGainX + kKnobShadowPad - kMeterW - 2,
+    // Left meter — clear of In's left shadow halo + clear of card edge.
+    inMeter.setBounds(juce::jmax(levelsCardX + kMeterEdgeMargin,
+                                  inGainX - kMeterKnobGap - kMeterW),
                        knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
 
     const int trimX = inGainX + kMedium - kMedSmallOverlap;
@@ -269,8 +275,9 @@ void RightPanel::resized()
 
     const int outGainX = trimX + kSmallSide - kMedSmallOverlap;
     outGainKnob.setBounds(outGainX, knobRowTop, kMedium, kMedium);
-    const int outBodyRight = outGainX + kMedium - kKnobShadowPad;
-    outMeter.setBounds(outBodyRight + 2,
+    // Right meter — mirror of the left, outside Out's right shadow halo.
+    outMeter.setBounds(juce::jmin(levelsCardRight - kMeterEdgeMargin - kMeterW,
+                                   outGainX + kMedium + kMeterKnobGap),
                         knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
 
     levelsCardBounds = juce::Rectangle<int>(levelsCardX, cardTop,
