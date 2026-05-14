@@ -224,12 +224,12 @@ void RightPanel::resized()
     const int levelsCardRight = getWidth() - kAdvancedSidePad;
     const int levelsCardW     = levelsCardRight - levelsCardX;
 
-    constexpr int kMeterW          = 20;   // stereo meter — 2 bars + small gap
+    constexpr int kMeterW          = 28;   // wider bars — each L/R bar is ~13 px
     constexpr int kMedSmallOverlap = 30;
     constexpr int kSmallSide       = 90;
     constexpr int kKnobShadowPad   = 24;
     constexpr int kMeterEdgeMargin = 6;    // breathing room from the section card edge
-    constexpr int kMeterKnobGap    = 6;    // gap between meter and knob shadow halo
+    constexpr int kMeterKnobGap    = -2;   // negative → meter shifts ~8 px inward into the shadow halo
 
     // --- Harmonic Engine: 3 medium knobs, fit into harmonicCardW ──────
     // Adaptive overlap so 3 mediums fit the card's content area exactly.
