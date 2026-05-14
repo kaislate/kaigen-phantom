@@ -22,7 +22,7 @@ void RightPanel::setEnginePrefix(const juce::String& activePrefix,
 {
     // Skip inGainKnob — input_gain is global, not per-engine; its
     // PhantomKnob.isPerEngine() returns false and setEnginePrefix is a no-op.
-    for (auto* k : { &saturationKnob, &shapeKnob, &skipKnob,
+    for (auto* k : { &saturationKnob, &shapeKnob, &skipKnob, &trimKnob,
                      &widthKnob, &outGainKnob })
         k->setEnginePrefix(activePrefix, mirrorPrefix);
 
@@ -39,6 +39,7 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
       saturationKnob(apvts, "a_harmonic_saturation", PhantomKnob::Size::Medium, "Saturation"),
       shapeKnob     (apvts, "a_synth_step",          PhantomKnob::Size::Medium, "Shape"),
       skipKnob      (apvts, "a_synth_skip",          PhantomKnob::Size::Medium, "Skip"),
+      trimKnob      (apvts, "a_synth_trim",          PhantomKnob::Size::Small,  "Trim"),
       widthKnob     (apvts, "a_stereo_width",        PhantomKnob::Size::Medium, "Width"),
       inGainKnob    (apvts, "input_gain",            PhantomKnob::Size::Medium, "In"),
       outGainKnob   (apvts, "a_output_gain",         PhantomKnob::Size::Medium, "Out"),
@@ -50,6 +51,7 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
     addAndMakeVisible(saturationKnob);
     addAndMakeVisible(shapeKnob);
     addAndMakeVisible(skipKnob);
+    addAndMakeVisible(trimKnob);
 
     // Shape knob OLED: small waveform in the upper portion (sine→square
     // morph), numeric value in the lower portion. The OLED itself is a
@@ -141,9 +143,8 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
             { "a_env_attack_ms",         "Attack"    },
             { "a_env_release_ms",        "Release"   },
             { "a_binaural_width",        "Width"     },
-            { "a_synth_trim",            "Trim"      },
         };
-        static_assert(sizeof(miniDefs) / sizeof(miniDefs[0]) == 15, "15 mini knobs expected");
+        static_assert(sizeof(miniDefs) / sizeof(miniDefs[0]) == 14, "14 mini knobs expected");
 
         for (size_t i = 0; i < miniKnobs.size(); ++i)
         {
@@ -242,23 +243,35 @@ void RightPanel::resized()
     constexpr int kMeterInset = 8;       // meters sit further inward toward the knobs
     inMeter.setBounds(x + kMeterInset, knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
     x += kMeterInset + kMeterW + 2;
+    const int inGainX = x;
     inGainKnob .setBounds(x, knobRowTop, kMedium, kMedium);
     x += kMedium - knobOverlap;
     outGainKnob.setBounds(x, knobRowTop, kMedium, kMedium);
+    const int outGainX = x;
     x += kMedium + 2;
     outMeter.setBounds(x, knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
     x += kMeterW + kMeterInset;
     const int levelsCardRight = x + 4;
-    levelsCardBounds = juce::Rectangle<int>(levelsCardX, cardTop,
-                                             levelsCardRight - levelsCardX, cardHeight);
 
-    // Reserve area below the top knob row for advanced + visualizers.
-    area.removeFromTop(knobRowTop + knobRowHeight + cardPadY);
+    // Small Trim knob in a 2nd row, centred horizontally between the In and
+    // Out medium knobs and sitting just below them.
+    constexpr int kSmallSide = 90;              // PhantomKnob::Small natural size
+    const int trimRowTop = knobRowTop + kMedium - 16;    // overlap shadow halos
+    const int trimCentre = (inGainX + (kMedium / 2) + outGainX + (kMedium / 2)) / 2;
+    trimKnob.setBounds(trimCentre - kSmallSide / 2, trimRowTop, kSmallSide, kSmallSide);
+
+    // Grow the Levels card to encompass the Trim knob's visible body.
+    const int levelsCardBottom = trimRowTop + kSmallSide - 8;
+    levelsCardBounds = juce::Rectangle<int>(levelsCardX, cardTop,
+                                             levelsCardRight - levelsCardX,
+                                             levelsCardBottom - cardTop);
+
+    // Reserve area below the (now taller) Levels card for advanced + visualizers.
+    area.removeFromTop(levelsCardBottom + cardPadY);
 
     // --- Advanced section: toggle ABOVE the mini knob row ---
-    // Add ~32 px of breathing room below the top row before the Advanced
-    // section starts, matching the photo reference.
-    constexpr int advancedToggleY = 220;          // was 182
+    // Pushed down to clear the taller Levels card.
+    const int advancedToggleY = levelsCardBottom + 16;
     constexpr int advancedToggleH = 20;
     advancedToggle.setBounds(12, advancedToggleY, 100, advancedToggleH);
 
