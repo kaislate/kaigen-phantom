@@ -201,7 +201,7 @@ void RightPanel::resized()
     // by the panel's top edge.
     constexpr int knobRowTop    = 36;
     constexpr int knobRowHeight = kMedium;
-    constexpr int sectionGap    = 16;
+    constexpr int sectionGap    = 8;    // gap between HE/Stereo and Stereo/Levels (was 16)
     constexpr int cardPadY      = 4;
     const int cardTop = knobRowTop - 24;   // card top above the header label
     const int cardHeight = knobRowHeight + 24 + cardPadY * 2;
