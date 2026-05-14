@@ -22,7 +22,7 @@ void RightPanel::setEnginePrefix(const juce::String& activePrefix,
 {
     // Skip inGainKnob — input_gain is global, not per-engine; its
     // PhantomKnob.isPerEngine() returns false and setEnginePrefix is a no-op.
-    for (auto* k : { &saturationKnob, &shapeKnob, &skipKnob, &trimKnob,
+    for (auto* k : { &saturationKnob, &shapeKnob, &skipKnob,
                      &widthKnob, &outGainKnob })
         k->setEnginePrefix(activePrefix, mirrorPrefix);
 
@@ -39,7 +39,6 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
       saturationKnob(apvts, "a_harmonic_saturation", PhantomKnob::Size::Medium, "Saturation"),
       shapeKnob     (apvts, "a_synth_step",          PhantomKnob::Size::Medium, "Shape"),
       skipKnob      (apvts, "a_synth_skip",          PhantomKnob::Size::Medium, "Skip"),
-      trimKnob      (apvts, "a_synth_trim",          PhantomKnob::Size::Medium, "Trim"),
       widthKnob     (apvts, "a_stereo_width",        PhantomKnob::Size::Medium, "Width"),
       inGainKnob    (apvts, "input_gain",            PhantomKnob::Size::Medium, "In"),
       outGainKnob   (apvts, "a_output_gain",         PhantomKnob::Size::Medium, "Out"),
@@ -51,7 +50,6 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
     addAndMakeVisible(saturationKnob);
     addAndMakeVisible(shapeKnob);
     addAndMakeVisible(skipKnob);
-    addAndMakeVisible(trimKnob);
 
     // Shape knob OLED: small waveform in the upper portion (sine→square
     // morph), numeric value in the lower portion. The OLED itself is a
@@ -143,8 +141,9 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
             { "a_env_attack_ms",         "Attack"    },
             { "a_env_release_ms",        "Release"   },
             { "a_binaural_width",        "Width"     },
+            { "a_synth_trim",            "Trim"      },
         };
-        static_assert(sizeof(miniDefs) / sizeof(miniDefs[0]) == 14, "14 mini knobs expected");
+        static_assert(sizeof(miniDefs) / sizeof(miniDefs[0]) == 15, "15 mini knobs expected");
 
         for (size_t i = 0; i < miniKnobs.size(); ++i)
         {
@@ -209,15 +208,14 @@ void RightPanel::resized()
 
     int x = 12;
 
-    // --- Harmonic Engine: 4 medium knobs (Saturation / Shape / Skip / Trim) ---
+    // --- Harmonic Engine: 3 medium knobs (Saturation / Shape / Skip) ---
+    // Trim lives in the Advanced mini-knob row below.
     const int harmonicCardX = x - 4;
     saturationKnob.setBounds(x, knobRowTop, kMedium, kMedium);
     x += kMedium - knobOverlap;
     shapeKnob     .setBounds(x, knobRowTop, kMedium, kMedium);
     x += kMedium - knobOverlap;
     skipKnob      .setBounds(x, knobRowTop, kMedium, kMedium);
-    x += kMedium - knobOverlap;
-    trimKnob      .setBounds(x, knobRowTop, kMedium, kMedium);
     x += kMedium;
     const int harmonicCardRight = x + 4;
     harmonicCardBounds = juce::Rectangle<int>(harmonicCardX, cardTop,

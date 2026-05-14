@@ -40,7 +40,6 @@ private:
     PhantomKnob saturationKnob;
     PhantomKnob shapeKnob;
     PhantomKnob skipKnob;
-    PhantomKnob trimKnob;
 
     // Stereo section
     PhantomKnob widthKnob;
@@ -57,8 +56,10 @@ private:
     IOMeter inMeter;
     IOMeter outMeter;
 
-    // Advanced panel — 14 mini knobs, all per-engine 'a_' prefix.
-    std::array<std::unique_ptr<PhantomMiniKnob>, 14> miniKnobs;
+    // Advanced panel — 15 mini knobs, all per-engine 'a_' prefix
+    // (Push / H1 / Sub / Length / Gate / MinSmp / MaxSmp / Track / Punch /
+    //  PunchAmt / BoostThr / BoostAmt / MIDI Trig / Gate Rel / Trim).
+    std::array<std::unique_ptr<PhantomMiniKnob>, 15> miniKnobs;
 
     // Advanced section collapse toggle (instant, no animation).
     juce::TextButton advancedToggle { "Advanced (-)" };
