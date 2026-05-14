@@ -234,33 +234,44 @@ void RightPanel::resized()
 
     x += sectionGap;
 
-    // --- Levels: meter + 2 medium knobs + meter ───────────────────────
-    // Meters sit inside their own 8-wide depressed slots, moved inward
-    // by 2 px each (closer to the centre of the section) and tightened
-    // against the In/Out knobs.
-    const int levelsCardX = x - 4;
-    constexpr int kMeterW = 12;
-    constexpr int kMeterInset = 4;      // tightened from 8 to make room for Trim in the row
-    constexpr int kMedSmallOverlap = 30;  // Medium↔Small halo overlap (keeps body gap ~11 px)
-    constexpr int kSmallSide = 90;        // PhantomKnob::Small natural size
+    // --- Levels: meter + In + Trim + Out + meter ──────────────────────
+    // Right-anchored so the card aligns with the Advanced section's
+    // right edge (getWidth() - 8). Meters tuck inside the In/Out shadow
+    // halos so the section can be narrow without sacrificing visible
+    // body sizes.
+    constexpr int kMeterW          = 12;
+    constexpr int kMedSmallOverlap = 30;   // Medium↔Small halo overlap (~11 px body gap)
+    constexpr int kSmallSide       = 90;
+    constexpr int kKnobShadowPad   = 24;
 
-    inMeter.setBounds(x + kMeterInset, knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
-    x += kMeterInset + kMeterW + 2;
-    inGainKnob .setBounds(x, knobRowTop, kMedium, kMedium);
-    x += kMedium - kMedSmallOverlap;
+    // Compute the section's natural width (In + overlap + Trim + overlap + Out)
+    // then right-anchor it to the Advanced section's right edge.
+    const int levelsContentW = kMedium
+                              + (kSmallSide - kMedSmallOverlap)
+                              + (kMedium    - kMedSmallOverlap);
+    constexpr int kAdvancedRight = 8;   // Advanced card right pad = 8 (see below)
+    const int levelsContentRight = getWidth() - kAdvancedRight - 4;   // 4 px card inner pad
+    const int inGainX     = levelsContentRight - levelsContentW;
 
-    // Small Trim knob inline between In and Out. y-offset aligns its body
-    // centre with the larger knobs' body centres (Small has less shadow
-    // padding above, so we shift it down by half the body-height delta).
+    inGainKnob.setBounds(inGainX, knobRowTop, kMedium, kMedium);
+    inMeter.setBounds(inGainX + kKnobShadowPad - kMeterW - 2,
+                       knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
+
+    const int trimX = inGainX + kMedium - kMedSmallOverlap;
     const int trimY = knobRowTop + (kMedium - kSmallSide) / 2 + 1;
-    trimKnob.setBounds(x, trimY, kSmallSide, kSmallSide);
-    x += kSmallSide - kMedSmallOverlap;
+    trimKnob.setBounds(trimX, trimY, kSmallSide, kSmallSide);
 
-    outGainKnob.setBounds(x, knobRowTop, kMedium, kMedium);
-    x += kMedium + 2;
-    outMeter.setBounds(x, knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
-    x += kMeterW + kMeterInset;
-    const int levelsCardRight = x + 4;
+    const int outGainX = trimX + kSmallSide - kMedSmallOverlap;
+    outGainKnob.setBounds(outGainX, knobRowTop, kMedium, kMedium);
+    const int outBodyRight = outGainX + kMedium - kKnobShadowPad;
+    outMeter.setBounds(outBodyRight + 2,
+                        knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
+
+    // Card spans from inGainX (left edge of In's component) to the panel's
+    // advanced-aligned right edge.
+    const int levelsCardX     = inGainX - 4;
+    const int levelsCardRight = getWidth() - kAdvancedRight;
+    x = levelsCardRight;
     levelsCardBounds = juce::Rectangle<int>(levelsCardX, cardTop,
                                              levelsCardRight - levelsCardX, cardHeight);
 
