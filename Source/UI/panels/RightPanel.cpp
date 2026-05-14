@@ -201,58 +201,64 @@ void RightPanel::resized()
     // by the panel's top edge.
     constexpr int knobRowTop    = 36;
     constexpr int knobRowHeight = kMedium;
-    constexpr int knobOverlap   = 24;   // adjacent knobs overlap their shadow halos
     constexpr int sectionGap    = 16;
     constexpr int cardPadY      = 4;
     const int cardTop = knobRowTop - 24;   // card top above the header label
     const int cardHeight = knobRowHeight + 24 + cardPadY * 2;
 
-    int x = 12;
+    // ── Layout strategy ────────────────────────────────────────────────
+    // Stereo is centred horizontally with the panel (so it aligns with
+    // the Advanced card's centre). HE and Levels become symmetric
+    // mirror partners with equal widths and equal 16 px gaps to Stereo.
+    constexpr int kAdvancedSidePad = 8;   // Advanced card sits at x=8 .. getWidth()-8
+    const int panelCentre   = getWidth() / 2;
+    const int stereoCardW   = kMedium + 8;             // 1 medium + 4 pad each side
+    const int stereoCardX   = panelCentre - stereoCardW / 2;
+    const int stereoCardRight = stereoCardX + stereoCardW;
 
-    // --- Harmonic Engine: 3 medium knobs (Saturation / Shape / Skip) ---
-    // Trim lives in the Advanced mini-knob row below.
-    const int harmonicCardX = x - 4;
-    saturationKnob.setBounds(x, knobRowTop, kMedium, kMedium);
-    x += kMedium - knobOverlap;
-    shapeKnob     .setBounds(x, knobRowTop, kMedium, kMedium);
-    x += kMedium - knobOverlap;
-    skipKnob      .setBounds(x, knobRowTop, kMedium, kMedium);
-    x += kMedium;
-    const int harmonicCardRight = x + 4;
-    harmonicCardBounds = juce::Rectangle<int>(harmonicCardX, cardTop,
-                                              harmonicCardRight - harmonicCardX, cardHeight);
+    const int harmonicCardX     = kAdvancedSidePad;
+    const int harmonicCardRight = stereoCardX - sectionGap;
+    const int harmonicCardW     = harmonicCardRight - harmonicCardX;
 
-    x += sectionGap;
+    const int levelsCardX     = stereoCardRight + sectionGap;
+    const int levelsCardRight = getWidth() - kAdvancedSidePad;
+    const int levelsCardW     = levelsCardRight - levelsCardX;
 
-    // --- Stereo: 1 medium knob ---
-    const int stereoCardX = x - 4;
-    widthKnob.setBounds(x, knobRowTop, kMedium, kMedium);
-    x += kMedium;
-    const int stereoCardRight = x + 4;
-    stereoCardBounds = juce::Rectangle<int>(stereoCardX, cardTop,
-                                             stereoCardRight - stereoCardX, cardHeight);
-
-    x += sectionGap;
-
-    // --- Levels: meter + In + Trim + Out + meter ──────────────────────
-    // Right-anchored so the card aligns with the Advanced section's
-    // right edge (getWidth() - 8). Meters tuck inside the In/Out shadow
-    // halos so the section can be narrow without sacrificing visible
-    // body sizes.
     constexpr int kMeterW          = 12;
-    constexpr int kMedSmallOverlap = 30;   // Medium↔Small halo overlap (~11 px body gap)
+    constexpr int kMedSmallOverlap = 30;
     constexpr int kSmallSide       = 90;
     constexpr int kKnobShadowPad   = 24;
 
-    // Compute the section's natural width (In + overlap + Trim + overlap + Out)
-    // then right-anchor it to the Advanced section's right edge.
+    // --- Harmonic Engine: 3 medium knobs, fit into harmonicCardW ──────
+    // Adaptive overlap so 3 mediums fit the card's content area exactly.
+    // contentW = harmonicCardW - 8 (4 px pad each side).
+    // contentW = kMedium + 2 * (kMedium - heOverlap)
+    // => heOverlap = (3 * kMedium - contentW) / 2
+    {
+        const int contentW = harmonicCardW - 8;
+        const int heOverlap = juce::jmax(24, (3 * kMedium - contentW) / 2);
+        int hx = harmonicCardX + 4;
+        saturationKnob.setBounds(hx, knobRowTop, kMedium, kMedium);
+        hx += kMedium - heOverlap;
+        shapeKnob     .setBounds(hx, knobRowTop, kMedium, kMedium);
+        hx += kMedium - heOverlap;
+        skipKnob      .setBounds(hx, knobRowTop, kMedium, kMedium);
+    }
+    harmonicCardBounds = juce::Rectangle<int>(harmonicCardX, cardTop,
+                                              harmonicCardW, cardHeight);
+
+    // --- Stereo: 1 medium knob centred in the card ────────────────────
+    widthKnob.setBounds(stereoCardX + 4, knobRowTop, kMedium, kMedium);
+    stereoCardBounds = juce::Rectangle<int>(stereoCardX, cardTop,
+                                             stereoCardW, cardHeight);
+
+    // --- Levels: In + Trim + Out, content centred in the card ─────────
+    // Meters tuck inside the In/Out shadow halos so the section can
+    // remain narrow without losing visible body sizes.
     const int levelsContentW = kMedium
                               + (kSmallSide - kMedSmallOverlap)
                               + (kMedium    - kMedSmallOverlap);
-    constexpr int kAdvancedRight = 8;   // Advanced card right pad = 8 (see below)
-    const int levelsContentRight = getWidth() - kAdvancedRight - 4;   // 4 px card inner pad
-    const int inGainX     = levelsContentRight - levelsContentW;
-
+    const int inGainX = levelsCardX + (levelsCardW - levelsContentW) / 2;
     inGainKnob.setBounds(inGainX, knobRowTop, kMedium, kMedium);
     inMeter.setBounds(inGainX + kKnobShadowPad - kMeterW - 2,
                        knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
@@ -267,13 +273,8 @@ void RightPanel::resized()
     outMeter.setBounds(outBodyRight + 2,
                         knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
 
-    // Card spans from inGainX (left edge of In's component) to the panel's
-    // advanced-aligned right edge.
-    const int levelsCardX     = inGainX - 4;
-    const int levelsCardRight = getWidth() - kAdvancedRight;
-    x = levelsCardRight;
     levelsCardBounds = juce::Rectangle<int>(levelsCardX, cardTop,
-                                             levelsCardRight - levelsCardX, cardHeight);
+                                             levelsCardW, cardHeight);
 
     // Reserve area below the top knob row for advanced + visualizers.
     area.removeFromTop(knobRowTop + knobRowHeight + cardPadY);
