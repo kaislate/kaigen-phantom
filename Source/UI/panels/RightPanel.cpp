@@ -229,7 +229,7 @@ void RightPanel::resized()
     constexpr int kSmallSide       = 90;
     constexpr int kKnobShadowPad   = 24;
     constexpr int kMeterEdgeMargin = 6;    // breathing room from the section card edge
-    constexpr int kMeterKnobGap    = -2;   // negative → meter shifts ~8 px inward into the shadow halo
+    constexpr int kMeterKnobGap    = -8;   // negative → meter shifts further into the shadow halo
 
     // --- Harmonic Engine: 3 medium knobs, fit into harmonicCardW ──────
     // Adaptive overlap so 3 mediums fit the card's content area exactly.
