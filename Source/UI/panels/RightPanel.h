@@ -6,6 +6,7 @@
 #include "../widgets/PhantomKnob.h"
 #include "../widgets/PhantomMiniKnob.h"
 #include "../widgets/IOMeter.h"
+#include "../widgets/WordSelector.h"
 #include "../visualizers/Oscilloscope.h"
 #include "../visualizers/Spectrum.h"
 
@@ -52,9 +53,9 @@ private:
     PhantomKnob inGainKnob;
     PhantomKnob outGainKnob;
 
-    // Levels section auto-gain toggle
-    juce::TextButton autoGainButton { "Auto" };
-    std::unique_ptr<juce::ButtonParameterAttachment> autoGainAttachment;
+    // Levels section auto-gain toggle — same WordSelector style as the
+    // Ghost Mode (Replace / Combine / Phantom Only) toggle in LeftPanel.
+    WordSelector autoGainToggle;
 
     // Levels section meters (flanking In/Out knobs)
     IOMeter inMeter;

@@ -45,6 +45,7 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
       outGainKnob   (apvts, "a_output_gain",         PhantomKnob::Size::Medium, "Out"),
       inMeter       (p.peakInL,  p.peakInR),
       outMeter      (p.peakOutL, p.peakOutR),
+      autoGainToggle(apvts, "input_gain_auto", { "Manual", "Auto" }),
       oscilloscope  (p),
       spectrum      (p, a)
 {
@@ -125,13 +126,7 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
     addAndMakeVisible(oscilloscope);
     addAndMakeVisible(spectrum);
 
-    autoGainButton.setClickingTogglesState(true);
-    autoGainButton.getProperties().set("phantom-style", "header-raised");
-    addAndMakeVisible(autoGainButton);
-    if (auto* param = apvts.getParameter("input_gain_auto"))
-        autoGainAttachment = std::make_unique<juce::ButtonParameterAttachment>(*param, autoGainButton);
-    else
-        jassertfalse;  // unknown paramID: typo or stale reference
+    addAndMakeVisible(autoGainToggle);
 
     {
         static constexpr struct { const char* paramID; const char* label; } miniDefs[] = {
@@ -343,8 +338,16 @@ void RightPanel::resized()
     vizArea.removeFromTop(8);
     spectrum    .setBounds(vizArea.removeFromTop(280));
 
-    // Auto button — positioned next to the "Levels" section header.
-    autoGainButton.setBounds(580, 6, 40, 18);
+    // Auto/Manual toggle — sits just above the PKE (In) knob, centred on
+    // the knob's body. Same WordSelector visual style as the Ghost-Mode
+    // (Replace / Combine / Phantom Only) toggle in LeftPanel.
+    {
+        const int  inBodyCx = inGainKnob.getX() + kMedium / 2;
+        constexpr int kAutoW = 96;
+        constexpr int kAutoH = 16;
+        const int autoY = inGainKnob.getY() - kAutoH - 2;
+        autoGainToggle.setBounds(inBodyCx - kAutoW / 2, autoY, kAutoW, kAutoH);
+    }
 }
 
 } // namespace kaigen::phantom
