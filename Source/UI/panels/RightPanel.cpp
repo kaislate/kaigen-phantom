@@ -41,7 +41,7 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
       skipKnob      (apvts, "a_synth_skip",          PhantomKnob::Size::Medium, "Skip"),
       trimKnob      (apvts, "a_synth_trim",          PhantomKnob::Size::Small,  "Trim"),
       widthKnob     (apvts, "a_stereo_width",        PhantomKnob::Size::Medium, "Width"),
-      inGainKnob    (apvts, "input_gain",            PhantomKnob::Size::Medium, "In"),
+      inGainKnob    (apvts, "input_gain",            PhantomKnob::Size::Medium, "PKE"),
       outGainKnob   (apvts, "a_output_gain",         PhantomKnob::Size::Medium, "Out"),
       inMeter       (p.peakInL,  p.peakInR),
       outMeter      (p.peakOutL, p.peakOutR),
@@ -52,6 +52,12 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
     addAndMakeVisible(shapeKnob);
     addAndMakeVisible(skipKnob);
     addAndMakeVisible(trimKnob);
+
+    // PKE = "Psycho-Kinetic Energy" detector — Ghostbusters Easter egg.
+    // Functionally it's the synth-detection gain: scales the signal that
+    // the WaveletSynth's pitch / gate / boost detectors see, without
+    // affecting the audio path's output level. Higher values = engine
+    // tracks quieter material; doesn't make anything louder.
 
     // Shape knob OLED: small waveform in the upper portion (sine→square
     // morph), numeric value in the lower portion. The OLED itself is a
