@@ -543,9 +543,12 @@ void PhantomProcessor::parameterChanged(const juce::String& parameterID, float n
 
 juce::AudioProcessorEditor* PhantomProcessor::createEditor()
 {
-    if (editorView.useNativeEditor)
-        return new kaigen::phantom::NativePluginEditor(*this, apvts);
-    return new PhantomEditor(*this);
+    // Native UI is now the only UI. The WebView editor (PhantomEditor) and
+    // its shift+click toggle handlers (TopBar mouseDown, phantom.js
+    // setupNativeUIToggle) still exist but the createEditor flag is ignored
+    // — restore the conditional branch on `editorView.useNativeEditor` if
+    // you ever need the WebView fallback during Path B troubleshooting.
+    return new kaigen::phantom::NativePluginEditor(*this, apvts);
 }
 
 void PhantomProcessor::setEngineFocus(EngineFocus newFocus) noexcept
