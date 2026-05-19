@@ -133,6 +133,14 @@ private:
     // Loop gain → 4 s RT60 at the longest delay line. Computed in prepare().
     float baseFeedbackGain { 0.0f };
 
+    // In-loop bass-shelf weight (used in process() as `tap += bassBoostMul * state`).
+    // Computed in prepare() from `baseFeedbackGain` so the total per-pass loop gain
+    // at DC — `(1 + bassBoostMul) * baseFeedbackGain` — stays under a stability
+    // margin. The original design hard-coded 0.5 here, which combined with the 4 s
+    // RT60 feedback gain (~0.86) gave a DC loop gain of ~1.29 and the tank ran
+    // away into self-oscillation. See prepareDelayLines() for the bound.
+    float bassBoostMul { 0.0f };
+
     // 1970s downsample LPF target.
     static constexpr float kPretankLpfHz = 10000.0f;
 

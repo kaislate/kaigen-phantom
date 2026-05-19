@@ -115,6 +115,34 @@ void SingleKnobReverb::prepareDelayLines()
             -3.0f * ((float) maxLen / (float) sr) / kDecaySeconds);
     else
         baseFeedbackGain = 0.0f;
+
+    // Bound the in-loop bass-shelf weight so the FDN stays stable at DC.
+    //
+    // The bass shelf adds a fraction of the per-line LPF state back to the
+    // tap; at DC the LPF state equals the tap, so the per-pass DC gain through
+    // the shelf is (1 + bassBoostMul). Combined with the feedback-gain scaling
+    // applied to the writeback, the per-pass DC loop gain is
+    //     g_dc = (1 + bassBoostMul) * baseFeedbackGain
+    // Stability requires g_dc < 1. The original design hard-coded
+    // bassBoostMul = 0.5 ("+3.5 dB low shelf in the loop"), which gives
+    // g_dc ≈ 1.29 at 4 s RT60 / 44.1 kHz and the tank self-saturates regardless
+    // of input.
+    //
+    // We pick the largest weight such that g_dc ≤ kLoopStabilityMargin (0.95 →
+    // ~5 % safety from the unit circle), and cap it at the original 0.5 target
+    // in case future tuning (shorter RT60, different sample rate) ever makes
+    // 0.5 itself safe.
+    constexpr float kLoopStabilityMargin = 0.95f;
+    constexpr float kBassBoostTargetMul  = 0.5f;
+    if (baseFeedbackGain > 1.0e-6f)
+    {
+        const float maxSafeMul = (kLoopStabilityMargin / baseFeedbackGain) - 1.0f;
+        bassBoostMul = juce::jlimit(0.0f, kBassBoostTargetMul, maxSafeMul);
+    }
+    else
+    {
+        bassBoostMul = 0.0f;
+    }
 }
 
 void SingleKnobReverb::prepareFilters()
@@ -287,10 +315,12 @@ void SingleKnobReverb::process(juce::AudioBuffer<float>& buffer)
 
             // Bass-boost shelf (in-loop): track low band with a one-pole
             // LPF, then ADD a fraction of it back to the tap. This gives
-            // an in-loop low-shelf bump (≈ +3.5 dB ≈ ×1.5 below 300 Hz)
-            // without disturbing the damping LPF's high-frequency loss.
+            // an in-loop low-shelf bump so the bass rings longer than the
+            // mids/highs. The weight is bounded (see prepareDelayLines())
+            // so the per-pass DC loop gain stays under unity — the original
+            // 0.5 constant pushed it to ~1.29 and the tank ran away.
             dl.bassBoostState += dl.bassBoostCoef * (tap - dl.bassBoostState);
-            tap = tap + 0.5f * dl.bassBoostState;
+            tap = tap + bassBoostMul * dl.bassBoostState;
 
             taps[(size_t) k] = tap;
         }
