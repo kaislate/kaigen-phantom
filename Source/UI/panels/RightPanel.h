@@ -54,6 +54,10 @@ private:
     PhantomKnob inGainKnob;
     PhantomKnob outGainKnob;
 
+    // Reverb send — global (single-knob algorithmic reverb). Sits between
+    // Trim and Out in the Levels card to mirror the WebView layout.
+    PhantomKnob reverbKnob;
+
     // Levels section auto-gain toggle — single etched word in the same
     // visual style as the Ghost-Mode WordSelector (off = etched dark,
     // on = backlit glow).
