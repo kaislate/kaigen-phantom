@@ -228,7 +228,12 @@ void RightPanel::resized()
     const int levelsCardW     = levelsCardRight - levelsCardX;
 
     constexpr int kMeterW          = 28;   // wider bars — each L/R bar is ~13 px
-    constexpr int kMedSmallOverlap = 30;
+    // Bumped 30 → 35 when Reverb joined the Levels row. With 4 knobs centred
+    // in the card, an extra 5 px per join is what keeps the In/Out shadow
+    // halos from spilling past the card edges. Knob bodies (Small = 42 px)
+    // still don't overlap — only their 24 px shadow halos do, which is the
+    // intended visual.
+    constexpr int kMedSmallOverlap = 35;
     constexpr int kSmallSide       = 90;
     constexpr int kKnobShadowPad   = 24;
     constexpr int kMeterEdgeMargin = 6;    // breathing room from the section card edge
