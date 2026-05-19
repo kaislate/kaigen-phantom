@@ -1,11 +1,14 @@
 build/
 .superpowers/
+.claude/
 *.user
 *.suo
 .vs/
 *.vcxproj.user
 .worktrees/
 Parameter value map.mhtml
+*.log
+*.code-workspace
 
 # Debug screenshots
 *.png

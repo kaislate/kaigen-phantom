@@ -45,7 +45,7 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
       outGainKnob   (apvts, "a_output_gain",         PhantomKnob::Size::Medium, "Out"),
       inMeter       (p.peakInL,  p.peakInR),
       outMeter      (p.peakOutL, p.peakOutR),
-      autoGainToggle(apvts, "input_gain_auto", { "Manual", "Auto" }),
+      autoGainToggle(apvts, "input_gain_auto", "Auto"),
       oscilloscope  (p),
       spectrum      (p, a)
 {
@@ -338,14 +338,14 @@ void RightPanel::resized()
     vizArea.removeFromTop(8);
     spectrum    .setBounds(vizArea.removeFromTop(280));
 
-    // Auto/Manual toggle — sits just above the PKE (In) knob, centred on
-    // the knob's body. Same WordSelector visual style as the Ghost-Mode
-    // (Replace / Combine / Phantom Only) toggle in LeftPanel.
+    // Auto toggle — single etched word, centred on the PKE (In) knob's
+    // body and tucked just below the Levels card so it sits in the empty
+    // strip between the section card and the Advanced row.
     {
         const int  inBodyCx = inGainKnob.getX() + kMedium / 2;
-        constexpr int kAutoW = 96;
-        constexpr int kAutoH = 16;
-        const int autoY = inGainKnob.getY() - kAutoH - 2;
+        constexpr int kAutoW = 60;
+        constexpr int kAutoH = 14;
+        const int autoY = inGainKnob.getY() + kMedium - 18;
         autoGainToggle.setBounds(inBodyCx - kAutoW / 2, autoY, kAutoW, kAutoH);
     }
 }

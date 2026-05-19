@@ -7,6 +7,7 @@
 #include "../widgets/PhantomMiniKnob.h"
 #include "../widgets/IOMeter.h"
 #include "../widgets/WordSelector.h"
+#include "../widgets/EtchedToggle.h"
 #include "../visualizers/Oscilloscope.h"
 #include "../visualizers/Spectrum.h"
 
@@ -53,9 +54,10 @@ private:
     PhantomKnob inGainKnob;
     PhantomKnob outGainKnob;
 
-    // Levels section auto-gain toggle — same WordSelector style as the
-    // Ghost Mode (Replace / Combine / Phantom Only) toggle in LeftPanel.
-    WordSelector autoGainToggle;
+    // Levels section auto-gain toggle — single etched word in the same
+    // visual style as the Ghost-Mode WordSelector (off = etched dark,
+    // on = backlit glow).
+    EtchedToggle autoGainToggle;
 
     // Levels section meters (flanking In/Out knobs)
     IOMeter inMeter;
