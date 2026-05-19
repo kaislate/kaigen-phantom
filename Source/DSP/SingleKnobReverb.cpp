@@ -309,9 +309,23 @@ void SingleKnobReverb::process(juce::AudioBuffer<float>& buffer)
 
             float tap = readDelayInterpolated(dl, delaySamp);
 
-            // Damping LPF (in-loop): one-pole towards `tap` darkens highs.
+            // In-loop damping — shelf style, NOT a strict LPF replacement.
+            //
+            // The original `tap = dl.dampingLpfState` swapped the tap for its
+            // LPF output every pass, which compounds to ~7 dB of HF loss per
+            // pass at Nyquist; over the ~46 passes of a 4 s RT60 that's
+            // hundreds of dB and the tail goes muffled inside the first
+            // second. Voiced wrong against VVV's "Concert Hall 1970s" which
+            // keeps the highs audible across the whole tail.
+            //
+            // Shelf blend: lows ride through at unit gain, highs lose only
+            // ~1.4 dB per pass (kDampingMix = 0.85 keeps 85 % of the tap,
+            // mixes in 15 % of the LPF state). Net HF-vs-LF darkening over
+            // the full RT60 ends up ~20 dB — the VVV-style "darker tail
+            // than mids" without the kill-floor we had before.
             dl.dampingLpfState += dl.dampingCoef * (tap - dl.dampingLpfState);
-            tap = dl.dampingLpfState;
+            constexpr float kDampingMix = 0.85f;
+            tap = kDampingMix * tap + (1.0f - kDampingMix) * dl.dampingLpfState;
 
             // Bass-boost shelf (in-loop): track low band with a one-pole
             // LPF, then ADD a fraction of it back to the tap. This gives
@@ -352,10 +366,14 @@ void SingleKnobReverb::process(juce::AudioBuffer<float>& buffer)
         for (int k = 0; k < kNumLines / 2; ++k) wetL += taps[(size_t) k];
         for (int k = kNumLines / 2; k < kNumLines; ++k) wetR += taps[(size_t) k];
 
-        // Compensate the tap summation gain so the per-line damping budget
-        // doesn't blow up output level. 4 lines summed → divide by 4.
-        wetL *= 0.25f;
-        wetR *= 0.25f;
+        // Compensate the tap summation gain. The 4 lines summed per channel
+        // are largely uncorrelated (Householder mixing + per-line modulation
+        // + per-line damping), so the energy-correct divisor is sqrt(4) = 2
+        // → multiplier 0.5. The previous 0.25 treated them as fully
+        // coherent and over-attenuated by 6 dB; that's the main reason the
+        // wet signal felt anaemic next to VVV at the same mix setting.
+        wetL *= 0.5f;
+        wetR *= 0.5f;
 
         // ── Output band-limit: 10 Hz HPF + 8 kHz LPF ─────────────────
         // HPF: y[n] = α*(y[n-1] + x[n] − x[n-1])
