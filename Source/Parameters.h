@@ -87,6 +87,13 @@ namespace ParamID
     inline constexpr auto MACRO3 = "macro3";
     inline constexpr auto MACRO4 = "macro4";
 
+    // ── Reverb (single-knob global send) ──────────────────────────────
+    // Single global param: dry/wet mix into the post-engine signal. The
+    // reverb's character is baked (Concert Hall / 1970s VVV preset, 4 s
+    // decay), so the user only sees an "amount" knob. Same instance feeds
+    // both engines (parallel send on the morphed output).
+    inline constexpr auto REVERB_MIX = "reverb_mix";
+
     #undef KAIGEN_PER_ENGINE
 }
 
@@ -170,6 +177,8 @@ inline std::vector<juce::String> getAllParameterIDs()
     ids.push_back(ParamID::MACRO2);
     ids.push_back(ParamID::MACRO3);
     ids.push_back(ParamID::MACRO4);
+
+    ids.push_back(ParamID::REVERB_MIX);
 
     return ids;
 }
@@ -394,6 +403,13 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         NormalisableRange<float>(0.0f, 1.0f), 0.0f));
     params.push_back(std::make_unique<APF>(
         ParamID::MACRO4, "Macro 4",
+        NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+
+    // Reverb send — global single-knob. Default 0 (off) so the reverb is
+    // opt-in and pre-existing presets / sessions remain bit-identical to
+    // pre-reverb behaviour until the user dials it up.
+    params.push_back(std::make_unique<APF>(
+        ParamID::REVERB_MIX, "Reverb",
         NormalisableRange<float>(0.0f, 1.0f), 0.0f));
 
     return { params.begin(), params.end() };

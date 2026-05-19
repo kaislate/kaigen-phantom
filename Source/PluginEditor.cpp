@@ -203,6 +203,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         &self.synthBoostThresholdRelayA,  &self.synthBoostThresholdRelayB,
         &self.synthBoostAmountRelayA,     &self.synthBoostAmountRelayB,
         &self.morphAmountRelay,
+        &self.reverbMixRelay,
     };
     for (auto* r : sliderRelays)
         options = options.withOptionsFrom(*r);
@@ -708,6 +709,7 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         { ParamID::B_SYNTH_BOOST_AMOUNT,      synthBoostAmountRelayB },
 
         { ParamID::MORPH_AMOUNT,              morphAmountRelay },
+        { ParamID::REVERB_MIX,                reverbMixRelay },
     };
     for (auto& b : sliderBindings)
         sliderAttachments.push_back(std::make_unique<juce::WebSliderParameterAttachment>(

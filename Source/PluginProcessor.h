@@ -8,6 +8,7 @@
 #include "SpectrumViewMode.h"
 #include "Modulation/ModulationEngine.h"
 #include "Modulation/Macro.h"
+#include "DSP/SingleKnobReverb.h"
 
 class PhantomProcessor : public juce::AudioProcessor,
                          private juce::AudioProcessorValueTreeState::Listener
@@ -184,6 +185,18 @@ private:
     // these for value-lookup intercept).
     kaigen::phantom::ModulationEngine modEngineA { apvts, "a_" };
     kaigen::phantom::ModulationEngine modEngineB { apvts, "b_" };
+
+    // ─── Single-knob reverb (global parallel send) ────────────────────────
+    // Sits after the dual-engine host's crossfaded output. The user knob
+    // (`reverb_mix`) is just the wet amount; every internal coefficient is
+    // baked to match the user's reference Valhalla Vintage Verb preset.
+    // Scratch buffer holds a copy of the post-engine signal so the reverb
+    // can write its wet output without trampling the dry path. Pre-allocated
+    // in prepareToPlay() to keep processBlock allocation-free.
+    kaigen::phantom::SingleKnobReverb reverb;
+    juce::AudioBuffer<float>          reverbScratch;
+    float                             reverbMixSmoothed { 0.0f };
+    std::atomic<float>*               reverbMixParam    { nullptr };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomProcessor)
 };

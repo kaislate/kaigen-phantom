@@ -43,6 +43,10 @@ PhantomProcessor::PhantomProcessor()
     // happen after the engines are populated above so the host caches
     // pointers to fully-configured engines.
     dualEngineHost.setModulationEngines(&modEngineA, &modEngineB);
+
+    // Cache the reverb-mix atomic pointer once so processBlock can read it
+    // with a single relaxed load (no APVTS lookup on the audio thread).
+    reverbMixParam = apvts.getRawParameterValue(ParamID::REVERB_MIX);
 }
 
 PhantomProcessor::~PhantomProcessor()
@@ -93,6 +97,14 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
     fftBufferEngineB.fill(0.0f);
     fftWritePosEngineA.store(0, std::memory_order_relaxed);
     fftWritePosEngineB.store(0, std::memory_order_relaxed);
+
+    // Reverb send: prepare delay lines + filter state, then pre-allocate a
+    // stereo scratch buffer matching the worst-case block size so the audio
+    // thread can grab a copy of the engine output without allocating.
+    reverb.prepare(sr, samplesPerBlock);
+    reverb.reset();
+    reverbScratch.setSize(2, samplesPerBlock, false, true, false);
+    reverbMixSmoothed = reverbMixParam ? reverbMixParam->load() : 0.0f;
 }
 
 void PhantomProcessor::releaseResources() {}
@@ -313,6 +325,57 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             }
             fftWritePosEngineA.store(posA, std::memory_order_relaxed);
             fftWritePosEngineB.store(posB, std::memory_order_relaxed);
+        }
+    }
+
+    // ── Reverb send (post-engine parallel mix) ───────────────────────
+    // Read the target mix once per block and slew toward it across the
+    // block to avoid zipper noise on automation changes. When the target
+    // is exactly zero AND the smoothed value has also settled to zero we
+    // skip the reverb work entirely — the tank still needs occasional
+    // reset() to fully silence but at 0 mix the wet contribution is
+    // already inaudible.
+    {
+        const float target = reverbMixParam ? reverbMixParam->load() : 0.0f;
+        const bool  isAudibleNow = (reverbMixSmoothed > 1.0e-4f) || (target > 1.0e-4f);
+
+        if (isAudibleNow && nCh > 0 && n > 0
+            && reverbScratch.getNumSamples() >= n)
+        {
+            // Copy the post-engine signal into the reverb scratch — this is
+            // the wet input. The main buffer stays as the dry signal we'll
+            // mix back into.
+            for (int c = 0; c < nCh && c < reverbScratch.getNumChannels(); ++c)
+                reverbScratch.copyFrom(c, 0, buffer, c, 0, n);
+
+            // Render wet in-place into the scratch (caller does dry-mix).
+            reverb.process(reverbScratch);
+
+            // Mix back: out = dry + smoothed_mix * wet. Slew the mix value
+            // linearly across the block so a sudden knob jump doesn't click.
+            float mix = reverbMixSmoothed;
+            const float deltaPerSample = (target - mix) / (float) n;
+
+            for (int c = 0; c < nCh; ++c)
+            {
+                float* dry = buffer.getWritePointer(c);
+                const float* wet = reverbScratch.getReadPointer(
+                    juce::jmin(c, reverbScratch.getNumChannels() - 1));
+                float m = mix;
+                for (int i = 0; i < n; ++i)
+                {
+                    dry[i] += m * wet[i];
+                    m += deltaPerSample;
+                }
+            }
+            // End-of-block snap to the target so floating drift over many
+            // blocks doesn't accumulate against the param value.
+            reverbMixSmoothed = target;
+        }
+        else
+        {
+            // Not audible — just track the target without doing reverb work.
+            reverbMixSmoothed = target;
         }
     }
 

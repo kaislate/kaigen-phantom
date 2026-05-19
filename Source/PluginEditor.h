@@ -115,6 +115,10 @@ private:
     // Morph slider — global. Drives the audio crossfader between engines A and B.
     juce::WebSliderRelay morphAmountRelay            { "morph_amount" };
 
+    // Reverb send — global. Single-knob algorithmic reverb on the post-engine
+    // signal; same character for both engines.
+    juce::WebSliderRelay reverbMixRelay              { "reverb_mix" };
+
     // ── Combo-box relays ──────────────────────────────────────────────
     juce::WebComboBoxRelay modeRelayA                { "a_mode" };
     juce::WebComboBoxRelay modeRelayB                { "b_mode" };
