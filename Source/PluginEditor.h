@@ -123,6 +123,10 @@ private:
     juce::WebSliderRelay macro3Relay                 { "macro3" };
     juce::WebSliderRelay macro4Relay                 { "macro4" };
 
+    // Reverb send — global. Single-knob algorithmic reverb on the post-engine
+    // signal; same character for both engines.
+    juce::WebSliderRelay reverbMixRelay              { "reverb_mix" };
+
     // ── Combo-box relays ──────────────────────────────────────────────
     juce::WebComboBoxRelay modeRelayA                { "a_mode" };
     juce::WebComboBoxRelay modeRelayB                { "b_mode" };

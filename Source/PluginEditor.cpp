@@ -216,6 +216,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         &self.macro2Relay,
         &self.macro3Relay,
         &self.macro4Relay,
+        &self.reverbMixRelay,
     };
     for (auto* r : sliderRelays)
         options = options.withOptionsFrom(*r);
@@ -995,6 +996,8 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         { ParamID::MACRO2,                    macro2Relay },
         { ParamID::MACRO3,                    macro3Relay },
         { ParamID::MACRO4,                    macro4Relay },
+
+        { ParamID::REVERB_MIX,                reverbMixRelay },
     };
     for (auto& b : sliderBindings)
         sliderAttachments.push_back(std::make_unique<juce::WebSliderParameterAttachment>(
