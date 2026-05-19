@@ -344,7 +344,8 @@ bool PresetManager::loadPreset(juce::AudioProcessorValueTreeState& apvts,
 
 bool PresetManager::loadPresetInto(ABSlotManager& abSlots,
                                    const juce::String& presetName,
-                                   const juce::String& packName)
+                                   const juce::String& packName,
+                                   std::function<void(const juce::ValueTree&)> onMorphConfig)
 {
     auto file = getPresetFile(presetName, packName);
     if (!file.existsAsFile()) return false;
@@ -397,6 +398,14 @@ bool PresetManager::loadPresetInto(ABSlotManager& abSlots,
         abSlots.loadABPreset(stateForLoad, ref);
     }
 
+    // If caller provided a callback AND the preset has <MorphConfig>, invoke it.
+    if (onMorphConfig)
+    {
+        auto morphConfig = tree.getChildWithName("MorphConfig");
+        if (morphConfig.isValid())
+            onMorphConfig(morphConfig);
+    }
+
     return true;
 }
 
@@ -407,7 +416,8 @@ juce::String PresetManager::savePreset(juce::AudioProcessorValueTreeState& apvts
                                        const juce::String& designer,
                                        const juce::String& description,
                                        PresetKind kind,
-                                       bool overwrite)
+                                       bool overwrite,
+                                       const juce::ValueTree* morphConfig)
 {
     auto sanitized = sanitizeName(presetName);
     if (sanitized.isEmpty()) return {};
@@ -475,7 +485,15 @@ juce::String PresetManager::savePreset(juce::AudioProcessorValueTreeState& apvts
         state.appendChild(abSlots->buildPresetSlotBChild(), nullptr);
     }
 
-    // <MorphConfig> is Pro-build only — not emitted in this plan.
+    // MorphConfig child — use the provided Pro-build tree if supplied; otherwise
+    // fall back to the attribute-only form from the A/B compare spec (Standard).
+    if (kind == PresetKind::ABMorph && morphConfig != nullptr && morphConfig->isValid())
+    {
+        // Strip any existing MorphConfig; append the provided one.
+        if (auto existing = state.getChildWithName("MorphConfig"); existing.isValid())
+            state.removeChild(existing, nullptr);
+        state.appendChild(morphConfig->createCopy(), nullptr);
+    }
 
     auto xml = state.createXml();
     if (xml == nullptr) return {};

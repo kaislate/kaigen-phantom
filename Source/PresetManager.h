@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <functional>
 
 namespace kaigen::phantom
 {
@@ -99,7 +100,8 @@ public:
     // Returns true on success, false if missing/parse/unsupported.
     bool loadPresetInto(ABSlotManager& abSlots,
                         const juce::String& presetName,
-                        const juce::String& packName);
+                        const juce::String& packName,
+                        std::function<void(const juce::ValueTree&)> onMorphConfig = {});
 
     // Save APVTS state as a new preset in User/. If overwrite=false and a
     // preset with this name exists, a numeric suffix is appended.
@@ -115,13 +117,14 @@ public:
     // the method returns empty to signal "rejected". The UI is expected to
     // prevent this case; the check here is a safety net.
     juce::String savePreset(juce::AudioProcessorValueTreeState& apvts,
-                            ABSlotManager* abSlots,        // may be nullptr for Single
+                            ABSlotManager* abSlots,
                             const juce::String& presetName,
                             const juce::String& type,
                             const juce::String& designer,
                             const juce::String& description,
                             PresetKind kind,
-                            bool overwrite);
+                            bool overwrite,
+                            const juce::ValueTree* morphConfig = nullptr);
 
     // Delete a user preset (factory/pack presets cannot be deleted).
     bool deletePreset(const juce::String& presetName,
