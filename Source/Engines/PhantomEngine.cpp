@@ -30,6 +30,8 @@ void PhantomEngine::prepare(double sr, int blockSize, int nCh)
 
     lowBuf .setSize(numChannels, blockSize, false, true, true);
     highBuf.setSize(numChannels, blockSize, false, true, true);
+    phantomOnlyBuf.setSize(numChannels, blockSize, false, true, true);
+    phantomOnlyBuf.clear();
 
     juce::dsp::ProcessSpec spec;
     spec.sampleRate       = sr;
@@ -59,6 +61,7 @@ void PhantomEngine::reset()
     envelopeR.reset();
     lowBuf.clear();
     highBuf.clear();
+    phantomOnlyBuf.clear();
     lpf1pole.reset(); hpf1pole.reset();
     lpfL_sa.reset(); lpfR_sa.reset(); lpfL_sb.reset(); lpfR_sb.reset();
     hpfL_sa.reset(); hpfR_sa.reset(); hpfL_sb.reset(); hpfR_sb.reset();
@@ -328,6 +331,13 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
     const float highCoef   = (ghostMode == 2) ? 0.0f : 1.0f;
 
     int oscWp = oscSynthWrPos.load(std::memory_order_relaxed);
+
+    // Phantom-only side buffer for the reverb-source selector — sized
+    // to match the current block, zeroed so unwritten channels stay
+    // clean.
+    phantomOnlyBuf.setSize(nCh, n, false, false, true);
+    phantomOnlyBuf.clear();
+
     for (int ch = 0; ch < nCh; ++ch)
     {
         auto& env   = (ch == 0) ? envelopeL  : envelopeR;
@@ -418,8 +428,15 @@ void PhantomEngine::process(juce::AudioBuffer<float>& buffer, const juce::AudioB
             }
 
             // Ghost mix (coefficients hoisted above).
-            const float mixedLow = low[i] * dryLowCoef + phantomOut * ghostAmount;
+            const float phantomContribution = phantomOut * ghostAmount;
+            const float mixedLow = low[i] * dryLowCoef + phantomContribution;
             out[i] = (mixedLow + high[i] * highCoef) * outputGainLin;
+
+            // Side tap for the reverb-source selector — same gain stage
+            // as the contribution appears in the main output, so the
+            // reverb hears the synth at the same level whichever source
+            // it's pointed at.
+            phantomOnlyBuf.getWritePointer(ch)[i] = phantomContribution * outputGainLin;
         }
     }
 

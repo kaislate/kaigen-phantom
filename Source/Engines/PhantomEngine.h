@@ -76,6 +76,12 @@ public:
      *  operates on the bass band, not the full input signal shown in the scope. */
     float getSynthInputPeak() const noexcept;
 
+    /** Phantom-only output for the most recent process() call. Holds
+     *  phantomOut * ghostAmount * outputGainLin per sample per channel.
+     *  Same lifetime as DualEngineHost::getEngineAOutput: stable until
+     *  the next process() call. */
+    const juce::AudioBuffer<float>& getPhantomOnlyOutput() const noexcept { return phantomOnlyBuf; }
+
     // ─── Audio processing ────────────────────────────────────────────────
     void process(juce::AudioBuffer<float>& buffer, const juce::AudioBuffer<float>* sidechain = nullptr);
 
@@ -100,6 +106,13 @@ private:
 
     juce::AudioBuffer<float> lowBuf;
     juce::AudioBuffer<float> highBuf;
+
+    // Captures phantomOut * ghostAmount * outputGainLin per sample per
+    // channel in the main process loop. Used by the reverb-source
+    // selector to feed only the synth contribution into the reverb,
+    // independently of ghost mode. Sized in prepare(), populated in
+    // process(), exposed via getPhantomOnlyOutput().
+    juce::AudioBuffer<float> phantomOnlyBuf;
 
     // Post-synthesis saturation (smoothed per-sample)
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothSatL;
