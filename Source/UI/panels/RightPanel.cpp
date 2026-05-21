@@ -41,9 +41,10 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
       skipKnob      (apvts, "a_synth_skip",          PhantomKnob::Size::Medium, "Skip"),
       trimKnob      (apvts, "a_synth_trim",          PhantomKnob::Size::Small,  "Trim"),
       widthKnob     (apvts, "a_stereo_width",        PhantomKnob::Size::Medium, "Width"),
-      inGainKnob    (apvts, "input_gain",            PhantomKnob::Size::Medium, "PKE"),
-      outGainKnob   (apvts, "a_output_gain",         PhantomKnob::Size::Medium, "Out"),
-      reverbKnob    (apvts, "reverb_mix",            PhantomKnob::Size::Small,  "Reverb"),
+      inGainKnob         (apvts, "input_gain",       PhantomKnob::Size::Medium, "PKE"),
+      outGainKnob        (apvts, "a_output_gain",    PhantomKnob::Size::Medium, "Out"),
+      reverbKnob         (apvts, "reverb_mix",       PhantomKnob::Size::Small,  "Reverb"),
+      reverbSourceToggle (apvts, "reverb_source",    "PHNTM"),
       inMeter       (p.peakInL,  p.peakInR),
       outMeter      (p.peakOutL, p.peakOutR),
       autoGainToggle(apvts, "input_gain_auto", "Auto"),
@@ -121,6 +122,7 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
     addAndMakeVisible(inGainKnob);
     addAndMakeVisible(outGainKnob);
     addAndMakeVisible(reverbKnob);
+    addAndMakeVisible(reverbSourceToggle);
 
     addAndMakeVisible(inMeter);
     addAndMakeVisible(outMeter);
@@ -292,6 +294,16 @@ void RightPanel::resized()
     outMeter.setBounds(juce::jmin(levelsCardRight - kMeterEdgeMargin - kMeterW,
                                    outGainX + kMedium + kMeterKnobGap),
                         knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
+
+    // Reverb-source toggle — small etched word centred under the Reverb
+    // knob, in the empty space below the small-knob row inside the
+    // Levels card. ~50 x 14 px to match the Auto-gain toggle's feel.
+    constexpr int kReverbToggleW = 50;
+    constexpr int kReverbToggleH = 14;
+    const int reverbToggleX = reverbX + (kSmallSide - kReverbToggleW) / 2;
+    const int reverbToggleY = smallY + kSmallSide + 2;
+    reverbSourceToggle.setBounds(reverbToggleX, reverbToggleY,
+                                  kReverbToggleW, kReverbToggleH);
 
     levelsCardBounds = juce::Rectangle<int>(levelsCardX, cardTop,
                                              levelsCardW, cardHeight);

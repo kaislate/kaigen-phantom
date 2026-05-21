@@ -58,6 +58,10 @@ private:
     // Trim and Out in the Levels card to mirror the WebView layout.
     PhantomKnob reverbKnob;
 
+    // Reverb-source toggle — global bool. Lit (active) = Phantom Only;
+    // unlit = Post-Engine. Sits beneath the Reverb knob in the Levels card.
+    EtchedToggle reverbSourceToggle;
+
     // Levels section auto-gain toggle — single etched word in the same
     // visual style as the Ghost-Mode WordSelector (off = etched dark,
     // on = backlit glow).
