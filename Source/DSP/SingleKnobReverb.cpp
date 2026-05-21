@@ -42,6 +42,8 @@ constexpr float SingleKnobReverb::kBassShelfHz;
 constexpr float SingleKnobReverb::kPretankLpfHz;
 constexpr float SingleKnobReverb::kOutLpfHz;
 constexpr float SingleKnobReverb::kOutHpfHz;
+constexpr float SingleKnobReverb::kOutShelfHz;
+constexpr float SingleKnobReverb::kOutShelfMul;
 constexpr float SingleKnobReverb::kPredelayMs;
 constexpr float SingleKnobReverb::kDecaySeconds;
 
@@ -61,15 +63,12 @@ void SingleKnobReverb::prepareDelayLines()
     // Scale base lengths (defined at 44.1 kHz) to the prepared sample rate.
     const float scale = (float) (sr / 44100.0);
 
-    // Modulation depth: stay well below the shortest line's headroom. VVV's
-    // 38 % mod-depth at a relatively slow rate translates to ~2 ms of delay-
-    // line displacement; we centre at that figure and let the per-line LFOs
-    // vary slightly in amplitude to chorus the swirl.
-    // 2 ms → 3.5 ms — lusher, more VVV-like chorussing in the tank.
-    // Still well under the shortest delay-line headroom (shortest line
-    // ~40 ms at 44.1 kHz; 3.5 ms uses ~9 % of headroom and
-    // prepareDelayLines reserves modDepthSamples * 1.5 + 8 samples
-    // per line, which still fits).
+    // Modulation depth: stay well below the shortest line's headroom.
+    // 3.5 ms gives a lusher, more VVV-like chorussing than VVV's nominal
+    // ~2 ms "38 % mod depth" reading; well under the shortest line's
+    // headroom (shortest line ~40 ms at 44.1 kHz; 3.5 ms uses ~9 % and
+    // prepareDelayLines reserves modDepthSamples * 1.5 + 8 samples per
+    // line, which still fits).
     constexpr float kModDepthMs = 3.5f;
     modDepthSamples = (kModDepthMs * 1.0e-3f) * (float) sr;
 
@@ -250,7 +249,7 @@ void SingleKnobReverb::process(juce::AudioBuffer<float>& buffer)
         const float inL = L[i];
         const float inR = R[i];
 
-        // ── Pre-tank LPF (10 kHz, 1970s downsample colour) ────────────
+        // ── Pre-tank LPF (8 kHz, 1970s downsample colour) ────────────
         // Sum to mono for the tank input — the tank itself creates the
         // stereo image via line-pair routing. Mono predelay is standard
         // for hall reverbs and saves a buffer.
@@ -265,7 +264,7 @@ void SingleKnobReverb::process(juce::AudioBuffer<float>& buffer)
         const float predOut = predelayBuf[(size_t) readP];
         predelayPos = (predelayPos + 1) % predBufLen;
 
-        // ── Early diffusion (4-stage allpass, per-channel) ────────────
+        // ── Early diffusion (6-stage allpass, per-channel) ────────────
         // Stereo separation: L and R feed mirror-image cascades of the
         // same prime lengths, so identical inputs decorrelate over the
         // four stages.

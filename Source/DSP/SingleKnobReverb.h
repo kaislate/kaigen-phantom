@@ -5,8 +5,8 @@
 // prominent ~2.5 Hz modulation). The user-facing parameter is wet amount only;
 // every internal coefficient is baked.
 //
-// Topology: 8-tap FDN with Householder feedback matrix. Pre-tank chain: 10 kHz
-// downsampling LPF (1970s color) → 20 ms predelay → 4-stage Schroeder allpass
+// Topology: 8-tap FDN with Householder feedback matrix. Pre-tank chain: 8 kHz
+// downsampling LPF (1970s color) → 20 ms predelay → 6-stage Schroeder allpass
 // diffuser (early reflections / build-up shape). Each FDN delay line has:
 //   • a per-line LFO at staggered rates near 2.53 Hz (delay-line modulation,
 //     interpolated read tap)
@@ -60,7 +60,7 @@ private:
     // Predelay: 20 ms baked in. At 192 kHz that's < 4096 samples.
     static constexpr int kPredelayMaxSamples = 4096;
 
-    // Early-diffusion allpass stages (4-stage Schroeder cascade). Mutually-
+    // Early-diffusion allpass stages (6-stage Schroeder cascade). Mutually-
     // prime so the diffuser fingerprint stays smooth. Coefficient (g) chosen
     // for ~78 % diffusion — enough to smear transients without ringing.
     static constexpr int kNumEarlyAPs = 6;
@@ -77,7 +77,7 @@ private:
     std::vector<float> predelayBuf;
     int                predelayPos { 0 };
 
-    // Pre-tank LPF (10 kHz, one-pole). 1970s downsample colour.
+    // Pre-tank LPF (8 kHz, one-pole). 1970s downsample colour.
     float pretankLpfState { 0.0f };
     float pretankLpfCoef  { 0.0f };
 
