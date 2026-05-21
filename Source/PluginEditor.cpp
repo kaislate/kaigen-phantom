@@ -236,6 +236,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
     // Globals stay registered once.
     options = options.withOptionsFrom(self.bypassRelay);
     options = options.withOptionsFrom(self.inputGainAutoRelay);
+    options = options.withOptionsFrom(self.reverbSourceRelay);
     // Per-engine toggles get both A and B registered.
     options = options.withOptionsFrom(self.punchEnabledRelayA);
     options = options.withOptionsFrom(self.punchEnabledRelayB);
@@ -1027,6 +1028,8 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         *processor.apvts.getParameter(ParamID::BYPASS), bypassRelay, nullptr);
     inputGainAutoAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
         *processor.apvts.getParameter(ParamID::INPUT_GAIN_AUTO), inputGainAutoRelay, nullptr);
+    reverbSourceAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
+        *processor.apvts.getParameter(ParamID::REVERB_SOURCE), reverbSourceRelay, nullptr);
 
     // Per-engine toggles — paired A/B attachments, each bound to its respective param.
     punchEnabledAttachmentA = std::make_unique<juce::WebToggleButtonParameterAttachment>(

@@ -45,6 +45,20 @@ if (autoGainBtn && inputGainAutoState) {
   updateAutoGainUI();
 }
 
+// ── Reverb source toggle ─────────────────────────────────────────────────
+const reverbSourceState = window.Juce.getToggleStateLogical?.("reverb_source");
+const reverbSourceBtn   = document.getElementById("reverb-source-btn");
+if (reverbSourceState && reverbSourceBtn) {
+    reverbSourceBtn.addEventListener("click", () => {
+        reverbSourceState.setValue(!reverbSourceState.getValue());
+    });
+    reverbSourceState.valueChangedEvent.addListener(() => {
+        reverbSourceBtn.classList.toggle("active", reverbSourceState.getValue());
+    });
+    // Initial visual state.
+    reverbSourceBtn.classList.toggle("active", reverbSourceState.getValue());
+}
+
 // ── MIDI triggering toggles ───────────────────────────────────────────────────
 const midiTriggerState     = window.Juce.getToggleStateLogical?.("midi_trigger_enabled");
 const midiGateReleaseState = window.Juce.getToggleStateLogical?.("midi_gate_release");

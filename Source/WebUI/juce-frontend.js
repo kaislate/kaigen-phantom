@@ -601,7 +601,7 @@ class ControlParameterIndexUpdater {
     'morph_amount', 'morph_curve', 'morph_a_level_db',
     'morph_b_level_db', 'morph_bypass_idle_engine',
     'macro1', 'macro2', 'macro3', 'macro4',
-    'reverb_mix'
+    'reverb_mix', 'reverb_source'
   ]);
 
   // Cache of wrappers keyed by logical name (one wrapper per logical

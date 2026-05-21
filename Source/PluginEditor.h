@@ -127,6 +127,10 @@ private:
     // signal; same character for both engines.
     juce::WebSliderRelay reverbMixRelay              { "reverb_mix" };
 
+    // Reverb source — global bool. false = Post-Engine (default),
+    // true = Phantom Only (reverb hears synth contribution only).
+    juce::WebToggleButtonRelay reverbSourceRelay     { "reverb_source" };
+
     // ── Combo-box relays ──────────────────────────────────────────────
     juce::WebComboBoxRelay modeRelayA                { "a_mode" };
     juce::WebComboBoxRelay modeRelayB                { "b_mode" };
@@ -161,6 +165,7 @@ private:
     std::vector<std::unique_ptr<juce::WebComboBoxParameterAttachment>> comboAttachments;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          bypassAttachment;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          inputGainAutoAttachment;
+    std::unique_ptr<juce::WebToggleButtonParameterAttachment>          reverbSourceAttachment;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          punchEnabledAttachmentA;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          punchEnabledAttachmentB;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          midiTriggerAttachmentA;
