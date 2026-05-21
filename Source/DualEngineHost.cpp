@@ -142,12 +142,15 @@ void DualEngineHost::prepareToPlay(double sampleRate, int blockSize, int numChan
     crossfader.prepare(sampleRate, blockSize);
     bScratch.setSize(numChannels, blockSize, false, true, true);
     aScratch.setSize(numChannels, blockSize, false, true, true);
+    phantomOnlyMix.setSize(numChannels, blockSize, false, true, true);
+    phantomOnlyMix.clear();
 }
 
 void DualEngineHost::reset()
 {
     engineA.reset();
     engineB.reset();
+    phantomOnlyMix.clear();
 }
 
 void DualEngineHost::handleMidiNoteOn()
@@ -279,6 +282,15 @@ void DualEngineHost::process(juce::AudioBuffer<float>& buffer,
 
     // Crossfade into `buffer` (in place).
     crossfader.mix(aScratch, bypassA, bScratch, bypassB, buffer);
+
+    // Same crossfade applied to the per-engine phantom-only side
+    // buffers. Re-uses the crossfader state set just above, so the
+    // weights match the main mix exactly — the reverb-source selector
+    // hears the synth at the same relative gain as the main output.
+    phantomOnlyMix.setSize(nCh, n, false, false, true);
+    crossfader.mix(engineA.getPhantomOnlyOutput(), bypassA,
+                   engineB.getPhantomOnlyOutput(), bypassB,
+                   phantomOnlyMix);
 }
 
 } // namespace kaigen::phantom

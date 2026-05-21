@@ -49,6 +49,11 @@ public:
     const juce::AudioBuffer<float>& getEngineAOutput() const noexcept { return aScratch; }
     const juce::AudioBuffer<float>& getEngineBOutput() const noexcept { return bScratch; }
 
+    /** Crossfaded phantom-only outputs of both engines. Used by the
+     *  reverb-source selector to feed only the synth contribution
+     *  into the reverb. Same lifetime as getEngineAOutput. */
+    const juce::AudioBuffer<float>& getPhantomOnlyOutput() const noexcept { return phantomOnlyMix; }
+
     /** Inject the modulation engines that intercept per-param value lookup
      *  in syncEngineFromPrefix. Owned by PhantomProcessor; pointers are
      *  non-owning. Pass nullptr for either side to disable modulation
@@ -101,6 +106,12 @@ private:
     // input so that A and B both process the same pre-engine signal.
     juce::AudioBuffer<float> aScratch;
     juce::AudioBuffer<float> bScratch;
+
+    // Crossfaded mix of engineA.getPhantomOnlyOutput() and
+    // engineB.getPhantomOnlyOutput() using the same weights as the main
+    // crossfader. Exposed to PluginProcessor for the reverb-source
+    // selector. Stable until the next process() call.
+    juce::AudioBuffer<float> phantomOnlyMix;
 
     std::atomic<kaigen::phantom::ModulationEngine*> modA { nullptr };
     std::atomic<kaigen::phantom::ModulationEngine*> modB { nullptr };
