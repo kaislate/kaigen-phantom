@@ -65,7 +65,12 @@ void SingleKnobReverb::prepareDelayLines()
     // 38 % mod-depth at a relatively slow rate translates to ~2 ms of delay-
     // line displacement; we centre at that figure and let the per-line LFOs
     // vary slightly in amplitude to chorus the swirl.
-    constexpr float kModDepthMs = 2.0f;
+    // 2 ms → 3.5 ms — lusher, more VVV-like chorussing in the tank.
+    // Still well under the shortest delay-line headroom (shortest line
+    // ~40 ms at 44.1 kHz; 3.5 ms uses ~9 % of headroom and
+    // prepareDelayLines reserves modDepthSamples * 1.5 + 8 samples
+    // per line, which still fits).
+    constexpr float kModDepthMs = 3.5f;
     modDepthSamples = (kModDepthMs * 1.0e-3f) * (float) sr;
 
     // Per-line LFO rate spread (±15 % around centre) so eight LFOs sweeping
@@ -157,6 +162,10 @@ void SingleKnobReverb::prepareFilters()
     outHpfPrevInL = outHpfPrevInR = 0.0f;
     // One-pole DC blocker coefficient: pole at 1 - 2*pi*fc/fs.
     outHpfCoef = std::exp(-juce::MathConstants<float>::twoPi * kOutHpfHz / (float) sr);
+
+    // Output low-shelf.
+    outShelfL = outShelfR = 0.0f;
+    outShelfCoef = onePoleCoef(kOutShelfHz, sr);
 }
 
 void SingleKnobReverb::prepare(double sampleRate, int /*blockSize*/)
@@ -203,6 +212,7 @@ void SingleKnobReverb::reset()
     outLpfL = outLpfR = 0.0f;
     outHpfStateL = outHpfStateR = 0.0f;
     outHpfPrevInL = outHpfPrevInR = 0.0f;
+    outShelfL = outShelfR = 0.0f;
 }
 
 // Linear interpolation read on a delay line at fractional offset behind the
@@ -393,8 +403,18 @@ void SingleKnobReverb::process(juce::AudioBuffer<float>& buffer)
         outLpfL += outLpfCoef * (wetL - outLpfL);
         outLpfR += outLpfCoef * (wetR - outLpfR);
 
-        L[i] = outLpfL;
-        if (nCh > 1) R[i] = outLpfR;
+        // Output low-shelf — same one-pole-LPF-plus-add-back structure
+        // as the in-loop bass shelf, but post-tank where stability
+        // isn't a concern. Track the low band, add back kOutShelfMul
+        // * state for an effective +4 dB bump below ~250 Hz with no
+        // boost above it.
+        outShelfL += outShelfCoef * (outLpfL - outShelfL);
+        outShelfR += outShelfCoef * (outLpfR - outShelfR);
+        const float shelfedL = outLpfL + kOutShelfMul * outShelfL;
+        const float shelfedR = outLpfR + kOutShelfMul * outShelfR;
+
+        L[i] = shelfedL;
+        if (nCh > 1) R[i] = shelfedR;
     }
 }
 

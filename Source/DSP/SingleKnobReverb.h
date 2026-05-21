@@ -63,8 +63,8 @@ private:
     // Early-diffusion allpass stages (4-stage Schroeder cascade). Mutually-
     // prime so the diffuser fingerprint stays smooth. Coefficient (g) chosen
     // for ~78 % diffusion — enough to smear transients without ringing.
-    static constexpr int kNumEarlyAPs = 4;
-    static constexpr int kEarlyAPSamples[kNumEarlyAPs] = { 113, 197, 313, 421 };
+    static constexpr int kNumEarlyAPs = 6;
+    static constexpr int kEarlyAPSamples[kNumEarlyAPs] = { 113, 197, 313, 421, 571, 691 };
     static constexpr float kEarlyAPGain = 0.7f;
 
     // ── State ─────────────────────────────────────────────────────────────
@@ -117,6 +117,15 @@ private:
     float outHpfPrevInL { 0.0f },  outHpfPrevInR { 0.0f };
     float outHpfCoef    { 0.0f };
 
+    // Static output low-shelf — VVV "bass mult" style coloration applied
+    // post-tank, post-band-limit. One-pole LPF state + a fractional
+    // add-back gives ~+4 dB below ~250 Hz, flat above. Always on;
+    // stability is irrelevant because it sits outside the feedback loop.
+    float outShelfL { 0.0f }, outShelfR { 0.0f };
+    float outShelfCoef { 0.0f };
+    static constexpr float kOutShelfHz  = 250.0f;
+    static constexpr float kOutShelfMul = 0.585f;  // ~+4 dB at DC (1 + 0.585 = 1.585)
+
     // Per-line LFO base rate (Hz). Each line picks a slightly different rate
     // around this centre so the modulation chorusses rather than rings as one.
     static constexpr float kModRateHz = 2.53f;
@@ -142,7 +151,7 @@ private:
     float bassBoostMul { 0.0f };
 
     // 1970s downsample LPF target.
-    static constexpr float kPretankLpfHz = 10000.0f;
+    static constexpr float kPretankLpfHz = 8000.0f;
 
     // Output band-limit (matches VVV EQ HighCut 8 kHz / LowCut 10 Hz).
     static constexpr float kOutLpfHz = 8000.0f;
