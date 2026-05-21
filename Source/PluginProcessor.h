@@ -237,6 +237,7 @@ private:
     juce::AudioBuffer<float>          reverbScratch;
     float                             reverbMixSmoothed { 0.0f };
     std::atomic<float>*               reverbMixParam    { nullptr };
+    std::atomic<float>*               reverbSourceParam { nullptr };  // 0 = Post, 1 = Phantom
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomProcessor)
 };

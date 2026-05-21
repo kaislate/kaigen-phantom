@@ -36,7 +36,8 @@ PhantomProcessor::PhantomProcessor()
 
     // Cache the reverb-mix atomic pointer once so processBlock can read it
     // with a single relaxed load (no APVTS lookup on the audio thread).
-    reverbMixParam = apvts.getRawParameterValue(ParamID::REVERB_MIX);
+    reverbMixParam    = apvts.getRawParameterValue(ParamID::REVERB_MIX);
+    reverbSourceParam = apvts.getRawParameterValue(ParamID::REVERB_SOURCE);
 }
 
 PhantomProcessor::~PhantomProcessor()
@@ -404,11 +405,25 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         if (isAudibleNow && nCh > 0 && n > 0
             && reverbScratch.getNumSamples() >= n)
         {
-            // Copy the post-engine signal into the reverb scratch — this is
-            // the wet input. The main buffer stays as the dry signal we'll
-            // mix back into.
+            // Select the wet input. By default (reverb_source = 0) the
+            // reverb processes the full post-engine signal (input + synth).
+            // When reverb_source = 1 it processes ONLY the synth
+            // contribution — the dry input still passes to the output
+            // through `buffer` unchanged, but the reverb tail is
+            // generated from just the synth.
+            const bool reverbOnPhantomOnly =
+                reverbSourceParam && reverbSourceParam->load() > 0.5f;
+            const juce::AudioBuffer<float>& reverbSource =
+                reverbOnPhantomOnly
+                    ? dualEngineHost.getPhantomOnlyOutput()
+                    : buffer;
+
+            // Copy the chosen source into the reverb scratch — the main
+            // buffer stays as the dry signal we'll mix back into.
             for (int c = 0; c < nCh && c < reverbScratch.getNumChannels(); ++c)
-                reverbScratch.copyFrom(c, 0, buffer, c, 0, n);
+                reverbScratch.copyFrom(c, 0, reverbSource,
+                                       juce::jmin(c, reverbSource.getNumChannels() - 1),
+                                       0, n);
 
             // Render wet in-place into the scratch (caller does dry-mix).
             reverb.process(reverbScratch);
