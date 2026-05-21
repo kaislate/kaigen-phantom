@@ -93,7 +93,8 @@ namespace ParamID
     // reverb's character is baked (Concert Hall / 1970s VVV preset, 4 s
     // decay), so the user only sees an "amount" knob. Same instance feeds
     // both engines (parallel send on the morphed output).
-    inline constexpr auto REVERB_MIX = "reverb_mix";
+    inline constexpr auto REVERB_MIX    = "reverb_mix";
+    inline constexpr auto REVERB_SOURCE = "reverb_source";
 
     #undef KAIGEN_PER_ENGINE
 }
@@ -181,6 +182,7 @@ inline std::vector<juce::String> getAllParameterIDs()
     ids.push_back(ParamID::MACRO4);
 
     ids.push_back(ParamID::REVERB_MIX);
+    ids.push_back(ParamID::REVERB_SOURCE);
 
     return ids;
 }
@@ -422,6 +424,17 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     params.push_back(std::make_unique<APF>(
         ParamID::REVERB_MIX, "Reverb",
         NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+
+    // Reverb routing: false (default) = reverb processes the full
+    // post-engine signal (input + synth). true = reverb processes only
+    // the synth contribution (phantomOut * ghostAmount), regardless of
+    // ghost mode.
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        ParamID::REVERB_SOURCE, "Reverb Source", false,
+        juce::AudioParameterBoolAttributes()
+            .withStringFromValueFunction([](bool b, int) {
+                return b ? juce::String("Phantom") : juce::String("Post");
+            })));
 
     return { params.begin(), params.end() };
 }
