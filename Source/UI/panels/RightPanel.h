@@ -8,6 +8,7 @@
 #include "../widgets/IOMeter.h"
 #include "../widgets/WordSelector.h"
 #include "../widgets/EtchedToggle.h"
+#include "../widgets/ChoiceToggle.h"
 #include "../visualizers/Oscilloscope.h"
 #include "../visualizers/Spectrum.h"
 
@@ -73,6 +74,12 @@ private:
 
     // Advanced panel — 14 mini knobs, all per-engine 'a_' prefix.
     std::array<std::unique_ptr<PhantomMiniKnob>, 14> miniKnobs;
+
+    // Binaural quick toggle — sits above the Width mini-knob in the
+    // Advanced row. Off (unlit) = binaural_mode = 0 (off). On (lit) =
+    // binaural_mode = 1 (Spread). Skip choice index 2 (Voice-Split is
+    // stubbed in BinauralStage).
+    ChoiceToggle binauralToggle;
 
     // Advanced section collapse toggle (instant, no animation).
     juce::TextButton advancedToggle { "Advanced (-)" };

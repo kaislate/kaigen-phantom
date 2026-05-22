@@ -26,6 +26,10 @@ void RightPanel::setEnginePrefix(const juce::String& activePrefix,
                      &widthKnob, &outGainKnob })
         k->setEnginePrefix(activePrefix, mirrorPrefix);
 
+    // ChoiceToggle retarget is single-arg (no mirror — choice mirroring is
+    // handled by the WordSelector in the settings overlay for LINK mode).
+    binauralToggle.setEnginePrefix(activePrefix);
+
     // Advanced-row mini knobs — all per-engine.
     for (auto& mk : miniKnobs)
         if (mk) mk->setEnginePrefix(activePrefix, mirrorPrefix);
@@ -48,6 +52,7 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
       inMeter       (p.peakInL,  p.peakInR),
       outMeter      (p.peakOutL, p.peakOutR),
       autoGainToggle(apvts, "input_gain_auto", "Auto"),
+      binauralToggle(apvts, "a_binaural_mode", "BIN", 1),
       oscilloscope  (p),
       spectrum      (p, a)
 {
@@ -131,6 +136,7 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
     addAndMakeVisible(spectrum);
 
     addAndMakeVisible(autoGainToggle);
+    addAndMakeVisible(binauralToggle);
 
     {
         static constexpr struct { const char* paramID; const char* label; } miniDefs[] = {
@@ -338,15 +344,31 @@ void RightPanel::resized()
         // shadow overlap (slotW < miniW is fine — bodies stay separate).
         const int slotW = (n > 0) ? (rowAvail - miniW) / juce::jmax(1, n - 1) : 0;
         int mx = rowLeft;
-        for (auto& mk : miniKnobs)
+        int widthKnobX = rowLeft;   // captured for the binaural toggle below
+        for (size_t i = 0; i < miniKnobs.size(); ++i)
         {
-            mk->setBounds(mx, miniRowY, miniW, miniH);
+            miniKnobs[i]->setBounds(mx, miniRowY, miniW, miniH);
+            // Width is the last mini-knob (index 13 — "binaural_width").
+            if (i == miniKnobs.size() - 1)
+                widthKnobX = mx;
             mx += slotW;
         }
+
+        // Binaural quick toggle — sits in the 14 px gap directly above the
+        // Width mini-knob. ~40 x 12, centred on the knob body (knob body is
+        // 48 px wide inside the 82-px component bounds, so the body centre
+        // is at widthKnobX + (miniW / 2)).
+        constexpr int kBinW = 40;
+        constexpr int kBinH = 12;
+        const int binX = widthKnobX + (miniW - kBinW) / 2;
+        const int binY = advancedToggleY + advancedToggleH + 2;
+        binauralToggle.setBounds(binX, binY, kBinW, kBinH);
+
         advancedCardBottom = miniRowY + miniH + 6;
     }
     else
     {
+        binauralToggle.setBounds(0, 0, 0, 0);  // hide while Advanced is collapsed
         advancedCardBottom = advancedToggleY + advancedToggleH + 8;
     }
     area.removeFromTop(advancedCardBottom - knobRowTop - knobRowHeight - cardPadY);
