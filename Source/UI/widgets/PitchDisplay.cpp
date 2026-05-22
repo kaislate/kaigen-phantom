@@ -9,11 +9,23 @@ namespace kaigen::phantom
 
 namespace
 {
-    constexpr float kCardHeight = 36.0f;
-    constexpr float kCardWidth  = 180.0f;
-    constexpr float kLabelH     = 11.0f;
-    constexpr float kLabelGap   = 2.0f;
-    constexpr float kEpsilonHz  = 0.5f;   // changes below this don't repaint
+    // Card sizing.
+    constexpr int   kCardSidePad = 24;     // gap from edge of the component
+    constexpr float kCardCorner  = 4.0f;
+
+    // Smoothing.
+    //
+    // Polling at 20 Hz; alpha 0.25 = ~5-tick (≈ 250 ms) settling.
+    // Smooth in log-Hz space so jumps blend musically rather than linearly,
+    // and snap when the new value is more than a semitone (5.9 %) away from
+    // the smoothed value — that's the threshold for "this is a new note",
+    // not "this is a noisy reading of the same note."
+    constexpr float kSmoothAlpha     = 0.25f;
+    constexpr float kSnapSemitones   = 1.0f;
+    constexpr float kSnapRatio       = 1.0594631f;  // 2^(1/12)
+
+    // Don't repaint on changes smaller than this (in displayed Hz).
+    constexpr float kRepaintEpsilonHz = 0.25f;
 }
 
 PitchDisplay::PitchDisplay(PhantomProcessor& p)
@@ -43,57 +55,97 @@ juce::String PitchDisplay::hzToNoteName(float hz)
     return juce::String(kNames[noteIndex]) + juce::String(octave);
 }
 
+int PitchDisplay::hzToCents(float hz)
+{
+    if (hz <= 0.0f) return 0;
+
+    // Distance in semitones from A4, take fractional part, scale to cents.
+    const float midiF = 12.0f * std::log2(hz / 440.0f) + 69.0f;
+    const float frac  = midiF - std::round(midiF);     // -0.5 .. +0.5
+    return juce::roundToInt(frac * 100.0f);
+}
+
 void PitchDisplay::timerCallback()
 {
     if (! isShowing()) return;
 
-    const float hz = processor.currentPitch.load(std::memory_order_relaxed);
-    if (std::abs(hz - lastHz) < kEpsilonHz) return;
-    lastHz = hz;
+    const float rawHz = processor.currentPitch.load(std::memory_order_relaxed);
 
-    if (hz > 0.0f)
-        currentText = hzToNoteName(hz)
-                       + juce::String::fromUTF8(" \xC2\xB7 ")   // middle dot
-                       + juce::String(juce::roundToInt(hz))
-                       + "Hz";
+    // Smoothing pass.
+    if (rawHz <= 0.0f)
+    {
+        smoothedHz = -1.0f;
+    }
+    else if (smoothedHz <= 0.0f)
+    {
+        // First reading after silence — snap.
+        smoothedHz = rawHz;
+    }
     else
+    {
+        // If the new reading is more than a semitone away, it's a new note —
+        // snap instantly. Otherwise EMA in log-Hz space.
+        const float ratio = rawHz / smoothedHz;
+        if (ratio > kSnapRatio || ratio < (1.0f / kSnapRatio))
+        {
+            smoothedHz = rawHz;
+        }
+        else
+        {
+            const float logSmooth = std::log(smoothedHz);
+            const float logRaw    = std::log(rawHz);
+            smoothedHz = std::exp(logSmooth + kSmoothAlpha * (logRaw - logSmooth));
+        }
+    }
+
+    // Gate repaints to meaningful changes.
+    if (std::abs(smoothedHz - displayedHz) < kRepaintEpsilonHz) return;
+    displayedHz = smoothedHz;
+
+    if (smoothedHz > 0.0f)
+    {
+        const int cents = hzToCents(smoothedHz);
+        const juce::String centsStr =
+            (cents >= 0 ? juce::String("+") : juce::String())
+            + juce::String(cents) + juce::String::fromUTF8("\xC2\xA2");   // ¢
+
+        currentText = hzToNoteName(smoothedHz)
+                       + "  " + centsStr
+                       + juce::String::fromUTF8(" \xC2\xB7 ")             // middle dot
+                       + juce::String(juce::roundToInt(smoothedHz))
+                       + " Hz";
+    }
+    else
+    {
         currentText = "---";
+    }
 
     repaint();
 }
 
+void PitchDisplay::resized()
+{
+    // Card fills the component horizontally minus side padding; vertically
+    // takes the full height.
+    cardBounds = getLocalBounds().reduced(kCardSidePad, 0);
+}
+
 void PitchDisplay::paint(juce::Graphics& g)
 {
-    const auto bounds = getLocalBounds().toFloat();
+    if (cardBounds.isEmpty()) return;
 
-    // Centre an OLED card horizontally; sit it flush at the top.
-    const float cardX = std::round((bounds.getWidth() - kCardWidth) * 0.5f);
-    const float cardY = 0.0f;
-    const juce::Rectangle<float> cardF(cardX, cardY, kCardWidth, kCardHeight);
-
-    // Reuse the visualiser inset paint helper for the OLED surface so the
-    // card matches the spectrum / oscilloscope bezel exactly.
-    Theme::paintVisualizerInset(g, cardF.toNearestInt(), 4.0f);
+    // OLED bezel — same helper used by spectrum / oscilloscope for visual
+    // consistency.
+    Theme::paintVisualizerInset(g, cardBounds, kCardCorner);
 
     // OLED text — large Courier centred on the card.
-    const float textPx = kCardHeight * 0.55f;
+    const float textPx = (float) cardBounds.getHeight() * 0.55f;
     g.setFont(juce::Font(juce::FontOptions()
                              .withName("Courier New")
                              .withHeight(textPx)));
     g.setColour(juce::Colour::fromFloatRGBA(0.9f, 0.95f, 1.0f, 0.92f));
-    g.drawText(currentText, cardF, juce::Justification::centred, false);
-
-    // "FUND" etched label below the card.
-    const juce::Rectangle<int> labelBounds(
-        (int) cardX,
-        (int) std::round(cardY + kCardHeight + kLabelGap),
-        (int) kCardWidth,
-        (int) kLabelH);
-
-    const auto labelFont = juce::Font(juce::FontOptions("Space Grotesk", 9.0f, juce::Font::bold))
-                                .withExtraKerningFactor(0.30f);
-    Theme::drawEtchedText(g, "FUND", labelBounds, juce::Justification::centred,
-                           labelFont, Theme::textOnLightLabel);
+    g.drawText(currentText, cardBounds.toFloat(),
+                juce::Justification::centred, false);
 }
 
 } // namespace kaigen::phantom

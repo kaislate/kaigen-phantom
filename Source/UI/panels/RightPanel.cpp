@@ -422,10 +422,10 @@ void RightPanel::resized()
     inMeter .setBounds(inMeterXNew,  meterY, kIndividualMeterW, kMeterHeight);
     outMeter.setBounds(outMeterXNew, meterY, kIndividualMeterW, kMeterHeight);
 
-    // PitchDisplay slot — fixed-height OLED + FUND label, sits between
-    // spectrum and oscilloscope. Shortens the spectrum so the spectrum
-    // isn't overwhelming and we get a useful fund-frequency readout.
-    constexpr int kPitchSlotH        = 50;
+    // PitchDisplay slot — wide OLED with pitch / cents / Hz, sits between
+    // spectrum and oscilloscope. No more "FUND" label below the card; the
+    // OLED now fills the entire slot and extends edge-to-edge.
+    constexpr int kPitchSlotH        = 40;
     constexpr int kPitchSlotGapAbove = 6;
     constexpr int kPitchSlotGapBelow = 6;
 

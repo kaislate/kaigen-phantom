@@ -7,12 +7,15 @@ class PhantomProcessor;
 namespace kaigen::phantom
 {
 
-/** OLED-style pitch / note readout. Polls `processor.currentPitch` on a
- *  20 Hz timer and renders either "<note> · <hz>Hz" (e.g. "A4 · 440Hz")
- *  when a pitch is detected, or "---" when silent. A small "FUND" etched
- *  label sits below the OLED card.
+/** Wide OLED-style pitch / note readout. Polls `processor.currentPitch`
+ *  on a 20 Hz timer, runs a smoothing pass on the raw Hz (EMA in log-Hz
+ *  space; snaps on big jumps so legitimate new notes still appear
+ *  instantly), and renders:
  *
- *  Native equivalent of the WebView's wheel-OLED `#pitchDisplay`. */
+ *      A4  +12¢  ·  440 Hz
+ *
+ *  Note name + cents-offset from nearest equal-tempered note + Hz value.
+ *  Renders "---" when the engine reports no detected pitch. */
 class PitchDisplay : public juce::Component, private juce::Timer
 {
 public:
@@ -20,6 +23,7 @@ public:
     ~PitchDisplay() override;
 
     void paint(juce::Graphics& g) override;
+    void resized() override;
 
 private:
     void timerCallback() override;
@@ -28,9 +32,19 @@ private:
      *  string for non-positive Hz. */
     static juce::String hzToNoteName(float hz);
 
+    /** Cents offset from the nearest equal-tempered note. Range about
+     *  [-50, +50]. Returns 0 for non-positive Hz. */
+    static int hzToCents(float hz);
+
     PhantomProcessor& processor;
-    float lastHz { -1.0f };          // last value read; gates repaints
-    juce::String currentText  { "---" };
+
+    // EMA-smoothed pitch in log-Hz space. -1 = no pitch detected yet.
+    float smoothedHz   { -1.0f };
+    float displayedHz  { -1.0f };       // last value we painted (gates repaints)
+    juce::String currentText { "---" };
+
+    // Card geometry computed in resized() so paint() can re-use it.
+    juce::Rectangle<int> cardBounds;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PitchDisplay)
 };
