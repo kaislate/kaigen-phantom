@@ -17,6 +17,18 @@ PhantomProcessor::PhantomProcessor()
     // preset from either tab populates that engine's harmonic amps.
     apvts.addParameterListener(ParamID::A_RECIPE_PRESET, this);
     apvts.addParameterListener(ParamID::B_RECIPE_PRESET, this);
+
+    // H param listeners drive the auto-switch / revert / mark-dirty path.
+    const char* aH[] = { ParamID::A_RECIPE_H2, ParamID::A_RECIPE_H3,
+                          ParamID::A_RECIPE_H4, ParamID::A_RECIPE_H5,
+                          ParamID::A_RECIPE_H6, ParamID::A_RECIPE_H7,
+                          ParamID::A_RECIPE_H8 };
+    const char* bH[] = { ParamID::B_RECIPE_H2, ParamID::B_RECIPE_H3,
+                          ParamID::B_RECIPE_H4, ParamID::B_RECIPE_H5,
+                          ParamID::B_RECIPE_H6, ParamID::B_RECIPE_H7,
+                          ParamID::B_RECIPE_H8 };
+    for (auto* id : aH) apvts.addParameterListener(id, this);
+    for (auto* id : bH) apvts.addParameterListener(id, this);
     presetManager.initialize();
 
     // ── Modulation engines (PR3a) ─────────────────────────────────────
@@ -44,6 +56,17 @@ PhantomProcessor::~PhantomProcessor()
 {
     apvts.removeParameterListener(ParamID::A_RECIPE_PRESET, this);
     apvts.removeParameterListener(ParamID::B_RECIPE_PRESET, this);
+
+    const char* aH[] = { ParamID::A_RECIPE_H2, ParamID::A_RECIPE_H3,
+                          ParamID::A_RECIPE_H4, ParamID::A_RECIPE_H5,
+                          ParamID::A_RECIPE_H6, ParamID::A_RECIPE_H7,
+                          ParamID::A_RECIPE_H8 };
+    const char* bH[] = { ParamID::B_RECIPE_H2, ParamID::B_RECIPE_H3,
+                          ParamID::B_RECIPE_H4, ParamID::B_RECIPE_H5,
+                          ParamID::B_RECIPE_H6, ParamID::B_RECIPE_H7,
+                          ParamID::B_RECIPE_H8 };
+    for (auto* id : aH) apvts.removeParameterListener(id, this);
+    for (auto* id : bH) apvts.removeParameterListener(id, this);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout PhantomProcessor::makeLayout()
@@ -524,36 +547,169 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     }
 }
 
+namespace
+{
+    const char* hParamId(int engineIdx, int hIdx)
+    {
+        // hIdx is 0..6 (H2..H8). engineIdx 0=A, 1=B.
+        static const char* aIds[7] = {
+            ParamID::A_RECIPE_H2, ParamID::A_RECIPE_H3, ParamID::A_RECIPE_H4,
+            ParamID::A_RECIPE_H5, ParamID::A_RECIPE_H6, ParamID::A_RECIPE_H7,
+            ParamID::A_RECIPE_H8
+        };
+        static const char* bIds[7] = {
+            ParamID::B_RECIPE_H2, ParamID::B_RECIPE_H3, ParamID::B_RECIPE_H4,
+            ParamID::B_RECIPE_H5, ParamID::B_RECIPE_H6, ParamID::B_RECIPE_H7,
+            ParamID::B_RECIPE_H8
+        };
+        return (engineIdx == 1 ? bIds : aIds)[juce::jlimit(0, 6, hIdx)];
+    }
+
+    int hIndexFromParamId(const juce::String& paramId, int& engineIdxOut)
+    {
+        for (int e = 0; e < 2; ++e)
+            for (int h = 0; h < 7; ++h)
+                if (paramId == hParamId(e, h))
+                {
+                    engineIdxOut = e;
+                    return h;
+                }
+        return -1;
+    }
+}
+
 void PhantomProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
-    // Recipe Preset is a per-engine choice: when either engine's selector changes,
-    // populate that engine's H2..H8 amplitudes from the chosen recipe table.
-    // "Custom" (index 6) leaves the harmonics untouched.
-    const bool isA = (parameterID == ParamID::A_RECIPE_PRESET);
-    const bool isB = (parameterID == ParamID::B_RECIPE_PRESET);
-    if (!isA && !isB) return;
+    // Branch 1: recipe_preset change → load that preset's H values.
+    if (parameterID == ParamID::A_RECIPE_PRESET)
+    {
+        applyRecipePreset(0, juce::roundToInt(newValue));
+        return;
+    }
+    if (parameterID == ParamID::B_RECIPE_PRESET)
+    {
+        applyRecipePreset(1, juce::roundToInt(newValue));
+        return;
+    }
 
-    const int idx = juce::roundToInt(newValue);
-    const float* tables[] = {
-        kWarmAmps, kAggressiveAmps, kHollowAmps, kDenseAmps,
-        kStableAmps, kWeirdAmps,
-        nullptr   // Custom (index 6)
-    };
+    // Branch 2: H param change → auto-switch / revert / mark-dirty.
+    int engineIdx = -1;
+    const int hIdx = hIndexFromParamId(parameterID, engineIdx);
+    if (hIdx < 0) return;
 
-    if (idx < 0 || idx >= 6 || tables[idx] == nullptr) return;
+    // Ignore writes we issued ourselves while loading a preset.
+    if (loadingPreset) return;
 
-    const char* hIds[7] = {
-        isA ? ParamID::A_RECIPE_H2 : ParamID::B_RECIPE_H2,
-        isA ? ParamID::A_RECIPE_H3 : ParamID::B_RECIPE_H3,
-        isA ? ParamID::A_RECIPE_H4 : ParamID::B_RECIPE_H4,
-        isA ? ParamID::A_RECIPE_H5 : ParamID::B_RECIPE_H5,
-        isA ? ParamID::A_RECIPE_H6 : ParamID::B_RECIPE_H6,
-        isA ? ParamID::A_RECIPE_H7 : ParamID::B_RECIPE_H7,
-        isA ? ParamID::A_RECIPE_H8 : ParamID::B_RECIPE_H8,
-    };
-    for (int i = 0; i < 7; ++i)
-        if (auto* p = apvts.getParameter(hIds[i]))
-            p->setValueNotifyingHost(p->convertTo0to1(tables[idx][i] * 100.0f));
+    const char* presetParamId = (engineIdx == 1)
+        ? ParamID::B_RECIPE_PRESET : ParamID::A_RECIPE_PRESET;
+    const int currentPreset = juce::roundToInt(
+        apvts.getRawParameterValue(presetParamId)->load());
+
+    if (currentPreset >= 6 && currentPreset <= 8)
+    {
+        // On a Custom slot — accept the edit, refresh previousH so a
+        // subsequent preset-load can revert to this state.
+        readCurrentH(engineIdx, previousH[(size_t) engineIdx]);
+        return;
+    }
+
+    // On a built-in. Find the first empty Custom slot.
+    const int emptySlot = findFirstEmptyCustomSlot(engineIdx);
+    if (emptySlot < 0)
+    {
+        // All customs full → revert this edit, fire wheel-lock flash.
+        loadingPreset = true;
+        writeHParamsRaw01(engineIdx, previousH[(size_t) engineIdx]);
+        loadingPreset = false;
+
+        juce::MessageManager::callAsync(
+            [bc = &wheelLockBroadcaster]() { bc->sendChangeMessage(); });
+        return;
+    }
+
+    // Remember which built-in we came from.
+    lastBuiltInPreset[(size_t) engineIdx] = currentPreset;
+
+    // Switch the preset to the empty slot. applyRecipePreset will fire as
+    // a result of the choice change; since the slot is not `filled`, it
+    // won't overwrite the just-edited H values.
+    if (auto* presetParam = apvts.getParameter(presetParamId))
+        presetParam->setValueNotifyingHost(presetParam->convertTo0to1((float) (6 + emptySlot)));
+}
+
+void PhantomProcessor::readCurrentH(int engineIdx, std::array<float, 7>& outH) const
+{
+    for (int h = 0; h < 7; ++h)
+    {
+        const auto* raw = apvts.getRawParameterValue(hParamId(engineIdx, h));
+        // Params are stored as [0..100] (percent). Normalise to [0..1].
+        outH[(size_t) h] = (raw != nullptr) ? raw->load() * 0.01f : 0.0f;
+    }
+}
+
+void PhantomProcessor::writeHParams(int engineIdx, const std::array<float, 7>& inH)
+{
+    // inH is [0..1]; the params want [0..100]; setValueNotifyingHost wants normalised [0..1].
+    for (int h = 0; h < 7; ++h)
+    {
+        if (auto* p = apvts.getParameter(hParamId(engineIdx, h)))
+        {
+            const float pct = juce::jlimit(0.0f, 100.0f, inH[(size_t) h] * 100.0f);
+            p->setValueNotifyingHost(p->convertTo0to1(pct));
+        }
+    }
+}
+
+void PhantomProcessor::writeHParamsRaw01(int engineIdx, const std::array<float, 7>& inH01)
+{
+    // Same as writeHParams but inputs already 0..1 (used by the revert
+    // path which has the previous percent-normalised values cached as
+    // 0..1 of the param range).
+    writeHParams(engineIdx, inH01);
+}
+
+void PhantomProcessor::applyRecipePreset(int engineIdx, int presetIdx)
+{
+    // Snapshot current H into previousH BEFORE the load — so a subsequent
+    // user edit can revert to the just-loaded values, not to whatever was
+    // there before this load.
+    readCurrentH(engineIdx, previousH[(size_t) engineIdx]);
+
+    if (presetIdx >= 0 && presetIdx <= 5)
+    {
+        const float* tables[6] = {
+            kWarmAmps, kAggressiveAmps, kHollowAmps,
+            kDenseAmps, kStableAmps, kWeirdAmps
+        };
+        const float* src = tables[presetIdx];
+        std::array<float, 7> values {};
+        for (int h = 0; h < 7; ++h) values[(size_t) h] = src[h];
+
+        loadingPreset = true;
+        writeHParams(engineIdx, values);
+        loadingPreset = false;
+
+        // After loading a built-in, remember it for delete fallback.
+        lastBuiltInPreset[(size_t) engineIdx] = presetIdx;
+
+        // Refresh previousH to the just-loaded values.
+        previousH[(size_t) engineIdx] = values;
+    }
+    else if (presetIdx >= 6 && presetIdx <= 8)
+    {
+        const int slotIdx = presetIdx - 6;
+        const auto& slot = recipeSlots[(size_t) engineIdx][(size_t) slotIdx];
+        if (slot.filled)
+        {
+            loadingPreset = true;
+            writeHParams(engineIdx, slot.savedH);
+            loadingPreset = false;
+            previousH[(size_t) engineIdx] = slot.savedH;
+        }
+        // If !filled, leave H values as-is — the user is editing into an
+        // empty slot. previousH stays at the snapshot above so a later
+        // revert restores the pre-switch values.
+    }
 }
 
 juce::AudioProcessorEditor* PhantomProcessor::createEditor()
@@ -593,16 +749,48 @@ int PhantomProcessor::findFirstEmptyCustomSlot(int engineIdx) const noexcept
     return -1;
 }
 
-void PhantomProcessor::saveRecipeSlot(int /*engineIdx*/, int /*slotIdx*/)
+void PhantomProcessor::saveRecipeSlot(int engineIdx, int slotIdx)
 {
-    // Implemented in Task 3 once the live-H reader is wired in.
-    jassertfalse;
+    const int e = juce::jlimit(0, 1, engineIdx);
+    const int s = juce::jlimit(0, 2, slotIdx);
+
+    auto& slot = recipeSlots[(size_t) e][(size_t) s];
+    readCurrentH(e, slot.savedH);
+    slot.filled = true;
 }
 
-void PhantomProcessor::clearRecipeSlot(int /*engineIdx*/, int /*slotIdx*/)
+void PhantomProcessor::clearRecipeSlot(int engineIdx, int slotIdx)
 {
-    // Implemented in Task 3.
-    jassertfalse;
+    const int e = juce::jlimit(0, 1, engineIdx);
+    const int s = juce::jlimit(0, 2, slotIdx);
+
+    auto& slot = recipeSlots[(size_t) e][(size_t) s];
+    slot.filled = false;
+    slot.savedH = {};
+
+    // If this slot was the active preset, fall back: first other filled
+    // Custom → lastBuiltInPreset → 0 (Warm).
+    const char* presetParamId = (e == 1)
+        ? ParamID::B_RECIPE_PRESET : ParamID::A_RECIPE_PRESET;
+    const int currentPreset = juce::roundToInt(
+        apvts.getRawParameterValue(presetParamId)->load());
+
+    if (currentPreset == 6 + s)
+    {
+        int fallback = -1;
+        for (int other = 0; other < 3; ++other)
+            if (other != s && recipeSlots[(size_t) e][(size_t) other].filled)
+            {
+                fallback = 6 + other;
+                break;
+            }
+        if (fallback < 0)
+            fallback = juce::jlimit(0, 5, lastBuiltInPreset[(size_t) e]);
+
+        if (auto* presetParam = apvts.getParameter(presetParamId))
+            presetParam->setValueNotifyingHost(
+                presetParam->convertTo0to1((float) fallback));
+    }
 }
 
 void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)

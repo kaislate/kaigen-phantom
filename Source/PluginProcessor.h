@@ -146,6 +146,10 @@ public:
 
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
+    void applyRecipePreset(int engineIdx, int presetIdx);
+    void readCurrentH(int engineIdx, std::array<float, 7>& outH) const;
+    void writeHParams (int engineIdx, const std::array<float, 7>& inH);
+    void writeHParamsRaw01(int engineIdx, const std::array<float, 7>& inH01);
     static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout();
 
     double sampleRate = 44100.0;
