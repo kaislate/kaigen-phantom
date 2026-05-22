@@ -22,6 +22,34 @@ Oscilloscope::Oscilloscope(PhantomProcessor& p)
 {
     setSize(800, 120);
     startTimerHz(20);   // dropped from 30 — still smooth, halves CPU
+
+    autoButton.setClickingTogglesState(true);
+    autoButton.setToggleState(autoScale, juce::dontSendNotification);
+    autoButton.setColour(juce::TextButton::buttonColourId,
+                         juce::Colours::transparentBlack);
+    autoButton.setColour(juce::TextButton::buttonOnColourId,
+                         juce::Colour::fromFloatRGBA(1.0f, 1.0f, 1.0f, 0.10f));
+    autoButton.setColour(juce::TextButton::textColourOffId,
+                         juce::Colour::fromFloatRGBA(1.0f, 1.0f, 1.0f, 0.50f));
+    autoButton.setColour(juce::TextButton::textColourOnId,
+                         juce::Colour::fromFloatRGBA(1.0f, 1.0f, 1.0f, 0.90f));
+    autoButton.setColour(juce::ComboBox::outlineColourId,
+                         juce::Colour::fromFloatRGBA(1.0f, 1.0f, 1.0f, 0.15f));
+    autoButton.onClick = [this] {
+        autoScale = autoButton.getToggleState();
+        repaint();
+    };
+    addAndMakeVisible(autoButton);
+}
+
+void Oscilloscope::resized()
+{
+    constexpr int kBtnW   = 28;
+    constexpr int kBtnH   = 12;
+    constexpr int kBtnPad = 4;
+    autoButton.setBounds(getWidth()  - kBtnW - kBtnPad,
+                         getHeight() - kBtnH - kBtnPad,
+                         kBtnW, kBtnH);
 }
 
 Oscilloscope::~Oscilloscope()

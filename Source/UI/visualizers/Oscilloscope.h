@@ -21,6 +21,7 @@ public:
     ~Oscilloscope() override;
 
     void paint(juce::Graphics& g) override;
+    void resized() override;
 
 private:
     void timerCallback() override;
@@ -54,6 +55,10 @@ private:
 
     // Smoothed normScale so auto-scale transitions don't pop.
     float currentNormScale { 1.0f };
+
+    // Editor-local AUTO button — toggles autoScale. Matches WebView's
+    // bottom-right corner pill. Not persisted to APVTS (matches WebView).
+    juce::TextButton autoButton { "AUTO" };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Oscilloscope)
 };
