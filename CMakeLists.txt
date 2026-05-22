@@ -50,6 +50,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/widgets/ToggleGroup.cpp
     Source/UI/widgets/WordSelector.cpp
     Source/UI/widgets/EtchedToggle.cpp
+    Source/UI/widgets/ChoiceToggle.cpp
     Source/UI/widgets/LinkButton.cpp
     Source/UI/widgets/IOMeter.cpp
     Source/UI/widgets/RecipeWheel.cpp
