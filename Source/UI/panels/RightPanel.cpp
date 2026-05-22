@@ -199,6 +199,27 @@ void RightPanel::paint(juce::Graphics& g)
     drawSectionHeader(g, juce::Rectangle<int>(stereoCardBounds.getX(),   stereoCardBounds.getY()   + 1, stereoCardBounds.getWidth(),   14), "Stereo");
     drawSectionHeader(g, juce::Rectangle<int>(levelsCardBounds.getX(),   levelsCardBounds.getY()   + 1, levelsCardBounds.getWidth(),   14), "Levels");
     drawSectionHeader(g, juce::Rectangle<int>(advancedCardBounds.getX(), advancedCardBounds.getY() + 1, advancedCardBounds.getWidth(), 14), "Advanced");
+
+    // Meter column labels — small etched "IN" / "OUT" under each meter.
+    if (! inMeter.getBounds().isEmpty() && ! outMeter.getBounds().isEmpty())
+    {
+        const auto labelFont = juce::Font(juce::FontOptions("Space Grotesk", 8.0f, juce::Font::bold))
+                                   .withExtraKerningFactor(0.25f);
+
+        const auto inLabelBounds  = juce::Rectangle<int>(
+            inMeter.getX() - 2, inMeter.getBottom() + 1,
+            inMeter.getWidth() + 4, 9);
+        const auto outLabelBounds = juce::Rectangle<int>(
+            outMeter.getX() - 2, outMeter.getBottom() + 1,
+            outMeter.getWidth() + 4, 9);
+
+        Theme::drawEtchedText(g, "IN",  inLabelBounds.toFloat().toNearestInt(),
+                               juce::Justification::centred,
+                               labelFont, Theme::textOnLightLabel);
+        Theme::drawEtchedText(g, "OUT", outLabelBounds.toFloat().toNearestInt(),
+                               juce::Justification::centred,
+                               labelFont, Theme::textOnLightLabel);
+    }
 }
 
 void RightPanel::resized()
@@ -235,7 +256,6 @@ void RightPanel::resized()
     const int levelsCardRight = getWidth() - kAdvancedSidePad;
     const int levelsCardW     = levelsCardRight - levelsCardX;
 
-    constexpr int kMeterW          = 28;   // wider bars — each L/R bar is ~13 px
     // Bumped 30 → 35 when Reverb joined the Levels row. With 4 knobs centred
     // in the card, an extra 5 px per join is what keeps the In/Out shadow
     // halos from spilling past the card edges. Knob bodies (Small = 42 px)
@@ -244,8 +264,6 @@ void RightPanel::resized()
     constexpr int kMedSmallOverlap = 35;
     constexpr int kSmallSide       = 90;
     constexpr int kKnobShadowPad   = 24;
-    constexpr int kMeterEdgeMargin = 6;    // breathing room from the section card edge
-    constexpr int kMeterKnobGap    = -8;   // negative → meter shifts further into the shadow halo
 
     // --- Harmonic Engine: 3 medium knobs, fit into harmonicCardW ──────
     // Adaptive overlap so 3 mediums fit the card's content area exactly.
@@ -282,10 +300,6 @@ void RightPanel::resized()
                               + (kMedium    - kMedSmallOverlap);        // Out
     const int inGainX = levelsCardX + (levelsCardW - levelsContentW) / 2;
     inGainKnob.setBounds(inGainX, knobRowTop, kMedium, kMedium);
-    // Left meter — clear of In's left shadow halo + clear of card edge.
-    inMeter.setBounds(juce::jmax(levelsCardX + kMeterEdgeMargin,
-                                  inGainX - kMeterKnobGap - kMeterW),
-                       knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
 
     const int trimX = inGainX + kMedium - kMedSmallOverlap;
     const int smallY = knobRowTop + (kMedium - kSmallSide) / 2 + 1;
@@ -296,10 +310,6 @@ void RightPanel::resized()
 
     const int outGainX = reverbX + kSmallSide - kMedSmallOverlap;
     outGainKnob.setBounds(outGainX, knobRowTop, kMedium, kMedium);
-    // Right meter — mirror of the left, outside Out's right shadow halo.
-    outMeter.setBounds(juce::jmin(levelsCardRight - kMeterEdgeMargin - kMeterW,
-                                   outGainX + kMedium + kMeterKnobGap),
-                        knobRowTop + (kMedium - 90) / 2, kMeterW, 90);
 
     // Reverb-source toggle — small etched word centred under the Reverb
     // knob, in the empty space below the small-knob row inside the
@@ -377,12 +387,46 @@ void RightPanel::resized()
                                                getWidth() - 16,
                                                advancedCardBottom - advancedCardTop);
 
-    // Visualizers below Advanced row — excluded from inset cards (Task 5).
-    area.removeFromTop(12);
-    auto vizArea = area.reduced(12, 0);
-    oscilloscope.setBounds(vizArea.removeFromTop(120));
-    vizArea.removeFromTop(8);
-    spectrum    .setBounds(vizArea.removeFromTop(280));
+    // Visualizers — bottom-anchored layout. Whole bottom row (oscilloscope
+    // + meter column) is fixed in size and position; spectrum fills the
+    // variable height between the Advanced row's bottom and the bottom
+    // row's top. Collapsing Advanced only expands the spectrum upward.
+    constexpr int kOscRowHeight     = 100;   // oscilloscope + meter column height
+    constexpr int kVizSidePad       = 12;
+    constexpr int kVizBottomPad     = 8;
+    constexpr int kOscToSpecGap     = 6;
+    constexpr int kMeterColWidth    = 56;
+    constexpr int kMeterColPad      = 4;
+    constexpr int kIndividualMeterW = 24;
+    constexpr int kMeterHeight      = 88;     // fits within kOscRowHeight with 6 px margin
+    constexpr int kSpectrumMinH     = 60;
+
+    const int vizLeft   = kVizSidePad;
+    const int vizRight  = getWidth() - kVizSidePad;
+    const int vizBottom = getHeight() - kVizBottomPad;
+
+    // Bottom row: oscilloscope on the left, meter column on the right.
+    const int bottomRowTop = vizBottom - kOscRowHeight;
+    const int meterColX    = vizRight - kMeterColWidth;
+    const int oscRight     = meterColX - kMeterColPad;
+    oscilloscope.setBounds(vizLeft, bottomRowTop,
+                           oscRight - vizLeft, kOscRowHeight);
+
+    // Meter column — two vertical IOMeters side-by-side, anchored bottom-right.
+    constexpr int kMeterColGap = (kMeterColWidth - 2 * kIndividualMeterW) / 3;
+    const int meterY      = bottomRowTop + (kOscRowHeight - kMeterHeight) / 2;
+    const int inMeterXNew = meterColX + kMeterColGap;
+    const int outMeterXNew = inMeterXNew + kIndividualMeterW + kMeterColGap;
+    inMeter .setBounds(inMeterXNew,  meterY, kIndividualMeterW, kMeterHeight);
+    outMeter.setBounds(outMeterXNew, meterY, kIndividualMeterW, kMeterHeight);
+
+    // Spectrum — variable height. Bottom is fixed (just above bottom row);
+    // top moves up or down based on advancedCardBottom.
+    const int spectrumBottom = bottomRowTop - kOscToSpecGap;
+    const int spectrumTop    = advancedCardBottom + kOscToSpecGap;
+    const int spectrumHeight = juce::jmax(kSpectrumMinH, spectrumBottom - spectrumTop);
+    spectrum.setBounds(vizLeft, spectrumBottom - spectrumHeight,
+                       vizRight - vizLeft, spectrumHeight);
 
     // Auto toggle — single etched word, centred on the PKE (In) knob's
     // body and tucked just below the Levels card so it sits in the empty
