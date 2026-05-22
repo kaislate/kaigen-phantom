@@ -6,21 +6,28 @@
 namespace kaigen::phantom
 {
 
-/** Single-word toggle painted in the EtchedToggle style, but bound to a
- *  juce::AudioParameterChoice. Used when a 2-value choice needs the same
- *  visual affordance as the bool EtchedToggle (off = etched dark; on =
- *  backlit glow). Clicking cycles the param between the two configured
- *  choice indices.
+/** Single-word toggle painted in the EtchedToggle style, bound to a
+ *  juce::AudioParameterChoice. Renders a 2-state view of the param:
+ *  index 0 = off (etched dark); index `onChoiceIndex` = on (backlit
+ *  glow). Other indices (in choice params with 3+ values, e.g.
+ *  `binaural_mode`'s stubbed Voice-Split at index 2) render as off
+ *  and a click jumps the param to `onChoiceIndex`. Clicking when
+ *  already on jumps the param to 0.
  */
 class ChoiceToggle : public juce::Button
 {
 public:
     /** @param apvts          The plugin's APVTS.
      *  @param choiceParamId  Choice param ID. Must resolve to an
-     *                        AudioParameterChoice with at least two values.
+     *                        AudioParameterChoice with at least
+     *                        `onChoiceIndex + 1` values.
      *  @param label          Single-word label drawn on the button.
      *  @param onChoiceIndex  The choice index that counts as "on" (lit).
-     *                        The "off" state is always index 0.
+     *                        The "off" state is always index 0. If the
+     *                        underlying param holds any other index
+     *                        (e.g. a stubbed third option), the toggle
+     *                        renders as off and clicking jumps to
+     *                        `onChoiceIndex`.
      */
     ChoiceToggle(juce::AudioProcessorValueTreeState& apvts,
                  const juce::String& choiceParamId,
