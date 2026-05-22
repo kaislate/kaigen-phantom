@@ -345,15 +345,19 @@ void Spectrum::drawPane(juce::Graphics& g,
         g.setColour(juce::Colour(0x61508ed7));
         g.fillPath(dashedPath);
 
-        // Crossover label: "NNNHz" top-left of the line
-        const float labelFontPx = juce::jmax(8.0f, std::round(paneH * 0.10f));
+        // Crossover label: "NNNNHz" top-left of the line. Font size capped
+        // at 14 px so tall spectrum panes don't blow it up; the rect width
+        // is computed from the font size + a 6-character allowance so the
+        // full "20000Hz" (5 digits + 2 chars) always fits without clipping.
+        const float labelFontPx = juce::jlimit(8.0f, 14.0f, std::round(paneH * 0.10f));
         g.setFont(juce::Font(juce::FontOptions()
                                  .withName("Courier New")
                                  .withHeight(labelFontPx)));
         g.setColour(juce::Colour(0x99508ed7)); // rgba(80,142,215,0.60) → 0x99
         const juce::String labelText = juce::String(juce::roundToInt(xoverHz)) + "Hz";
+        const float labelW = labelFontPx * 4.5f;   // ~7 Courier glyph widths
         g.drawText(labelText,
-                   juce::Rectangle<float>(xPos + 3.0f, 2.0f, 80.0f, labelFontPx),
+                   juce::Rectangle<float>(xPos + 3.0f, 2.0f, labelW, labelFontPx),
                    juce::Justification::centredLeft, false);
     }
 }
