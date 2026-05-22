@@ -3,6 +3,7 @@
 // Full canvas port of Source/WebUI/recipe-wheel.js.
 // Read every line of that file before touching this one.
 #include "RecipeWheel.h"
+#include "../../PluginProcessor.h"
 
 #include <cmath>
 #include <random>
@@ -44,7 +45,8 @@ void RecipeWheel::setSpokeAmp(int spokeIdx, float amp01)
 // ─── Constructor / Destructor ─────────────────────────────────────────────────
 
 RecipeWheel::RecipeWheel(juce::AudioProcessorValueTreeState& apvts,
-                         const std::array<juce::String, kSpokes>& paramIDs)
+                         const std::array<juce::String, kSpokes>& paramIDs,
+                         ::PhantomProcessor* processor)
 {
     // Initialise 140 particles with random progress so they start spread out
     // across the spoke lengths (steady-state like the JS Math.random() init).
@@ -78,17 +80,42 @@ RecipeWheel::RecipeWheel(juce::AudioProcessorValueTreeState& apvts,
     // 24 Hz — animation stays smooth for the rotating rings + scan + particles
     // while halving CPU vs 60-Hz-with-parity-throttle.
     startTimerHz(24);
+
+    processorRef = processor;
+    if (processorRef != nullptr)
+        processorRef->getWheelLockBroadcaster().addChangeListener(this);
 }
 
 RecipeWheel::~RecipeWheel()
 {
+    if (processorRef != nullptr)
+        processorRef->getWheelLockBroadcaster().removeChangeListener(this);
+
     stopTimer();
+}
+
+void RecipeWheel::changeListenerCallback(juce::ChangeBroadcaster* /*source*/)
+{
+    // Fired by PhantomProcessor::wheelLockBroadcaster when an H edit is
+    // rejected because all Custom slots are filled. Flash for ~120 ms
+    // (timer runs at 60 Hz → 7 frames).
+    lockFlashActive          = true;
+    lockFlashFramesRemaining = 7;
+    repaint();
 }
 
 // ─── Timer ────────────────────────────────────────────────────────────────────
 
 void RecipeWheel::timerCallback()
 {
+    if (lockFlashFramesRemaining > 0)
+    {
+        --lockFlashFramesRemaining;
+        if (lockFlashFramesRemaining == 0)
+            lockFlashActive = false;
+        repaint();
+    }
+
     // Skip animation work entirely when the editor isn't on screen
     // (DAW window minimised, GUI hidden, etc.) — saves ~5-10% CPU at idle.
     if (! isShowing()) return;
@@ -471,6 +498,14 @@ void RecipeWheel::paint(juce::Graphics& g)
 
         g.setGradientFill(glowGrad);
         g.fillEllipse(cx - innerR, cy - innerR, innerR * 2.0f, innerR * 2.0f);
+    }
+
+    if (lockFlashActive)
+    {
+        // Red-tinted overlay over the full wheel bounds. 0.18 alpha is
+        // visible but doesn't obliterate the wheel underneath.
+        g.setColour(juce::Colour::fromFloatRGBA(1.0f, 0.25f, 0.20f, 0.18f));
+        g.fillRoundedRectangle(getLocalBounds().toFloat(), 6.0f);
     }
 }
 

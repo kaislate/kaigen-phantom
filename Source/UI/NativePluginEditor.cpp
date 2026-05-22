@@ -20,7 +20,7 @@ namespace
 NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
                                        juce::AudioProcessorValueTreeState& a)
     : juce::AudioProcessorEditor(&p), processor(p), apvts(a),
-      rightPanel(a, p), leftPanel(a), topBar(p, a), presetBrowser(p, a),
+      rightPanel(a, p), leftPanel(a, p), topBar(p, a), presetBrowser(p, a),
       settingsOverlay(a),
       presetDropdown(p, a), modulationPanel(p, a), matrixView(p, a)
 {

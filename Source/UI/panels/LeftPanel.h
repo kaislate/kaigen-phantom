@@ -8,13 +8,15 @@
 #include "../widgets/LinkButton.h"
 #include "../widgets/RecipeWheel.h"
 
+class PhantomProcessor;
+
 namespace kaigen::phantom
 {
 
 class LeftPanel : public juce::Component, private juce::Slider::Listener
 {
 public:
-    explicit LeftPanel(juce::AudioProcessorValueTreeState& apvts);
+    LeftPanel(juce::AudioProcessorValueTreeState& apvts, ::PhantomProcessor& processor);
     ~LeftPanel() override;
 
     void paint(juce::Graphics& g) override;

@@ -16,13 +16,14 @@ namespace
     }
 }
 
-LeftPanel::LeftPanel(juce::AudioProcessorValueTreeState& a)
+LeftPanel::LeftPanel(juce::AudioProcessorValueTreeState& a, ::PhantomProcessor& p)
     : apvts(a),
       recipeWheel(apvts,
                   std::array<juce::String, 7>{
                       "a_recipe_h2", "a_recipe_h3", "a_recipe_h4",
                       "a_recipe_h5", "a_recipe_h6", "a_recipe_h7", "a_recipe_h8"
-                  }),
+                  },
+                  &p),
       recipePresetSelector(apvts, "a_recipe_preset",
                            { "Warm", "Aggr", "Hollow",
                              "Dense", "Stable", "Weird",

@@ -4,6 +4,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
+class PhantomProcessor;
+
 namespace kaigen::phantom
 {
 
@@ -22,16 +24,23 @@ namespace kaigen::phantom
  *  Internally owns 7 hidden juce::Slider instances + 7 SliderParameterAttachments
  *  to bind to 'a_recipe_h2' through 'a_recipe_h8'.
  *  A 60 Hz Timer drives animation; repaint is throttled to ~30 fps (every other tick). */
-class RecipeWheel : public juce::Component, private juce::Timer
+class RecipeWheel : public juce::Component,
+                     private juce::Timer,
+                     private juce::ChangeListener
 {
 public:
     static constexpr int kSpokes            = 7;
     static constexpr int kParticlesPerSpoke = 20;
     static constexpr int kNumRings          = 6;
 
-    /** Constructor takes apvts and the 7 parameter IDs in H2-H8 order. */
+    /** @param apvts      The plugin APVTS.
+     *  @param paramIDs   7 H param IDs (H2..H8) in order.
+     *  @param processor  Optional pointer for wheel-lock subscription;
+     *                    pass nullptr if the wheel is used outside of the
+     *                    main editor (no flash on lock-reject). */
     RecipeWheel(juce::AudioProcessorValueTreeState& apvts,
-                const std::array<juce::String, kSpokes>& paramIDs);
+                const std::array<juce::String, kSpokes>& paramIDs,
+                ::PhantomProcessor* processor = nullptr);
     ~RecipeWheel() override;
 
     void paint(juce::Graphics& g) override;
@@ -77,6 +86,16 @@ private:
     // ── Interaction state ─────────────────────────────────────────────────
     int dragSpoke  { -1 };
     int hoverSpoke { -1 };
+
+    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
+
+    // Lock-flash overlay state. Set true by changeListenerCallback when the
+    // processor rejects an H edit; cleared after ~120 ms by the existing
+    // animation timer.
+    bool  lockFlashActive  { false };
+    int   lockFlashFramesRemaining { 0 };
+
+    ::PhantomProcessor* processorRef { nullptr };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RecipeWheel)
 };
