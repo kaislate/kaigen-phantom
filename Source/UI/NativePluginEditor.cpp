@@ -21,6 +21,7 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
                                        juce::AudioProcessorValueTreeState& a)
     : juce::AudioProcessorEditor(&p), processor(p), apvts(a),
       rightPanel(a, p), leftPanel(a), topBar(p, a), presetBrowser(p, a),
+      settingsOverlay(a),
       presetDropdown(p, a), modulationPanel(p, a), matrixView(p, a)
 {
     setLookAndFeel(&lookAndFeel);
@@ -69,6 +70,30 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
     addAndMakeVisible(presetBrowser);
     presetBrowser.setVisible(false);
     presetBrowser.toFront(false);  // ensure it's painted on top of other panels
+
+    addAndMakeVisible(settingsOverlay);
+    settingsOverlay.setVisible(false);
+    settingsOverlay.toFront(false);
+
+    settingsOverlay.onDismiss = [this] {
+        settingsOverlay.setVisible(false);
+    };
+
+    // TopBar's gear button → open the overlay with mutual exclusion against
+    // the preset browser, dropdown, and matrix overlay.
+    topBar.onSettingsRequested = [this, persistMatrixMode] {
+        if (matrixView.isVisible())
+        {
+            matrixView.setVisible(false);
+            resized();
+            persistMatrixMode(false);
+        }
+        presetBrowser .setVisible(false);
+        presetDropdown.setVisible(false);
+        settingsOverlay.setBounds(getLocalBounds());
+        settingsOverlay.setVisible(true);
+        settingsOverlay.toFront(false);
+    };
 
     // Quick-pick dropdown: visible-on-demand, full-editor overlay, only the
     // card sub-rect actually paints. Hidden by default.
@@ -154,6 +179,7 @@ void NativePluginEditor::applyEngineFocus()
     leftPanel .setEnginePrefix(activePrefix, mirrorPrefix);
     rightPanel.setEnginePrefix(activePrefix, mirrorPrefix);
     topBar.getModeToggle().setEnginePrefix(activePrefix, mirrorPrefix);
+    settingsOverlay.setEnginePrefix(activePrefix, mirrorPrefix);
 }
 
 NativePluginEditor::~NativePluginEditor()
@@ -191,9 +217,10 @@ void NativePluginEditor::resized()
 
     // PresetBrowser + PresetDropdown both overlay the entire editor when
     // visible (PresetDropdown only paints inside its anchored card sub-rect).
-    presetBrowser.setBounds(getLocalBounds());
-    presetDropdown.setBounds(getLocalBounds());
-    matrixView.setBounds(getLocalBounds());
+    presetBrowser  .setBounds(getLocalBounds());
+    presetDropdown .setBounds(getLocalBounds());
+    matrixView     .setBounds(getLocalBounds());
+    settingsOverlay.setBounds(getLocalBounds());
 
     // DSP status tag overlay at top-right corner — 2 px from the edges.
     if (dspStatusTag)
