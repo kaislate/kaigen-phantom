@@ -5,6 +5,7 @@
 #include "../widgets/PhantomKnob.h"
 #include "../widgets/ToggleGroup.h"
 #include "../widgets/WordSelector.h"
+#include "../widgets/RecipeSlotPills.h"
 #include "../widgets/LinkButton.h"
 #include "../widgets/RecipeWheel.h"
 
@@ -43,6 +44,7 @@ private:
     // Recipe wheel + preset selector
     RecipeWheel  recipeWheel;
     WordSelector recipePresetSelector;
+    RecipeSlotPills recipeSlotPills;
 
     // Ghost section
     PhantomKnob  ghostAmountKnob;

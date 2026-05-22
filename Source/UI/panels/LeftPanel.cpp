@@ -29,6 +29,7 @@ LeftPanel::LeftPanel(juce::AudioProcessorValueTreeState& a, ::PhantomProcessor& 
                              "Dense", "Stable", "Weird",
                              "Cust 1", "Cust 2", "Cust 3" },
                            /*numRows*/ 3),
+      recipeSlotPills(p),
       ghostAmountKnob  (apvts, "a_ghost",              PhantomKnob::Size::Large,  "Amount"),
       crossoverKnob    (apvts, "a_phantom_threshold",  PhantomKnob::Size::Medium, "Crossover"),
       strengthKnob     (apvts, "a_phantom_strength",   PhantomKnob::Size::Medium, "Strength"),
@@ -39,6 +40,7 @@ LeftPanel::LeftPanel(juce::AudioProcessorValueTreeState& a, ::PhantomProcessor& 
 {
     addAndMakeVisible(recipeWheel);
     addAndMakeVisible(recipePresetSelector);
+    addAndMakeVisible(recipeSlotPills);
     addAndMakeVisible(ghostAmountKnob);
     addAndMakeVisible(crossoverKnob);
     addAndMakeVisible(strengthKnob);
@@ -161,6 +163,14 @@ void LeftPanel::resized()
     constexpr int kRecipeContentY = kRecipeCardTop + 24;
     constexpr int kRecipeBottomPad = 16;            // extra room below buttons
     recipePresetSelector.setBounds(16, kRecipeContentY, panelW - 32, kPresetH);
+
+    // Pills strip — directly below the WordSelector, full width so each
+    // row of pills sits under the corresponding "Cust N" column.
+    constexpr int kPillsStripH = 12 * 3 + 2 * 2 + 2;   // 3 rows × 12 + 2 gaps × 2 + 2 px pad
+    auto pillsBounds = recipePresetSelector.getBounds()
+                          .translated(0, recipePresetSelector.getHeight() + 2)
+                          .withHeight(kPillsStripH);
+    recipeSlotPills.setBounds(pillsBounds);
 
     // Knob component natural sizes (body + shadow padding × 2).
     //   Large:  114 + 32*2 = 178
