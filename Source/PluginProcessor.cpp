@@ -576,6 +576,35 @@ void PhantomProcessor::setEngineFocus(EngineFocus newFocus) noexcept
             [bc = &engineFocusBroadcaster]() { bc->sendChangeMessage(); });
 }
 
+const PhantomProcessor::RecipeSlot&
+PhantomProcessor::getRecipeSlot(int engineIdx, int slotIdx) const noexcept
+{
+    const int e = juce::jlimit(0, 1, engineIdx);
+    const int s = juce::jlimit(0, 2, slotIdx);
+    return recipeSlots[(size_t) e][(size_t) s];
+}
+
+int PhantomProcessor::findFirstEmptyCustomSlot(int engineIdx) const noexcept
+{
+    const int e = juce::jlimit(0, 1, engineIdx);
+    for (int s = 0; s < 3; ++s)
+        if (! recipeSlots[(size_t) e][(size_t) s].filled)
+            return s;
+    return -1;
+}
+
+void PhantomProcessor::saveRecipeSlot(int /*engineIdx*/, int /*slotIdx*/)
+{
+    // Implemented in Task 3 once the live-H reader is wired in.
+    jassertfalse;
+}
+
+void PhantomProcessor::clearRecipeSlot(int /*engineIdx*/, int /*slotIdx*/)
+{
+    // Implemented in Task 3.
+    jassertfalse;
+}
+
 void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     // New format: a wrapper <PluginState> tree containing a single

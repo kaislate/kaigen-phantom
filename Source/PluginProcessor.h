@@ -239,5 +239,59 @@ private:
     std::atomic<float>*               reverbMixParam    { nullptr };
     std::atomic<float>*               reverbSourceParam { nullptr };  // 0 = Post, 1 = Phantom
 
+    // ─── Recipe Custom slots ─────────────────────────────────────────────
+    // Per-engine, per-Custom-slot stored H values (H2..H8 normalised [0..1]).
+    // When the user manually edits an H value while a built-in preset is
+    // selected, the processor auto-switches to the first EMPTY slot. The
+    // RecipeSlotPills widget reads these and renders the save/delete UI.
+    struct RecipeSlot
+    {
+        bool                 filled { false };
+        std::array<float, 7> savedH {};   // H2..H8
+    };
+
+    // [engineIdx 0=A, 1=B][slotIdx 0=Cust1, 1=Cust2, 2=Cust3]
+    std::array<std::array<RecipeSlot, 3>, 2> recipeSlots {};
+
+    // Last selected built-in preset per engine — used by clearRecipeSlot()
+    // as the fall-back when the user deletes the currently-active slot and
+    // no other Custom slot is filled. Indexed [engineIdx]. Initialised to
+    // 0 ("Warm").
+    std::array<int, 2> lastBuiltInPreset { 0, 0 };
+
+    // Guard that suppresses the auto-switch H-listener while we're loading
+    // a preset's H values into the params (so the load itself doesn't read
+    // as a user edit and re-trigger auto-switch). UI thread only.
+    bool loadingPreset { false };
+
+    // Per-engine "previous H" buffer used by the revert path when an H edit
+    // is rejected (all Custom slots full + on a built-in). Updated before
+    // every accepted edit and every preset-load. Indexed [engineIdx][hIdx].
+    std::array<std::array<float, 7>, 2> previousH {};
+
+    // Fired on the message thread when an H edit was rejected. RecipeWheel
+    // listens and triggers its lock-flash overlay.
+    juce::ChangeBroadcaster wheelLockBroadcaster;
+
+public:
+    // ── Recipe slot public surface (UI-thread only) ──────────────────────
+    const RecipeSlot& getRecipeSlot(int engineIdx, int slotIdx) const noexcept;
+
+    /** Save current live H values into the given slot. Marks filled. */
+    void saveRecipeSlot(int engineIdx, int slotIdx);
+
+    /** Mark slot empty. If this slot is the active preset, falls back to
+     *  the first other filled Custom slot, else lastBuiltInPreset, else 0. */
+    void clearRecipeSlot(int engineIdx, int slotIdx);
+
+    /** Returns 0..2 for the first empty Custom slot, or -1 if all filled. */
+    int findFirstEmptyCustomSlot(int engineIdx) const noexcept;
+
+    int getLastBuiltInPreset(int engineIdx) const noexcept { return lastBuiltInPreset[(size_t) engineIdx]; }
+
+    juce::ChangeBroadcaster& getWheelLockBroadcaster() noexcept { return wheelLockBroadcaster; }
+
+private:
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomProcessor)
 };
