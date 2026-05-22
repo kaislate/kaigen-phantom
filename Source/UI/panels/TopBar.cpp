@@ -22,6 +22,10 @@ TopBar::TopBar(PhantomProcessor& p, juce::AudioProcessorValueTreeState& a)
     addAndMakeVisible(*bypassBtn);
     addAndMakeVisible(*settingsBtn);
     addAndMakeVisible(*advancedBtn);
+
+    settingsBtn->onClick = [this] {
+        if (onSettingsRequested) onSettingsRequested();
+    };
 }
 
 TopBar::~TopBar() = default;

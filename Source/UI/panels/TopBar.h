@@ -22,6 +22,10 @@ public:
     PresetSelector& getPresetSelector() noexcept { return presetSelector; }
     ModeTogglePill& getModeToggle()    noexcept { return modeToggle; }
 
+    /** Fired when the user clicks the gear button. The editor owns the
+     *  settings overlay component and decides what to do. */
+    std::function<void()> onSettingsRequested;
+
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
