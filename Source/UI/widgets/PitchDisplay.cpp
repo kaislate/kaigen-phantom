@@ -2,6 +2,8 @@
 #include "PitchDisplay.h"
 #include "../Theme.h"
 #include "../../PluginProcessor.h"
+#include "../../EngineFocus.h"
+#include "../../Parameters.h"
 #include <cmath>
 
 namespace kaigen::phantom
@@ -98,27 +100,67 @@ void PitchDisplay::timerCallback()
         }
     }
 
-    // Gate repaints to meaningful changes.
-    if (std::abs(smoothedHz - displayedHz) < kRepaintEpsilonHz) return;
-    displayedHz = smoothedHz;
+    // Output peak (max of L/R) → dB, rounded to one decimal.
+    const float peakL  = processor.peakOutL.load(std::memory_order_relaxed);
+    const float peakR  = processor.peakOutR.load(std::memory_order_relaxed);
+    const float peak   = juce::jmax(peakL, peakR);
+    const float peakDb = juce::Decibels::gainToDecibels(peak, -60.0f);
+    const float roundedDb = std::round(peakDb * 10.0f) * 0.1f;
 
+    // Active engine's recipe preset (choice index → name).
+    const auto activeTab = processor.getEngineFocus().activeTab;
+    const juce::String recipeId =
+        (activeTab == kaigen::phantom::ActiveTab::B)
+            ? juce::String(ParamID::B_RECIPE_PRESET)
+            : juce::String(ParamID::A_RECIPE_PRESET);
+    int recipeIndex = -1;
+    juce::String recipeName;
+    if (auto* choice = dynamic_cast<juce::AudioParameterChoice*>(
+            processor.apvts.getParameter(recipeId)))
+    {
+        recipeIndex = choice->getIndex();
+        recipeName  = choice->getCurrentChoiceName().toUpperCase();
+    }
+
+    // Gate repaints when nothing meaningful changed.
+    const bool hzSame     = std::abs(smoothedHz   - displayedHz) < kRepaintEpsilonHz;
+    const bool dbSame     = std::abs(roundedDb    - displayedDb) < 0.05f;
+    const bool recipeSame = (recipeIndex == displayedRecipe);
+    if (hzSame && dbSame && recipeSame) return;
+
+    displayedHz     = smoothedHz;
+    displayedDb     = roundedDb;
+    displayedRecipe = recipeIndex;
+
+    // Compose the text.
+    const juce::String midDot = juce::String::fromUTF8(" \xC2\xB7 ");
+    juce::String pitchPart;
     if (smoothedHz > 0.0f)
     {
         const int cents = hzToCents(smoothedHz);
         const juce::String centsStr =
             (cents >= 0 ? juce::String("+") : juce::String())
             + juce::String(cents) + juce::String::fromUTF8("\xC2\xA2");   // ¢
-
-        currentText = hzToNoteName(smoothedHz)
-                       + "  " + centsStr
-                       + juce::String::fromUTF8(" \xC2\xB7 ")             // middle dot
-                       + juce::String(juce::roundToInt(smoothedHz))
-                       + " Hz";
+        pitchPart = hzToNoteName(smoothedHz)
+                     + "  " + centsStr
+                     + midDot
+                     + juce::String(juce::roundToInt(smoothedHz))
+                     + " Hz";
     }
     else
     {
-        currentText = "---";
+        pitchPart = "---";
     }
+
+    juce::String dbStr;
+    if (peak < 1.0e-5f)
+        dbStr = "-inf dB";
+    else
+        dbStr = juce::String(roundedDb, 1) + " dB";
+
+    currentText = pitchPart
+                   + midDot + (recipeName.isEmpty() ? juce::String("---") : recipeName)
+                   + midDot + dbStr;
 
     repaint();
 }

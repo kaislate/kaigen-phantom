@@ -7,15 +7,16 @@ class PhantomProcessor;
 namespace kaigen::phantom
 {
 
-/** Wide OLED-style pitch / note readout. Polls `processor.currentPitch`
- *  on a 20 Hz timer, runs a smoothing pass on the raw Hz (EMA in log-Hz
- *  space; snaps on big jumps so legitimate new notes still appear
- *  instantly), and renders:
+/** Wide OLED-style status readout. Polls the processor on a 20 Hz timer
+ *  and renders, when a pitch is detected:
  *
- *      A4  +12¢  ·  440 Hz
+ *      A4  +12¢  ·  440 Hz  ·  WARM  ·  -12.4 dB
  *
- *  Note name + cents-offset from nearest equal-tempered note + Hz value.
- *  Renders "---" when the engine reports no detected pitch. */
+ *  Pitch (smoothed via EMA in log-Hz space with a semitone-snap so new
+ *  notes appear instantly), cents offset from the nearest equal-tempered
+ *  note, active engine's recipe preset name, and output peak in dB.
+ *  Renders just "---  ·  WARM  ·  -inf dB" when the engine reports no
+ *  detected pitch (recipe and dB stay live). */
 class PitchDisplay : public juce::Component, private juce::Timer
 {
 public:
@@ -40,7 +41,12 @@ private:
 
     // EMA-smoothed pitch in log-Hz space. -1 = no pitch detected yet.
     float smoothedHz   { -1.0f };
-    float displayedHz  { -1.0f };       // last value we painted (gates repaints)
+
+    // Last values we composed text from — gates repaints on no-op ticks.
+    float displayedHz     { -1.0f };
+    float displayedDb     { -200.0f };
+    int   displayedRecipe { -1 };
+
     juce::String currentText { "---" };
 
     // Card geometry computed in resized() so paint() can re-use it.
