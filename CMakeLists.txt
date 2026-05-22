@@ -71,6 +71,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/panels/TopBar.cpp
     Source/UI/panels/ModulationPanel.cpp
     Source/UI/panels/MatrixView.cpp
+    Source/UI/panels/SettingsOverlay.cpp
     Source/Engines/BinauralStage.cpp
     Source/Engines/BassExtractor.cpp
     Source/Engines/ZeroCrossingSynth.cpp
