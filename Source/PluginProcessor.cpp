@@ -636,6 +636,33 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
     modConfig.appendChild(modEngineB.toValueTree(), nullptr);
     wrapper.appendChild(modConfig, nullptr);
 
+    // <RecipeSlots> — per-engine Custom slot data + last-built-in preset.
+    // 6 <Slot engine=E slot=S filled=B h2..h8=F> children, plus two
+    // <LastBuiltIn engine=E value=I> entries. Missing on load → all slots
+    // empty + lastBuiltIn = 0.
+    juce::ValueTree slotsRoot("RecipeSlots");
+    for (int e = 0; e < 2; ++e)
+    {
+        for (int s = 0; s < 3; ++s)
+        {
+            const auto& slot = recipeSlots[(size_t) e][(size_t) s];
+            juce::ValueTree slotNode("Slot");
+            slotNode.setProperty("engine", e, nullptr);
+            slotNode.setProperty("slot",   s, nullptr);
+            slotNode.setProperty("filled", slot.filled, nullptr);
+            for (int h = 0; h < 7; ++h)
+                slotNode.setProperty(juce::String("h") + juce::String(h + 2),
+                                     slot.savedH[(size_t) h], nullptr);
+            slotsRoot.appendChild(slotNode, nullptr);
+        }
+
+        juce::ValueTree last("LastBuiltIn");
+        last.setProperty("engine", e, nullptr);
+        last.setProperty("value",  lastBuiltInPreset[(size_t) e], nullptr);
+        slotsRoot.appendChild(last, nullptr);
+    }
+    wrapper.appendChild(slotsRoot, nullptr);
+
     if (auto xml = wrapper.createXml())
         copyXmlToBinary(*xml, destData);
 }
@@ -697,6 +724,36 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
                 const auto p = engineNode.getProperty("prefix").toString();
                 if      (p == "a_") modEngineA.fromValueTree(engineNode);
                 else if (p == "b_") modEngineB.fromValueTree(engineNode);
+            }
+        }
+
+        // <RecipeSlots> — per-engine Custom slot data. Missing on legacy
+        // projects → all slots remain empty (default-constructed).
+        if (auto slotsRoot = wrapper.getChildWithName("RecipeSlots"); slotsRoot.isValid())
+        {
+            for (int i = 0; i < slotsRoot.getNumChildren(); ++i)
+            {
+                const auto node = slotsRoot.getChild(i);
+
+                if (node.hasType("Slot"))
+                {
+                    const int e = (int) node.getProperty("engine", -1);
+                    const int s = (int) node.getProperty("slot",   -1);
+                    if (e < 0 || e > 1 || s < 0 || s > 2) continue;
+
+                    auto& slot = recipeSlots[(size_t) e][(size_t) s];
+                    slot.filled = (bool) node.getProperty("filled", false);
+                    for (int h = 0; h < 7; ++h)
+                        slot.savedH[(size_t) h] = (float) node.getProperty(
+                            juce::String("h") + juce::String(h + 2), 0.0f);
+                }
+                else if (node.hasType("LastBuiltIn"))
+                {
+                    const int e = (int) node.getProperty("engine", -1);
+                    const int v = (int) node.getProperty("value",  0);
+                    if (e >= 0 && e <= 1)
+                        lastBuiltInPreset[(size_t) e] = juce::jlimit(0, 5, v);
+                }
             }
         }
     }
