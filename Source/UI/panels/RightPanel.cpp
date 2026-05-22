@@ -54,7 +54,8 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
       autoGainToggle(apvts, "input_gain_auto", "Auto"),
       binauralToggle(apvts, "a_binaural_mode", "BIN", 1),
       oscilloscope  (p),
-      spectrum      (p, a)
+      spectrum      (p, a),
+      pitchDisplay  (p)
 {
     addAndMakeVisible(saturationKnob);
     addAndMakeVisible(shapeKnob);
@@ -134,6 +135,7 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
 
     addAndMakeVisible(oscilloscope);
     addAndMakeVisible(spectrum);
+    addAndMakeVisible(pitchDisplay);
 
     addAndMakeVisible(autoGainToggle);
     addAndMakeVisible(binauralToggle);
@@ -420,9 +422,21 @@ void RightPanel::resized()
     inMeter .setBounds(inMeterXNew,  meterY, kIndividualMeterW, kMeterHeight);
     outMeter.setBounds(outMeterXNew, meterY, kIndividualMeterW, kMeterHeight);
 
-    // Spectrum — variable height. Bottom is fixed (just above bottom row);
-    // top moves up or down based on advancedCardBottom.
-    const int spectrumBottom = bottomRowTop - kOscToSpecGap;
+    // PitchDisplay slot — fixed-height OLED + FUND label, sits between
+    // spectrum and oscilloscope. Shortens the spectrum so the spectrum
+    // isn't overwhelming and we get a useful fund-frequency readout.
+    constexpr int kPitchSlotH        = 50;
+    constexpr int kPitchSlotGapAbove = 6;
+    constexpr int kPitchSlotGapBelow = 6;
+
+    const int pitchSlotBottom = bottomRowTop - kPitchSlotGapBelow;
+    const int pitchSlotTop    = pitchSlotBottom - kPitchSlotH;
+    pitchDisplay.setBounds(vizLeft, pitchSlotTop,
+                            vizRight - vizLeft, kPitchSlotH);
+
+    // Spectrum — variable height. Bottom is fixed (just above the pitch
+    // slot); top moves up or down based on advancedCardBottom.
+    const int spectrumBottom = pitchSlotTop - kPitchSlotGapAbove;
     const int spectrumTop    = advancedCardBottom + kOscToSpecGap;
     const int spectrumHeight = juce::jmax(kSpectrumMinH, spectrumBottom - spectrumTop);
     spectrum.setBounds(vizLeft, spectrumBottom - spectrumHeight,

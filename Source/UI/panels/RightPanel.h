@@ -9,6 +9,7 @@
 #include "../widgets/WordSelector.h"
 #include "../widgets/EtchedToggle.h"
 #include "../widgets/ChoiceToggle.h"
+#include "../widgets/PitchDisplay.h"
 #include "../visualizers/Oscilloscope.h"
 #include "../visualizers/Spectrum.h"
 
@@ -88,6 +89,10 @@ private:
     // Visualizers (below Advanced row)
     Oscilloscope oscilloscope;
     Spectrum spectrum;
+
+    // Pitch / note OLED display — sits between the spectrum (above) and
+    // the oscilloscope (below). Reads PhantomProcessor::currentPitch.
+    PitchDisplay pitchDisplay;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RightPanel)
 };
