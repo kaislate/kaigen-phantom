@@ -122,15 +122,18 @@ void PitchDisplay::timerCallback()
     if (smoothedHz > 0.0f)
     {
         const int cents = hzToCents(smoothedHz);
-        const juce::String centsStr =
-            (cents >= 0 ? juce::String("+") : juce::String())
-            + juce::String(cents) + juce::String::fromUTF8("\xC2\xA2");   // ¢
-        fieldPitch = hzToNoteName(smoothedHz) + " " + centsStr;
+        // Sign-padded so "+5¢" and "-5¢" occupy the same column count.
+        const juce::String signStr = (cents >= 0 ? juce::String("+") : juce::String("-"));
+        fieldNote  = hzToNoteName(smoothedHz);
+        fieldCents = signStr
+                     + juce::String(std::abs(cents)).paddedLeft('0', 2)
+                     + juce::String::fromUTF8("\xC2\xA2");   // ¢
         fieldHz    = juce::String(juce::roundToInt(smoothedHz)) + " Hz";
     }
     else
     {
-        fieldPitch = "---";
+        fieldNote  = "---";
+        fieldCents = "";
         fieldHz    = "--- Hz";
     }
 
@@ -149,9 +152,21 @@ void PitchDisplay::resized()
     cardBounds = getLocalBounds();
     if (cardBounds.isEmpty()) return;
 
-    // Split the card into 4 equal-width fields (left to right):
-    // pitch, hz, recipe, dB. Each field is centred-text within its sub-rect
-    // so changes to one don't shift the others.
+    // Split the card into 4 equal-width fields (left to right): pitch, hz,
+    // recipe, dB. Within the pitch field we further split into a fixed
+    // note sub-rect on the left and a fixed cents sub-rect on the right —
+    // that way "A" → "A#" only shifts characters inside the note sub-rect
+    // and the cents string stays put.
+    //
+    // Per-field text alignments are chosen so the meaningful anchor edge
+    // doesn't move when the value grows:
+    //   noteRect:   centredLeft  — note letter pinned to the left
+    //   centsRect:  centredRight — ¢ pinned to the right (always 4 chars
+    //                              after sign-padding, so it stays steady)
+    //   hzRect:     centredRight — "Hz" pinned to the right edge
+    //   recipeRect: centred      — recipe name varies; centred is fine
+    //                              because it's the only thing in its slot
+    //   dbRect:     centredRight — "dB" pinned to the right edge
     const int innerLeft  = cardBounds.getX()      + (int) kFieldPadX;
     const int innerRight = cardBounds.getRight()  - (int) kFieldPadX;
     const int innerTop   = cardBounds.getY();
@@ -164,6 +179,14 @@ void PitchDisplay::resized()
     recipeRect = { innerLeft + 2 * fieldW,     innerTop, fieldW, innerH };
     dbRect     = { innerLeft + 3 * fieldW,     innerTop,
                     innerRight - (innerLeft + 3 * fieldW), innerH };
+
+    // Note sub-rect: ~45% of the pitch field on the left.
+    // Cents sub-rect: ~50% of the pitch field on the right.
+    // Tiny gap between them so the # doesn't kiss the +.
+    const int noteW  = (int) std::round(pitchRect.getWidth() * 0.45f);
+    const int centsW = (int) std::round(pitchRect.getWidth() * 0.50f);
+    noteRect  = { pitchRect.getX(),                            innerTop, noteW,  innerH };
+    centsRect = { pitchRect.getRight() - centsW,               innerTop, centsW, innerH };
 }
 
 void PitchDisplay::paint(juce::Graphics& g)
@@ -186,10 +209,11 @@ void PitchDisplay::paint(juce::Graphics& g)
                              .withHeight(textPx)));
     g.setColour(juce::Colour::fromFloatRGBA(0.9f, 0.95f, 1.0f, 0.92f));
 
-    g.drawText(fieldPitch,  pitchRect.toFloat(),  juce::Justification::centred, false);
-    g.drawText(fieldHz,     hzRect.toFloat(),     juce::Justification::centred, false);
-    g.drawText(fieldRecipe, recipeRect.toFloat(), juce::Justification::centred, false);
-    g.drawText(fieldDb,     dbRect.toFloat(),     juce::Justification::centred, false);
+    g.drawText(fieldNote,   noteRect.toFloat(),   juce::Justification::centredLeft,  false);
+    g.drawText(fieldCents,  centsRect.toFloat(),  juce::Justification::centredRight, false);
+    g.drawText(fieldHz,     hzRect.toFloat(),     juce::Justification::centredRight, false);
+    g.drawText(fieldRecipe, recipeRect.toFloat(), juce::Justification::centred,      false);
+    g.drawText(fieldDb,     dbRect.toFloat(),     juce::Justification::centredRight, false);
 }
 
 } // namespace kaigen::phantom

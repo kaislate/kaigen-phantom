@@ -49,14 +49,21 @@ private:
     int          displayedRecipe { -1 };
 
     // Current per-field text. Updated in timerCallback; read in paint.
-    juce::String fieldPitch  { "---" };
-    juce::String fieldHz     {};
+    // Note and cents are separate so the note's variable width (A vs A#)
+    // doesn't shift the cents string.
+    juce::String fieldNote   { "---" };
+    juce::String fieldCents  {};
+    juce::String fieldHz     { "---" };
     juce::String fieldRecipe { "---" };
     juce::String fieldDb     { "-inf dB" };
 
     // Card + per-field bounds computed in resized().
+    // pitchRect is subdivided into noteRect + centsRect so the "A4" → "A#4"
+    // transition doesn't shift the cents string.
     juce::Rectangle<int> cardBounds;
     juce::Rectangle<int> pitchRect;
+    juce::Rectangle<int> noteRect;
+    juce::Rectangle<int> centsRect;
     juce::Rectangle<int> hzRect;
     juce::Rectangle<int> recipeRect;
     juce::Rectangle<int> dbRect;
