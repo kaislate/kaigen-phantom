@@ -7,16 +7,17 @@ class PhantomProcessor;
 namespace kaigen::phantom
 {
 
-/** Wide OLED-style status readout. Polls the processor on a 20 Hz timer
- *  and renders, when a pitch is detected:
+/** Wide OLED-style status readout, segmented into fixed-width fields so
+ *  changing one value doesn't reflow the others. Polls the processor on
+ *  a 20 Hz timer and shows:
  *
- *      A4  +12¢  ·  440 Hz  ·  WARM  ·  -12.4 dB
+ *      [ A4  +12¢ ]   [ 440 Hz ]   [ WARM ]   [ -12.4 dB ]
  *
  *  Pitch (smoothed via EMA in log-Hz space with a semitone-snap so new
- *  notes appear instantly), cents offset from the nearest equal-tempered
- *  note, active engine's recipe preset name, and output peak in dB.
- *  Renders just "---  ·  WARM  ·  -inf dB" when the engine reports no
- *  detected pitch (recipe and dB stay live). */
+ *  notes still appear instantly), cents offset from the nearest
+ *  equal-tempered note, active engine's recipe preset name, and output
+ *  peak in dB. Each field renders into its own fixed-width sub-rectangle
+ *  so jitter in one field is visually contained. */
 class PitchDisplay : public juce::Component, private juce::Timer
 {
 public:
@@ -43,14 +44,22 @@ private:
     float smoothedHz   { -1.0f };
 
     // Last values we composed text from — gates repaints on no-op ticks.
-    float displayedHz     { -1.0f };
-    float displayedDb     { -200.0f };
-    int   displayedRecipe { -1 };
+    float        displayedHz     { -1.0f };
+    float        displayedDb     { -200.0f };
+    int          displayedRecipe { -1 };
 
-    juce::String currentText { "---" };
+    // Current per-field text. Updated in timerCallback; read in paint.
+    juce::String fieldPitch  { "---" };
+    juce::String fieldHz     {};
+    juce::String fieldRecipe { "---" };
+    juce::String fieldDb     { "-inf dB" };
 
-    // Card geometry computed in resized() so paint() can re-use it.
+    // Card + per-field bounds computed in resized().
     juce::Rectangle<int> cardBounds;
+    juce::Rectangle<int> pitchRect;
+    juce::Rectangle<int> hzRect;
+    juce::Rectangle<int> recipeRect;
+    juce::Rectangle<int> dbRect;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PitchDisplay)
 };

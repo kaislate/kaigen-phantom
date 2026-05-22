@@ -55,7 +55,8 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
       binauralToggle(apvts, "a_binaural_mode", "BIN", 1),
       oscilloscope  (p),
       spectrum      (p, a),
-      pitchDisplay  (p)
+      pitchDisplay  (p),
+      levelReadout  (p)
 {
     addAndMakeVisible(saturationKnob);
     addAndMakeVisible(shapeKnob);
@@ -136,6 +137,7 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
     addAndMakeVisible(oscilloscope);
     addAndMakeVisible(spectrum);
     addAndMakeVisible(pitchDisplay);
+    addAndMakeVisible(levelReadout);
 
     addAndMakeVisible(autoGainToggle);
     addAndMakeVisible(binauralToggle);
@@ -422,9 +424,11 @@ void RightPanel::resized()
     inMeter .setBounds(inMeterXNew,  meterY, kIndividualMeterW, kMeterHeight);
     outMeter.setBounds(outMeterXNew, meterY, kIndividualMeterW, kMeterHeight);
 
-    // PitchDisplay slot — wide OLED with pitch / cents / Hz, sits between
-    // spectrum and oscilloscope. No more "FUND" label below the card; the
-    // OLED now fills the entire slot and extends edge-to-edge.
+    // PitchDisplay + LevelReadout slot — sits between spectrum and the
+    // bottom row. PitchDisplay is constrained to the oscilloscope's width
+    // (left side); LevelReadout fills the meter-column width on the right.
+    // Each is its own OLED card so digit-count changes inside one don't
+    // shift the other.
     constexpr int kPitchSlotH        = 40;
     constexpr int kPitchSlotGapAbove = 6;
     constexpr int kPitchSlotGapBelow = 6;
@@ -432,7 +436,9 @@ void RightPanel::resized()
     const int pitchSlotBottom = bottomRowTop - kPitchSlotGapBelow;
     const int pitchSlotTop    = pitchSlotBottom - kPitchSlotH;
     pitchDisplay.setBounds(vizLeft, pitchSlotTop,
-                            vizRight - vizLeft, kPitchSlotH);
+                            oscRight - vizLeft, kPitchSlotH);
+    levelReadout.setBounds(meterColX, pitchSlotTop,
+                            kMeterColWidth, kPitchSlotH);
 
     // Spectrum — variable height. Bottom is fixed (just above the pitch
     // slot); top moves up or down based on advancedCardBottom.

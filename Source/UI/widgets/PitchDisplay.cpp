@@ -11,22 +11,15 @@ namespace kaigen::phantom
 
 namespace
 {
-    // Card sizing.
-    constexpr int   kCardSidePad = 24;     // gap from edge of the component
-    constexpr float kCardCorner  = 4.0f;
+    constexpr float kCardCorner   = 4.0f;
+    constexpr float kFieldPadX    = 8.0f;
 
-    // Smoothing.
-    //
-    // Polling at 20 Hz; alpha 0.25 = ~5-tick (≈ 250 ms) settling.
-    // Smooth in log-Hz space so jumps blend musically rather than linearly,
-    // and snap when the new value is more than a semitone (5.9 %) away from
-    // the smoothed value — that's the threshold for "this is a new note",
-    // not "this is a noisy reading of the same note."
-    constexpr float kSmoothAlpha     = 0.25f;
-    constexpr float kSnapSemitones   = 1.0f;
-    constexpr float kSnapRatio       = 1.0594631f;  // 2^(1/12)
+    // EMA in log-Hz space (alpha 0.25 ≈ 250 ms settling at 20 Hz polling).
+    // Snap when the new reading is more than a semitone (5.9 %) away from
+    // the smoothed value — that's a new note, not noisy retracking.
+    constexpr float kSmoothAlpha = 0.25f;
+    constexpr float kSnapRatio   = 1.0594631f;   // 2^(1/12)
 
-    // Don't repaint on changes smaller than this (in displayed Hz).
     constexpr float kRepaintEpsilonHz = 0.25f;
 }
 
@@ -44,8 +37,6 @@ PitchDisplay::~PitchDisplay()
 juce::String PitchDisplay::hzToNoteName(float hz)
 {
     if (hz <= 0.0f) return {};
-
-    // MIDI note = 12 * log2(hz / 440) + 69 → A4 = MIDI 69.
     const float midiF = 12.0f * std::log2(hz / 440.0f) + 69.0f;
     const int   midi  = juce::roundToInt(midiF);
 
@@ -60,8 +51,6 @@ juce::String PitchDisplay::hzToNoteName(float hz)
 int PitchDisplay::hzToCents(float hz)
 {
     if (hz <= 0.0f) return 0;
-
-    // Distance in semitones from A4, take fractional part, scale to cents.
     const float midiF = 12.0f * std::log2(hz / 440.0f) + 69.0f;
     const float frac  = midiF - std::round(midiF);     // -0.5 .. +0.5
     return juce::roundToInt(frac * 100.0f);
@@ -80,13 +69,10 @@ void PitchDisplay::timerCallback()
     }
     else if (smoothedHz <= 0.0f)
     {
-        // First reading after silence — snap.
         smoothedHz = rawHz;
     }
     else
     {
-        // If the new reading is more than a semitone away, it's a new note —
-        // snap instantly. Otherwise EMA in log-Hz space.
         const float ratio = rawHz / smoothedHz;
         if (ratio > kSnapRatio || ratio < (1.0f / kSnapRatio))
         {
@@ -101,13 +87,13 @@ void PitchDisplay::timerCallback()
     }
 
     // Output peak (max of L/R) → dB, rounded to one decimal.
-    const float peakL  = processor.peakOutL.load(std::memory_order_relaxed);
-    const float peakR  = processor.peakOutR.load(std::memory_order_relaxed);
-    const float peak   = juce::jmax(peakL, peakR);
-    const float peakDb = juce::Decibels::gainToDecibels(peak, -60.0f);
+    const float peakL   = processor.peakOutL.load(std::memory_order_relaxed);
+    const float peakR   = processor.peakOutR.load(std::memory_order_relaxed);
+    const float peak    = juce::jmax(peakL, peakR);
+    const float peakDb  = juce::Decibels::gainToDecibels(peak, -60.0f);
     const float roundedDb = std::round(peakDb * 10.0f) * 0.1f;
 
-    // Active engine's recipe preset (choice index → name).
+    // Active engine's recipe preset.
     const auto activeTab = processor.getEngineFocus().activeTab;
     const juce::String recipeId =
         (activeTab == kaigen::phantom::ActiveTab::B)
@@ -122,9 +108,9 @@ void PitchDisplay::timerCallback()
         recipeName  = choice->getCurrentChoiceName().toUpperCase();
     }
 
-    // Gate repaints when nothing meaningful changed.
-    const bool hzSame     = std::abs(smoothedHz   - displayedHz) < kRepaintEpsilonHz;
-    const bool dbSame     = std::abs(roundedDb    - displayedDb) < 0.05f;
+    // Gate repaints.
+    const bool hzSame     = std::abs(smoothedHz - displayedHz) < kRepaintEpsilonHz;
+    const bool dbSame     = std::abs(roundedDb  - displayedDb) < 0.05f;
     const bool recipeSame = (recipeIndex == displayedRecipe);
     if (hzSame && dbSame && recipeSame) return;
 
@@ -132,62 +118,78 @@ void PitchDisplay::timerCallback()
     displayedDb     = roundedDb;
     displayedRecipe = recipeIndex;
 
-    // Compose the text.
-    const juce::String midDot = juce::String::fromUTF8(" \xC2\xB7 ");
-    juce::String pitchPart;
+    // Recompose each field independently.
     if (smoothedHz > 0.0f)
     {
         const int cents = hzToCents(smoothedHz);
         const juce::String centsStr =
             (cents >= 0 ? juce::String("+") : juce::String())
             + juce::String(cents) + juce::String::fromUTF8("\xC2\xA2");   // ¢
-        pitchPart = hzToNoteName(smoothedHz)
-                     + "  " + centsStr
-                     + midDot
-                     + juce::String(juce::roundToInt(smoothedHz))
-                     + " Hz";
+        fieldPitch = hzToNoteName(smoothedHz) + " " + centsStr;
+        fieldHz    = juce::String(juce::roundToInt(smoothedHz)) + " Hz";
     }
     else
     {
-        pitchPart = "---";
+        fieldPitch = "---";
+        fieldHz    = "--- Hz";
     }
 
-    juce::String dbStr;
-    if (peak < 1.0e-5f)
-        dbStr = "-inf dB";
-    else
-        dbStr = juce::String(roundedDb, 1) + " dB";
+    fieldRecipe = recipeName.isEmpty() ? juce::String("---") : recipeName;
 
-    currentText = pitchPart
-                   + midDot + (recipeName.isEmpty() ? juce::String("---") : recipeName)
-                   + midDot + dbStr;
+    if (peak < 1.0e-5f)
+        fieldDb = "-inf dB";
+    else
+        fieldDb = juce::String(roundedDb, 1) + " dB";
 
     repaint();
 }
 
 void PitchDisplay::resized()
 {
-    // Card fills the component horizontally minus side padding; vertically
-    // takes the full height.
-    cardBounds = getLocalBounds().reduced(kCardSidePad, 0);
+    cardBounds = getLocalBounds();
+    if (cardBounds.isEmpty()) return;
+
+    // Split the card into 4 equal-width fields (left to right):
+    // pitch, hz, recipe, dB. Each field is centred-text within its sub-rect
+    // so changes to one don't shift the others.
+    const int innerLeft  = cardBounds.getX()      + (int) kFieldPadX;
+    const int innerRight = cardBounds.getRight()  - (int) kFieldPadX;
+    const int innerTop   = cardBounds.getY();
+    const int innerH     = cardBounds.getHeight();
+    const int innerW     = innerRight - innerLeft;
+    const int fieldW     = innerW / 4;
+
+    pitchRect  = { innerLeft,                  innerTop, fieldW, innerH };
+    hzRect     = { innerLeft +     fieldW,     innerTop, fieldW, innerH };
+    recipeRect = { innerLeft + 2 * fieldW,     innerTop, fieldW, innerH };
+    dbRect     = { innerLeft + 3 * fieldW,     innerTop,
+                    innerRight - (innerLeft + 3 * fieldW), innerH };
 }
 
 void PitchDisplay::paint(juce::Graphics& g)
 {
     if (cardBounds.isEmpty()) return;
 
-    // OLED bezel — same helper used by spectrum / oscilloscope for visual
-    // consistency.
+    // OLED bezel + dark surface (matches the spectrum / oscilloscope bezel).
     Theme::paintVisualizerInset(g, cardBounds, kCardCorner);
 
-    // OLED text — large Courier centred on the card.
-    const float textPx = (float) cardBounds.getHeight() * 0.55f;
+    // Faint divider lines between fields.
+    g.setColour(juce::Colour::fromFloatRGBA(1.0f, 1.0f, 1.0f, 0.06f));
+    for (auto x : { hzRect.getX(), recipeRect.getX(), dbRect.getX() })
+        g.drawLine((float) x, (float) cardBounds.getY() + 4.0f,
+                    (float) x, (float) cardBounds.getBottom() - 4.0f, 1.0f);
+
+    // OLED text — Courier centred in each field, sized off card height.
+    const float textPx = (float) cardBounds.getHeight() * 0.5f;
     g.setFont(juce::Font(juce::FontOptions()
                              .withName("Courier New")
                              .withHeight(textPx)));
     g.setColour(juce::Colour::fromFloatRGBA(0.9f, 0.95f, 1.0f, 0.92f));
-    g.drawText(currentText, cardBounds.toFloat(),
-                juce::Justification::centred, false);
+
+    g.drawText(fieldPitch,  pitchRect.toFloat(),  juce::Justification::centred, false);
+    g.drawText(fieldHz,     hzRect.toFloat(),     juce::Justification::centred, false);
+    g.drawText(fieldRecipe, recipeRect.toFloat(), juce::Justification::centred, false);
+    g.drawText(fieldDb,     dbRect.toFloat(),     juce::Justification::centred, false);
 }
 
 } // namespace kaigen::phantom

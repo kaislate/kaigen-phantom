@@ -52,6 +52,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/widgets/EtchedToggle.cpp
     Source/UI/widgets/ChoiceToggle.cpp
     Source/UI/widgets/PitchDisplay.cpp
+    Source/UI/widgets/LevelReadout.cpp
     Source/UI/widgets/LinkButton.cpp
     Source/UI/widgets/IOMeter.cpp
     Source/UI/widgets/RecipeWheel.cpp

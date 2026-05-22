@@ -10,6 +10,7 @@
 #include "../widgets/EtchedToggle.h"
 #include "../widgets/ChoiceToggle.h"
 #include "../widgets/PitchDisplay.h"
+#include "../widgets/LevelReadout.h"
 #include "../visualizers/Oscilloscope.h"
 #include "../visualizers/Spectrum.h"
 
@@ -91,8 +92,12 @@ private:
     Spectrum spectrum;
 
     // Pitch / note OLED display — sits between the spectrum (above) and
-    // the oscilloscope (below). Reads PhantomProcessor::currentPitch.
+    // the oscilloscope (below), constrained to the oscilloscope's width.
     PitchDisplay pitchDisplay;
+
+    // IN / OUT level numeric readouts — sits above the meter column,
+    // constrained to the meter column's width.
+    LevelReadout levelReadout;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RightPanel)
 };
