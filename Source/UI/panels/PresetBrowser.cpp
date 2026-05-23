@@ -175,6 +175,197 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
     deleteButton.setVisible(false);
     addAndMakeVisible(deleteButton);
 
+#if DEVELOPER_MODE
+    auto setupAuthoringButton = [this](juce::TextButton& b)
+    {
+        b.setLookAndFeel(&closeButton.getLookAndFeel());  // reuse the same flat look
+        addAndMakeVisible(b);
+    };
+    setupAuthoringButton(newPackButton);
+    setupAuthoringButton(saveIntoPackButton);
+    setupAuthoringButton(editPackMetaButton);
+    setupAuthoringButton(setCoverButton);
+    setupAuthoringButton(renamePackButton);
+    setupAuthoringButton(deletePackButton);
+    setupAuthoringButton(exportPackButton);
+    setupAuthoringButton(importPackButton);
+
+    // === Button callbacks ===
+
+    newPackButton.onClick = [this]
+    {
+        auto* aw = new juce::AlertWindow("New Pack",
+            "Create a new pack:", juce::AlertWindow::NoIcon);
+        aw->addTextEditor("name",        "",  "Name:");
+        aw->addTextEditor("description", "",  "Description:");
+        aw->addTextEditor("designer",    "",  "Designer:");
+        aw->addButton("Create", 1, juce::KeyPress(juce::KeyPress::returnKey));
+        aw->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
+        aw->enterModalState(true, juce::ModalCallbackFunction::create(
+            [this, aw](int r)
+            {
+                if (r == 1)
+                {
+                    processor.getPresetManager().createPack(
+                        aw->getTextEditorContents("name"),
+                        aw->getTextEditorContents("description"),
+                        aw->getTextEditorContents("designer"));
+                }
+                delete aw;
+            }), false);
+    };
+
+    saveIntoPackButton.onClick = [this]
+    {
+        const auto packName = activePackName();
+        if (packName.isEmpty()) return;
+
+        auto* aw = new juce::AlertWindow("Save Into " + packName,
+            "Preset name:", juce::AlertWindow::NoIcon);
+        aw->addTextEditor("name", "", "Name:");
+        aw->addButton("Save",   1, juce::KeyPress(juce::KeyPress::returnKey));
+        aw->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
+        aw->enterModalState(true, juce::ModalCallbackFunction::create(
+            [this, aw, packName](int r)
+            {
+                if (r == 1)
+                {
+                    processor.getPresetManager().savePresetIntoPack(
+                        apvts, packName,
+                        aw->getTextEditorContents("name"),
+                        "Experimental", "User", "");
+                }
+                delete aw;
+            }), false);
+    };
+
+    editPackMetaButton.onClick = [this]
+    {
+        const auto packName = activePackName();
+        if (packName.isEmpty()) return;
+
+        const auto packs = processor.getPresetManager().getAllPacks();
+        auto it = std::find_if(packs.begin(), packs.end(),
+            [&](const kaigen::phantom::PackInfo& p) { return p.name == packName; });
+        if (it == packs.end()) return;
+
+        auto* aw = new juce::AlertWindow("Edit Pack",
+            "Edit metadata for " + packName, juce::AlertWindow::NoIcon);
+        aw->addTextEditor("description", it->description, "Description:");
+        aw->addTextEditor("designer",    it->designer,    "Designer:");
+        aw->addButton("Save",   1, juce::KeyPress(juce::KeyPress::returnKey));
+        aw->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
+        aw->enterModalState(true, juce::ModalCallbackFunction::create(
+            [this, aw, packName](int r)
+            {
+                if (r == 1)
+                {
+                    processor.getPresetManager().setPackMetadata(packName,
+                        aw->getTextEditorContents("description"),
+                        aw->getTextEditorContents("designer"));
+                }
+                delete aw;
+            }), false);
+    };
+
+    setCoverButton.onClick = [this]
+    {
+        const auto packName = activePackName();
+        if (packName.isEmpty()) return;
+
+        auto chooser = std::make_shared<juce::FileChooser>(
+            "Choose cover art",
+            juce::File::getSpecialLocation(juce::File::userPicturesDirectory),
+            "*.png;*.jpg;*.jpeg");
+        chooser->launchAsync(juce::FileBrowserComponent::openMode
+                             | juce::FileBrowserComponent::canSelectFiles,
+            [this, packName, chooser](const juce::FileChooser& fc)
+            {
+                const auto src = fc.getResult();
+                if (src.existsAsFile())
+                    processor.getPresetManager().setPackCover(packName, src);
+            });
+    };
+
+    renamePackButton.onClick = [this]
+    {
+        const auto packName = activePackName();
+        if (packName.isEmpty()) return;
+
+        auto* aw = new juce::AlertWindow("Rename Pack",
+            "New name for " + packName + ":", juce::AlertWindow::NoIcon);
+        aw->addTextEditor("name", packName, "Name:");
+        aw->addButton("Rename", 1, juce::KeyPress(juce::KeyPress::returnKey));
+        aw->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
+        aw->enterModalState(true, juce::ModalCallbackFunction::create(
+            [this, aw, packName](int r)
+            {
+                if (r == 1)
+                {
+                    processor.getPresetManager().renamePack(packName,
+                        aw->getTextEditorContents("name"));
+                }
+                delete aw;
+            }), false);
+    };
+
+    deletePackButton.onClick = [this]
+    {
+        const auto packName = activePackName();
+        if (packName.isEmpty()) return;
+
+        juce::AlertWindow::showAsync(
+            juce::MessageBoxOptions()
+                .withIconType(juce::MessageBoxIconType::WarningIcon)
+                .withTitle("Delete Pack")
+                .withMessage("Delete pack \"" + packName
+                    + "\" and all its presets? This cannot be undone.")
+                .withButton("Delete")
+                .withButton("Cancel"),
+            [this, packName](int r)
+            {
+                if (r == 1)
+                    processor.getPresetManager().deletePack(packName);
+            });
+    };
+
+    exportPackButton.onClick = [this]
+    {
+        const auto packName = activePackName();
+        if (packName.isEmpty()) return;
+
+        auto chooser = std::make_shared<juce::FileChooser>(
+            "Export " + packName + " as .kaipack",
+            juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                .getChildFile(packName + ".kaipack"),
+            "*.kaipack");
+        chooser->launchAsync(juce::FileBrowserComponent::saveMode
+                             | juce::FileBrowserComponent::canSelectFiles,
+            [this, packName, chooser](const juce::FileChooser& fc)
+            {
+                const auto dest = fc.getResult();
+                if (dest != juce::File{})
+                    processor.getPresetManager().exportPack(packName, dest);
+            });
+    };
+
+    importPackButton.onClick = [this]
+    {
+        auto chooser = std::make_shared<juce::FileChooser>(
+            "Import .kaipack",
+            juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
+            "*.kaipack");
+        chooser->launchAsync(juce::FileBrowserComponent::openMode
+                             | juce::FileBrowserComponent::canSelectFiles,
+            [this, chooser](const juce::FileChooser& fc)
+            {
+                const auto src = fc.getResult();
+                if (src.existsAsFile())
+                    processor.getPresetManager().importPack(src, /*overwrite*/ false);
+            });
+    };
+#endif
+
     processor.getPresetManager().addChangeListener(this);
 }
 
@@ -817,6 +1008,14 @@ void PresetBrowser::paint(juce::Graphics& g)
             y += h;
         }
     }
+
+#if DEVELOPER_MODE
+    {
+        const auto strip = authoringStripBounds();
+        g.setColour(juce::Colours::white.withAlpha(0.06f));
+        g.fillRect(strip.getX(), strip.getY(), strip.getWidth(), 1);
+    }
+#endif
 }
 
 juce::Rectangle<int> PresetBrowser::searchBarBounds() const
@@ -1010,6 +1209,29 @@ void PresetBrowser::resized()
     searchField.setBounds(searchBarBounds().reduced(12, 6));
     if (deleteButton.isVisible())
         deleteButton.setBounds(previewDeleteButtonBounds());
+
+#if DEVELOPER_MODE
+    {
+        auto strip = authoringStripBounds().reduced(8);
+        const int gap = 6;
+        const int buttons = 8;
+        const int btnW = (strip.getWidth() - gap * (buttons - 1)) / buttons;
+
+        auto place = [&](juce::TextButton& b)
+        {
+            b.setBounds(strip.removeFromLeft(btnW));
+            strip.removeFromLeft(gap);
+        };
+        place(newPackButton);
+        place(saveIntoPackButton);
+        place(editPackMetaButton);
+        place(setCoverButton);
+        place(renamePackButton);
+        place(deletePackButton);
+        place(exportPackButton);
+        place(importPackButton);
+    }
+#endif
 }
 
 void PresetBrowser::mouseMove(const juce::MouseEvent& e)
@@ -1212,5 +1434,23 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
         y += h;
     }
 }
+
+#if DEVELOPER_MODE
+juce::String PresetBrowser::activePackName() const
+{
+    if (activeCategoryIdx < 0 || activeCategoryIdx >= (int) categories.size())
+        return {};
+    const auto& cat = categories[(size_t) activeCategoryIdx];
+    if (cat.kind == CategoryKind::Pack) return cat.packFilter;
+    return {};
+}
+
+juce::Rectangle<int> PresetBrowser::authoringStripBounds() const
+{
+    const auto card = cardBounds();
+    return { card.getX(), card.getBottom() - kAuthoringStripH,
+             card.getWidth(), kAuthoringStripH };
+}
+#endif
 
 } // namespace kaigen::phantom

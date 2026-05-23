@@ -130,6 +130,27 @@ private:
     juce::TextButton deleteButton { "Delete" };
     juce::TextEditor searchField;
 
+#if DEVELOPER_MODE
+    juce::TextButton newPackButton       { "+ New Pack" };
+    juce::TextButton saveIntoPackButton  { "Save Into Pack" };
+    juce::TextButton editPackMetaButton  { "Edit Metadata" };
+    juce::TextButton setCoverButton      { "Set Cover" };
+    juce::TextButton renamePackButton    { "Rename" };
+    juce::TextButton deletePackButton    { "Delete Pack" };
+    juce::TextButton exportPackButton    { "Export Pack" };
+    juce::TextButton importPackButton    { "Import Pack" };
+
+    // Bounds of the AUTHORING strip — laid out under the row table.
+    juce::Rectangle<int> authoringStripBounds() const;
+
+    // Returns the currently-selected pack from the sidebar, or empty when
+    // the active sidebar entry is Explore / Favorites / Packs (not a
+    // specific pack drill-in).
+    juce::String activePackName() const;
+
+    static constexpr int kAuthoringStripH = 56;
+#endif
+
     // Webview spec: card is 90% × 90% of parent (capped). 3-column layout:
     //   [sidebar 160] [middle flex] [preview 180]
     // Arturia-style proportions: taller rows + larger text for at-a-glance
