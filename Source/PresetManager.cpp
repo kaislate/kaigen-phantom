@@ -3,6 +3,10 @@
 #include "PresetMigration.h"
 #include <juce_core/juce_core.h>
 
+#if KAIGEN_HAS_FACTORY_PACKS
+ #include "KaigenFactoryPacks.h"
+#endif
+
 namespace kaigen::phantom
 {
 
@@ -231,6 +235,7 @@ void PresetManager::scanPresetsFromDisk()
 
         info.hasCoverArt = packDir.getChildFile("cover.png").existsAsFile()
                         || packDir.getChildFile("cover.jpg").existsAsFile();
+        info.isReadOnly = (packName == kFactoryPackName);
         packs[packName] = info;
     };
 
@@ -285,6 +290,127 @@ void PresetManager::scanPresetsFromDisk()
         auto it = allPresets.find(name);
         info.presetCount = (it != allPresets.end()) ? (int) it->second.size() : 0;
     }
+
+    // Embedded factory packs supplement the on-disk packs. They get scanned
+    // last so a disk pack of the same name would win — useful during designer
+    // review iterations where they want a live copy to override the baked-in
+    // one without rebuilding.
+    loadFactoryPacksFromBinaryData();
+}
+
+void PresetManager::loadFactoryPacksFromBinaryData()
+{
+#if KAIGEN_HAS_FACTORY_PACKS
+    // Group embedded resources by their first path segment (= pack name).
+    // KaigenFactoryPacks::originalFilenames[i] looks like "TestPack/Empty.fxp"
+    // or "TestPack/pack.json"; we route metadata files to PackInfo and *.fxp
+    // files to PresetInfo entries with embeddedData populated.
+    struct PendingPack
+    {
+        PackInfo info;
+        std::vector<PresetInfo> presets;
+        juce::MemoryBlock packJsonBytes;
+    };
+    std::map<juce::String, PendingPack> pending;
+
+    for (int i = 0; i < KaigenFactoryPacks::namedResourceListSize; ++i)
+    {
+        const juce::String resourceName = KaigenFactoryPacks::namedResourceList[i];
+        const juce::String origPath     = KaigenFactoryPacks::originalFilenames[i];
+
+        int size = 0;
+        const char* data = KaigenFactoryPacks::getNamedResource(
+            resourceName.toRawUTF8(), size);
+        if (data == nullptr || size <= 0) continue;
+
+        // juce_add_binary_data only stores file basenames, so the CMake glue
+        // mangles "<PackName>/<file>" into "<PackName>__<file>" before staging.
+        // Split on the first "__" to recover (packName, fileName).
+        const int sep = origPath.indexOf("__");
+        if (sep < 1 || sep + 2 >= origPath.length()) continue;
+        const auto packName = origPath.substring(0, sep);
+        const auto fileName = origPath.substring(sep + 2);
+
+        auto& pp = pending[packName];
+        if (pp.info.name.isEmpty())
+        {
+            pp.info.name = packName;
+            pp.info.displayName = packName;
+            pp.info.isReadOnly = true;
+        }
+
+        if (fileName.equalsIgnoreCase("pack.json"))
+        {
+            pp.packJsonBytes.append(data, (size_t) size);
+        }
+        else if (fileName.equalsIgnoreCase("cover.png")
+              || fileName.equalsIgnoreCase("cover.jpg"))
+        {
+            pp.info.hasCoverArt = true;
+        }
+        else if (fileName.endsWithIgnoreCase(".fxp"))
+        {
+            PresetInfo pi;
+            pi.embeddedData.append(data, (size_t) size);
+            pi.metadata.name = juce::File::createLegalFileName(
+                fileName.upToLastOccurrenceOf(".", false, true));
+            pi.metadata.packName = packName;
+            pi.metadata.isFactory = true;
+            pi.metadata.type = "Experimental";
+
+            // Parse metadata + preview from the embedded XML bytes.
+            if (auto xml = juce::parseXML(juce::String::createStringFromData(data, size)))
+            {
+                auto tree = juce::ValueTree::fromXml(*xml);
+                if (tree.isValid())
+                {
+                    if (auto meta = tree.getChildWithName("Metadata"); meta.isValid())
+                    {
+                        pi.metadata.name        = meta.getProperty("name", pi.metadata.name).toString();
+                        pi.metadata.type        = meta.getProperty("type", "Experimental").toString();
+                        pi.metadata.designer    = meta.getProperty("designer", "").toString();
+                        pi.metadata.description = meta.getProperty("description", "").toString();
+                    }
+                    pi.preview = readPreviewFromState(tree);
+                }
+            }
+            pi.metadata.isFavorite = isFavorite(pi.metadata.name, packName);
+            pp.presets.push_back(std::move(pi));
+        }
+    }
+
+    // Parse pack.json bytes (if present) and merge into PackInfo.
+    for (auto& [packName, pp] : pending)
+    {
+        if (pp.packJsonBytes.getSize() > 0)
+        {
+            auto json = juce::String::createStringFromData(
+                pp.packJsonBytes.getData(), (int) pp.packJsonBytes.getSize());
+            auto parsed = juce::JSON::parse(json);
+            if (auto* obj = parsed.getDynamicObject())
+            {
+                const auto get = [obj](const char* k, const juce::String& fb)
+                {
+                    auto v = obj->getProperty(k);
+                    return v.toString().isNotEmpty() ? v.toString() : fb;
+                };
+                pp.info.displayName = get("name", packName);
+                pp.info.description = get("description", "");
+                pp.info.designer    = get("designer", "");
+            }
+        }
+
+        if (! pp.presets.empty())
+        {
+            std::sort(pp.presets.begin(), pp.presets.end(),
+                [](const PresetInfo& a, const PresetInfo& b)
+                { return a.metadata.name.compareIgnoreCase(b.metadata.name) < 0; });
+            pp.info.presetCount = (int) pp.presets.size();
+            allPresets[packName] = std::move(pp.presets);
+        }
+        packs[packName] = pp.info;
+    }
+#endif
 }
 
 std::vector<PackInfo> PresetManager::getAllPacks() const

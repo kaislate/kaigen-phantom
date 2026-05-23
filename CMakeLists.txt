@@ -132,15 +132,31 @@ juce_add_binary_data(PhantomNativeAssets
 # get embedded as binary data, appearing as read-only packs in the
 # preset browser. To add a designer-authored pack: unzip the .kaipack
 # into Source/FactoryPacks/<pack-name>/ and rebuild.
+#
+# juce_add_binary_data uses only the basename of each input file for the
+# originalFilenames[] entry, so we mangle "<PackName>/<file>" into
+# "<PackName>__<file>" at stage-time. PresetManager::loadFactoryPacksFromBinaryData
+# splits on "__" to recover the pack name.
+set(FACTORY_PACK_SRC_DIR   "${CMAKE_CURRENT_SOURCE_DIR}/Source/FactoryPacks")
+set(FACTORY_PACK_STAGE_DIR "${CMAKE_CURRENT_BINARY_DIR}/factory_pack_stage")
+file(MAKE_DIRECTORY "${FACTORY_PACK_STAGE_DIR}")
 file(GLOB_RECURSE FACTORY_PACK_FILES
      CONFIGURE_DEPENDS
-     "${CMAKE_CURRENT_SOURCE_DIR}/Source/FactoryPacks/*")
+     "${FACTORY_PACK_SRC_DIR}/*")
 list(FILTER FACTORY_PACK_FILES EXCLUDE REGEX "/\\.gitkeep$")
-if(FACTORY_PACK_FILES)
+set(STAGED_FACTORY_PACK_FILES "")
+foreach(src ${FACTORY_PACK_FILES})
+    file(RELATIVE_PATH rel "${FACTORY_PACK_SRC_DIR}" "${src}")
+    string(REPLACE "/" "__" mangled "${rel}")
+    set(staged "${FACTORY_PACK_STAGE_DIR}/${mangled}")
+    configure_file("${src}" "${staged}" COPYONLY)
+    list(APPEND STAGED_FACTORY_PACK_FILES "${staged}")
+endforeach()
+if(STAGED_FACTORY_PACK_FILES)
     juce_add_binary_data(KaigenFactoryPacks
         HEADER_NAME KaigenFactoryPacks.h
         NAMESPACE   KaigenFactoryPacks
-        SOURCES     ${FACTORY_PACK_FILES})
+        SOURCES     ${STAGED_FACTORY_PACK_FILES})
     target_link_libraries(KaigenPhantom PRIVATE KaigenFactoryPacks)
     target_compile_definitions(KaigenPhantom PRIVATE KAIGEN_HAS_FACTORY_PACKS=1)
 else()

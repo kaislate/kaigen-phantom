@@ -49,7 +49,8 @@ struct PresetInfo
 {
     PresetMetadata metadata;
     PreviewData    preview;
-    juce::File     file;
+    juce::File     file;            // Empty when sourced from embedded BinaryData
+    juce::MemoryBlock embeddedData; // Non-empty only for embedded factory packs
 };
 
 // A preset pack = any directory under Presets/. Factory and User are the
@@ -63,6 +64,7 @@ struct PackInfo
     juce::String description;
     juce::String designer;
     bool         hasCoverArt = false;  // Whether cover.png exists in the pack folder
+    bool         isReadOnly  = false;   // Embedded factory packs are read-only
     int          presetCount = 0;
 };
 
@@ -150,6 +152,7 @@ public:
 private:
     void ensureDirectoryStructure();
     void scanPresetsFromDisk();
+    void loadFactoryPacksFromBinaryData();
 
     void loadFavoritesIndex();
     void saveFavoritesIndex();
