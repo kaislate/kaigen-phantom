@@ -51,6 +51,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/UI/widgets/WordSelector.cpp
     Source/UI/widgets/EtchedToggle.cpp
     Source/UI/widgets/ChoiceToggle.cpp
+    Source/UI/widgets/EyeButton.cpp
     Source/UI/widgets/PitchDisplay.cpp
     Source/UI/widgets/LevelReadout.cpp
     Source/UI/widgets/RecipeSlotPills.cpp

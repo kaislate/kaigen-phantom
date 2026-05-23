@@ -168,10 +168,9 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
         }
     }
 
-    advancedToggle.setClickingTogglesState(false);
-    advancedToggle.onClick = [this] {
-        advancedExpanded = !advancedExpanded;
-        advancedToggle.setButtonText(advancedExpanded ? "Advanced (-)" : "Advanced (+)");
+    advancedToggle.setIsOpen(advancedExpanded);
+    advancedToggle.onToggle = [this](bool open) {
+        advancedExpanded = open;
         for (auto& mk : miniKnobs)
             mk->setVisible(advancedExpanded);
         resized();  // recompute visualizer bounds based on new state
@@ -331,10 +330,11 @@ void RightPanel::resized()
     // Reserve area below the top knob row for advanced + visualizers.
     area.removeFromTop(knobRowTop + knobRowHeight + cardPadY);
 
-    // --- Advanced section: toggle ABOVE the mini knob row ---
+    // --- Advanced section: eye toggle ABOVE the mini knob row ---
     constexpr int advancedToggleY = 220;
     constexpr int advancedToggleH = 20;
-    advancedToggle.setBounds(12, advancedToggleY, 100, advancedToggleH);
+    constexpr int advancedToggleW = 26;     // square-ish eye icon
+    advancedToggle.setBounds(12, advancedToggleY, advancedToggleW, advancedToggleH);
 
     const int advancedCardTop = advancedToggleY - 4;
     int advancedCardBottom    = 0;

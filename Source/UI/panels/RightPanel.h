@@ -11,6 +11,7 @@
 #include "../widgets/ChoiceToggle.h"
 #include "../widgets/PitchDisplay.h"
 #include "../widgets/LevelReadout.h"
+#include "../widgets/EyeButton.h"
 #include "../visualizers/Oscilloscope.h"
 #include "../visualizers/Spectrum.h"
 
@@ -83,8 +84,10 @@ private:
     // stubbed in BinauralStage).
     ChoiceToggle binauralToggle;
 
-    // Advanced section collapse toggle (instant, no animation).
-    juce::TextButton advancedToggle { "Advanced (-)" };
+    // Advanced section collapse toggle — eye icon, no text label (the
+    // section's title-notch already says "Advanced"). Open eye =
+    // expanded, closed eye = collapsed.
+    EyeButton advancedToggle;
     bool advancedExpanded { true };
 
     // Visualizers (below Advanced row)
