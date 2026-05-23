@@ -215,9 +215,12 @@ void NativePluginEditor::resized()
     leftPanel.setBounds(leftBounds);
     rightPanel.setBounds(area);
 
-    // PresetBrowser + PresetDropdown both overlay the entire editor when
-    // visible (PresetDropdown only paints inside its anchored card sub-rect).
-    presetBrowser  .setBounds(getLocalBounds());
+    // Preset browser sits BELOW the top bar so the user can still see the
+    // preset name pill, engine tabs, and gear / advanced buttons while
+    // browsing. The other overlays (dropdown, matrix, settings) still
+    // cover everything — they're shorter / centred cards that benefit
+    // from the dimmed-everywhere backdrop.
+    presetBrowser  .setBounds(getLocalBounds().withTrimmedTop(topBarHeight));
     presetDropdown .setBounds(getLocalBounds());
     matrixView     .setBounds(getLocalBounds());
     settingsOverlay.setBounds(getLocalBounds());
