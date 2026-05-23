@@ -11,11 +11,23 @@ namespace
     // Tests run against the user's REAL preset directory. This RAII helper
     // guarantees the pack folder is removed even if a REQUIRE/CHECK aborts
     // the test before reaching an explicit teardown line.
+    //
+    // Non-copyable, non-movable: a temporary's destructor would delete the
+    // pack out from under the in-place guard (cf. the roundtrip test which
+    // wraps this in std::make_unique).
     struct ScopedAuthPack
     {
         PresetManager& pm;
         juce::String name;
+
+        ScopedAuthPack(PresetManager& p, juce::String n)
+            : pm(p), name(std::move(n)) {}
         ~ScopedAuthPack() { pm.deletePack(name); }
+
+        ScopedAuthPack(const ScopedAuthPack&) = delete;
+        ScopedAuthPack& operator=(const ScopedAuthPack&) = delete;
+        ScopedAuthPack(ScopedAuthPack&&) = delete;
+        ScopedAuthPack& operator=(ScopedAuthPack&&) = delete;
     };
 
     juce::String uniquePackName(const char* purpose)
@@ -209,6 +221,11 @@ TEST_CASE("PresetManager DEV API: exportPack + importPack roundtrip", "[pm-dev]"
 
     const auto packName = uniquePackName("RT");
     REQUIRE(pm.createPack(packName, "d", "me"));
+    // Guard the live pack with a unique_ptr so we can release it explicitly
+    // after the in-test deletePack, while still cleaning up on a REQUIRE abort
+    // between createPack and deletePack. In-place construction (no temporary)
+    // because ScopedAuthPack's destructor mutates global filesystem state.
+    auto cleanup = std::make_unique<ScopedAuthPack>(pm, packName);
 
     auto tmp = juce::File::createTempFile("kp-export");
     tmp.deleteFile();
@@ -219,10 +236,12 @@ TEST_CASE("PresetManager DEV API: exportPack + importPack roundtrip", "[pm-dev]"
 
     // Delete the live pack, then import the .kaipack back.
     REQUIRE(pm.deletePack(packName));
+    cleanup.reset();  // pack now gone — drop the original guard
+
     const auto imported = pm.importPack(zip, /*overwrite*/ false);
+    ScopedAuthPack cleanup2{pm, imported};  // guards the re-imported copy
     CHECK(imported == packName);
 
-    pm.deletePack(packName);  // teardown (after the test deletePack/import dance)
     tmp.deleteRecursively();
 }
 

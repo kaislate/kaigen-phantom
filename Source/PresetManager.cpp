@@ -882,6 +882,16 @@ bool PresetManager::setPackCover(const juce::String& packName, const juce::File&
     return true;
 }
 
+// Designer-mode equivalent of savePreset, with three intentional differences:
+//   - target directory is the caller-specified packDir (not the User folder)
+//   - skips the defensive SlotB/MorphConfig strip from savePreset because
+//     the live APVTS state has been free of those children since PR1
+//     (2026-05-04) — re-add if we ever load a pre-PR1 preset into the live
+//     editor and then re-save it
+//   - calls rescan() instead of the incremental cache update savePreset
+//     does. Designer-mode saves are user-initiated menu actions, not a hot
+//     UI loop, so the simpler full rescan is fine here. If this ever
+//     becomes hot, mirror the savePreset cache-mutation pattern.
 juce::String PresetManager::savePresetIntoPack(juce::AudioProcessorValueTreeState& apvts,
                                                 const juce::String& packName,
                                                 const juce::String& presetName,

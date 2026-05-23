@@ -159,8 +159,12 @@ public:
     bool exportPack(const juce::String& packName, const juce::File& destZipFile);
 
     // Unzips a .kaipack into the User-presets root. Returns the imported
-    // pack name on success; empty string if archive is invalid or the
-    // pack already exists and overwriteExisting is false.
+    // pack name on success, or empty string when:
+    //   - the archive is missing / malformed
+    //   - the pack already exists and overwriteExisting is false
+    //   - the pack would shadow a read-only pack (embedded factory) — even
+    //     with overwriteExisting=true, isReadOnly is not bypassed
+    //   - the pack name is the reserved "Factory" or "User"
     juce::String importPack(const juce::File& sourceZipFile, bool overwriteExisting);
 #endif
 
