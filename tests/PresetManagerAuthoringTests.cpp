@@ -1,5 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include "../Source/PresetManager.h"
+#include "../Source/Pack/PackArchive.h"
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_graphics/juce_graphics.h>
 
 using namespace kaigen::phantom;
 
@@ -123,4 +126,124 @@ TEST_CASE("PresetManager DEV API: deletePack refuses Factory/User/embedded", "[p
     CHECK_FALSE(pm.deletePack("Factory"));
     CHECK_FALSE(pm.deletePack("User"));
     CHECK_FALSE(pm.deletePack("TestPack"));  // embedded fixture from Task 2
+}
+
+TEST_CASE("PresetManager DEV API: setPackCover writes cover.png", "[pm-dev]")
+{
+    PresetManager pm;
+    pm.initialize();
+
+    const auto packName = uniquePackName("Cover");
+    REQUIRE(pm.createPack(packName, "d", "me"));
+    ScopedAuthPack cleanup{pm, packName};
+
+    // Build a tiny PNG on disk to use as the source.
+    auto tmpDir = juce::File::createTempFile("kp-cover-src");
+    tmpDir.deleteFile();
+    tmpDir.createDirectory();
+    auto src = tmpDir.getChildFile("art.png");
+    {
+        juce::Image img(juce::Image::RGB, 32, 32, true);
+        juce::FileOutputStream out(src);
+        juce::PNGImageFormat fmt;
+        REQUIRE(out.openedOk());
+        REQUIRE(fmt.writeImageToStream(img, out));
+    }
+
+    REQUIRE(pm.setPackCover(packName, src));
+    CHECK(pm.getPackCoverFile(packName).existsAsFile());
+
+    tmpDir.deleteRecursively();
+}
+
+TEST_CASE("PresetManager DEV API: savePresetIntoPack writes into the target pack", "[pm-dev]")
+{
+    // StubAuthProcessor — bare juce::AudioProcessor subclass for APVTS construction.
+    // Mirror the StubLoadProcessor pattern from tests/FactoryPackLoadingTests.cpp.
+    struct StubAuthProcessor : public juce::AudioProcessor
+    {
+        StubAuthProcessor() : juce::AudioProcessor(juce::AudioProcessor::BusesProperties{}) {}
+        const juce::String getName() const override { return "StubAuthProcessor"; }
+        void prepareToPlay(double, int) override {}
+        void releaseResources() override {}
+        void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override {}
+        double getTailLengthSeconds() const override { return 0; }
+        bool acceptsMidi() const override { return false; }
+        bool producesMidi() const override { return false; }
+        juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+        bool hasEditor() const override { return false; }
+        int getNumPrograms() override { return 1; }
+        int getCurrentProgram() override { return 0; }
+        void setCurrentProgram(int) override {}
+        const juce::String getProgramName(int) override { return {}; }
+        void changeProgramName(int, const juce::String&) override {}
+        void getStateInformation(juce::MemoryBlock&) override {}
+        void setStateInformation(const void*, int) override {}
+    };
+
+    StubAuthProcessor proc;
+    juce::AudioProcessorValueTreeState apvts(proc, nullptr, "KaigenPhantomState", {});
+
+    PresetManager pm;
+    pm.initialize();
+
+    const auto packName = uniquePackName("Save");
+    REQUIRE(pm.createPack(packName, "d", "me"));
+    ScopedAuthPack cleanup{pm, packName};
+
+    const auto saved = pm.savePresetIntoPack(apvts, packName,
+                                              "MyPreset", "Synth", "me", "");
+    REQUIRE(saved == "MyPreset");
+
+    const auto all = pm.getAllPresets();
+    auto it = all.find(packName);
+    REQUIRE(it != all.end());
+    CHECK(it->second.size() == 1);
+    CHECK(it->second.front().metadata.name == "MyPreset");
+}
+
+TEST_CASE("PresetManager DEV API: exportPack + importPack roundtrip", "[pm-dev]")
+{
+    PresetManager pm;
+    pm.initialize();
+
+    const auto packName = uniquePackName("RT");
+    REQUIRE(pm.createPack(packName, "d", "me"));
+
+    auto tmp = juce::File::createTempFile("kp-export");
+    tmp.deleteFile();
+    tmp.createDirectory();
+    const auto zip = tmp.getChildFile(packName + ".kaipack");
+    REQUIRE(pm.exportPack(packName, zip));
+    REQUIRE(zip.existsAsFile());
+
+    // Delete the live pack, then import the .kaipack back.
+    REQUIRE(pm.deletePack(packName));
+    const auto imported = pm.importPack(zip, /*overwrite*/ false);
+    CHECK(imported == packName);
+
+    pm.deletePack(packName);  // teardown (after the test deletePack/import dance)
+    tmp.deleteRecursively();
+}
+
+TEST_CASE("PresetManager DEV API: importPack refuses overwriting embedded packs", "[pm-dev]")
+{
+    PresetManager pm;
+    pm.initialize();
+
+    // Manufacture a fake .kaipack whose top folder is "TestPack" (the
+    // embedded fixture name) — peekPackName should match and importPack
+    // should refuse.
+    auto tmp = juce::File::createTempFile("kp-conflict");
+    tmp.deleteFile();
+    tmp.createDirectory();
+    auto fakePack = tmp.getChildFile("TestPack");
+    fakePack.createDirectory();
+    fakePack.getChildFile("pack.json").replaceWithText(R"({"name":"TestPack"})");
+
+    auto zip = tmp.getChildFile("TestPack.kaipack");
+    REQUIRE(PackArchive::exportPack(fakePack, zip));
+
+    CHECK(pm.importPack(zip, /*overwrite*/ true).isEmpty());
+    tmp.deleteRecursively();
 }

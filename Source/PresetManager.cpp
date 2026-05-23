@@ -1,6 +1,7 @@
 #include "PresetManager.h"
 #include "Parameters.h"
 #include "PresetMigration.h"
+#include "Pack/PackArchive.h"
 #include <juce_core/juce_core.h>
 
 #if KAIGEN_HAS_FACTORY_PACKS
@@ -838,6 +839,135 @@ bool PresetManager::deletePack(const juce::String& packName)
 
     rescan();
     return true;
+}
+
+bool PresetManager::setPackCover(const juce::String& packName, const juce::File& sourceImage)
+{
+    auto packIt = packs.find(packName);
+    if (packIt == packs.end() || packIt->second.isReadOnly) return false;
+    if (! sourceImage.existsAsFile()) return false;
+
+    auto packDir = getPresetsRootDirectory().getChildFile(packName);
+    if (! packDir.isDirectory()) return false;
+
+    // Load -> resize to fit 512x512 -> write as PNG. Format is forced to
+    // PNG regardless of source extension so the rest of the code only
+    // needs to look for cover.png / cover.jpg.
+    auto img = juce::ImageFileFormat::loadFrom(sourceImage);
+    if (! img.isValid()) return false;
+
+    const int maxEdge = 512;
+    if (img.getWidth() > maxEdge || img.getHeight() > maxEdge)
+    {
+        const float scale = (float) maxEdge
+            / (float) juce::jmax(img.getWidth(), img.getHeight());
+        img = img.rescaled((int) (img.getWidth()  * scale),
+                            (int) (img.getHeight() * scale),
+                            juce::Graphics::highResamplingQuality);
+    }
+
+    // Remove a stale cover.jpg if present so the new cover.png wins.
+    packDir.getChildFile("cover.jpg").deleteFile();
+
+    auto destPng = packDir.getChildFile("cover.png");
+    destPng.deleteFile();
+    juce::FileOutputStream out(destPng);
+    if (! out.openedOk()) return false;
+
+    juce::PNGImageFormat fmt;
+    if (! fmt.writeImageToStream(img, out)) return false;
+    out.flush();
+
+    rescan();
+    return true;
+}
+
+juce::String PresetManager::savePresetIntoPack(juce::AudioProcessorValueTreeState& apvts,
+                                                const juce::String& packName,
+                                                const juce::String& presetName,
+                                                const juce::String& type,
+                                                const juce::String& designer,
+                                                const juce::String& description)
+{
+    auto packIt = packs.find(packName);
+    if (packIt == packs.end() || packIt->second.isReadOnly) return {};
+
+    auto sanitized = sanitizeName(presetName);
+    if (sanitized.isEmpty()) return {};
+
+    const auto validType = kValidTypes.contains(type) ? type
+                                                       : juce::String("Experimental");
+    const auto effectiveDesigner = designer.isEmpty() ? juce::String("User") : designer;
+
+    auto packDir = getPresetsRootDirectory().getChildFile(packName);
+    if (! packDir.isDirectory()) return {};
+
+    auto target = packDir.getChildFile(sanitized + ".fxp");
+    // Disambiguate name with a numeric suffix if the file already exists.
+    if (target.existsAsFile())
+    {
+        int suffix = 2;
+        while (true)
+        {
+            auto candidate = packDir.getChildFile(sanitized + " "
+                + juce::String(suffix) + ".fxp");
+            if (! candidate.existsAsFile())
+            {
+                target = candidate;
+                sanitized = sanitized + " " + juce::String(suffix);
+                break;
+            }
+            if (++suffix > 999) return {};
+        }
+    }
+
+    juce::ValueTree state = apvts.copyState();
+    if (auto existingMeta = state.getChildWithName(kMetadataNodeId); existingMeta.isValid())
+        state.removeChild(existingMeta, nullptr);
+
+    auto metadataTree = buildMetadataTree(sanitized, validType, effectiveDesigner, description);
+    metadataTree.setProperty("presetKind", presetKindToString(PresetKind::Single), nullptr);
+    state.appendChild(metadataTree, nullptr);
+
+    auto xml = state.createXml();
+    if (xml == nullptr) return {};
+    if (! target.replaceWithText(xml->toString())) return {};
+
+    rescan();
+    return sanitized;
+}
+
+bool PresetManager::exportPack(const juce::String& packName, const juce::File& destZipFile)
+{
+    auto packIt = packs.find(packName);
+    // Note: exportPack works on read-only packs too — designers can export
+    // a Factory/embedded pack for inspection if they want. The interesting
+    // restriction is on import (next).
+    if (packIt == packs.end()) return false;
+
+    auto packDir = getPresetsRootDirectory().getChildFile(packName);
+    if (! packDir.isDirectory()) return false;
+
+    return PackArchive::exportPack(packDir, destZipFile);
+}
+
+juce::String PresetManager::importPack(const juce::File& sourceZipFile, bool overwriteExisting)
+{
+    const auto packName = PackArchive::peekPackName(sourceZipFile);
+    if (packName.isEmpty()) return {};
+
+    // Refuse to import on top of a read-only pack — embedded factory
+    // packs shouldn't be shadowed by user-imported ones (it would just
+    // be confusing).
+    auto packIt = packs.find(packName);
+    if (packIt != packs.end() && packIt->second.isReadOnly) return {};
+    if (packName == "Factory" || packName == "User") return {};
+
+    const auto result = PackArchive::importPack(sourceZipFile,
+                                                 getPresetsRootDirectory(),
+                                                 overwriteExisting);
+    if (! result.isEmpty()) rescan();
+    return result;
 }
 #endif
 

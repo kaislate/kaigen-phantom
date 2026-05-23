@@ -141,6 +141,27 @@ public:
                          const juce::String& designer);
 
     bool deletePack(const juce::String& packName);
+
+    // Copies + resizes the source image to <packDir>/cover.png. Resizes
+    // to <= 512x512, preserving aspect ratio. Replaces any existing cover.
+    bool setPackCover(const juce::String& packName, const juce::File& sourceImage);
+
+    // Saves the current APVTS state as <packDir>/<presetName>.fxp.
+    // Returns the saved (possibly disambiguated) preset name, empty on failure.
+    juce::String savePresetIntoPack(juce::AudioProcessorValueTreeState& apvts,
+                                    const juce::String& packName,
+                                    const juce::String& presetName,
+                                    const juce::String& type,
+                                    const juce::String& designer,
+                                    const juce::String& description);
+
+    // Zips the pack folder into destZipFile. Returns true on success.
+    bool exportPack(const juce::String& packName, const juce::File& destZipFile);
+
+    // Unzips a .kaipack into the User-presets root. Returns the imported
+    // pack name on success; empty string if archive is invalid or the
+    // pack already exists and overwriteExisting is false.
+    juce::String importPack(const juce::File& sourceZipFile, bool overwriteExisting);
 #endif
 
     // Favorites (persisted in favorites.index).
