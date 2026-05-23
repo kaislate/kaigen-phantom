@@ -93,3 +93,32 @@ TEST_CASE("PackArchive: malformed archive returns empty pack name", "[pack-archi
 
     tmp.deleteFile();
 }
+
+TEST_CASE("PackArchive: peekPackName skips __MACOSX entries", "[pack-archive]")
+{
+    auto tmp = juce::File::createTempFile("kaipack-macosx");
+    tmp.deleteFile();
+    tmp.createDirectory();
+
+    // Build a zip whose first entry is __MACOSX metadata, second is the
+    // real pack folder. peekPackName must return "RealPack", not "__MACOSX".
+    auto metaSrc = tmp.getChildFile("metadata_blob");
+    metaSrc.replaceWithText("macos resource fork");
+    auto realSrc = tmp.getChildFile("pack.json");
+    realSrc.replaceWithText(R"({"name":"RealPack"})");
+
+    juce::ZipFile::Builder builder;
+    builder.addFile(metaSrc, 9, "__MACOSX/somefile");
+    builder.addFile(realSrc, 9, "RealPack/pack.json");
+
+    const auto destZip = tmp.getChildFile("MixedTopLevel.kaipack");
+    {
+        juce::FileOutputStream out(destZip);
+        REQUIRE(out.openedOk());
+        REQUIRE(builder.writeToStream(out, nullptr));
+    }
+
+    CHECK(PackArchive::peekPackName(destZip) == "RealPack");
+
+    tmp.deleteRecursively();
+}

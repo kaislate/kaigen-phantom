@@ -38,14 +38,26 @@ juce::String PackArchive::peekPackName(const juce::File& sourceZipFile)
     if (! sourceZipFile.existsAsFile()) return {};
 
     juce::ZipFile zip(sourceZipFile);
-    if (zip.getNumEntries() == 0) return {};
+    const int n = zip.getNumEntries();
+    if (n == 0) return {};
 
-    const auto* entry = zip.getEntry(0);
-    if (entry == nullptr) return {};
+    // Scan entries, skipping macOS resource-fork metadata (__MACOSX/) and
+    // similar tooling artefacts whose first path segment starts with "__".
+    // Return the first segment of the first real entry.
+    for (int i = 0; i < n; ++i)
+    {
+        const auto* entry = zip.getEntry(i);
+        if (entry == nullptr) continue;
 
-    const auto firstSlash = entry->filename.indexOfChar('/');
-    if (firstSlash < 1) return {};
-    return entry->filename.substring(0, firstSlash);
+        const auto firstSlash = entry->filename.indexOfChar('/');
+        if (firstSlash < 1) continue;
+
+        const auto firstSegment = entry->filename.substring(0, firstSlash);
+        if (firstSegment.startsWith("__")) continue;
+
+        return firstSegment;
+    }
+    return {};
 }
 
 juce::String PackArchive::importPack(const juce::File& sourceZipFile,
@@ -67,7 +79,6 @@ juce::String PackArchive::importPack(const juce::File& sourceZipFile,
         if (! overwriteExisting) return {};
         if (! packDir.deleteRecursively()) return {};
     }
-    if (! packDir.createDirectory().wasOk()) return {};
 
     const auto result = zip.uncompressTo(destRoot, /*shouldOverwriteFiles*/ true);
     if (result.failed()) return {};
