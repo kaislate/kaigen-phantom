@@ -37,10 +37,10 @@ namespace
         return s;
     }
 
-    juce::File writePackManifest(const juce::File& packDir,
-                                  const juce::String& displayName,
-                                  const juce::String& description,
-                                  const juce::String& designer)
+    void writePackManifest(const juce::File& packDir,
+                            const juce::String& displayName,
+                            const juce::String& description,
+                            const juce::String& designer)
     {
         auto* obj = new juce::DynamicObject();
         obj->setProperty("name",        displayName);
@@ -48,9 +48,7 @@ namespace
         obj->setProperty("designer",    designer);
 
         auto json = juce::JSON::toString(juce::var(obj));
-        auto manifest = packDir.getChildFile("pack.json");
-        manifest.replaceWithText(json);
-        return manifest;
+        packDir.getChildFile("pack.json").replaceWithText(json);
     }
 }
 

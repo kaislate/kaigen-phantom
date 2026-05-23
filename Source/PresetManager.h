@@ -123,12 +123,17 @@ public:
     // All authoring ops refuse PackInfo::isReadOnly packs (embedded
     // factory packs + the on-disk Factory pack). Names are sanitised to
     // safe folder names. Each successful op triggers a rescan + change
-    // broadcast so the browser refreshes.
+    // broadcast so the browser refreshes. Call from the message thread
+    // only — these mutate the in-memory packs map that timerCallback
+    // also reads.
 
     bool createPack(const juce::String& packName,
                     const juce::String& description,
                     const juce::String& designer);
 
+    // Renames the pack folder AND overwrites pack.json's displayName to
+    // match the trimmed newName. If a caller wants to preserve a custom
+    // displayName across a folder rename, follow up with setPackMetadata.
     bool renamePack(const juce::String& oldName, const juce::String& newName);
 
     bool setPackMetadata(const juce::String& packName,
