@@ -508,10 +508,33 @@ bool PresetManager::loadPreset(juce::AudioProcessorValueTreeState& apvts,
                                const juce::String& presetName,
                                const juce::String& packName)
 {
-    auto file = getPresetFile(presetName, packName);
-    if (!file.existsAsFile()) return false;
+    std::unique_ptr<juce::XmlElement> xml;
 
-    auto xml = juce::parseXML(file);
+    // Check in-memory cache first — embedded factory packs live entirely
+    // in BinaryData and have no disk file. We look the entry up by name
+    // so we can read from its embeddedData MemoryBlock.
+    auto packIt = allPresets.find(packName);
+    if (packIt != allPresets.end())
+    {
+        const auto& list = packIt->second;
+        auto entryIt = std::find_if(list.begin(), list.end(),
+            [&](const PresetInfo& p) { return p.metadata.name == presetName; });
+        if (entryIt != list.end() && entryIt->embeddedData.getSize() > 0)
+        {
+            xml = juce::parseXML(juce::String::createStringFromData(
+                entryIt->embeddedData.getData(),
+                (int) entryIt->embeddedData.getSize()));
+        }
+    }
+
+    // Fall through to the on-disk path when not found in embedded data.
+    if (xml == nullptr)
+    {
+        auto file = getPresetFile(presetName, packName);
+        if (!file.existsAsFile()) return false;
+        xml = juce::parseXML(file);
+    }
+
     if (xml == nullptr) return false;
 
     auto tree = juce::ValueTree::fromXml(*xml);
