@@ -1272,21 +1272,24 @@ void PresetBrowser::mouseMove(const juce::MouseEvent& e)
     auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + kColHeaderH).reduced(8, 4);
 
     int newRowHover = -1;
-    int y = listArea.getY() - listScrollY;
-    for (size_t i = 0; i < rows.size(); ++i)
+    if (! isPacksMode())
     {
-        const auto& r = rows[i];
-        const int h = r.isHeader ? kHeaderHeight : kRowHeight;
-        if (y + h <= listArea.getY()) { y += h; continue; }
-        if (y >= listArea.getBottom()) break;
-        if (! r.isHeader
-            && e.x >= listArea.getX() && e.x < listArea.getRight()
-            && e.y >= y               && e.y < y + h)
+        int y = listArea.getY() - listScrollY;
+        for (size_t i = 0; i < rows.size(); ++i)
         {
-            newRowHover = (int) i;
-            break;
+            const auto& r = rows[i];
+            const int h = r.isHeader ? kHeaderHeight : kRowHeight;
+            if (y + h <= listArea.getY()) { y += h; continue; }
+            if (y >= listArea.getBottom()) break;
+            if (! r.isHeader
+                && e.x >= listArea.getX() && e.x < listArea.getRight()
+                && e.y >= y               && e.y < y + h)
+            {
+                newRowHover = (int) i;
+                break;
+            }
+            y += h;
         }
-        y += h;
     }
 
     int newCatHover = -1;
@@ -1421,6 +1424,13 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
             }
         }
     }
+
+    // In Packs mode the middle column shows pack cards, not preset rows,
+    // so row hit-testing is skipped entirely — the rows vector is still
+    // populated (rebuildRows doesn't clear it) and paint() also skips
+    // drawing them, so without this guard clicks would land on invisible
+    // rows and load presets.
+    if (isPacksMode()) return;
 
     // List area: hit test the preset rows (with scroll offset).
     // contentBounds() so clicks in the bottom DEV strip don't get
