@@ -146,6 +146,15 @@ void RecipeSlotPills::paint(juce::Graphics& g)
     font.setExtraKerningFactor(kKerning);
     g.setFont(font);
 
+    // Highlight palette — matches EtchedToggle / WordSelector active-word
+    // recipe (white halo + bright white body) so SAVE pills feel native
+    // alongside the preset words above. DIRTY / empty-pending states blink
+    // by alternating the body alpha; CLEAN state is solid bright. Colour
+    // is never used — state distinction comes from glow vs etched and
+    // solid vs blinking.
+    const juce::Colour kWhiteHalo = juce::Colour::fromFloatRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+    const juce::Colour kBrightBody = juce::Colour(0xfff5f8fb);
+
     for (int col = 0; col < 3; ++col)
     {
         const auto& slot      = processor.getRecipeSlot(engineIdx, col);
@@ -158,39 +167,31 @@ void RecipeSlotPills::paint(juce::Graphics& g)
             // Not the active slot — dim etched grey.
             drawEtched(g, "SAVE", saveRect, juce::Colour(0x38000000));
         }
-        else if (! slot.filled)
-        {
-            // Empty + current → blinking red (calling for save).
-            const juce::Colour body = blinkPhase
-                ? juce::Colour::fromFloatRGBA(0.95f, 0.20f, 0.18f, 1.00f)
-                : juce::Colour::fromFloatRGBA(0.95f, 0.20f, 0.18f, 0.35f);
-            drawGlowing(g, "SAVE", saveRect,
-                         juce::Colour::fromFloatRGBA(1.0f, 0.30f, 0.25f, 1.0f),
-                         body);
-        }
         else
         {
-            // Filled + current → DIRTY check.
+            // Compute DIRTY: filled + current and live H differs from savedH.
             bool dirty = false;
-            for (int h = 0; h < 7; ++h)
-                if (std::abs(slot.savedH[(size_t) h] - liveH[(size_t) h]) > kDirtyEpsilon)
-                { dirty = true; break; }
-
-            if (dirty)
+            if (slot.filled)
             {
-                const juce::Colour body = blinkPhase
-                    ? juce::Colour::fromFloatRGBA(0.95f, 0.20f, 0.18f, 1.00f)
-                    : juce::Colour::fromFloatRGBA(0.95f, 0.20f, 0.18f, 0.35f);
-                drawGlowing(g, "SAVE", saveRect,
-                             juce::Colour::fromFloatRGBA(1.0f, 0.30f, 0.25f, 1.0f),
-                             body);
+                for (int h = 0; h < 7; ++h)
+                    if (std::abs(slot.savedH[(size_t) h] - liveH[(size_t) h]) > kDirtyEpsilon)
+                    { dirty = true; break; }
+            }
+
+            const bool needsSave = ! slot.filled || dirty;
+            if (needsSave)
+            {
+                // Blinking white — alternate bright body with dim body.
+                // Halo stays on both phases so the pulse reads as throb,
+                // not on/off flicker.
+                const float alpha = blinkPhase ? 1.00f : 0.30f;
+                drawGlowing(g, "SAVE", saveRect, kWhiteHalo,
+                             juce::Colour::fromFloatRGBA(0.96f, 0.97f, 0.98f, alpha));
             }
             else
             {
-                // Solid green glow.
-                drawGlowing(g, "SAVE", saveRect,
-                             juce::Colour::fromFloatRGBA(0.35f, 0.95f, 0.45f, 1.0f),
-                             juce::Colour::fromFloatRGBA(0.30f, 0.95f, 0.40f, 1.0f));
+                // Solid bright white — clean and saved.
+                drawGlowing(g, "SAVE", saveRect, kWhiteHalo, kBrightBody);
             }
         }
 
@@ -203,9 +204,10 @@ void RecipeSlotPills::paint(juce::Graphics& g)
         }
         else
         {
-            // Filled → standard etched with a subtle red tint.
-            drawEtched(g, "DEL", delRect,
-                        juce::Colour::fromFloatRGBA(0.70f, 0.15f, 0.13f, 0.85f));
+            // Filled → standard etched (clickable), same body colour as
+            // an inactive WordSelector word so it reads as a peer rather
+            // than a coloured warning.
+            drawEtched(g, "DEL", delRect, juce::Colour(0x80000000));
         }
     }
 }

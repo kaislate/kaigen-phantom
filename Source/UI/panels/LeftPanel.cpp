@@ -180,10 +180,11 @@ void LeftPanel::resized()
     constexpr int kMedium = 136;
 
     // ── Ghost section ──────────────────────────────────────────────────
-    // Modes card now spans 328 → ~486 (24 top + 84 selector + 4 gap + 18
-    // pills + 12 bottom), so Ghost shifts down further to maintain the
-    // card-to-card gap that was here before pills were added.
-    constexpr int ghostY  = 518;   // was 502 (+16 for the pills strip)
+    // Ghost Y is intentionally NOT pushed down by the new pills strip.
+    // Instead the Modes-to-Ghost gap absorbs the extra Modes height — a
+    // tighter (~24 px) gap reads cleaner than shifting the rest of the
+    // panel downward.
+    constexpr int ghostY  = 502;
     const int ghostTotal  = kLarge + kMedium + kMedium;
     const int ghostOverlap = (ghostTotal - panelW + 16) / 2;
     int gx = 8;
@@ -198,7 +199,9 @@ void LeftPanel::resized()
     ghostModeToggle.setBounds(12, ghostY + kLarge + 4, panelW - 24, 22);
 
     // ── Filter section (more vertical gap from Ghost) ──────────────────
-    constexpr int filterY = 788;   // tracks the bumped Ghost Y (was 772, +16)
+    // Filter Y tightened so the Ghost-to-Filter gap matches the new
+    // Modes-to-Ghost gap (~24 px) — keeps inter-card spacing symmetric.
+    constexpr int filterY = 750;
     const int filterTotal = kMedium + 40 + kMedium;
     int fx = (panelW - filterTotal) / 2;
     lpfKnob.setBounds(fx, filterY, kMedium, kMedium);
