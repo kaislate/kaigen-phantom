@@ -301,10 +301,10 @@ void PresetManager::scanPresetsFromDisk()
 void PresetManager::loadFactoryPacksFromBinaryData()
 {
 #if KAIGEN_HAS_FACTORY_PACKS
-    // Group embedded resources by their first path segment (= pack name).
-    // KaigenFactoryPacks::originalFilenames[i] looks like "TestPack/Empty.fxp"
-    // or "TestPack/pack.json"; we route metadata files to PackInfo and *.fxp
-    // files to PresetInfo entries with embeddedData populated.
+    // Group embedded resources by pack name; see the "<PackName>__<file>"
+    // mangling note below for the exact originalFilenames[] path shape.
+    // Routes metadata files to PackInfo and *.fxp files to PresetInfo
+    // entries with embeddedData populated.
     struct PendingPack
     {
         PackInfo info;

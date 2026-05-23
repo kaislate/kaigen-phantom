@@ -147,6 +147,14 @@ list(FILTER FACTORY_PACK_FILES EXCLUDE REGEX "/\\.gitkeep$")
 set(STAGED_FACTORY_PACK_FILES "")
 foreach(src ${FACTORY_PACK_FILES})
     file(RELATIVE_PATH rel "${FACTORY_PACK_SRC_DIR}" "${src}")
+    string(REGEX REPLACE "/.*" "" first_segment "${rel}")
+    string(FIND "${first_segment}" "__" double_underscore_hit)
+    if(NOT double_underscore_hit EQUAL -1)
+        message(FATAL_ERROR
+            "Factory pack folder name '${first_segment}' contains '__', which "
+            "conflicts with the juce_add_binary_data staging convention. "
+            "Rename the pack folder under Source/FactoryPacks/.")
+    endif()
     string(REPLACE "/" "__" mangled "${rel}")
     set(staged "${FACTORY_PACK_STAGE_DIR}/${mangled}")
     configure_file("${src}" "${staged}" COPYONLY)

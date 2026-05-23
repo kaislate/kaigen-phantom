@@ -59,6 +59,14 @@ file(GLOB_RECURSE FIXTURE_PACK_FILES
      "${FACTORY_PACK_FIXTURE_DIR}/*")
 foreach(src ${FIXTURE_PACK_FILES})
     file(RELATIVE_PATH rel ${FACTORY_PACK_FIXTURE_DIR} ${src})
+    string(REGEX REPLACE "/.*" "" first_segment "${rel}")
+    string(FIND "${first_segment}" "__" double_underscore_hit)
+    if(NOT double_underscore_hit EQUAL -1)
+        message(FATAL_ERROR
+            "Factory pack folder name '${first_segment}' contains '__', which "
+            "conflicts with the juce_add_binary_data staging convention. "
+            "Rename the pack folder under tests/fixtures/FactoryPacksTest/.")
+    endif()
     # rel looks like "TestPack/pack.json"; mangle to "TestPack__pack.json".
     string(REPLACE "/" "__" mangled ${rel})
     set(staged ${FACTORY_PACK_STAGE_DIR}/${mangled})
