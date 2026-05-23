@@ -39,6 +39,8 @@ add_executable(KaigenPhantomTests
     ../Source/Modulation/Routing.cpp
     ../Source/Modulation/Macro.cpp
     ../Source/Modulation/ModulationEngine.cpp
+    ../Source/Pack/PackArchive.cpp
+    PackArchiveTests.cpp
 )
 
 # Embedded fixture pack used by FactoryPackLoadingTests. This is a TEST-ONLY

@@ -82,6 +82,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/Engines/WaveletSynth.cpp
     Source/Engines/EnvelopeFollower.cpp
     Source/Engines/PhantomEngine.cpp
+    Source/Pack/PackArchive.cpp
     Source/PresetManager.cpp
     Source/PresetMigration.cpp
     Source/MorphCrossfader.cpp
