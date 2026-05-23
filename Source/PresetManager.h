@@ -117,6 +117,27 @@ public:
     bool deletePreset(const juce::String& presetName,
                       const juce::String& packName);
 
+#if DEVELOPER_MODE
+    // ── Pack authoring (designer build only) ──────────────────────────
+    //
+    // All authoring ops refuse PackInfo::isReadOnly packs (embedded
+    // factory packs + the on-disk Factory pack). Names are sanitised to
+    // safe folder names. Each successful op triggers a rescan + change
+    // broadcast so the browser refreshes.
+
+    bool createPack(const juce::String& packName,
+                    const juce::String& description,
+                    const juce::String& designer);
+
+    bool renamePack(const juce::String& oldName, const juce::String& newName);
+
+    bool setPackMetadata(const juce::String& packName,
+                         const juce::String& description,
+                         const juce::String& designer);
+
+    bool deletePack(const juce::String& packName);
+#endif
+
     // Favorites (persisted in favorites.index).
     void setFavorite(const juce::String& presetName,
                      const juce::String& packName,

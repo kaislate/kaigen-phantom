@@ -25,6 +25,33 @@ namespace
         return name.trim().retainCharacters(
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-()[]");
     }
+
+    juce::String sanitizePackFolderName(const juce::String& name)
+    {
+        // Same charset as preset names — no path separators, no oddballs.
+        auto s = name.trim().retainCharacters(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-()[]");
+        // Reserve the special pack names; refuse them outright.
+        if (s.equalsIgnoreCase("Factory") || s.equalsIgnoreCase("User"))
+            return {};
+        return s;
+    }
+
+    juce::File writePackManifest(const juce::File& packDir,
+                                  const juce::String& displayName,
+                                  const juce::String& description,
+                                  const juce::String& designer)
+    {
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty("name",        displayName);
+        obj->setProperty("description", description);
+        obj->setProperty("designer",    designer);
+
+        auto json = juce::JSON::toString(juce::var(obj));
+        auto manifest = packDir.getChildFile("pack.json");
+        manifest.replaceWithText(json);
+        return manifest;
+    }
 }
 
 juce::String presetKindToString(PresetKind k)
@@ -739,5 +766,81 @@ void PresetManager::saveFavoritesIndex()
     auto indexFile = getPresetsRootDirectory().getChildFile("favorites.index");
     indexFile.replaceWithText(json);
 }
+
+#if DEVELOPER_MODE
+// ── Pack authoring (designer build only) ───────────────────────────────
+
+bool PresetManager::createPack(const juce::String& packName,
+                                const juce::String& description,
+                                const juce::String& designer)
+{
+    const auto sanitized = sanitizePackFolderName(packName);
+    if (sanitized.isEmpty()) return false;
+
+    auto packDir = getPresetsRootDirectory().getChildFile(sanitized);
+    if (packDir.exists()) return false;
+    if (! packDir.createDirectory().wasOk()) return false;
+
+    writePackManifest(packDir, packName.trim(), description, designer);
+
+    rescan();
+    return true;
+}
+
+bool PresetManager::renamePack(const juce::String& oldName, const juce::String& newName)
+{
+    auto packIt = packs.find(oldName);
+    if (packIt == packs.end() || packIt->second.isReadOnly) return false;
+
+    const auto sanitized = sanitizePackFolderName(newName);
+    if (sanitized.isEmpty()) return false;
+
+    auto oldDir = getPresetsRootDirectory().getChildFile(oldName);
+    auto newDir = getPresetsRootDirectory().getChildFile(sanitized);
+    if (! oldDir.isDirectory()) return false;
+    if (newDir.exists()) return false;
+
+    if (! oldDir.moveFileTo(newDir)) return false;
+
+    // Update pack.json displayName so the in-app name follows the folder.
+    writePackManifest(newDir,
+                       newName.trim(),
+                       packIt->second.description,
+                       packIt->second.designer);
+
+    rescan();
+    return true;
+}
+
+bool PresetManager::setPackMetadata(const juce::String& packName,
+                                     const juce::String& description,
+                                     const juce::String& designer)
+{
+    auto packIt = packs.find(packName);
+    if (packIt == packs.end() || packIt->second.isReadOnly) return false;
+
+    auto packDir = getPresetsRootDirectory().getChildFile(packName);
+    if (! packDir.isDirectory()) return false;
+
+    writePackManifest(packDir, packIt->second.displayName, description, designer);
+
+    rescan();
+    return true;
+}
+
+bool PresetManager::deletePack(const juce::String& packName)
+{
+    auto packIt = packs.find(packName);
+    if (packIt == packs.end() || packIt->second.isReadOnly) return false;
+    if (packName == kFactoryPackName || packName == kUserPackName) return false;
+
+    auto packDir = getPresetsRootDirectory().getChildFile(packName);
+    if (! packDir.isDirectory()) return false;
+    if (! packDir.deleteRecursively()) return false;
+
+    rescan();
+    return true;
+}
+#endif
 
 } // namespace kaigen::phantom

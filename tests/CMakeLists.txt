@@ -7,6 +7,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2)
 
+# Strip the parent CMakeLists' directory-scope DEVELOPER_MODE=0 so the
+# per-target target_compile_definitions(DEVELOPER_MODE=1) below wins
+# unambiguously. Without this, both definitions land on the test compile
+# command line and the later (=0) silently wins on MSVC.
+remove_definitions(-DDEVELOPER_MODE=0)
+
 add_executable(KaigenPhantomTests
     WaveletSynthTests.cpp
     BinauralStageTests.cpp
@@ -85,6 +91,9 @@ target_compile_definitions(KaigenPhantomTests PRIVATE KAIGEN_HAS_FACTORY_PACKS=1
 
 # Add FactoryPackLoadingTests.cpp to the test sources.
 target_sources(KaigenPhantomTests PRIVATE FactoryPackLoadingTests.cpp)
+
+target_compile_definitions(KaigenPhantomTests PRIVATE DEVELOPER_MODE=1)
+target_sources(KaigenPhantomTests PRIVATE PresetManagerAuthoringTests.cpp)
 
 target_link_libraries(KaigenPhantomTests
     PRIVATE
