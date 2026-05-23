@@ -211,8 +211,7 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
                         aw->getTextEditorContents("description"),
                         aw->getTextEditorContents("designer"));
                 }
-                delete aw;
-            }), false);
+            }), true);
     };
 
     saveIntoPackButton.onClick = [this]
@@ -235,8 +234,7 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
                         aw->getTextEditorContents("name"),
                         "Experimental", "User", "");
                 }
-                delete aw;
-            }), false);
+            }), true);
     };
 
     editPackMetaButton.onClick = [this]
@@ -264,8 +262,7 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
                         aw->getTextEditorContents("description"),
                         aw->getTextEditorContents("designer"));
                 }
-                delete aw;
-            }), false);
+            }), true);
     };
 
     setCoverButton.onClick = [this]
@@ -305,8 +302,7 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
                     processor.getPresetManager().renamePack(packName,
                         aw->getTextEditorContents("name"));
                 }
-                delete aw;
-            }), false);
+            }), true);
     };
 
     deletePackButton.onClick = [this]
@@ -561,6 +557,20 @@ juce::Rectangle<int> PresetBrowser::cardBounds() const
     return getLocalBounds();
 }
 
+juce::Rectangle<int> PresetBrowser::contentBounds() const
+{
+    // Card area reserved for browsable content (list / preview / sidebar /
+    // pack grid). In DEV builds the AUTHORING strip lives at the bottom of
+    // the card, so layouts that draw or hit-test content must shrink to
+    // avoid overlapping it. In ship builds the strip doesn't exist and
+    // this is identical to cardBounds().
+    auto c = cardBounds();
+#if DEVELOPER_MODE
+    c.removeFromBottom(kAuthoringStripH);
+#endif
+    return c;
+}
+
 void PresetBrowser::loadPresetAt(int rowIndex)
 {
     if (rowIndex < 0 || rowIndex >= (int) rows.size()) return;
@@ -575,14 +585,16 @@ void PresetBrowser::loadPresetAt(int rowIndex)
 
 void PresetBrowser::paint(juce::Graphics& g)
 {
-    // Full-bleed silver background — fills the editor.
-    const auto card  = cardBounds();
-    const auto cardF = card.toFloat();
-    g.setGradientFill(cardGradient(cardF));
-    g.fillRect(card);
+    // Full-bleed silver background — fills the editor. The frame fill uses
+    // the full card; the content layout below uses contentBounds() so the
+    // DEV AUTHORING strip isn't covered by sidebar / preview / list paint.
+    const auto frame  = cardBounds();
+    const auto frameF = frame.toFloat();
+    g.setGradientFill(cardGradient(frameF));
+    g.fillRect(frame);
 
     // Layout slots inside the card.
-    auto inner = card;
+    auto inner = contentBounds();
     auto sidebarBounds = inner.removeFromLeft(kSidebarW);
     auto previewBounds = inner.removeFromRight(kPreviewW);
     auto middleBounds  = inner;
@@ -1020,7 +1032,10 @@ void PresetBrowser::paint(juce::Graphics& g)
 
 juce::Rectangle<int> PresetBrowser::searchBarBounds() const
 {
-    auto card = cardBounds();
+    // Top-anchored, so the bottom-of-card strip doesn't change placement,
+    // but route through contentBounds() so any future bottom-anchored math
+    // here stays correct.
+    auto card = contentBounds();
     auto inner = card;
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
@@ -1030,7 +1045,10 @@ juce::Rectangle<int> PresetBrowser::searchBarBounds() const
 
 juce::Rectangle<int> PresetBrowser::columnHeaderBounds(SortColumn col) const
 {
-    auto card = cardBounds();
+    // Top-anchored; uses contentBounds() for consistency with the rest of
+    // the middle-column layout (so sort-column hit-tests line up with the
+    // headers paint() draws).
+    auto card = contentBounds();
     auto inner = card;
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
@@ -1066,7 +1084,9 @@ juce::Rectangle<int> PresetBrowser::columnHeaderBounds(SortColumn col) const
 
 juce::Rectangle<int> PresetBrowser::packCardBounds(int idx) const
 {
-    auto card = cardBounds();
+    // Pack cards lay out from top with a bottom-clip — must use
+    // contentBounds() so the bottom row isn't pushed under the DEV strip.
+    auto card = contentBounds();
     auto inner = card;
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
@@ -1090,7 +1110,10 @@ juce::Rectangle<int> PresetBrowser::packCardBounds(int idx) const
 
 juce::Rectangle<int> PresetBrowser::previewBounds() const
 {
-    auto card = cardBounds();
+    // contentBounds() so the preview pane's bottom edge sits above the DEV
+    // strip — otherwise the strip would paint over the delete button and
+    // the bottom of the metadata area.
+    auto card = contentBounds();
     return card.removeFromRight(kPreviewW);
 }
 
@@ -1115,8 +1138,9 @@ int PresetBrowser::contentHeightForList() const
         }
         // packCardBounds returns the on-screen rect (already offset by
         // listArea.getY()), so subtract the listArea origin to get content
-        // height. Approximate by using the inner trim width.
-        const auto card = cardBounds();
+        // height. Must mirror packCardBounds' use of contentBounds() so
+        // listOriginY matches the actual card layout.
+        const auto card = contentBounds();
         auto inner = card;
         inner.removeFromLeft(kSidebarW);
         inner.removeFromRight(kPreviewW);
@@ -1137,7 +1161,9 @@ int PresetBrowser::contentHeightForSidebar() const
 void PresetBrowser::mouseWheelMove(const juce::MouseEvent& e,
                                      const juce::MouseWheelDetails& wheel)
 {
-    const auto card = cardBounds();
+    // Use contentBounds() so wheel events over the DEV AUTHORING strip
+    // don't scroll the list/sidebar (the strip is non-scrollable chrome).
+    const auto card = contentBounds();
     if (! card.contains(e.getPosition())) return;
 
     const int dy = juce::roundToInt(wheel.deltaY * 60.0f
@@ -1194,7 +1220,9 @@ juce::Rectangle<int> PresetBrowser::sidebarRowBounds(int categoryIdx) const
 {
     constexpr int kSidebarTopOffset = 36;   // below the "CATEGORIES" label
     constexpr int kSidebarRowH      = 30;
-    const auto card = cardBounds();
+    // contentBounds() so sidebar row hit-tests don't extend over the DEV
+    // strip and steal clicks meant for the AUTHORING buttons.
+    const auto card = contentBounds();
     auto sidebar = card.withWidth(kSidebarW).reduced(8, 0);
     return { sidebar.getX(),
              card.getY() + kSidebarTopOffset + categoryIdx * kSidebarRowH,
@@ -1236,7 +1264,8 @@ void PresetBrowser::resized()
 
 void PresetBrowser::mouseMove(const juce::MouseEvent& e)
 {
-    const auto card = cardBounds();
+    // contentBounds() so row hover hit-tests stop above the DEV strip.
+    const auto card = contentBounds();
     auto inner = card;
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
@@ -1394,7 +1423,9 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
     }
 
     // List area: hit test the preset rows (with scroll offset).
-    auto inner = cardBounds();
+    // contentBounds() so clicks in the bottom DEV strip don't get
+    // interpreted as preset-row clicks.
+    auto inner = contentBounds();
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
     const auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + kColHeaderH).reduced(8, 4);

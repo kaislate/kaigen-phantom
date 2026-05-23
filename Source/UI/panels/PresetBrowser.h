@@ -44,6 +44,11 @@ public:
 private:
     void loadPresetAt(int rowIndex);
     juce::Rectangle<int> cardBounds() const;
+    // Effective content card bounds — same as cardBounds() but in
+    // DEVELOPER_MODE builds, reserves kAuthoringStripH at the bottom for
+    // the AUTHORING strip so the list / preview / sidebar don't overlap
+    // the buttons.
+    juce::Rectangle<int> contentBounds() const;
     juce::Rectangle<int> searchBarBounds() const;
     juce::Rectangle<int> sidebarRowBounds(int categoryIdx) const;
     void rebuildCategories();    // build sidebar entries from preset packs
