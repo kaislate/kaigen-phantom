@@ -104,6 +104,12 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
     // Wire PresetSelector callbacks via TopBar.
     topBar.getPresetSelector().onBrowseRequested = [this, persistMatrixMode]
     {
+        // Click-to-toggle: if the browser is already open, close it.
+        if (presetBrowser.isVisible())
+        {
+            presetBrowser.setVisible(false);
+            return;
+        }
         // Mutual exclusion: opening the browser dismisses matrix + dropdown.
         if (matrixView.isVisible())
         {
