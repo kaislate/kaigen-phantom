@@ -8,23 +8,27 @@ class PhantomProcessor;
 namespace kaigen::phantom
 {
 
-/** Save + delete pills sitting beneath the WordSelector's Cust 1/2/3
- *  entries. Renders three rows (one per Custom slot); each row has two
- *  small circular dots:
+/** Save + delete pills engraved beneath the WordSelector's Cust 1/2/3
+ *  entries. Renders a single row of 6 etched-word "pills":
  *
- *      [ save-dot ]  [ delete-dot ]
+ *      [ SAVE  DEL ]   [ SAVE  DEL ]   [ SAVE  DEL ]
+ *           Cust 1          Cust 2          Cust 3
  *
- *  Save dot:
- *    - grey   when this slot is not the active preset
- *    - green  solid when active preset + filled + clean
- *    - red    blinking (~2 Hz) when active preset + (DIRTY or empty-with-pending-edits)
+ *  Each pill is an etched-text word matching the WordSelector aesthetic
+ *  (white shadow below + dark body). State is conveyed by the body
+ *  colour:
  *
- *  Delete dot:
- *    - grey   when slot is empty
- *    - red    when slot is filled (clickable)
+ *    SAVE pill (per Cust slot):
+ *      - dim grey   when this slot is not the active preset
+ *      - bright green when active + filled + clean
+ *      - blinking red (~2 Hz) when active + (DIRTY or empty-with-pending-edits)
+ *
+ *    DEL pill (per Cust slot):
+ *      - very dim grey when slot is empty (no-op click)
+ *      - red-tinted etched when slot is filled (clickable)
  *
  *  Click handling delegates to PhantomProcessor::saveRecipeSlot /
- *  clearRecipeSlot. State is polled on a 4 Hz timer (blink). */
+ *  clearRecipeSlot. State is polled on a 4 Hz timer (drives blink). */
 class RecipeSlotPills : public juce::Component, private juce::Timer
 {
 public:
@@ -38,16 +42,13 @@ public:
 private:
     void timerCallback() override;
 
-    /** Returns 0..2 for which row contains the point, or -1. */
-    int rowAtY(int y) const noexcept;
+    /** Per-slot pill bounds, computed in resized(). Each Custom slot has
+     *  a SAVE pill (left half of its column) and a DEL pill (right half). */
+    std::array<juce::Rectangle<int>, 3> saveBounds;
+    std::array<juce::Rectangle<int>, 3> deleteBounds;
 
     PhantomProcessor& processor;
-
-    // Per-row geometry, computed in resized().
-    std::array<juce::Rectangle<int>, 3> saveDots;
-    std::array<juce::Rectangle<int>, 3> deleteDots;
-
-    bool blinkPhase { false };   // toggled at 2 Hz by the 4 Hz timer
+    bool blinkPhase { false };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RecipeSlotPills)
 };

@@ -157,18 +157,19 @@ void LeftPanel::resized()
     // the card top so it clears the 16-px notched title bar (Ghost / Filter
     // cards get away with +8 because their knobs have built-in shadow
     // padding above the visible disc; the WordSelector here doesn't).
-    constexpr int kPresetRowH     = 28;
-    constexpr int kPresetH        = kPresetRowH * 3;
-    constexpr int kRecipeCardTop  = 328;            // touches bottom of wheel
-    constexpr int kRecipeContentY = kRecipeCardTop + 24;
-    constexpr int kRecipeBottomPad = 16;            // extra room below buttons
+    constexpr int kPresetRowH      = 28;
+    constexpr int kPresetH         = kPresetRowH * 3;
+    constexpr int kRecipeCardTop   = 328;            // touches bottom of wheel
+    constexpr int kRecipeContentY  = kRecipeCardTop + 24;
+    constexpr int kPillsStripH     = 18;             // one row of etched word pills
+    constexpr int kPillsGapAbove   = 4;              // gap between WordSelector and pills
+    constexpr int kRecipeBottomPad = 12 + kPillsStripH + kPillsGapAbove;
     recipePresetSelector.setBounds(16, kRecipeContentY, panelW - 32, kPresetH);
 
     // Pills strip — directly below the WordSelector, full width so each
-    // row of pills sits under the corresponding "Cust N" column.
-    constexpr int kPillsStripH = 12 * 3 + 2 * 2 + 2;   // 3 rows × 12 + 2 gaps × 2 + 2 px pad
+    // SAVE/DEL pair sits under the corresponding "Cust N" column.
     auto pillsBounds = recipePresetSelector.getBounds()
-                          .translated(0, recipePresetSelector.getHeight() + 2)
+                          .translated(0, recipePresetSelector.getHeight() + kPillsGapAbove)
                           .withHeight(kPillsStripH);
     recipeSlotPills.setBounds(pillsBounds);
 
@@ -179,9 +180,10 @@ void LeftPanel::resized()
     constexpr int kMedium = 136;
 
     // ── Ghost section ──────────────────────────────────────────────────
-    // Modes card now spans 328 → ~452 (24 top + 84 content + 16 bottom),
-    // so Ghost shifts down to maintain a comfortable card-to-card gap.
-    constexpr int ghostY  = 502;   // was 478 (+24 for taller Modes)
+    // Modes card now spans 328 → ~486 (24 top + 84 selector + 4 gap + 18
+    // pills + 12 bottom), so Ghost shifts down further to maintain the
+    // card-to-card gap that was here before pills were added.
+    constexpr int ghostY  = 518;   // was 502 (+16 for the pills strip)
     const int ghostTotal  = kLarge + kMedium + kMedium;
     const int ghostOverlap = (ghostTotal - panelW + 16) / 2;
     int gx = 8;
@@ -196,7 +198,7 @@ void LeftPanel::resized()
     ghostModeToggle.setBounds(12, ghostY + kLarge + 4, panelW - 24, 22);
 
     // ── Filter section (more vertical gap from Ghost) ──────────────────
-    constexpr int filterY = 772;   // tracks the bumped Ghost Y (was 748, +24)
+    constexpr int filterY = 788;   // tracks the bumped Ghost Y (was 772, +16)
     const int filterTotal = kMedium + 40 + kMedium;
     int fx = (panelW - filterTotal) / 2;
     lpfKnob.setBounds(fx, filterY, kMedium, kMedium);
