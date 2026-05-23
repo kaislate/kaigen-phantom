@@ -128,10 +128,24 @@ juce_add_binary_data(PhantomNativeAssets
         Source/Assets/fonts/SpaceGrotesk-Bold.ttf
 )
 
-# Factory presets (optional, for Phase 2 implementation)
-# set(FACTORY_PRESETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Source/FactoryPresets")
-# file(GLOB FACTORY_PRESET_FILES "${FACTORY_PRESETS_DIR}/*.fxp")
-# juce_add_binary_data(KaigenPhantomData SOURCES ${FACTORY_PRESET_FILES})
+# Factory packs — drop pack folders under Source/FactoryPacks/ and they
+# get embedded as binary data, appearing as read-only packs in the
+# preset browser. To add a designer-authored pack: unzip the .kaipack
+# into Source/FactoryPacks/<pack-name>/ and rebuild.
+file(GLOB_RECURSE FACTORY_PACK_FILES
+     CONFIGURE_DEPENDS
+     "${CMAKE_CURRENT_SOURCE_DIR}/Source/FactoryPacks/*")
+list(FILTER FACTORY_PACK_FILES EXCLUDE REGEX "/\\.gitkeep$")
+if(FACTORY_PACK_FILES)
+    juce_add_binary_data(KaigenFactoryPacks
+        HEADER_NAME KaigenFactoryPacks.h
+        NAMESPACE   KaigenFactoryPacks
+        SOURCES     ${FACTORY_PACK_FILES})
+    target_link_libraries(KaigenPhantom PRIVATE KaigenFactoryPacks)
+    target_compile_definitions(KaigenPhantom PRIVATE KAIGEN_HAS_FACTORY_PACKS=1)
+else()
+    target_compile_definitions(KaigenPhantom PRIVATE KAIGEN_HAS_FACTORY_PACKS=0)
+endif()
 
 target_include_directories(KaigenPhantom PRIVATE Source)
 
