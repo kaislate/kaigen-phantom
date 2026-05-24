@@ -93,6 +93,15 @@ private:
     // an invalid Image when the pack has no cover.
     juce::Image getPackCoverFrame(const juce::String& packName);
 
+    // Paints a cover image into dest. When the image has translucent
+    // pixels (alpha < ~250 anywhere in a 5-point sample), fills a solid
+    // dark backdrop first so transparency shows dark instead of washing
+    // out against whatever component background sits behind. Opaque
+    // images skip the backdrop and draw directly.
+    void drawPackCover(juce::Graphics& g,
+                        const juce::Image& img,
+                        juce::Rectangle<int> dest);
+
     /** Visible pack cards in Explore mode. Computed in rebuildPackCards()
      *  from PresetManager::getAllPacks(); updated whenever the row list
      *  rebuilds so card hit-testing stays in sync with rendering. */

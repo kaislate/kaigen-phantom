@@ -778,8 +778,7 @@ void PresetBrowser::paint(juce::Graphics& g)
             const auto coverImg = getPackCoverFrame(pc.name);
             if (coverImg.isValid())
             {
-                g.drawImage(coverImg, coverArea.toFloat(),
-                            juce::RectanglePlacement::fillDestination);
+                drawPackCover(g, coverImg, coverArea);
             }
             else
             {
@@ -969,8 +968,7 @@ void PresetBrowser::paint(juce::Graphics& g)
         const auto coverRect = packBannerCoverBounds();
         if (thumb.isValid())
         {
-            g.drawImage(thumb, coverRect.toFloat(),
-                        juce::RectanglePlacement::fillDestination);
+            drawPackCover(g, thumb, coverRect);
         }
         else
         {
@@ -1044,17 +1042,13 @@ void PresetBrowser::paint(juce::Graphics& g)
             auto art = card.removeFromTop(card.getWidth());
 
             // Tile cover — animated when cover is a GIF and pack
-            // animations are enabled; otherwise the current frame is
-            // just frame 0 (static).
+            // animations are enabled. drawPackCover handles the
+            // transparent-vs-opaque distinction (solid dark backdrop
+            // only when the image actually has translucent pixels).
             const auto cover = getPackCoverFrame(pc.name);
             if (cover.isValid())
             {
-                // fillDestination crops to avoid letterbox bars on
-                // portrait/landscape covers in the square tile. No
-                // backdrop fill — transparent PNG pixels show the card
-                // surface; opaque pixels show true colour.
-                g.drawImage(cover, art.toFloat(),
-                            juce::RectanglePlacement::fillDestination);
+                drawPackCover(g, cover, art);
             }
             else
             {
@@ -1425,6 +1419,43 @@ juce::Image PresetBrowser::getPackCoverFrame(const juce::String& packName)
     // (tile + preview + banner can all reference the same pack) don't
     // hit the disk on every frame.
     return juce::ImageCache::getFromFile(coverFile);
+}
+
+void PresetBrowser::drawPackCover(juce::Graphics& g,
+                                    const juce::Image& img,
+                                    juce::Rectangle<int> dest)
+{
+    if (! img.isValid()) return;
+
+    // Cheap transparency probe: sample 5 points (corners + centre). RGB
+    // images are by definition opaque so skip the probe. Threshold 250
+    // (not 255) tolerates rounding-induced alpha drift in some PNG
+    // encoders that emit alpha=254 for "fully opaque" pixels.
+    bool hasTransparency = false;
+    if (img.getFormat() == juce::Image::ARGB)
+    {
+        juce::Image::BitmapData bd(img, juce::Image::BitmapData::readOnly);
+        const int w = img.getWidth();
+        const int h = img.getHeight();
+        auto a = [&](int x, int y) { return bd.getPixelColour(x, y).getAlpha(); };
+        hasTransparency = a(0,     0)     < 250
+                       || a(w - 1, 0)     < 250
+                       || a(0,     h - 1) < 250
+                       || a(w - 1, h - 1) < 250
+                       || a(w / 2, h / 2) < 250;
+    }
+
+    if (hasTransparency)
+    {
+        // Solid dark fill so transparent pixels read as intentional
+        // background (matches Arturia/Vital-style preview chrome) rather
+        // than letting the editor's grey/white pane bg wash the image.
+        g.setColour(juce::Colour(0xff1f2128));
+        g.fillRect(dest);
+    }
+
+    g.drawImage(img, dest.toFloat(),
+                juce::RectanglePlacement::fillDestination);
 }
 
 int PresetBrowser::contentHeightForList() const
