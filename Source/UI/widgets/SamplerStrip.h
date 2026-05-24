@@ -1,5 +1,6 @@
 // Source/UI/widgets/SamplerStrip.h
 #pragma once
+#include <atomic>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "WordSelector.h"
@@ -44,6 +45,13 @@ private:
     enum class LoadState { Idle, Loading, Error };
     LoadState loadState { LoadState::Idle };
     juce::String errorMessage;
+
+    // Monotonic counter bumped on every load kick - each launched
+    // background thread captures the value at launch and checks it
+    // matches the current value before applying its result, so a
+    // second load started while the first is still decoding wins
+    // (the slower first one's callAsync becomes a no-op).
+    std::atomic<int> loadGeneration { 0 };
 
     PhantomProcessor& processor;
     juce::AudioProcessorValueTreeState& apvts;

@@ -200,27 +200,34 @@ void SamplerStrip::loadSampleAsync(const juce::File& file)
     loadState = LoadState::Loading;
     repaint();
 
+    const int myGen = loadGeneration.fetch_add(1, std::memory_order_relaxed) + 1;
+
     juce::Component::SafePointer<SamplerStrip> self(this);
-    juce::Thread::launch([self, file]
+    juce::Thread::launch([self, file, myGen]
     {
-        juce::MemoryBlock bytes;
-        if (! file.loadFileAsData(bytes))
+        // Cheap up-front size check via stat() - avoids reading hundreds of MB
+        // into memory just to reject afterwards.
+        if (file.getSize() > 5 * 1024 * 1024)
         {
-            juce::MessageManager::callAsync([self] {
+            juce::MessageManager::callAsync([self, myGen] {
                 if (auto* pp = self.getComponent()) {
+                    if (pp->loadGeneration.load(std::memory_order_relaxed) != myGen) return;
                     pp->loadState = LoadState::Error;
-                    pp->errorMessage = "Couldn't read file";
+                    pp->errorMessage = "Sample too large (max 5MB)";
                     pp->repaint();
                 }
             });
             return;
         }
-        if (bytes.getSize() > 5 * 1024 * 1024)
+
+        juce::MemoryBlock bytes;
+        if (! file.loadFileAsData(bytes))
         {
-            juce::MessageManager::callAsync([self] {
+            juce::MessageManager::callAsync([self, myGen] {
                 if (auto* pp = self.getComponent()) {
+                    if (pp->loadGeneration.load(std::memory_order_relaxed) != myGen) return;
                     pp->loadState = LoadState::Error;
-                    pp->errorMessage = "Sample too large (max 5MB)";
+                    pp->errorMessage = "Couldn't read file";
                     pp->repaint();
                 }
             });
@@ -234,8 +241,9 @@ void SamplerStrip::loadSampleAsync(const juce::File& file)
             fm.createReaderFor(std::make_unique<juce::MemoryInputStream>(bytes, false)));
         if (reader == nullptr)
         {
-            juce::MessageManager::callAsync([self] {
+            juce::MessageManager::callAsync([self, myGen] {
                 if (auto* pp = self.getComponent()) {
+                    if (pp->loadGeneration.load(std::memory_order_relaxed) != myGen) return;
                     pp->loadState = LoadState::Error;
                     pp->errorMessage = "Couldn't decode file";
                     pp->repaint();
@@ -251,11 +259,12 @@ void SamplerStrip::loadSampleAsync(const juce::File& file)
         const auto filename = file.getFileName();
 
         juce::MessageManager::callAsync(
-            [self, bytes = std::move(bytes), filename,
+            [self, myGen, bytes = std::move(bytes), filename,
              decoded = std::move(decoded), sr]() mutable
             {
                 if (auto* pp = self.getComponent())
                 {
+                    if (pp->loadGeneration.load(std::memory_order_relaxed) != myGen) return;
                     if (pp->processor.setSampleFromBytes(
                             std::move(bytes), filename, std::move(decoded), sr))
                     {
