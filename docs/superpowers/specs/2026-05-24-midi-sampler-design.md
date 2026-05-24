@@ -82,7 +82,11 @@ public:
 };
 ```
 
-**PhantomSamplerVoice (subclass of `juce::SamplerVoice`):**
+**PhantomSamplerVoice (subclass of `juce::SynthesiserVoice`, not
+`juce::SamplerVoice`):** stock `SamplerVoice` hardcodes a one-shot
+play-then-release behavior we'd need to override almost entirely.
+Inheriting directly from `SynthesiserVoice` gives a cleaner
+implementation surface for the loop + ADSR logic.
 - Maintains a per-voice playback-position float and a per-voice ADSR
 - `renderNextBlock` reads from the shared `SamplerSound`'s `AudioBuffer`
   at the rate determined by (note / root-note) interval
@@ -114,19 +118,26 @@ samplerBuffer.clear();
 phantomSampler.renderNextBlock(samplerBuffer);
 
 // 3. Pick the buffer the engines will see.
+// sidechainBuffer is shorthand for the existing sidechain extraction
+// (PluginProcessor.cpp already locates the sidechain channels via
+// getBusBuffer); this design adds nothing to that path.
 const int source = (int) apvts.getRawParameterValue(ParamID::INPUT_SOURCE)->load();
-juce::AudioBuffer<float>* engineInput = nullptr;
+juce::AudioBuffer<float>* engineInput = &buffer;
 switch (source)
 {
-    case 0:  engineInput = &buffer; break;                 // main input
     case 1:  engineInput = sidechainAvailable
-                            ? &sidechainBuffer : &buffer;  // sidechain or fallback
-    case 2:  engineInput = &samplerBuffer; break;          // sampler
+                            ? &sidechainBuffer : &buffer;
+             break;
+    case 2:  engineInput = &samplerBuffer;
+             break;
+    case 0:
     default: engineInput = &buffer;
+             break;
 }
 
-// 4. Copy engineInput into `buffer` (the in-place buffer engines mutate),
-//    OR refactor DualEngineHost to take a source buffer + dest buffer.
+// 4. When engineInput is not &buffer (the in-place buffer engines mutate),
+//    copy it into buffer. Skip the copy when source == Input to avoid
+//    a no-op self-copy.
 ```
 
 The cleanest cut: keep the existing in-place pattern; before engine
