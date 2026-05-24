@@ -1,4 +1,5 @@
 #include "PhantomSampler.h"
+#include <cmath>
 
 namespace kaigen::phantom
 {
@@ -25,7 +26,7 @@ void PhantomSamplerVoice::startNote(int midiNoteNumber, float velocity,
     const double liveRate  = getSampleRate();
     pitchRatio       = noteRatio * (srcRate / liveRate);
     sourcePosition   = 0.0;
-    gainLinear       = juce::jlimit(0.0f, 1.0f, velocity) * gainLinear;
+    velocityGain     = juce::jlimit(0.0f, 1.0f, velocity);
     adsr.setSampleRate(liveRate);
     adsr.noteOn();
     playheadAtomic.store(0, std::memory_order_relaxed);
@@ -61,9 +62,9 @@ void PhantomSamplerVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer
     auto sampleAt = [&](int ch, double pos) -> float
     {
         // Linear interpolation between two integer source samples.
-        const int  i0 = (int) pos;
+        const int  i0 = juce::jlimit(0, srcLen - 1, (int) pos);
         const int  i1 = juce::jmin(srcLen - 1, i0 + 1);
-        const float f = (float) (pos - (double) i0);
+        const float f = (float) juce::jlimit(0.0, 1.0, pos - (double) i0);
         const int  sc = juce::jmin(srcChans - 1, ch);
         const float a = src.getSample(sc, i0);
         const float b = src.getSample(sc, i1);
@@ -82,7 +83,7 @@ void PhantomSamplerVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer
 
         for (int ch = 0; ch < outChans; ++ch)
         {
-            const float v = sampleAt(ch, sourcePosition) * env * gainLinear;
+            const float v = sampleAt(ch, sourcePosition) * env * baseGainLinear * velocityGain;
             outputBuffer.addSample(ch, startSample + n, v);
         }
 
@@ -90,10 +91,14 @@ void PhantomSamplerVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer
         if (sourcePosition >= (double) srcLen)
         {
             if (loopEnabled)
-                sourcePosition -= (double) srcLen;
+            {
+                sourcePosition = std::fmod(sourcePosition, (double) srcLen);
+                if (sourcePosition < 0.0) sourcePosition += (double) srcLen;
+            }
             else
             {
-                adsr.noteOff();   // start release; voice will silence next iters
+                sourcePosition = (double) (srcLen - 1);
+                adsr.noteOff();   // start release; voice continues to silence
             }
         }
     }
@@ -185,8 +190,10 @@ int PhantomSampler::getActiveVoiceCount() const noexcept
 
 int PhantomSampler::getPlayheadPosition() const noexcept
 {
-    // Report the most-recently-started active voice's playhead. Cheap
-    // visual feedback for the strip.
+    // Returns the first active voice scanning voice indices from highest
+    // to lowest — a cheap, deterministic heuristic for the SamplerStrip's
+    // playhead overlay. Not strictly "most recently started"; JUCE's
+    // Synthesiser voice allocator doesn't guarantee that ordering.
     for (int i = synth.getNumVoices() - 1; i >= 0; --i)
     {
         if (auto* v = dynamic_cast<PhantomSamplerVoice*>(synth.getVoice(i)))

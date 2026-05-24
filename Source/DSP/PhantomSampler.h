@@ -48,7 +48,7 @@ public:
     void setRootNote(int n) noexcept             { rootNote = juce::jlimit(0, 127, n); }
     void setLoopEnabled(bool l) noexcept         { loopEnabled = l; }
     void setEnvelopeParameters(const juce::ADSR::Parameters& p) { adsr.setParameters(p); }
-    void setGainLinear(float g) noexcept         { gainLinear = g; }
+    void setGainLinear(float g) noexcept { baseGainLinear = g; }
 
     // For the SamplerStrip playhead overlay. 0..numSamples-1 of the
     // active sample; -1 when voice idle. Read by the message thread,
@@ -60,7 +60,8 @@ private:
     double                sourcePosition   { 0.0 };
     int                   rootNote         { 60 };
     bool                  loopEnabled      { false };
-    float                 gainLinear       { 1.0f };
+    float                 baseGainLinear { 1.0f };   // settable from outside via setGainLinear
+    float                 velocityGain   { 1.0f };   // re-set every startNote
     juce::ADSR            adsr;
     std::atomic<int>      playheadAtomic   { -1 };
 };
@@ -101,7 +102,13 @@ public:
 
 private:
     juce::Synthesiser synth;
-    std::mutex        soundsMutex;     // protects synth.clearSounds/addSound
+    // Protects synth.clearSounds/addSound from concurrent renderNextBlock.
+    // The audio thread blocks at most a few microseconds during the rare
+    // UI-driven sample swap (clearSounds + addSound is a couple of pointer
+    // updates inside JUCE). Acceptable trade-off for a UI-rate operation;
+    // a SpinLock or atomic-pointer swap would be a follow-up if profiling
+    // flags this on a contended system.
+    std::mutex        soundsMutex;
 };
 
 } // namespace kaigen::phantom

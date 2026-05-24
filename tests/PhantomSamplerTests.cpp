@@ -135,3 +135,96 @@ TEST_CASE("PhantomSampler: note-off → ADSR release silences output", "[sampler
     for (int i = 1500; i < 2000; ++i)
         CHECK(std::abs(tail.getSample(0, i)) < 0.001f);
 }
+
+TEST_CASE("PhantomSampler: setGainDb persists across note-ons (no progressive decay)", "[sampler]")
+{
+    PhantomSampler s;
+    s.prepareToPlay(44100.0, 512);
+    s.setRootNote(60);
+    s.setLoopEnabled(true);
+    s.setGainDb(0.0f);   // unity
+    s.setEnvelope(0.001f, 0.001f, 1.0f, 0.001f);
+    REQUIRE(s.loadSample(makeSine440(), 44100.0));
+
+    auto peakOf = [&]() -> float
+    {
+        // Fire note-on, render, then note-off so the voice releases
+        // for the next iteration to reuse the same voice slot.
+        juce::MidiBuffer onBuf;
+        onBuf.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 127), 0);
+        juce::AudioBuffer<float> out(1, 512);
+        out.clear();
+        s.renderNextBlock(out, onBuf);
+
+        float peak = 0.0f;
+        for (int i = 0; i < 512; ++i)
+            peak = juce::jmax(peak, std::abs(out.getSample(0, i)));
+
+        juce::MidiBuffer offBuf;
+        offBuf.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
+        juce::AudioBuffer<float> tail(1, 256);
+        tail.clear();
+        s.renderNextBlock(tail, offBuf);
+
+        return peak;
+    };
+
+    const float p1 = peakOf();
+    const float p2 = peakOf();
+    const float p3 = peakOf();
+
+    REQUIRE(p1 > 0.5f);             // some actual audio
+    CHECK(std::abs(p1 - p2) < 0.01f);   // second note ~= first
+    CHECK(std::abs(p1 - p3) < 0.01f);   // third note ~= first
+}
+
+TEST_CASE("PhantomSampler: non-loop overrun does not crash and ends silent", "[sampler]")
+{
+    PhantomSampler s;
+    s.prepareToPlay(44100.0, 512);
+    s.setRootNote(60);
+    s.setLoopEnabled(false);                              // <-- key: no loop
+    s.setEnvelope(0.001f, 0.001f, 1.0f, 0.001f);          // quick release
+
+    // 200-sample buffer played at note 60 (rate 1.0). 4000 output
+    // samples means we run 3800 samples past the end of the source.
+    auto buf = juce::AudioBuffer<float>(1, 200);
+    for (int i = 0; i < 200; ++i) buf.setSample(0, i, 0.5f);
+    REQUIRE(s.loadSample(std::move(buf), 44100.0));
+
+    juce::MidiBuffer onBuf;
+    onBuf.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 127), 0);
+    juce::AudioBuffer<float> out(1, 4000);
+    out.clear();
+    REQUIRE_NOTHROW(s.renderNextBlock(out, onBuf));
+
+    // Last 1000 samples should be silent (well past release end).
+    for (int i = 3000; i < 4000; ++i)
+        CHECK(std::abs(out.getSample(0, i)) < 0.001f);
+}
+
+TEST_CASE("PhantomSampler: high pitch ratio on short loop wraps cleanly", "[sampler]")
+{
+    PhantomSampler s;
+    s.prepareToPlay(44100.0, 512);
+    s.setRootNote(60);
+    s.setLoopEnabled(true);
+    s.setEnvelope(0.001f, 0.001f, 1.0f, 0.001f);
+
+    // 20-sample loop, note 5 octaves above root => pitch ratio ~32.
+    // Each output sample advances position by ~32; single-subtract
+    // wrap would leave position above srcLen.
+    auto buf = juce::AudioBuffer<float>(1, 20);
+    for (int i = 0; i < 20; ++i) buf.setSample(0, i, 0.5f);
+    REQUIRE(s.loadSample(std::move(buf), 44100.0));
+
+    juce::MidiBuffer onBuf;
+    onBuf.addEvent(juce::MidiMessage::noteOn(1, 120, (juce::uint8) 127), 0);
+    juce::AudioBuffer<float> out(1, 1000);
+    out.clear();
+    REQUIRE_NOTHROW(s.renderNextBlock(out, onBuf));
+
+    const int playhead = s.getPlayheadPosition();
+    REQUIRE(playhead >= 0);
+    REQUIRE(playhead < 20);   // wrapped within bounds
+}
