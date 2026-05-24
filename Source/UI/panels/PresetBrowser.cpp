@@ -175,9 +175,13 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
     deleteButton.setVisible(false);
     addAndMakeVisible(deleteButton);
 
-    // Animated GIF cover player — added but hidden until a pack with a
-    // cover.gif is single-clicked in Packs mode.
-    addChildComponent(coverGifPlayer);
+    // Shared GIF frame cache. One repaint callback wakes the whole
+    // browser whenever any cached pack advances a frame; that keeps the
+    // tile grid and the preview pane in sync without per-tile timers.
+    gifCache.setRepaintCallback([this] { repaint(); });
+    gifCache.setEnabled(processor.getEditorView().packAnimationsEnabled);
+
+    processor.getEditorViewBroadcaster().addChangeListener(this);
 
     // Back-to-Packs arrow — only visible when drilled into a single pack.
     // UTF-8 "‹" lightweight angle for a clean Arturia-style chevron.
@@ -193,7 +197,6 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
                 selectedPackCardIdx = -1;
                 listScrollY = 0;
                 rebuildRows();
-                syncCoverGifPlayer();
                 resized();
                 repaint();
                 return;
@@ -395,20 +398,28 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
 PresetBrowser::~PresetBrowser()
 {
     processor.getPresetManager().removeChangeListener(this);
+    processor.getEditorViewBroadcaster().removeChangeListener(this);
 }
 
-void PresetBrowser::changeListenerCallback(juce::ChangeBroadcaster*)
+void PresetBrowser::changeListenerCallback(juce::ChangeBroadcaster* source)
 {
+    // EditorView (settings) changes — only the GIF-animations toggle
+    // matters to this component. Cheap to react: just flip the cache.
+    if (source == &processor.getEditorViewBroadcaster())
+    {
+        gifCache.setEnabled(processor.getEditorView().packAnimationsEnabled);
+        repaint();
+        return;
+    }
+
     if (! isVisible()) return;
     rebuildCategories();
     rebuildPackCards();
     rebuildRows();
-    // A rescan may have replaced/removed the selected pack's cover file
-    // (setPackCover, deletePack, etc.) — drop the cached GIF so the next
-    // sync reloads from disk.
-    coverGifPlayer.clear();
-    coverGifPackName.clear();
-    syncCoverGifPlayer();
+    // A rescan may have replaced/removed cover files (setPackCover,
+    // deletePack, etc.) — drop every cached GIF so the next paint reloads
+    // from disk.
+    gifCache.clearAll();
     repaint();
 }
 
@@ -428,9 +439,7 @@ void PresetBrowser::visibilityChanged()
         sortColumn = SortColumn::None;
         sortAscending = true;
         deleteButton.setVisible(false);
-        coverGifPlayer.clear();
-        coverGifPlayer.setVisible(false);
-        coverGifPackName.clear();
+        gifCache.clearAll();
         searchField.setText("", juce::dontSendNotification);
         return;
     }
@@ -766,19 +775,12 @@ void PresetBrowser::paint(juce::Graphics& g)
             auto coverArea = inner.removeFromTop(coverSize);
             inner.removeFromTop(12);
 
-            const auto coverFile = processor.getPresetManager()
-                                            .getPackCoverFile(pc.name);
-            const bool isGifCover = coverFile.existsAsFile()
-                && coverFile.getFileExtension().equalsIgnoreCase(".gif");
-            if (coverFile.existsAsFile() && ! isGifCover)
+            const auto coverImg = getPackCoverFrame(pc.name);
+            if (coverImg.isValid())
             {
-                auto img = juce::ImageFileFormat::loadFrom(coverFile);
-                if (img.isValid())
-                    g.drawImage(img, coverArea.toFloat(),
-                                juce::RectanglePlacement::fillDestination);
+                g.drawImage(coverImg, coverArea.toFloat(),
+                            juce::RectanglePlacement::fillDestination);
             }
-            // For GIF covers the GifPlayer child component paints this
-            // rect on top of whatever the preview pane background is.
             else
             {
                 // Fallback initial-letter art (matches pack-tile style).
@@ -961,12 +963,8 @@ void PresetBrowser::paint(juce::Graphics& g)
             [&](const kaigen::phantom::PackInfo& p) { return p.name == cat.packFilter; });
         const auto displayName = (pit != packInfos.end()) ? pit->displayName : cat.label;
 
-        // Cover thumbnail.
-        const auto coverFile = processor.getPresetManager()
-                                        .getPackCoverFile(cat.packFilter);
-        juce::Image thumb;
-        if (coverFile.existsAsFile())
-            thumb = juce::ImageFileFormat::loadFrom(coverFile);
+        // Cover thumbnail — animated when cover is a GIF.
+        const auto thumb = getPackCoverFrame(cat.packFilter);
 
         const auto coverRect = packBannerCoverBounds();
         if (thumb.isValid())
@@ -1045,12 +1043,10 @@ void PresetBrowser::paint(juce::Graphics& g)
             // to a deterministic gradient + initial-letter mark.
             auto art = card.removeFromTop(card.getWidth());
 
-            const auto coverFile = processor.getPresetManager()
-                                            .getPackCoverFile(pc.name);
-            juce::Image cover;
-            if (coverFile.existsAsFile())
-                cover = juce::ImageFileFormat::loadFrom(coverFile);
-
+            // Tile cover — animated when cover is a GIF and pack
+            // animations are enabled; otherwise the current frame is
+            // just frame 0 (static).
+            const auto cover = getPackCoverFrame(pc.name);
             if (cover.isValid())
             {
                 // fillDestination crops to avoid letterbox bars on
@@ -1419,47 +1415,16 @@ juce::Rectangle<int> PresetBrowser::packPreviewCoverBounds() const
     return inner.removeFromTop(coverSize);
 }
 
-void PresetBrowser::syncCoverGifPlayer()
+juce::Image PresetBrowser::getPackCoverFrame(const juce::String& packName)
 {
-    const bool packSelected = isPacksMode()
-                            && selectedPackCardIdx >= 0
-                            && selectedPackCardIdx < (int) packCards.size();
-
-    if (! packSelected)
-    {
-        if (coverGifPackName.isNotEmpty())
-        {
-            coverGifPlayer.clear();
-            coverGifPlayer.setVisible(false);
-            coverGifPackName.clear();
-        }
-        return;
-    }
-
-    const auto& pc = packCards[(size_t) selectedPackCardIdx];
-    const auto coverFile = processor.getPresetManager().getPackCoverFile(pc.name);
-    const bool isGif = coverFile.existsAsFile()
-        && coverFile.getFileExtension().equalsIgnoreCase(".gif");
-
-    if (! isGif)
-    {
-        if (coverGifPackName.isNotEmpty())
-        {
-            coverGifPlayer.clear();
-            coverGifPlayer.setVisible(false);
-            coverGifPackName.clear();
-        }
-        return;
-    }
-
-    if (coverGifPackName != pc.name)
-    {
-        coverGifPlayer.load(coverFile);
-        coverGifPackName = pc.name;
-    }
-    coverGifPlayer.setBounds(packPreviewCoverBounds());
-    coverGifPlayer.setVisible(true);
-    coverGifPlayer.toFront(false);
+    const auto coverFile = processor.getPresetManager().getPackCoverFile(packName);
+    if (! coverFile.existsAsFile()) return {};
+    if (coverFile.getFileExtension().equalsIgnoreCase(".gif"))
+        return gifCache.getCurrentFrame(packName, coverFile);
+    // Static covers route through juce::ImageCache so repeated paints
+    // (tile + preview + banner can all reference the same pack) don't
+    // hit the disk on every frame.
+    return juce::ImageCache::getFromFile(coverFile);
 }
 
 int PresetBrowser::contentHeightForList() const
@@ -1575,8 +1540,6 @@ void PresetBrowser::resized()
     searchField.setBounds(searchBarBounds().reduced(12, 6));
     if (deleteButton.isVisible())
         deleteButton.setBounds(previewDeleteButtonBounds());
-    if (coverGifPlayer.isVisible())
-        coverGifPlayer.setBounds(packPreviewCoverBounds());
 
     const bool drilledIn = isPackDrillIn();
     backToPacksButton.setVisible(drilledIn);
@@ -1705,7 +1668,6 @@ void PresetBrowser::mouseDoubleClick(const juce::MouseEvent& e)
                 selectedPackCardIdx = -1;
                 listScrollY = 0;
                 rebuildRows();
-                syncCoverGifPlayer();
                 resized();
                 repaint();
                 return;
@@ -1744,7 +1706,6 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
                 listScrollY = 0;
                 selectedPackCardIdx = -1;
                 rebuildRows();
-                syncCoverGifPlayer();
                 resized();   // back button + banner layout depend on drill-in state
                 searchField.setTextToShowWhenEmpty(
                     juce::String(juce::CharPointer_UTF8(
@@ -1775,7 +1736,6 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
         if (hit != selectedPackCardIdx)
         {
             selectedPackCardIdx = hit;
-            syncCoverGifPlayer();
             repaint();
         }
         return;

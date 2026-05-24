@@ -79,6 +79,17 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
         settingsOverlay.setVisible(false);
     };
 
+    // Pack-animations preference lives in EditorViewState (not APVTS).
+    // Sync the toggle on construction and persist user changes back to
+    // the processor; broadcasting causes PresetBrowser to update its
+    // GIF cache.
+    settingsOverlay.setPackAnimationsEnabled(processor.getEditorView().packAnimationsEnabled);
+    settingsOverlay.onPackAnimationsToggled = [this](bool enabled) {
+        auto s = processor.getEditorView();
+        s.packAnimationsEnabled = enabled;
+        processor.setEditorView(s);
+    };
+
     // TopBar's gear button → open the overlay with mutual exclusion against
     // the preset browser, dropdown, and matrix overlay.
     topBar.onSettingsRequested = [this, persistMatrixMode] {

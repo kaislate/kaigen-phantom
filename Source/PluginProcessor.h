@@ -142,7 +142,17 @@ public:
     using EditorViewState = kaigen::phantom::EditorViewState;
 
     EditorViewState getEditorView() const                      { return editorView; }
-    void            setEditorView(const EditorViewState& s)    { editorView = s; }
+    void            setEditorView(const EditorViewState& s)
+    {
+        editorView = s;
+        editorViewBroadcaster.sendChangeMessage();
+    }
+
+    /** Broadcaster fired (on the message thread) whenever EditorViewState
+     *  changes — UI components that mirror settings (e.g. PresetBrowser's
+     *  GIF animation toggle) listen to this. */
+    juce::ChangeBroadcaster& getEditorViewBroadcaster() noexcept
+        { return editorViewBroadcaster; }
 
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
@@ -209,6 +219,7 @@ private:
     // <PluginState> wrapper but outside of any preset.
     EngineFocus engineFocus;
     juce::ChangeBroadcaster engineFocusBroadcaster;
+    juce::ChangeBroadcaster editorViewBroadcaster;
 
     SpectrumViewMode spectrumViewMode { SpectrumViewMode::Split };
 

@@ -33,6 +33,15 @@ public:
      *  backdrop click). Wires back to the editor's hide logic. */
     std::function<void()> onDismiss;
 
+    /** Sync the pack-animations toggle from external state (EditorView).
+     *  Called from NativePluginEditor on construction and on the
+     *  editorView change broadcast. */
+    void setPackAnimationsEnabled(bool enabled);
+
+    /** Fired when the user flips the pack-animations toggle. The editor
+     *  persists the new value into EditorViewState. */
+    std::function<void(bool)> onPackAnimationsToggled;
+
 private:
     juce::AudioProcessorValueTreeState& apvts;
 
@@ -50,6 +59,10 @@ private:
     // MIDI triggering section.
     EtchedToggle midiTriggerToggle;
     EtchedToggle midiGateReleaseToggle;
+
+    // Pack-animations toggle. Bound to EditorViewState via the editor
+    // (not APVTS) since it's a UI preference, not a synth parameter.
+    juce::ToggleButton packAnimationsToggle { "Animate pack covers (GIFs)" };
 
     // Close button.
     juce::TextButton closeButton { "\xC3\x97" };   // UTF-8 ×

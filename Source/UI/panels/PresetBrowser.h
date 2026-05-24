@@ -4,7 +4,7 @@
 #include <vector>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "../widgets/GifPlayer.h"
+#include "../widgets/PackGifCache.h"
 
 class PhantomProcessor;
 
@@ -86,7 +86,12 @@ private:
     juce::Rectangle<int> previewDeleteButtonBounds() const;
     juce::Rectangle<int> packPreviewCoverBounds() const;
     void deleteSelectedPreset();
-    void syncCoverGifPlayer();
+
+    // Resolves the cover image to draw for a pack: GIFs route through the
+    // shared gifCache (giving the current animation frame), static images
+    // route through juce::ImageCache for cheap repeated paints. Returns
+    // an invalid Image when the pack has no cover.
+    juce::Image getPackCoverFrame(const juce::String& packName);
 
     /** Visible pack cards in Explore mode. Computed in rebuildPackCards()
      *  from PresetManager::getAllPacks(); updated whenever the row list
@@ -140,11 +145,12 @@ private:
     juce::TextButton deleteButton { "Delete" };
     juce::TextEditor searchField;
 
-    // Animated cover-art player — only visible when the selected pack's
-    // cover is a .gif. Tracked alongside selection state so we can avoid
-    // re-decoding on every repaint.
-    GifPlayer coverGifPlayer;
-    juce::String coverGifPackName;   // empty when no gif loaded
+    // Shared GIF frame cache + advance timer. Tiles, preview pane, and
+    // the drill-in banner all read frames from it during paint. Decoding
+    // is lazy (first request per pack) and cached for the browser's
+    // lifetime; invalidate(packName) is called when a rescan replaces a
+    // cover; clearAll() runs when the browser hides.
+    PackGifCache gifCache;
 
     // Back-to-Packs button — visible only when drilled into a specific
     // pack (CategoryKind::Pack). Click returns to the Packs grid.

@@ -37,6 +37,15 @@ SettingsOverlay::SettingsOverlay(juce::AudioProcessorValueTreeState& a)
     addAndMakeVisible(midiTriggerToggle);
     addAndMakeVisible(midiGateReleaseToggle);
 
+    packAnimationsToggle.setColour(juce::ToggleButton::textColourId,    juce::Colour(0xffd0d2d4));
+    packAnimationsToggle.setColour(juce::ToggleButton::tickColourId,    juce::Colour(0xffd0d2d4));
+    packAnimationsToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colour(0x66d0d2d4));
+    packAnimationsToggle.onClick = [this] {
+        if (onPackAnimationsToggled)
+            onPackAnimationsToggled(packAnimationsToggle.getToggleState());
+    };
+    addAndMakeVisible(packAnimationsToggle);
+
     closeButton.setColour(juce::TextButton::buttonColourId,   juce::Colours::transparentBlack);
     closeButton.setColour(juce::TextButton::buttonOnColourId, juce::Colours::transparentBlack);
     closeButton.setColour(juce::TextButton::textColourOffId,  juce::Colour(0xff656769));
@@ -46,6 +55,11 @@ SettingsOverlay::SettingsOverlay(juce::AudioProcessorValueTreeState& a)
 }
 
 SettingsOverlay::~SettingsOverlay() = default;
+
+void SettingsOverlay::setPackAnimationsEnabled(bool enabled)
+{
+    packAnimationsToggle.setToggleState(enabled, juce::dontSendNotification);
+}
 
 void SettingsOverlay::setEnginePrefix(const juce::String& activePrefix,
                                       const juce::String& mirrorPrefix)
@@ -158,6 +172,16 @@ void SettingsOverlay::resized()
         midiGateReleaseToggle.setBounds(colX + kToggleW + 24,
                                          sectionY + (kRowH - kToggleH) / 2,
                                          kToggleW + 20, kToggleH);
+        sectionY += kRowH + kSectionGap;
+    }
+
+    // Browser preferences row: pack-animations toggle (full row width).
+    {
+        sectionY += kLabelH + 2;
+        constexpr int kToggleH = 22;
+        packAnimationsToggle.setBounds(colX,
+                                        sectionY + (kRowH - kToggleH) / 2,
+                                        colW, kToggleH);
     }
 }
 
