@@ -856,25 +856,6 @@ bool PresetManager::deletePack(const juce::String& packName)
     return true;
 }
 
-PresetManager::CoverCrop PresetManager::getPackCoverCrop(const juce::String& packName) const
-{
-    CoverCrop c;
-    auto packDir = getPresetsRootDirectory().getChildFile(packName);
-    auto sidecar = packDir.getChildFile("cover.crop.json");
-    if (! sidecar.existsAsFile()) return c;
-
-    auto parsed = juce::JSON::parse(sidecar);
-    if (auto* obj = parsed.getDynamicObject())
-    {
-        c.valid   = true;
-        c.scale   = (float) (double) obj->getProperty("scale");
-        c.offsetX = (float) (double) obj->getProperty("offsetX");
-        c.offsetY = (float) (double) obj->getProperty("offsetY");
-        if (c.scale <= 0.0f) c.scale = 1.0f;   // guard against malformed
-    }
-    return c;
-}
-
 bool PresetManager::setPackCoverWithCrop(const juce::String& packName,
                                           const juce::File& sourceImage,
                                           float scale, float offsetX, float offsetY)
@@ -1113,5 +1094,27 @@ juce::String PresetManager::importPack(const juce::File& sourceZipFile, bool ove
     return result;
 }
 #endif
+
+// READ side of the cover crop — available in both DEV and ship builds
+// since drawPackCover (paint-time, runs in all builds) needs it to
+// render the GIF mask transform.
+PresetManager::CoverCrop PresetManager::getPackCoverCrop(const juce::String& packName) const
+{
+    CoverCrop c;
+    auto packDir = getPresetsRootDirectory().getChildFile(packName);
+    auto sidecar = packDir.getChildFile("cover.crop.json");
+    if (! sidecar.existsAsFile()) return c;
+
+    auto parsed = juce::JSON::parse(sidecar);
+    if (auto* obj = parsed.getDynamicObject())
+    {
+        c.valid   = true;
+        c.scale   = (float) (double) obj->getProperty("scale");
+        c.offsetX = (float) (double) obj->getProperty("offsetX");
+        c.offsetY = (float) (double) obj->getProperty("offsetY");
+        if (c.scale <= 0.0f) c.scale = 1.0f;   // guard against malformed
+    }
+    return c;
+}
 
 } // namespace kaigen::phantom

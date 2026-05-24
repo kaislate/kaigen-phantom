@@ -160,17 +160,6 @@ public:
                               const juce::File& sourceImage,
                               float scale, float offsetX, float offsetY);
 
-    // Crop transform stored alongside an animated GIF cover. Empty
-    // (valid==false) for non-GIF covers or covers saved without crop.
-    struct CoverCrop
-    {
-        bool  valid   { false };
-        float scale   { 1.0f };
-        float offsetX { 0.0f };
-        float offsetY { 0.0f };
-    };
-    CoverCrop getPackCoverCrop(const juce::String& packName) const;
-
     // Saves the current APVTS state as <packDir>/<presetName>.fxp.
     // Returns the saved (possibly disambiguated) preset name, empty on failure.
     juce::String savePresetIntoPack(juce::AudioProcessorValueTreeState& apvts,
@@ -192,6 +181,19 @@ public:
     //   - the pack name is the reserved "Factory" or "User"
     juce::String importPack(const juce::File& sourceZipFile, bool overwriteExisting);
 #endif
+
+    // Crop transform stored alongside an animated GIF cover. Empty
+    // (valid==false) for non-GIF covers or covers saved without crop.
+    // READ side is available in both DEV and ship builds since paint-
+    // time code (drawPackCover) needs it to render the crop mask.
+    struct CoverCrop
+    {
+        bool  valid   { false };
+        float scale   { 1.0f };
+        float offsetX { 0.0f };
+        float offsetY { 0.0f };
+    };
+    CoverCrop getPackCoverCrop(const juce::String& packName) const;
 
     // Favorites (persisted in favorites.index).
     void setFavorite(const juce::String& presetName,
