@@ -153,6 +153,17 @@ bool PhantomSampler::hasSample() const noexcept
     return synth.getNumSounds() > 0;
 }
 
+double PhantomSampler::getLoadedSourceSampleRate() const noexcept
+{
+    // Reaches into the currently-loaded sound to read its source rate.
+    // synth.getSound is safe from the message thread; sounds list is
+    // mutated under soundsMutex by loadSample/clearSample.
+    if (synth.getNumSounds() == 0) return 0.0;
+    if (auto* sound = dynamic_cast<PhantomSamplerSound*>(synth.getSound(0).get()))
+        return sound->getSourceSampleRate();
+    return 0.0;
+}
+
 void PhantomSampler::setRootNote(int n) noexcept
 {
     for (auto* v : phantomVoices) v->setRootNote(n);

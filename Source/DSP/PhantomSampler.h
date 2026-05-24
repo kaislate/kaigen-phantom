@@ -101,6 +101,12 @@ public:
     int  getActiveVoiceCount() const noexcept;
     int  getPlayheadPosition() const noexcept;
 
+    // Source sample rate of the currently-loaded sample, or 0.0 when no
+    // sample is loaded. Used by the SamplerStrip's playhead overlay to
+    // correctly map source-sample index to time without assuming the host
+    // rate matches the source rate.
+    double getLoadedSourceSampleRate() const noexcept;
+
 private:
     juce::Synthesiser synth;
     // Protects synth.clearSounds/addSound from concurrent renderNextBlock.

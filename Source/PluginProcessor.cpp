@@ -784,7 +784,10 @@ bool PhantomProcessor::setSampleFromBytes(juce::MemoryBlock sourceBytes,
     sampleThumb.addBlock(0, decoded, 0, decoded.getNumSamples());
 
     if (! phantomSampler.loadSample(std::move(decoded), sourceSampleRate))
+    {
+        sampleThumb.reset(0, 0.0, 0);
         return false;
+    }
     cachedSampleBytes    = std::move(sourceBytes);
     cachedSampleFilename = std::move(filename);
     return true;

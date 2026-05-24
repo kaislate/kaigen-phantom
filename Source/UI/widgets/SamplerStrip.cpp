@@ -100,11 +100,15 @@ void SamplerStrip::paint(juce::Graphics& g)
         const double durSec = thumb.getTotalLength();
         if (playhead >= 0 && durSec > 0.0 && processor.getPhantomSampler().hasSample())
         {
-            // Source-sample index -> fraction of total sample length. Use the
-            // thumbnail's source sample rate (approximated at host rate 44.1k
-            // since AudioThumbnail doesn't expose its source sample rate
-            // directly via the public API — close enough for visual feedback).
-            const int totalSamples = (int) (durSec * 44100.0);
+            // Source-sample index -> fraction of total sample length. We
+            // query the sampler for the real source sample rate of the
+            // loaded sound, which avoids the ~8.8% drift the playhead used
+            // to exhibit on 48k-rate samples. Defensive 44100 fallback if
+            // no sample is loaded (shouldn't happen — guarded by hasSample
+            // above — but keeps the math defined).
+            const double srcRate = processor.getPhantomSampler().getLoadedSourceSampleRate();
+            const double rate    = srcRate > 0.0 ? srcRate : 44100.0;
+            const int totalSamples = (int) (durSec * rate);
             const float frac = juce::jlimit(0.0f, 1.0f,
                 (float) playhead / juce::jmax(1.0f, (float) totalSamples));
             const int xpx = waveformArea.getX() + (int) (frac * waveformArea.getWidth());
