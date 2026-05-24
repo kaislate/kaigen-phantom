@@ -777,6 +777,12 @@ bool PhantomProcessor::setSampleFromBytes(juce::MemoryBlock sourceBytes,
                                            juce::AudioBuffer<float> decoded,
                                            double sourceSampleRate)
 {
+    // Reset + feed the thumbnail BEFORE the sampler load so we keep
+    // `decoded` around for the thumb addBlock call below; the sampler's
+    // loadSample takes the buffer by move (consuming it).
+    sampleThumb.reset(decoded.getNumChannels(), sourceSampleRate, decoded.getNumSamples());
+    sampleThumb.addBlock(0, decoded, 0, decoded.getNumSamples());
+
     if (! phantomSampler.loadSample(std::move(decoded), sourceSampleRate))
         return false;
     cachedSampleBytes    = std::move(sourceBytes);
@@ -789,6 +795,7 @@ void PhantomProcessor::clearSample()
     phantomSampler.clearSample();
     cachedSampleBytes.reset();
     cachedSampleFilename.clear();
+    sampleThumb.reset(0, 0.0, 0);
 }
 
 void PhantomProcessor::setEngineFocus(EngineFocus newFocus) noexcept

@@ -117,6 +117,11 @@ public:
 
     void clearSample();
     const juce::String& getSampleFilename() const noexcept { return cachedSampleFilename; }
+    // Returns a non-const reference because juce::AudioThumbnail::drawChannels
+    // (and a few other render-side APIs) are non-const — JUCE mutates internal
+    // cache state during drawing. The UI strip needs to call drawChannels, so
+    // a const accessor would force a const_cast at every call site.
+    juce::AudioThumbnail& getSampleThumbnail() noexcept { return sampleThumb; }
 
     // ─── Modulation engines (PR3a) ────────────────────────────────────────
     // Per-engine modulation containers. Engine A scopes Macro 1+2 to a_*
@@ -300,6 +305,15 @@ private:
     juce::MemoryBlock cachedSampleBytes;
     juce::String      cachedSampleFilename;
     juce::AudioFormatManager sampleFormatManager;
+
+    // AudioThumbnail of the loaded sample. Built from cachedSampleBytes
+    // after setSampleFromBytes; consumed by SamplerStrip for its waveform
+    // row. Owns its own background-thread cache via the cache below.
+    // Declaration order matters: sampleThumb's ctor takes references to
+    // sampleFormatManager and sampleThumbCache, both of which must be
+    // constructed first.
+    juce::AudioThumbnailCache sampleThumbCache { 1 };
+    juce::AudioThumbnail      sampleThumb { 512, sampleFormatManager, sampleThumbCache };
 
     // ─── Recipe Custom slots ─────────────────────────────────────────────
     // Per-engine, per-Custom-slot stored H values (H2..H8 normalised [0..1]).

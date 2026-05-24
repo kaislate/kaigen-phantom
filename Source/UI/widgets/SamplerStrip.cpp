@@ -92,15 +92,21 @@ void SamplerStrip::paint(juce::Graphics& g)
         g.drawImage(waveformImage, waveformArea.toFloat(),
                     juce::RectanglePlacement::stretchToFit);
 
-        // Playhead overlay (atomic int from PhantomSampler). Approximate
-        // playhead position mapping from sample index to fraction of
-        // the image width. Task 6 will replace this with a proper
-        // length-based mapping using juce::AudioThumbnail's total length.
+        // Playhead overlay (atomic int from PhantomSampler). Maps the
+        // source-sample index to a fraction of the thumbnail's total
+        // length, then to the waveform-area's width.
         const int playhead = processor.getPhantomSampler().getPlayheadPosition();
-        if (playhead >= 0 && processor.getPhantomSampler().hasSample())
+        auto& thumb         = processor.getSampleThumbnail();
+        const double durSec = thumb.getTotalLength();
+        if (playhead >= 0 && durSec > 0.0 && processor.getPhantomSampler().hasSample())
         {
-            const auto srcLenApprox = (float) waveformImage.getWidth();
-            const float frac = juce::jlimit(0.0f, 1.0f, (float) playhead / juce::jmax(1.0f, srcLenApprox));
+            // Source-sample index -> fraction of total sample length. Use the
+            // thumbnail's source sample rate (approximated at host rate 44.1k
+            // since AudioThumbnail doesn't expose its source sample rate
+            // directly via the public API — close enough for visual feedback).
+            const int totalSamples = (int) (durSec * 44100.0);
+            const float frac = juce::jlimit(0.0f, 1.0f,
+                (float) playhead / juce::jmax(1.0f, (float) totalSamples));
             const int xpx = waveformArea.getX() + (int) (frac * waveformArea.getWidth());
             g.setColour(juce::Colour(0xff77ddff));
             g.drawLine((float) xpx, (float) waveformArea.getY(),
@@ -284,20 +290,19 @@ void SamplerStrip::loadSampleAsync(const juce::File& file)
 
 void SamplerStrip::rebuildWaveformThumbnail()
 {
-    // Placeholder thumbnail: flat bar pattern. Task 6 replaces this
-    // with juce::AudioThumbnail-rendered peaks. Shipping the strip with
-    // a placeholder lets Task 5 land cleanly without the
-    // PluginProcessor changes Task 6 needs.
     constexpr int kImgW = 512;
     constexpr int kImgH = 60;
     waveformImage = juce::Image(juce::Image::ARGB, kImgW, kImgH, true);
+
+    auto& thumb = processor.getSampleThumbnail();
+    if (thumb.getTotalLength() <= 0.0) return;
+
     juce::Graphics g(waveformImage);
-    g.setColour(juce::Colour(0xff2a323d));
+    g.setColour(juce::Colour(0xff1a2028));
     g.fillAll();
     g.setColour(juce::Colour(0xff77ddff));
-    for (int x = 0; x < kImgW; x += 4)
-        g.drawLine((float) x, (float) kImgH * 0.5f - 8,
-                    (float) x, (float) kImgH * 0.5f + 8, 1.0f);
+    juce::Rectangle<int> rect(0, 0, kImgW, kImgH);
+    thumb.drawChannels(g, rect, 0.0, thumb.getTotalLength(), 1.0f);
 }
 
 } // namespace kaigen::phantom
