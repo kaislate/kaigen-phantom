@@ -11,6 +11,7 @@
 #include "Modulation/ModulationEngine.h"
 #include "Modulation/Macro.h"
 #include "DSP/SingleKnobReverb.h"
+#include "DSP/PhantomSampler.h"
 
 class PhantomProcessor : public juce::AudioProcessor,
                          private juce::AudioProcessorValueTreeState::Listener
@@ -101,6 +102,10 @@ public:
      *  PR1 = always A. PR2 will dispatch on the active tab. */
     PhantomEngine& getActiveEngine() noexcept { return dualEngineHost.getActiveEngine(); }
     kaigen::phantom::DualEngineHost& getDualEngineHost() noexcept { return dualEngineHost; }
+
+    // ── Sampler accessor (used by SamplerStrip UI in subsequent tasks) ──
+    kaigen::phantom::PhantomSampler&       getPhantomSampler()       noexcept { return phantomSampler; }
+    const kaigen::phantom::PhantomSampler& getPhantomSampler() const noexcept { return phantomSampler; }
 
     // ─── Modulation engines (PR3a) ────────────────────────────────────────
     // Per-engine modulation containers. Engine A scopes Macro 1+2 to a_*
@@ -253,6 +258,17 @@ private:
     float                             reverbMixSmoothed { 0.0f };
     std::atomic<float>*               reverbMixParam    { nullptr };
     std::atomic<float>*               reverbSourceParam { nullptr };  // 0 = Post, 1 = Phantom
+
+    // ─── MIDI-playable sampler (Input Source = 2) ─────────────────────────
+    // PhantomSampler owns the juce::Synthesiser + voices. Its output is
+    // rendered into samplerOutputBuffer every processBlock so the
+    // playhead/voice-count UI remains live even when INPUT_SOURCE is
+    // Input/Sidechain. When INPUT_SOURCE == 2 (Sampler) the main `buffer`
+    // is overwritten with the sampler output before the input-peak/FFT
+    // capture so the rest of processBlock sees sampler audio with no
+    // further branching.
+    kaigen::phantom::PhantomSampler phantomSampler;
+    juce::AudioBuffer<float>        samplerOutputBuffer;
 
     // ─── Recipe Custom slots ─────────────────────────────────────────────
     // Per-engine, per-Custom-slot stored H values (H2..H8 normalised [0..1]).

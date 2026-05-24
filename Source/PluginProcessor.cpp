@@ -125,6 +125,13 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
     reverb.reset();
     reverbScratch.setSize(2, samplesPerBlock, false, true, false);
     reverbMixSmoothed = reverbMixParam ? reverbMixParam->load() : 0.0f;
+
+    // ── Sampler (MIDI-playable source, INPUT_SOURCE = 2) ──────────────
+    // Preallocate stereo sampler output to the host's worst-case block
+    // size so processBlock can render the synth without heap allocation
+    // even when no sample is loaded (Synthesiser early-outs on idle).
+    phantomSampler.prepareToPlay(sr, samplesPerBlock);
+    samplerOutputBuffer.setSize(2, samplesPerBlock, false, true, true);
 }
 
 void PhantomProcessor::releaseResources() {}
@@ -179,6 +186,41 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         if      (m.isNoteOn())  dualEngineHost.handleMidiNoteOn();
         else if (m.isNoteOff()) dualEngineHost.handleMidiNoteOff();
     }
+
+    // ── Sampler + Engine-input source switch ────────────────────────
+    // Render the sampler into its own buffer regardless of the source
+    // selection so the playhead/voice-count UI updates even when the
+    // engines are reading Input or Sidechain (cheap when no voices
+    // are active — Synthesiser::renderNextBlock early-outs).
+    samplerOutputBuffer.setSize(buffer.getNumChannels(), n, false, false, true);
+    samplerOutputBuffer.clear();
+    {
+        // Push current APVTS values into the voices once per block.
+        phantomSampler.setRootNote(
+            (int) apvts.getRawParameterValue(ParamID::SAMPLER_ROOT_NOTE)->load());
+        phantomSampler.setLoopEnabled(
+            apvts.getRawParameterValue(ParamID::SAMPLER_LOOP)->load() > 0.5f);
+        phantomSampler.setGainDb(apvts.getRawParameterValue(ParamID::SAMPLER_GAIN)->load());
+        phantomSampler.setEnvelope(
+            apvts.getRawParameterValue(ParamID::SAMPLER_A)->load(),
+            apvts.getRawParameterValue(ParamID::SAMPLER_D)->load(),
+            apvts.getRawParameterValue(ParamID::SAMPLER_S)->load(),
+            apvts.getRawParameterValue(ParamID::SAMPLER_R)->load());
+        phantomSampler.renderNextBlock(samplerOutputBuffer, midiMessages);
+    }
+
+    const int sourceSel = (int) apvts.getRawParameterValue(ParamID::INPUT_SOURCE)->load();
+    if (sourceSel == 2)   // 0=Input, 1=Sidechain (existing path), 2=Sampler
+    {
+        // Overwrite the main buffer with the sampler's output so the rest
+        // of processBlock (input peak, FFT capture, engine input) sees
+        // sampler audio without any further branching.
+        for (int ch = 0; ch < nCh; ++ch)
+            buffer.copyFrom(ch, 0, samplerOutputBuffer,
+                            juce::jmin(ch, samplerOutputBuffer.getNumChannels() - 1), 0, n);
+    }
+    // sourceSel == 0 (Input): nothing to do — buffer already holds main input.
+    // sourceSel == 1 (Sidechain): existing DualEngineHost sidechain code handles it.
 
     // ── Input Gain → engine detection only ────────────────────────────
     // Buffer audio stays at unity. The gain is forwarded to both engines where
