@@ -146,6 +146,21 @@ private:
     GifPlayer coverGifPlayer;
     juce::String coverGifPackName;   // empty when no gif loaded
 
+    // Back-to-Packs button — visible only when drilled into a specific
+    // pack (CategoryKind::Pack). Click returns to the Packs grid.
+    juce::TextButton backToPacksButton;
+
+    // Returns kPackBannerH when the active category is a single-pack
+    // drill-in, 0 otherwise. Every layout helper adds this to the top
+    // strip so the row table sits below the banner.
+    int  packBannerHeight() const noexcept;
+    bool isPackDrillIn()   const noexcept;
+    juce::Rectangle<int> packBannerBounds() const;
+    juce::Rectangle<int> packBannerCoverBounds() const;
+    juce::Rectangle<int> packBannerBackButtonBounds() const;
+
+    static constexpr int kPackBannerH = 92;
+
 #if DEVELOPER_MODE
     juce::TextButton newPackButton       { "+ New Pack" };
     juce::TextButton saveIntoPackButton  { "Save Into Pack" };

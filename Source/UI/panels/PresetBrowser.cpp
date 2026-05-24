@@ -179,6 +179,29 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
     // cover.gif is single-clicked in Packs mode.
     addChildComponent(coverGifPlayer);
 
+    // Back-to-Packs arrow — only visible when drilled into a single pack.
+    // UTF-8 "‹" lightweight angle for a clean Arturia-style chevron.
+    backToPacksButton.setButtonText(juce::String(juce::CharPointer_UTF8("\xE2\x80\xB9")));
+    backToPacksButton.getProperties().set("phantom-style", "header-raised");
+    backToPacksButton.onClick = [this] {
+        // Find the Packs pseudo-category and switch to it.
+        for (size_t ci = 0; ci < categories.size(); ++ci)
+        {
+            if (categories[ci].kind == CategoryKind::Packs)
+            {
+                activeCategoryIdx = (int) ci;
+                selectedPackCardIdx = -1;
+                listScrollY = 0;
+                rebuildRows();
+                syncCoverGifPlayer();
+                resized();
+                repaint();
+                return;
+            }
+        }
+    };
+    addChildComponent(backToPacksButton);
+
 #if DEVELOPER_MODE
     auto setupAuthoringButton = [this](juce::TextButton& b)
     {
@@ -898,6 +921,8 @@ void PresetBrowser::paint(juce::Graphics& g)
     // ── Middle: header + list ───────────────────────────────────────────
     auto headerBar = middleBounds.removeFromTop(kHeaderBarH);
     auto searchBar = middleBounds.removeFromTop(kSearchBarH);
+    auto packBanner = isPackDrillIn() ? middleBounds.removeFromTop(kPackBannerH)
+                                       : juce::Rectangle<int>{};
     auto listArea  = middleBounds;
 
     // Header — title (active category) + total count.
@@ -935,6 +960,82 @@ void PresetBrowser::paint(juce::Graphics& g)
     g.drawLine((float) searchBar.getX(), (float) searchBar.getBottom(),
                 (float) searchBar.getRight(), (float) searchBar.getBottom(), 1.0f);
 
+    // Pack drill-in banner — cover thumb + BANK label + name + count.
+    // The back-arrow itself is a real juce::TextButton positioned in
+    // resized(), so we just leave its rect blank.
+    if (isPackDrillIn() && ! packBanner.isEmpty())
+    {
+        const auto& cat = categories[(size_t) activeCategoryIdx];
+        const auto packInfos = processor.getPresetManager().getAllPacks();
+        auto pit = std::find_if(packInfos.begin(), packInfos.end(),
+            [&](const kaigen::phantom::PackInfo& p) { return p.name == cat.packFilter; });
+        const auto displayName = (pit != packInfos.end()) ? pit->displayName : cat.label;
+
+        // Cover thumbnail.
+        const auto coverFile = processor.getPresetManager()
+                                        .getPackCoverFile(cat.packFilter);
+        juce::Image thumb;
+        if (coverFile.existsAsFile())
+            thumb = juce::ImageFileFormat::loadFrom(coverFile);
+
+        const auto coverRect = packBannerCoverBounds();
+        if (thumb.isValid())
+        {
+            g.setColour(juce::Colour(0x40000000));
+            g.fillRect(coverRect);
+            g.drawImage(thumb, coverRect.toFloat(),
+                        juce::RectanglePlacement::fillDestination);
+        }
+        else
+        {
+            // Gradient + letter fallback (matches the tile style).
+            const auto seed = (juce::uint32) cat.packFilter.hashCode();
+            const float hue = (float) (seed % 360) / 360.0f;
+            juce::ColourGradient grad(
+                juce::Colour::fromHSV(hue, 0.55f, 0.80f, 1.0f),
+                (float) coverRect.getX(), (float) coverRect.getY(),
+                juce::Colour::fromHSV(std::fmod(hue + 0.12f, 1.0f),
+                                        0.45f, 0.55f, 1.0f),
+                (float) coverRect.getRight(), (float) coverRect.getBottom(),
+                false);
+            g.setGradientFill(grad);
+            g.fillRect(coverRect);
+            g.setColour(juce::Colour(0xd9FFFFFF));
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(),
+                (float) coverRect.getHeight() * 0.55f, juce::Font::plain));
+            g.drawText(displayName.substring(0, 1).toUpperCase(),
+                       coverRect, juce::Justification::centred, false);
+        }
+
+        // Text column to the right of the cover thumb.
+        auto textArea = packBanner.reduced(16, 12);
+        textArea.removeFromLeft(28 + 12 + 64 + 16);  // back arrow + gap + cover + gap
+
+        g.setColour(juce::Colour(kTextLabel));
+        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 10.0f, juce::Font::bold));
+        g.drawText("BANK", textArea.removeFromTop(14),
+                   juce::Justification::topLeft, false);
+        textArea.removeFromTop(2);
+
+        g.setColour(juce::Colour(kTextStrong));
+        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 22.0f, juce::Font::bold));
+        g.drawText(displayName, textArea.removeFromTop(28),
+                   juce::Justification::topLeft, true);
+        textArea.removeFromTop(2);
+
+        const int presetCount = (int) std::count_if(rows.begin(), rows.end(),
+                                    [](const Row& r) { return ! r.isHeader; });
+        g.setColour(juce::Colour(kTextLabel));
+        g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::plain));
+        g.drawText(juce::String(presetCount) + " preset" + (presetCount == 1 ? "" : "s"),
+                   textArea.removeFromTop(16), juce::Justification::topLeft, false);
+
+        // Banner bottom border.
+        g.setColour(juce::Colour(kBorderSoft));
+        g.drawLine((float) packBanner.getX(), (float) packBanner.getBottom(),
+                   (float) packBanner.getRight(), (float) packBanner.getBottom(), 1.0f);
+    }
+
     // Explore mode: pack-card grid replaces the table. Clipped to the
     // middle column area + offset by listScrollY for vertical scrolling.
     if (isPacksMode())
@@ -950,27 +1051,47 @@ void PresetBrowser::paint(juce::Graphics& g)
                 continue;
             const auto cardOuter = card;   // unmodified copy for hover/border
 
-            // Initial-letter art square.
+            // Cover-image art square: use cover.png/.jpg/.gif when present
+            // (GIFs render the first frame only — animating every tile would
+            // be a CPU/memory tax for marginal benefit), otherwise fall back
+            // to a deterministic gradient + initial-letter mark.
             auto art = card.removeFromTop(card.getWidth());
 
-            // Deterministic warm/cool gradient seeded by the pack-name hash.
-            const auto seed = (juce::uint32) pc.name.hashCode();
-            const float hue = (float) (seed % 360) / 360.0f;
-            const auto colA = juce::Colour::fromHSV(hue,         0.55f, 0.80f, 1.0f);
-            const auto colB = juce::Colour::fromHSV(std::fmod(hue + 0.12f, 1.0f),
-                                                     0.45f, 0.55f, 1.0f);
-            juce::ColourGradient grad(colA, art.getX(), art.getY(),
-                                       colB, art.getRight(), art.getBottom(), false);
-            g.setGradientFill(grad);
-            g.fillRect(art);
+            const auto coverFile = processor.getPresetManager()
+                                            .getPackCoverFile(pc.name);
+            juce::Image cover;
+            if (coverFile.existsAsFile())
+                cover = juce::ImageFileFormat::loadFrom(coverFile);
 
-            // First letter of the display name, large and lightweight.
-            g.setColour(juce::Colour(0xd9FFFFFF));
-            g.setFont(juce::FontOptions(Theme::uiFontFamily(),
-                                         (float) art.getHeight() * 0.55f,
-                                         juce::Font::plain));
-            g.drawText(pc.displayName.substring(0, 1).toUpperCase(),
-                       art, juce::Justification::centred, false);
+            if (cover.isValid())
+            {
+                // fillDestination crops to avoid letterbox bars on
+                // portrait/landscape covers in the square tile.
+                g.setColour(juce::Colour(0x40000000));
+                g.fillRect(art);
+                g.drawImage(cover, art.toFloat(),
+                            juce::RectanglePlacement::fillDestination);
+            }
+            else
+            {
+                // Deterministic warm/cool gradient seeded by the pack-name hash.
+                const auto seed = (juce::uint32) pc.name.hashCode();
+                const float hue = (float) (seed % 360) / 360.0f;
+                const auto colA = juce::Colour::fromHSV(hue,         0.55f, 0.80f, 1.0f);
+                const auto colB = juce::Colour::fromHSV(std::fmod(hue + 0.12f, 1.0f),
+                                                         0.45f, 0.55f, 1.0f);
+                juce::ColourGradient grad(colA, art.getX(), art.getY(),
+                                           colB, art.getRight(), art.getBottom(), false);
+                g.setGradientFill(grad);
+                g.fillRect(art);
+
+                g.setColour(juce::Colour(0xd9FFFFFF));
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(),
+                                             (float) art.getHeight() * 0.55f,
+                                             juce::Font::plain));
+                g.drawText(pc.displayName.substring(0, 1).toUpperCase(),
+                           art, juce::Justification::centred, false);
+            }
 
             // Card body — title + count.
             auto body = card;
@@ -1164,6 +1285,47 @@ void PresetBrowser::paint(juce::Graphics& g)
 #endif
 }
 
+bool PresetBrowser::isPackDrillIn() const noexcept
+{
+    return ! categories.empty()
+        && activeCategoryIdx >= 0
+        && activeCategoryIdx < (int) categories.size()
+        && categories[(size_t) activeCategoryIdx].kind == CategoryKind::Pack;
+}
+
+int PresetBrowser::packBannerHeight() const noexcept
+{
+    return isPackDrillIn() ? kPackBannerH : 0;
+}
+
+juce::Rectangle<int> PresetBrowser::packBannerBounds() const
+{
+    if (! isPackDrillIn()) return {};
+    auto card = contentBounds();
+    auto inner = card;
+    inner.removeFromLeft(kSidebarW);
+    inner.removeFromRight(kPreviewW);
+    inner.removeFromTop(kHeaderBarH + kSearchBarH);
+    return inner.removeFromTop(kPackBannerH);
+}
+
+juce::Rectangle<int> PresetBrowser::packBannerBackButtonBounds() const
+{
+    auto banner = packBannerBounds();
+    if (banner.isEmpty()) return {};
+    auto inner = banner.reduced(16, 12);
+    return inner.removeFromLeft(28).withSizeKeepingCentre(28, 32);
+}
+
+juce::Rectangle<int> PresetBrowser::packBannerCoverBounds() const
+{
+    auto banner = packBannerBounds();
+    if (banner.isEmpty()) return {};
+    auto inner = banner.reduced(16, 12);
+    inner.removeFromLeft(28 + 12);  // skip back arrow + gap
+    return inner.removeFromLeft(64).withSizeKeepingCentre(64, 64);
+}
+
 juce::Rectangle<int> PresetBrowser::searchBarBounds() const
 {
     // Top-anchored, so the bottom-of-card strip doesn't change placement,
@@ -1186,7 +1348,7 @@ juce::Rectangle<int> PresetBrowser::columnHeaderBounds(SortColumn col) const
     auto inner = card;
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
-    auto middle = inner.withTrimmedTop(kHeaderBarH + kSearchBarH);
+    auto middle = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + packBannerHeight());
     auto colBar = middle.removeFromTop(kColHeaderH);
 
     const auto cells = colBar.getX() + 12;
@@ -1224,7 +1386,7 @@ juce::Rectangle<int> PresetBrowser::packCardBounds(int idx) const
     auto inner = card;
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
-    auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH).reduced(16, 16);
+    auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + packBannerHeight()).reduced(16, 16);
 
     constexpr int kCardW = 170;
     constexpr int kArtH  = kCardW;
@@ -1332,7 +1494,7 @@ int PresetBrowser::contentHeightForList() const
         auto inner = card;
         inner.removeFromLeft(kSidebarW);
         inner.removeFromRight(kPreviewW);
-        const auto listOriginY = inner.withTrimmedTop(kHeaderBarH + kSearchBarH).reduced(16, 16).getY();
+        const auto listOriginY = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + packBannerHeight()).reduced(16, 16).getY();
         return juce::jmax(0, maxBottom - listOriginY);
     }
     int total = 0;
@@ -1363,7 +1525,7 @@ void PresetBrowser::mouseWheelMove(const juce::MouseEvent& e,
     auto inner   = card;
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
-    const auto listView = inner.withTrimmedTop(kHeaderBarH + kSearchBarH
+    const auto listView = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + packBannerHeight()
                                                 + (isPacksMode() ? 0 : kColHeaderH))
                                 .reduced(8, 4);
 
@@ -1428,6 +1590,11 @@ void PresetBrowser::resized()
     if (coverGifPlayer.isVisible())
         coverGifPlayer.setBounds(packPreviewCoverBounds());
 
+    const bool drilledIn = isPackDrillIn();
+    backToPacksButton.setVisible(drilledIn);
+    if (drilledIn)
+        backToPacksButton.setBounds(packBannerBackButtonBounds());
+
 #if DEVELOPER_MODE
     {
         auto strip = authoringStripBounds().reduced(8);
@@ -1459,7 +1626,7 @@ void PresetBrowser::mouseMove(const juce::MouseEvent& e)
     auto inner = card;
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
-    auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + kColHeaderH).reduced(8, 4);
+    auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + packBannerHeight() + kColHeaderH).reduced(8, 4);
 
     int newRowHover = -1;
     if (! isPacksMode())
@@ -1551,6 +1718,7 @@ void PresetBrowser::mouseDoubleClick(const juce::MouseEvent& e)
                 listScrollY = 0;
                 rebuildRows();
                 syncCoverGifPlayer();
+                resized();
                 repaint();
                 return;
             }
@@ -1589,6 +1757,7 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
                 selectedPackCardIdx = -1;
                 rebuildRows();
                 syncCoverGifPlayer();
+                resized();   // back button + banner layout depend on drill-in state
                 searchField.setTextToShowWhenEmpty(
                     juce::String(juce::CharPointer_UTF8(
                         isPacksMode() ? "Search packs\xe2\x80\xa6"
@@ -1658,7 +1827,7 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
     auto inner = contentBounds();
     inner.removeFromLeft(kSidebarW);
     inner.removeFromRight(kPreviewW);
-    const auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + kColHeaderH).reduced(8, 4);
+    const auto listArea = inner.withTrimmedTop(kHeaderBarH + kSearchBarH + packBannerHeight() + kColHeaderH).reduced(8, 4);
     if (! listArea.contains(e.getPosition())) return;
 
     // The heart column sits at the rightmost ~30 px of each row; clicks
