@@ -71,10 +71,16 @@ private:
     float              dragStartOffsetY { 0.0f };
 
     // UI
-    juce::TextButton chooseImageButton { "Choose Image\xE2\x80\xA6" };
+    juce::TextButton chooseImageButton { "Choose Image..." };
     juce::TextButton saveButton        { "Save" };
     juce::TextButton cancelButton      { "Cancel" };
     juce::TextButton closeButton;
+
+    // Async state flags — only touched on the message thread; background
+    // work posts updates back via MessageManager::callAsync.
+    bool isLoading { false };
+    bool isSaving  { false };
+    void setBusyButtons(bool busy);
 
     // Optional GIF playback in the editor so the user previews motion
     // while cropping. Mirrors the frame cadence of the on-disk source.

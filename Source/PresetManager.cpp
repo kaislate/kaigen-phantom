@@ -262,7 +262,14 @@ void PresetManager::scanPresetsFromDisk()
         info.hasCoverArt = packDir.getChildFile("cover.png").existsAsFile()
                         || packDir.getChildFile("cover.jpg").existsAsFile()
                         || packDir.getChildFile("cover.gif").existsAsFile();
-        info.isReadOnly = (packName == kFactoryPackName);
+        // The on-disk Factory folder is editable by the designer — it's
+        // the pack that gets baked into shipped binaries via
+        // juce_add_binary_data, and the designer needs to set its cover
+        // / save presets into it / edit its metadata. Embedded packs
+        // (loaded from BinaryData via loadFactoryPacksFromBinaryData)
+        // are marked read-only there since they live in compiled
+        // resources, not on disk.
+        info.isReadOnly = false;
         packs[packName] = info;
     };
 
@@ -794,6 +801,10 @@ bool PresetManager::renamePack(const juce::String& oldName, const juce::String& 
 {
     auto packIt = packs.find(oldName);
     if (packIt == packs.end() || packIt->second.isReadOnly) return false;
+    // Reserved-name packs keep their canonical names regardless of
+    // isReadOnly (the on-disk Factory is editable in DEV but its name
+    // is the convention that the bake-in pipeline depends on).
+    if (oldName == kFactoryPackName || oldName == kUserPackName) return false;
 
     const auto sanitized = sanitizePackFolderName(newName);
     if (sanitized.isEmpty()) return false;

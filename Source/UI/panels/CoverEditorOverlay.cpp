@@ -31,9 +31,42 @@ CoverEditorOverlay::CoverEditorOverlay()
     saveButton.getProperties().set("phantom-style", "header-raised");
     saveButton.onClick = [this]
     {
-        if (sourceFile.existsAsFile() && onSave)
-            onSave(activePackName, sourceFile, isGifSource, scale, offsetX, offsetY);
-        if (onDismiss) onDismiss();
+        if (! sourceFile.existsAsFile() || ! onSave || isSaving || isLoading) return;
+
+        // Run the heavy save work (image decode + crop render + PNG
+        // encode, or GIF file copy) on a background thread so a large
+        // source file doesn't freeze the editor + DAW. Capture the
+        // overlay safely so a mid-save dismiss doesn't crash.
+        isSaving = true;
+        setBusyButtons(true);
+        repaint();
+
+        juce::Component::SafePointer<CoverEditorOverlay> self(this);
+        const auto cb       = onSave;
+        const auto packName = activePackName;
+        const auto file     = sourceFile;
+        const auto isGif    = isGifSource;
+        const auto sc       = scale;
+        const auto ox       = offsetX;
+        const auto oy       = offsetY;
+
+        juce::Thread::launch([self, cb, packName, file, isGif, sc, ox, oy]
+        {
+            // setPackCoverWithCrop is thread-safe: file I/O + off-screen
+            // juce::Graphics + sendChangeMessage (which is documented
+            // thread-safe). The callback target also does no UI work.
+            cb(packName, file, isGif, sc, ox, oy);
+
+            juce::MessageManager::callAsync([self]
+            {
+                if (auto* p = self.getComponent())
+                {
+                    p->isSaving = false;
+                    p->setBusyButtons(false);
+                    if (p->onDismiss) p->onDismiss();
+                }
+            });
+        });
     };
     addAndMakeVisible(saveButton);
 
@@ -127,8 +160,21 @@ void CoverEditorOverlay::paint(juce::Graphics& g)
     {
         g.setColour(juce::Colour(0x66ffffff));
         g.setFont(juce::FontOptions(13.0f));
-        g.drawText("Pick an image to begin", frame,
-                   juce::Justification::centred, false);
+        const char* msg = isLoading ? "Loading..."
+                       : isSaving  ? "Saving..."
+                                    : "Pick an image to begin";
+        g.drawText(msg, frame, juce::Justification::centred, false);
+    }
+
+    if ((isLoading || isSaving) && sourceImage.isValid())
+    {
+        // Overlay a faint busy indicator on top of the existing preview.
+        g.setColour(juce::Colour(0x99000000));
+        g.fillRect(frame);
+        g.setColour(juce::Colour(0xffd0d2d4));
+        g.setFont(juce::FontOptions(14.0f, juce::Font::bold));
+        g.drawText(isSaving ? "Saving..." : "Loading...",
+                   frame, juce::Justification::centred, false);
     }
 
     // Frame outline drawn on top so it stays visible over the image.
@@ -217,16 +263,22 @@ void CoverEditorOverlay::openForPack(const juce::String& packName,
 {
     activePackName = packName;
     if (existingCover.existsAsFile())
-        loadSource(existingCover);
+    {
+        loadSource(existingCover);   // async; sets buttons + paints
+    }
     else
     {
         sourceFile = {};
         sourceImage = {};
         isGifSource = false;
+        isLoading = false;
+        isSaving = false;
+        setBusyButtons(false);   // disables Save (no source yet)
     }
     setVisible(true);
     toFront(false);
     grabKeyboardFocus();
+    repaint();
 }
 
 void CoverEditorOverlay::pickSourceImage()
@@ -247,28 +299,54 @@ void CoverEditorOverlay::pickSourceImage()
 
 void CoverEditorOverlay::loadSource(const juce::File& file)
 {
+    // Decoding a large image on the message thread freezes the whole
+    // editor + DAW for multi-second images. Run the decode on a
+    // background thread and post the resulting juce::Image back to the
+    // message thread. SafePointer guards against the overlay being
+    // dismissed mid-load.
     sourceFile = file;
     isGifSource = file.getFileExtension().equalsIgnoreCase(".gif");
-
-    if (isGifSource)
-    {
-        // Use the first frame as the static preview; the GifCache
-        // drives animated playback inside the frame separately.
-        sourceImage = juce::ImageFileFormat::loadFrom(file);
-    }
-    else
-    {
-        sourceImage = juce::ImageFileFormat::loadFrom(file);
-    }
-
-    if (! sourceImage.isValid())
-    {
-        sourceFile = {};
-        return;
-    }
-
-    resetTransformForFit();
+    sourceImage = {};
+    isLoading = true;
+    setBusyButtons(true);
     repaint();
+
+    juce::Component::SafePointer<CoverEditorOverlay> self(this);
+    juce::Thread::launch([self, file]
+    {
+        auto decoded = juce::ImageFileFormat::loadFrom(file);
+
+        juce::MessageManager::callAsync([self, decoded, file]
+        {
+            auto* p = self.getComponent();
+            if (p == nullptr) return;
+            // Drop the result if the user picked a different file in
+            // the meantime (the SafePointer is alive but a fresh load
+            // is now in flight).
+            if (p->sourceFile != file) return;
+
+            p->isLoading = false;
+            p->setBusyButtons(false);
+            if (decoded.isValid())
+            {
+                p->sourceImage = decoded;
+                p->resetTransformForFit();
+            }
+            else
+            {
+                p->sourceFile = {};
+            }
+            p->repaint();
+        });
+    });
+}
+
+void CoverEditorOverlay::setBusyButtons(bool busy)
+{
+    chooseImageButton.setEnabled(! busy);
+    saveButton       .setEnabled(! busy && sourceFile.existsAsFile());
+    cancelButton     .setEnabled(! busy);
+    closeButton      .setEnabled(! busy);
 }
 
 void CoverEditorOverlay::resetTransformForFit()
