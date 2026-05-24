@@ -775,9 +775,9 @@ juce::AudioProcessorEditor* PhantomProcessor::createEditor()
 bool PhantomProcessor::setSampleFromBytes(juce::MemoryBlock sourceBytes,
                                            juce::String filename,
                                            juce::AudioBuffer<float> decoded,
-                                           double sampleRate)
+                                           double sourceSampleRate)
 {
-    if (! phantomSampler.loadSample(std::move(decoded), sampleRate))
+    if (! phantomSampler.loadSample(std::move(decoded), sourceSampleRate))
         return false;
     cachedSampleBytes    = std::move(sourceBytes);
     cachedSampleFilename = std::move(filename);
@@ -1041,6 +1041,12 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
                 if (juce::Base64::convertFromBase64(bytesStream, base64))
                 {
                     juce::MemoryBlock bytes(bytesStream.getData(), bytesStream.getDataSize());
+
+                    // Defensive: refuse oversized embedded samples. The UI-path cap is
+                    // 5 MB enforced in the SamplerStrip; this mirrors the cap so a
+                    // preset copied from a more permissive build cannot OOM the load.
+                    if (bytes.getSize() > 5 * 1024 * 1024) return;
+
                     // Decode synchronously here (we're already off the audio
                     // thread on the host's setStateInformation path). For a
                     // load triggered from the SamplerStrip UI, the strip's

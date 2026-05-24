@@ -113,7 +113,7 @@ public:
     bool setSampleFromBytes(juce::MemoryBlock sourceBytes,
                             juce::String filename,
                             juce::AudioBuffer<float> decoded,
-                            double sampleRate);
+                            double sourceSampleRate);
 
     void clearSample();
     const juce::String& getSampleFilename() const noexcept { return cachedSampleFilename; }
