@@ -8,6 +8,7 @@
 #include "panels/TopBar.h"
 #include "panels/PresetBrowser.h"
 #include "panels/SettingsOverlay.h"
+#include "panels/CoverEditorOverlay.h"
 #include "widgets/PresetDropdown.h"
 #include "widgets/BuildTagPill.h"
 #include <memory>
@@ -44,6 +45,7 @@ private:
     TopBar topBar;
     PresetBrowser presetBrowser;
     SettingsOverlay settingsOverlay;
+    CoverEditorOverlay coverEditor;
     PresetDropdown presetDropdown;
     ModulationPanel modulationPanel;
     std::unique_ptr<BuildTagPill> dspStatusTag;   // top-right corner overlay

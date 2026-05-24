@@ -142,9 +142,34 @@ public:
 
     bool deletePack(const juce::String& packName);
 
-    // Copies + resizes the source image to <packDir>/cover.png. Resizes
-    // to <= 512x512, preserving aspect ratio. Replaces any existing cover.
+    // Copies the source image (PNG/JPG/GIF) into the pack as-is. PNG
+    // alpha, JPG colour fidelity, and GIF animation are preserved.
+    // Replaces any existing cover.* in the pack folder.
     bool setPackCover(const juce::String& packName, const juce::File& sourceImage);
+
+    // Like setPackCover but applies a square crop. For static sources
+    // (PNG/JPG) the crop is BAKED into the saved PNG. For GIF sources
+    // the original file is copied as-is and a cover.crop.json sidecar
+    // is written with {scale, offsetX, offsetY} so the render path can
+    // apply the crop as a clip+transform mask (preserves animation).
+    //
+    // scale/offsetX/offsetY use the editor's source-image-pixel
+    // coordinate system: scale multiplies source dimensions; offsets
+    // position the scaled image relative to the frame's top-left.
+    bool setPackCoverWithCrop(const juce::String& packName,
+                              const juce::File& sourceImage,
+                              float scale, float offsetX, float offsetY);
+
+    // Crop transform stored alongside an animated GIF cover. Empty
+    // (valid==false) for non-GIF covers or covers saved without crop.
+    struct CoverCrop
+    {
+        bool  valid   { false };
+        float scale   { 1.0f };
+        float offsetX { 0.0f };
+        float offsetY { 0.0f };
+    };
+    CoverCrop getPackCoverCrop(const juce::String& packName) const;
 
     // Saves the current APVTS state as <packDir>/<presetName>.fxp.
     // Returns the saved (possibly disambiguated) preset name, empty on failure.

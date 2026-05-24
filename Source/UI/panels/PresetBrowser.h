@@ -98,7 +98,13 @@ private:
     // dark backdrop first so transparency shows dark instead of washing
     // out against whatever component background sits behind. Opaque
     // images skip the backdrop and draw directly.
+    //
+    // packName is used to look up an optional cover.crop.json sidecar
+    // (GIF covers); when present, the crop is applied as a clip+
+    // transform mask so the saved-as-is GIF only paints its cropped
+    // region. Static covers ignore the sidecar (their crop is baked).
     void drawPackCover(juce::Graphics& g,
+                        const juce::String& packName,
                         const juce::Image& img,
                         juce::Rectangle<int> dest);
 
@@ -177,6 +183,13 @@ private:
     static constexpr int kPackBannerH = 92;
 
 #if DEVELOPER_MODE
+public:
+    /** Wired by NativePluginEditor — opens the CoverEditorOverlay for
+     *  the given pack. PresetBrowser invokes it from the Set Cover
+     *  button's onClick handler. */
+    std::function<void(juce::String)> onSetCoverRequested;
+
+private:
     juce::TextButton newPackButton       { "+ New Pack" };
     juce::TextButton saveIntoPackButton  { "Save Into Pack" };
     juce::TextButton editPackMetaButton  { "Edit Metadata" };

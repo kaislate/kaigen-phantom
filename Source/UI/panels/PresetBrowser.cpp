@@ -299,19 +299,8 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
     {
         const auto packName = activePackName();
         if (packName.isEmpty()) return;
-
-        auto chooser = std::make_shared<juce::FileChooser>(
-            "Choose cover art",
-            juce::File::getSpecialLocation(juce::File::userPicturesDirectory),
-            "*.png;*.jpg;*.jpeg;*.gif");
-        chooser->launchAsync(juce::FileBrowserComponent::openMode
-                             | juce::FileBrowserComponent::canSelectFiles,
-            [this, packName, chooser](const juce::FileChooser& fc)
-            {
-                const auto src = fc.getResult();
-                if (src.existsAsFile())
-                    processor.getPresetManager().setPackCover(packName, src);
-            });
+        if (onSetCoverRequested)
+            onSetCoverRequested(packName);
     };
 
     renamePackButton.onClick = [this]
@@ -778,7 +767,7 @@ void PresetBrowser::paint(juce::Graphics& g)
             const auto coverImg = getPackCoverFrame(pc.name);
             if (coverImg.isValid())
             {
-                drawPackCover(g, coverImg, coverArea);
+                drawPackCover(g, pc.name, coverImg, coverArea);
             }
             else
             {
@@ -968,7 +957,7 @@ void PresetBrowser::paint(juce::Graphics& g)
         const auto coverRect = packBannerCoverBounds();
         if (thumb.isValid())
         {
-            drawPackCover(g, thumb, coverRect);
+            drawPackCover(g, cat.packFilter, thumb, coverRect);
         }
         else
         {
@@ -1048,7 +1037,7 @@ void PresetBrowser::paint(juce::Graphics& g)
             const auto cover = getPackCoverFrame(pc.name);
             if (cover.isValid())
             {
-                drawPackCover(g, cover, art);
+                drawPackCover(g, pc.name, cover, art);
             }
             else
             {
@@ -1422,6 +1411,7 @@ juce::Image PresetBrowser::getPackCoverFrame(const juce::String& packName)
 }
 
 void PresetBrowser::drawPackCover(juce::Graphics& g,
+                                    const juce::String& packName,
                                     const juce::Image& img,
                                     juce::Rectangle<int> dest)
 {
@@ -1454,13 +1444,34 @@ void PresetBrowser::drawPackCover(juce::Graphics& g,
         g.fillRect(dest);
     }
 
-    // Force opacity to 1.0 before drawing — defensive against any
-    // upstream g.setOpacity(x<1) that would dim the image. juce::Graphics
-    // state isn't reset between widget paints in the same parent.
     juce::Graphics::ScopedSaveState ss(g);
     g.setOpacity(1.0f);
-    g.drawImage(img, dest.toFloat(),
-                juce::RectanglePlacement::fillDestination);
+
+    const auto crop = processor.getPresetManager().getPackCoverCrop(packName);
+    if (crop.valid && crop.scale > 0.0f)
+    {
+        // Apply the saved GIF crop as a clip + scaled transform.
+        // The editor used a 360px square frame; map that frame into
+        // the destination rect, then position the source image with
+        // the saved scale + offset.
+        constexpr float kEditorFrameSize = 360.0f;
+        const float destToFrame = (float) dest.getWidth() / kEditorFrameSize;
+
+        g.reduceClipRegion(dest);
+        const auto t = juce::AffineTransform()
+                            .scaled(crop.scale, crop.scale)
+                            .translated(crop.offsetX, crop.offsetY)
+                            .scaled(destToFrame, destToFrame)
+                            .translated((float) dest.getX(), (float) dest.getY());
+        g.drawImageTransformed(img, t, false);
+    }
+    else
+    {
+        // No crop sidecar — original behaviour: fill the destination,
+        // cropping along whichever axis the source overshoots.
+        g.drawImage(img, dest.toFloat(),
+                    juce::RectanglePlacement::fillDestination);
+    }
 }
 
 int PresetBrowser::contentHeightForList() const

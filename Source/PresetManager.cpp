@@ -845,6 +845,122 @@ bool PresetManager::deletePack(const juce::String& packName)
     return true;
 }
 
+PresetManager::CoverCrop PresetManager::getPackCoverCrop(const juce::String& packName) const
+{
+    CoverCrop c;
+    auto packDir = getPresetsRootDirectory().getChildFile(packName);
+    auto sidecar = packDir.getChildFile("cover.crop.json");
+    if (! sidecar.existsAsFile()) return c;
+
+    auto parsed = juce::JSON::parse(sidecar);
+    if (auto* obj = parsed.getDynamicObject())
+    {
+        c.valid   = true;
+        c.scale   = (float) (double) obj->getProperty("scale");
+        c.offsetX = (float) (double) obj->getProperty("offsetX");
+        c.offsetY = (float) (double) obj->getProperty("offsetY");
+        if (c.scale <= 0.0f) c.scale = 1.0f;   // guard against malformed
+    }
+    return c;
+}
+
+bool PresetManager::setPackCoverWithCrop(const juce::String& packName,
+                                          const juce::File& sourceImage,
+                                          float scale, float offsetX, float offsetY)
+{
+    auto packIt = packs.find(packName);
+    if (packIt == packs.end() || packIt->second.isReadOnly) return false;
+    if (! sourceImage.existsAsFile()) return false;
+
+    auto packDir = getPresetsRootDirectory().getChildFile(packName);
+    if (! packDir.isDirectory()) return false;
+
+    const auto ext = sourceImage.getFileExtension().toLowerCase();
+    const bool isPng  = ext == ".png";
+    const bool isJpg  = ext == ".jpg" || ext == ".jpeg";
+    const bool isGif  = ext == ".gif";
+    if (! (isPng || isJpg || isGif)) return false;
+
+    // Wipe any prior cover.* and sidecar — only one cover stays.
+    packDir.getChildFile("cover.png").deleteFile();
+    packDir.getChildFile("cover.jpg").deleteFile();
+    packDir.getChildFile("cover.gif").deleteFile();
+    packDir.getChildFile("cover.crop.json").deleteFile();
+
+    if (isGif)
+    {
+        // Copy the original GIF + write a crop sidecar so the render
+        // path can apply the mask without re-encoding any frames.
+        auto destGif = packDir.getChildFile("cover.gif");
+        if (! sourceImage.copyFileTo(destGif)) return false;
+
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty("scale",   (double) scale);
+        obj->setProperty("offsetX", (double) offsetX);
+        obj->setProperty("offsetY", (double) offsetY);
+        packDir.getChildFile("cover.crop.json")
+              .replaceWithText(juce::JSON::toString(juce::var(obj)));
+
+        rescan();
+        return true;
+    }
+
+    // Static path: load source, render the cropped square region to a
+    // new juce::Image, write as PNG. JPEG sources lose their original
+    // extension here (output is always PNG); colour fidelity is
+    // preserved by the rescale + PNG encode round-trip.
+    auto src = juce::ImageFileFormat::loadFrom(sourceImage);
+    if (! src.isValid()) return false;
+
+    // Compute the source-image rect that maps to the unit square frame.
+    // Editor coords: scaledSrcW = src.w * scale, drawn at (offsetX,offsetY).
+    // To find the source rect we invert: srcX = -offsetX / scale, etc.
+    // Frame size in editor is irrelevant for output dimensions; we
+    // produce a fixed-size square output so all covers are uniform.
+    constexpr int kOutputSize = 720;   // square PNG output
+
+    // The user picked a 1:1 frame in the editor (kFrameSize). In source
+    // pixels, that frame is kFrameSize / scale wide and tall, anchored
+    // at (-offsetX/scale, -offsetY/scale). The CoverEditorOverlay used
+    // kFrameSize=360, but that value isn't visible here — we re-derive
+    // the equivalent crop in source pixels using only scale + offsets.
+    //
+    // editor frame side length = 360 px on screen
+    // source pixels per editor px = 1/scale
+    // source rect = 360/scale square at editor (0,0) -> source
+    //               (-offsetX/scale, -offsetY/scale)
+    constexpr float kEditorFrameSize = 360.0f;
+    const float srcRectSize = kEditorFrameSize / scale;
+    const float srcX = -offsetX / scale;
+    const float srcY = -offsetY / scale;
+
+    juce::Image out(juce::Image::ARGB, kOutputSize, kOutputSize, true);
+    {
+        juce::Graphics g(out);
+        // Background — matches drawPackCover's transparency backdrop so
+        // any out-of-source area composites cleanly.
+        g.fillAll(juce::Colour(0xff1f2128));
+
+        // Draw the source image scaled so that srcRectSize source px
+        // map to kOutputSize output px. Position so srcX/srcY land at
+        // output origin.
+        const float outScale = (float) kOutputSize / srcRectSize;
+        const auto t = juce::AffineTransform::translation(-srcX, -srcY)
+                            .scaled(outScale, outScale);
+        g.drawImageTransformed(src, t, false);
+    }
+
+    auto destPng = packDir.getChildFile("cover.png");
+    juce::FileOutputStream os(destPng);
+    if (! os.openedOk()) return false;
+    juce::PNGImageFormat fmt;
+    if (! fmt.writeImageToStream(out, os)) return false;
+    os.flush();
+
+    rescan();
+    return true;
+}
+
 bool PresetManager::setPackCover(const juce::String& packName, const juce::File& sourceImage)
 {
     auto packIt = packs.find(packName);

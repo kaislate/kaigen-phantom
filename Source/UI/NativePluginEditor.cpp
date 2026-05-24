@@ -75,6 +75,26 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
     settingsOverlay.setVisible(false);
     settingsOverlay.toFront(false);
 
+#if DEVELOPER_MODE
+    addAndMakeVisible(coverEditor);
+    coverEditor.setVisible(false);
+    coverEditor.toFront(false);
+    coverEditor.onDismiss = [this] { coverEditor.setVisible(false); };
+    coverEditor.onSave = [this](juce::String packName, juce::File source,
+                                  bool isGif, float scale, float ox, float oy)
+    {
+        juce::ignoreUnused(isGif);   // setPackCoverWithCrop branches on ext
+        processor.getPresetManager().setPackCoverWithCrop(
+            packName, source, scale, ox, oy);
+    };
+    presetBrowser.onSetCoverRequested = [this](juce::String packName)
+    {
+        const auto existing = processor.getPresetManager().getPackCoverFile(packName);
+        coverEditor.setBounds(getLocalBounds());
+        coverEditor.openForPack(packName, existing);
+    };
+#endif
+
     settingsOverlay.onDismiss = [this] {
         settingsOverlay.setVisible(false);
     };
