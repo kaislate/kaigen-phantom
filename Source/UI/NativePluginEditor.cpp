@@ -93,13 +93,17 @@ NativePluginEditor::NativePluginEditor(PhantomProcessor& p,
     // TopBar's gear button → open the overlay with mutual exclusion against
     // the preset browser, dropdown, and matrix overlay.
     topBar.onSettingsRequested = [this, persistMatrixMode] {
+        // Settings overlays on top of whatever's already shown — we
+        // don't hide the preset browser so the user lands back in their
+        // browse context after dismissing settings. Matrix is mutually
+        // exclusive because both fill the whole editor area; the
+        // dropdown's pill anchor would look orphaned behind settings.
         if (matrixView.isVisible())
         {
             matrixView.setVisible(false);
             resized();
             persistMatrixMode(false);
         }
-        presetBrowser .setVisible(false);
         presetDropdown.setVisible(false);
         settingsOverlay.setBounds(getLocalBounds());
         settingsOverlay.setVisible(true);

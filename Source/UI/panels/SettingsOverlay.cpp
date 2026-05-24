@@ -46,6 +46,8 @@ SettingsOverlay::SettingsOverlay(juce::AudioProcessorValueTreeState& a)
     };
     addAndMakeVisible(packAnimationsToggle);
 
+    closeButton.setButtonText(juce::String(juce::CharPointer_UTF8("\xE2\x9C\x95"))); // ✕
+    closeButton.getProperties().set("phantom-style", "header-glyph");
     closeButton.setColour(juce::TextButton::buttonColourId,   juce::Colours::transparentBlack);
     closeButton.setColour(juce::TextButton::buttonOnColourId, juce::Colours::transparentBlack);
     closeButton.setColour(juce::TextButton::textColourOffId,  juce::Colour(0xff656769));

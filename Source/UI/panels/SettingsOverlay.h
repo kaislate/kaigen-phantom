@@ -64,8 +64,10 @@ private:
     // (not APVTS) since it's a UI preference, not a synth parameter.
     juce::ToggleButton packAnimationsToggle { "Animate pack covers (GIFs)" };
 
-    // Close button.
-    juce::TextButton closeButton { "\xC3\x97" };   // UTF-8 ×
+    // Close button — uses U+2715 "heavy multiplication X" (✕) since the
+    // simpler U+00D7 (×) isn't present in Space Grotesk and falls back
+    // to whatever the system can supply, producing illegible glyphs.
+    juce::TextButton closeButton;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsOverlay)
 };
