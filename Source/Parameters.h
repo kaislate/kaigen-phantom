@@ -82,6 +82,16 @@ namespace ParamID
     inline constexpr auto MORPH_B_LEVEL_DB         = "morph_b_level_db";
     inline constexpr auto MORPH_BYPASS_IDLE_ENGINE = "morph_bypass_idle_engine";
 
+    // ── Sampler (PR-sampler) ─────────────────────────────────────────────
+    inline constexpr auto INPUT_SOURCE       = "input_source";       // choice 0/1/2
+    inline constexpr auto SAMPLER_ROOT_NOTE  = "sampler_root_note";  // int 0..127
+    inline constexpr auto SAMPLER_LOOP       = "sampler_loop";       // bool
+    inline constexpr auto SAMPLER_GAIN       = "sampler_gain";       // dB
+    inline constexpr auto SAMPLER_A          = "sampler_attack";     // seconds
+    inline constexpr auto SAMPLER_D          = "sampler_decay";      // seconds
+    inline constexpr auto SAMPLER_S          = "sampler_sustain";    // 0..1
+    inline constexpr auto SAMPLER_R          = "sampler_release";    // seconds
+
     // ── Macros (PR3a) — global, automatable ────────────────────────────
     inline constexpr auto MACRO1 = "macro1";
     inline constexpr auto MACRO2 = "macro2";
@@ -175,6 +185,15 @@ inline std::vector<juce::String> getAllParameterIDs()
     ids.push_back(ParamID::MORPH_A_LEVEL_DB);
     ids.push_back(ParamID::MORPH_B_LEVEL_DB);
     ids.push_back(ParamID::MORPH_BYPASS_IDLE_ENGINE);
+
+    ids.push_back(ParamID::INPUT_SOURCE);
+    ids.push_back(ParamID::SAMPLER_ROOT_NOTE);
+    ids.push_back(ParamID::SAMPLER_LOOP);
+    ids.push_back(ParamID::SAMPLER_GAIN);
+    ids.push_back(ParamID::SAMPLER_A);
+    ids.push_back(ParamID::SAMPLER_D);
+    ids.push_back(ParamID::SAMPLER_S);
+    ids.push_back(ParamID::SAMPLER_R);
 
     ids.push_back(ParamID::MACRO1);
     ids.push_back(ParamID::MACRO2);
@@ -402,6 +421,39 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         AudioParameterFloatAttributes().withLabel("dB")));
     params.push_back(std::make_unique<AudioParameterBool>(
         ParamID::MORPH_BYPASS_IDLE_ENGINE, "Morph Bypass Idle Engine", true));
+
+    // ── Sampler parameters ───────────────────────────────────────────────
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{ ParamID::INPUT_SOURCE, 1 },
+        "Engine Input Source",
+        juce::StringArray{ "Input", "Sidechain", "Sampler" },
+        0));   // default = Input
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        juce::ParameterID{ ParamID::SAMPLER_ROOT_NOTE, 1 },
+        "Sampler Root Note", 0, 127, 60));   // default C3
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ ParamID::SAMPLER_LOOP, 1 },
+        "Sampler Loop", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_GAIN, 1 },
+        "Sampler Gain",
+        juce::NormalisableRange<float>(-12.0f, 12.0f, 0.01f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_A, 1 },
+        "Sampler Attack",
+        juce::NormalisableRange<float>(0.001f, 4.0f, 0.0001f, 0.4f), 0.005f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_D, 1 },
+        "Sampler Decay",
+        juce::NormalisableRange<float>(0.0f, 4.0f, 0.0001f, 0.4f), 0.200f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_S, 1 },
+        "Sampler Sustain",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.80f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_R, 1 },
+        "Sampler Release",
+        juce::NormalisableRange<float>(0.001f, 4.0f, 0.0001f, 0.4f), 0.200f));
 
     // Macros (PR3a) — global APVTS params, automatable. Read by Macro
     // modulators in ModulationEngine.
