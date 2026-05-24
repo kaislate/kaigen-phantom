@@ -12,6 +12,7 @@
 #include "../widgets/PitchDisplay.h"
 #include "../widgets/LevelReadout.h"
 #include "../widgets/EyeButton.h"
+#include "../widgets/SamplerStrip.h"
 #include "../visualizers/Oscilloscope.h"
 #include "../visualizers/Spectrum.h"
 
@@ -93,6 +94,10 @@ private:
     // Visualizers (below Advanced row)
     Oscilloscope oscilloscope;
     Spectrum spectrum;
+
+    // Sampler strip — sits between the spectrum (above) and the pitch
+    // slot (below). MIDI-playable sampler UI (header + waveform + controls).
+    SamplerStrip samplerStrip;
 
     // Pitch / note OLED display — sits between the spectrum (above) and
     // the oscilloscope (below), constrained to the oscilloscope's width.
