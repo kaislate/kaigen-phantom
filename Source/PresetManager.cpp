@@ -854,43 +854,35 @@ bool PresetManager::setPackCover(const juce::String& packName, const juce::File&
     auto packDir = getPresetsRootDirectory().getChildFile(packName);
     if (! packDir.isDirectory()) return false;
 
+    // Accept PNG / JPG / JPEG / GIF. Anything else: refuse.
+    const auto ext = sourceImage.getFileExtension().toLowerCase();
+    const bool isPng  = ext == ".png";
+    const bool isJpg  = ext == ".jpg" || ext == ".jpeg";
+    const bool isGif  = ext == ".gif";
+    if (! (isPng || isJpg || isGif)) return false;
+
+    // For PNG/JPG, confirm the source actually decodes before we destroy
+    // any existing cover (catches renamed extensions / corrupt files).
+    // For GIFs the byte-copy is enough; JUCE's first-frame decoder would
+    // run later in the animation path.
+    if (! isGif)
+    {
+        auto probe = juce::ImageFileFormat::loadFrom(sourceImage);
+        if (! probe.isValid()) return false;
+    }
+
     // Always wipe any prior cover.* — only one stays.
     packDir.getChildFile("cover.png").deleteFile();
     packDir.getChildFile("cover.jpg").deleteFile();
     packDir.getChildFile("cover.gif").deleteFile();
 
-    // GIFs are stored verbatim so animation frames + timing are preserved.
-    // JUCE's image pipeline only decodes the first frame; the browser uses
-    // a separate animated-GIF player on the file directly.
-    if (sourceImage.getFileExtension().equalsIgnoreCase(".gif"))
-    {
-        auto destGif = packDir.getChildFile("cover.gif");
-        if (! sourceImage.copyFileTo(destGif)) return false;
-        rescan();
-        return true;
-    }
-
-    // PNG / JPG path — load, resize to fit 512x512, write as PNG.
-    auto img = juce::ImageFileFormat::loadFrom(sourceImage);
-    if (! img.isValid()) return false;
-
-    const int maxEdge = 512;
-    if (img.getWidth() > maxEdge || img.getHeight() > maxEdge)
-    {
-        const float scale = (float) maxEdge
-            / (float) juce::jmax(img.getWidth(), img.getHeight());
-        img = img.rescaled((int) (img.getWidth()  * scale),
-                            (int) (img.getHeight() * scale),
-                            juce::Graphics::highResamplingQuality);
-    }
-
-    auto destPng = packDir.getChildFile("cover.png");
-    juce::FileOutputStream out(destPng);
-    if (! out.openedOk()) return false;
-
-    juce::PNGImageFormat fmt;
-    if (! fmt.writeImageToStream(img, out)) return false;
-    out.flush();
+    // Copy as-is. Preserves PNG alpha, JPG colour fidelity, and GIF
+    // animation timing without re-encoding artefacts. Dropped the prior
+    // 512px resize: factory bake-in size is a developer concern at build
+    // time; on-disk user packs aren't space-constrained.
+    const auto destExt = isJpg ? ".jpg" : ext;
+    auto dest = packDir.getChildFile("cover" + destExt);
+    if (! sourceImage.copyFileTo(dest)) return false;
 
     rescan();
     return true;

@@ -774,21 +774,11 @@ void PresetBrowser::paint(juce::Graphics& g)
             {
                 auto img = juce::ImageFileFormat::loadFrom(coverFile);
                 if (img.isValid())
-                {
-                    g.setColour(juce::Colour(0x40000000));
-                    g.fillRect(coverArea);
                     g.drawImage(img, coverArea.toFloat(),
-                                juce::RectanglePlacement::centred);
-                }
+                                juce::RectanglePlacement::fillDestination);
             }
-            else if (isGifCover)
-            {
-                // GifPlayer is a child component painting this rect;
-                // just fill the background so transparent GIF frames
-                // don't show whatever's underneath.
-                g.setColour(juce::Colour(0x40000000));
-                g.fillRect(coverArea);
-            }
+            // For GIF covers the GifPlayer child component paints this
+            // rect on top of whatever the preview pane background is.
             else
             {
                 // Fallback initial-letter art (matches pack-tile style).
@@ -981,8 +971,6 @@ void PresetBrowser::paint(juce::Graphics& g)
         const auto coverRect = packBannerCoverBounds();
         if (thumb.isValid())
         {
-            g.setColour(juce::Colour(0x40000000));
-            g.fillRect(coverRect);
             g.drawImage(thumb, coverRect.toFloat(),
                         juce::RectanglePlacement::fillDestination);
         }
@@ -1066,9 +1054,9 @@ void PresetBrowser::paint(juce::Graphics& g)
             if (cover.isValid())
             {
                 // fillDestination crops to avoid letterbox bars on
-                // portrait/landscape covers in the square tile.
-                g.setColour(juce::Colour(0x40000000));
-                g.fillRect(art);
+                // portrait/landscape covers in the square tile. No
+                // backdrop fill — transparent PNG pixels show the card
+                // surface; opaque pixels show true colour.
                 g.drawImage(cover, art.toFloat(),
                             juce::RectanglePlacement::fillDestination);
             }
