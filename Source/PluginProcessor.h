@@ -107,6 +107,17 @@ public:
     kaigen::phantom::PhantomSampler&       getPhantomSampler()       noexcept { return phantomSampler; }
     const kaigen::phantom::PhantomSampler& getPhantomSampler() const noexcept { return phantomSampler; }
 
+    // Called by SamplerStrip after a successful background decode. Stores
+    // the original source bytes (for preset embed) and pushes the decoded
+    // AudioBuffer into the live PhantomSampler. Returns true on success.
+    bool setSampleFromBytes(juce::MemoryBlock sourceBytes,
+                            juce::String filename,
+                            juce::AudioBuffer<float> decoded,
+                            double sampleRate);
+
+    void clearSample();
+    const juce::String& getSampleFilename() const noexcept { return cachedSampleFilename; }
+
     // ─── Modulation engines (PR3a) ────────────────────────────────────────
     // Per-engine modulation containers. Engine A scopes Macro 1+2 to a_*
     // params; Engine B scopes Macro 3+4 to b_* params. Routings between a
@@ -281,6 +292,14 @@ private:
     // further branching.
     kaigen::phantom::PhantomSampler phantomSampler;
     juce::AudioBuffer<float>        samplerOutputBuffer;
+
+    // Original source bytes of the loaded sample, kept so getStateInformation
+    // can serialize them into the <Sampler> child. Written from the message
+    // thread when the SamplerStrip finishes loading; read by getStateInformation
+    // (also message thread).
+    juce::MemoryBlock cachedSampleBytes;
+    juce::String      cachedSampleFilename;
+    juce::AudioFormatManager sampleFormatManager;
 
     // ─── Recipe Custom slots ─────────────────────────────────────────────
     // Per-engine, per-Custom-slot stored H values (H2..H8 normalised [0..1]).

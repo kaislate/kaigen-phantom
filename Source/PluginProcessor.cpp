@@ -59,6 +59,8 @@ PhantomProcessor::PhantomProcessor()
     samplerDParam    = apvts.getRawParameterValue(ParamID::SAMPLER_D);
     samplerSParam    = apvts.getRawParameterValue(ParamID::SAMPLER_S);
     samplerRParam    = apvts.getRawParameterValue(ParamID::SAMPLER_R);
+
+    sampleFormatManager.registerBasicFormats();
 }
 
 PhantomProcessor::~PhantomProcessor()
@@ -770,6 +772,25 @@ juce::AudioProcessorEditor* PhantomProcessor::createEditor()
     return new kaigen::phantom::NativePluginEditor(*this, apvts);
 }
 
+bool PhantomProcessor::setSampleFromBytes(juce::MemoryBlock sourceBytes,
+                                           juce::String filename,
+                                           juce::AudioBuffer<float> decoded,
+                                           double sampleRate)
+{
+    if (! phantomSampler.loadSample(std::move(decoded), sampleRate))
+        return false;
+    cachedSampleBytes    = std::move(sourceBytes);
+    cachedSampleFilename = std::move(filename);
+    return true;
+}
+
+void PhantomProcessor::clearSample()
+{
+    phantomSampler.clearSample();
+    cachedSampleBytes.reset();
+    cachedSampleFilename.clear();
+}
+
 void PhantomProcessor::setEngineFocus(EngineFocus newFocus) noexcept
 {
     const bool changed = (engineFocus.activeTab != newFocus.activeTab)
@@ -899,6 +920,20 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
     }
     wrapper.appendChild(slotsRoot, nullptr);
 
+    // <Sampler> — embedded sample bytes (base64) + filename. Missing when
+    // no sample is loaded; the read path treats an empty/missing child as
+    // "no sample" and leaves PhantomSampler silent.
+    if (cachedSampleBytes.getSize() > 0)
+    {
+        juce::ValueTree samplerNode("Sampler");
+        samplerNode.setProperty("filename", cachedSampleFilename, nullptr);
+        samplerNode.setProperty("bytes",
+            juce::Base64::toBase64(cachedSampleBytes.getData(),
+                                    cachedSampleBytes.getSize()),
+            nullptr);
+        wrapper.appendChild(samplerNode, nullptr);
+    }
+
     if (auto xml = wrapper.createXml())
         copyXmlToBinary(*xml, destData);
 }
@@ -989,6 +1024,39 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
                     const int v = (int) node.getProperty("value",  0);
                     if (e >= 0 && e <= 1)
                         lastBuiltInPreset[(size_t) e] = juce::jlimit(0, 5, v);
+                }
+            }
+        }
+
+        // <Sampler> — decode bytes off the message thread and hand the
+        // resulting AudioBuffer back via setSampleFromBytes. Until decode
+        // completes, the sampler stays silent; the plugin remains fully usable.
+        if (auto samplerNode = wrapper.getChildWithName("Sampler"); samplerNode.isValid())
+        {
+            const auto filename  = samplerNode.getProperty("filename").toString();
+            const auto base64    = samplerNode.getProperty("bytes").toString();
+            if (base64.isNotEmpty())
+            {
+                juce::MemoryOutputStream bytesStream;
+                if (juce::Base64::convertFromBase64(bytesStream, base64))
+                {
+                    juce::MemoryBlock bytes(bytesStream.getData(), bytesStream.getDataSize());
+                    // Decode synchronously here (we're already off the audio
+                    // thread on the host's setStateInformation path). For a
+                    // load triggered from the SamplerStrip UI, the strip's
+                    // own callback uses juce::Thread::launch.
+                    std::unique_ptr<juce::AudioFormatReader> reader(
+                        sampleFormatManager.createReaderFor(
+                            std::make_unique<juce::MemoryInputStream>(bytes, false)));
+                    if (reader != nullptr)
+                    {
+                        juce::AudioBuffer<float> decoded(
+                            (int) reader->numChannels,
+                            (int) reader->lengthInSamples);
+                        reader->read(&decoded, 0, decoded.getNumSamples(), 0, true, true);
+                        setSampleFromBytes(std::move(bytes), filename,
+                                            std::move(decoded), reader->sampleRate);
+                    }
                 }
             }
         }
