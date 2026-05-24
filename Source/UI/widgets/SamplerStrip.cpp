@@ -10,7 +10,7 @@ namespace
 {
     constexpr int kHeaderH   = 24;
     constexpr int kWaveformH = 60;
-    constexpr int kControlsH = 40;
+    constexpr int kControlsH = 90;   // tall enough for full PhantomMiniKnob + labeled ADSR sliders
 
     juce::String midiNoteName(int n)
     {
@@ -127,6 +127,26 @@ void SamplerStrip::paint(juce::Graphics& g)
                                                 : "Click or drop a sample";
         g.drawText(msg, waveformArea, juce::Justification::centred, false);
     }
+
+    // A/D/S/R letter labels under each envelope slider. The sliders
+    // themselves are juce::Slider children that paint their own track +
+    // thumb; we add the letter underneath since LinearVertical sliders
+    // don't ship with built-in labels.
+    g.setColour(juce::Colour(0x99ffffff));
+    g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+    struct { juce::Slider* s; const char* label; } adsr[] = {
+        { &attackSlider,  "A" },
+        { &decaySlider,   "D" },
+        { &sustainSlider, "S" },
+        { &releaseSlider, "R" }
+    };
+    for (const auto& entry : adsr)
+    {
+        const auto b = entry.s->getBounds();
+        const juce::Rectangle<int> labelRect(b.getX(), b.getBottom() + 1,
+                                              b.getWidth(), 10);
+        g.drawText(entry.label, labelRect, juce::Justification::centred, false);
+    }
 }
 
 void SamplerStrip::resized()
@@ -135,28 +155,53 @@ void SamplerStrip::resized()
     auto headerArea = area.removeFromTop(kHeaderH);
     auto waveformArea = area.removeFromTop(kWaveformH);
     juce::ignoreUnused(waveformArea);   // painted directly, no children
-    auto controlsArea = area.removeFromTop(kControlsH).reduced(6, 4);
+    auto controlsArea = area.removeFromTop(kControlsH).reduced(8, 4);
 
     // Header - source selector left, folder button right, filename
     // painted between (in paint()).
     sourceToggle.setBounds(headerArea.removeFromLeft(220).reduced(6, 2));
     folderButton.setBounds(headerArea.removeFromRight(36).reduced(4));
 
-    // Controls row.
-    constexpr int kRootW = 64, kLoopW = 36, kGainW = 36, kEnvW = 18, kGap = 6;
-    rootNoteCombo.setBounds(controlsArea.removeFromLeft(kRootW));
-    controlsArea.removeFromLeft(kGap);
-    loopToggle.setBounds(controlsArea.removeFromLeft(kLoopW));
-    controlsArea.removeFromLeft(kGap);
-    gainKnob.setBounds(controlsArea.removeFromLeft(kGainW));
-    controlsArea.removeFromLeft(kGap * 2);
-    attackSlider.setBounds(controlsArea.removeFromLeft(kEnvW));
-    controlsArea.removeFromLeft(kGap);
-    decaySlider.setBounds(controlsArea.removeFromLeft(kEnvW));
-    controlsArea.removeFromLeft(kGap);
-    sustainSlider.setBounds(controlsArea.removeFromLeft(kEnvW));
-    controlsArea.removeFromLeft(kGap);
-    releaseSlider.setBounds(controlsArea.removeFromLeft(kEnvW));
+    // Controls row — 90 px tall. Widget heights vary; vertical-centre
+    // the small fixed-height widgets in the row so they share a
+    // baseline with the taller PhantomMiniKnob.
+    constexpr int kRootW    = 76;
+    constexpr int kRootH    = 28;
+    constexpr int kLoopW    = 50;
+    constexpr int kLoopH    = 22;
+    constexpr int kGainW    = 82;   // PhantomMiniKnob natural width
+    constexpr int kGainH    = 88;   // close to natural 93; slight squeeze fits the row
+    constexpr int kEnvW     = 30;   // each ADSR slider
+    constexpr int kEnvSpace = 10;   // reserved at bottom of slider for A/D/S/R letter labels
+    constexpr int kColGap   = 10;
+    constexpr int kAdsrGap  = 4;
+
+    const int rowH = controlsArea.getHeight();
+
+    auto placeCentered = [&](juce::Component& c, int w, int h)
+    {
+        auto slot = controlsArea.removeFromLeft(w);
+        c.setBounds(slot.getX(), slot.getY() + (rowH - h) / 2, w, h);
+        controlsArea.removeFromLeft(kColGap);
+    };
+
+    placeCentered(rootNoteCombo, kRootW, kRootH);
+    placeCentered(loopToggle,    kLoopW, kLoopH);
+    placeCentered(gainKnob,      kGainW, kGainH);
+
+    // ADSR sliders share a row, each with a letter label painted below.
+    // Slider takes rowH - kEnvSpace; the label area is drawn in paint().
+    const int sliderH = juce::jmax(40, rowH - kEnvSpace);
+    auto placeSlider = [&](juce::Slider& s)
+    {
+        auto slot = controlsArea.removeFromLeft(kEnvW);
+        s.setBounds(slot.getX(), slot.getY(), kEnvW, sliderH);
+        controlsArea.removeFromLeft(kAdsrGap);
+    };
+    placeSlider(attackSlider);
+    placeSlider(decaySlider);
+    placeSlider(sustainSlider);
+    placeSlider(releaseSlider);
 }
 
 void SamplerStrip::mouseDown(const juce::MouseEvent& e)

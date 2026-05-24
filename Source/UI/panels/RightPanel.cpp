@@ -333,7 +333,11 @@ void RightPanel::resized()
     area.removeFromTop(knobRowTop + knobRowHeight + cardPadY);
 
     // --- Advanced section: eye toggle ABOVE the mini knob row ---
-    constexpr int advancedToggleY = 220;
+    // Vertical gap to the top row above matches the 8 px horizontal
+    // sectionGap between HE/Stereo/Levels cards, so the inter-card
+    // breathing room is visually consistent in both axes. The previous
+    // 36 px gap left an awkward dead zone above Advanced.
+    constexpr int advancedToggleY = 192;
     constexpr int advancedToggleH = 20;
     constexpr int advancedToggleW = 26;     // square-ish eye icon
     advancedToggle.setBounds(12, advancedToggleY, advancedToggleW, advancedToggleH);
@@ -346,9 +350,10 @@ void RightPanel::resized()
         // Mini knob row spans the FULL panel width (toggle is above it now).
         // Component natural size: 48 body + 17 shadow pad × 2 + 11 label
         //   = 82 wide × 93 tall.
-        // 14-px gap below toggle so the mini knob's TOP shadow halo (17 px)
-        // clears the title-notch dip area (16 px deep) by ~7 px.
-        constexpr int miniRowY = advancedToggleY + advancedToggleH + 14;
+        // 8-px gap below toggle (tightened from 14 to claw back vertical
+        // space for the sampler strip — the mini knob's top shadow halo
+        // is 17 px so it still clears the 16-px-deep title-notch dip).
+        constexpr int miniRowY = advancedToggleY + advancedToggleH + 8;
         constexpr int miniW    = 82;
         constexpr int miniH    = 93;
         const int rowLeft  = 12;
@@ -444,7 +449,7 @@ void RightPanel::resized()
     // Sampler strip — sits between the spectrum (above) and the pitch
     // slot (below). Fixed height + small gaps either side; the spectrum
     // gives up the equivalent vertical space from its bottom-anchored area.
-    constexpr int kSamplerStripH   = 124;
+    constexpr int kSamplerStripH   = 174;   // header 24 + waveform 60 + controls 90
     constexpr int kSamplerGapAbove = 8;
     constexpr int kSamplerGapBelow = 8;
 
