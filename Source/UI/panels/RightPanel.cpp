@@ -55,9 +55,9 @@ RightPanel::RightPanel(juce::AudioProcessorValueTreeState& a, PhantomProcessor& 
       binauralToggle(apvts, "a_binaural_mode", "BIN", 1),
       oscilloscope  (p),
       spectrum      (p, a),
+      samplerStrip  (p, a),
       pitchDisplay  (p),
-      levelReadout  (p),
-      samplerStrip  (p, a)
+      levelReadout  (p)
 {
     addAndMakeVisible(saturationKnob);
     addAndMakeVisible(shapeKnob);
@@ -432,7 +432,6 @@ void RightPanel::resized()
     // Each is its own OLED card so digit-count changes inside one don't
     // shift the other.
     constexpr int kPitchSlotH        = 40;
-    constexpr int kPitchSlotGapAbove = 6;
     constexpr int kPitchSlotGapBelow = 6;
 
     const int pitchSlotBottom = bottomRowTop - kPitchSlotGapBelow;
