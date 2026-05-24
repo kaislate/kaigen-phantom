@@ -62,9 +62,20 @@ bool PackGifCache::decodeInto(const juce::File& gifFile, Entry& outEntry)
     outEntry.frames.reserve((size_t) layers);
     outEntry.delaysMs.reserve((size_t) layers);
 
+    // GIF transparency is binary (one palette index = transparent) and is
+    // almost always the canvas region around animated content, not part
+    // of the artistic intent. Compositing each frame onto a solid dark
+    // backdrop at decode time and storing as juce::Image::RGB (no alpha
+    // channel) means the drawing pipeline treats frames as fully opaque
+    // — same as a JPG — so the surrounding pane background never bleeds
+    // through. The backdrop colour matches drawPackCover's ARGB backdrop.
+    constexpr juce::uint8 bgR = 0x1f;
+    constexpr juce::uint8 bgG = 0x21;
+    constexpr juce::uint8 bgB = 0x28;
+
     for (int f = 0; f < layers; ++f)
     {
-        juce::Image img(juce::Image::ARGB, width, height, /*clear*/ false);
+        juce::Image img(juce::Image::RGB, width, height, /*clear*/ false);
         {
             juce::Image::BitmapData bd(img, juce::Image::BitmapData::writeOnly);
             const stbi_uc* src = data + f * frameBytes;
@@ -73,8 +84,24 @@ bool PackGifCache::decodeInto(const juce::File& gifFile, Entry& outEntry)
                 for (int x = 0; x < width; ++x)
                 {
                     const stbi_uc* p = src + (y * width + x) * 4;
-                    bd.setPixelColour(x, y,
-                        juce::Colour::fromRGBA(p[0], p[1], p[2], p[3]));
+                    const juce::uint8 a = p[3];
+                    if (a == 255)
+                    {
+                        bd.setPixelColour(x, y, juce::Colour::fromRGB(p[0], p[1], p[2]));
+                    }
+                    else if (a == 0)
+                    {
+                        bd.setPixelColour(x, y, juce::Colour::fromRGB(bgR, bgG, bgB));
+                    }
+                    else
+                    {
+                        // Soft-edge GIF (rare) — straight alpha blend onto backdrop.
+                        const int ia = 255 - a;
+                        const juce::uint8 r = (juce::uint8) ((p[0] * a + bgR * ia) / 255);
+                        const juce::uint8 g = (juce::uint8) ((p[1] * a + bgG * ia) / 255);
+                        const juce::uint8 b = (juce::uint8) ((p[2] * a + bgB * ia) / 255);
+                        bd.setPixelColour(x, y, juce::Colour::fromRGB(r, g, b));
+                    }
                 }
             }
         }
