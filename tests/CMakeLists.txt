@@ -47,6 +47,8 @@ add_executable(KaigenPhantomTests
     ../Source/Modulation/ModulationEngine.cpp
     ../Source/Pack/PackArchive.cpp
     PackArchiveTests.cpp
+    ../Source/DSP/PhantomSampler.cpp
+    PhantomSamplerTests.cpp
 )
 
 # Embedded fixture pack used by FactoryPackLoadingTests. This is a TEST-ONLY

@@ -95,6 +95,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/Modulation/Macro.cpp
     Source/Modulation/ModulationEngine.cpp
     Source/DSP/SingleKnobReverb.cpp
+    Source/DSP/PhantomSampler.cpp
 )
 
 juce_add_binary_data(PhantomWebUI SOURCES
