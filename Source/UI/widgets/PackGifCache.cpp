@@ -64,18 +64,20 @@ bool PackGifCache::decodeInto(const juce::File& gifFile, Entry& outEntry)
 
     // GIF transparency is binary (one palette index = transparent) and is
     // almost always the canvas region around animated content, not part
-    // of the artistic intent. Compositing each frame onto a solid dark
-    // backdrop at decode time and storing as juce::Image::RGB (no alpha
-    // channel) means the drawing pipeline treats frames as fully opaque
-    // — same as a JPG — so the surrounding pane background never bleeds
-    // through. The backdrop colour matches drawPackCover's ARGB backdrop.
+    // of the artistic intent. Pre-composite each frame onto a solid dark
+    // backdrop and force every output pixel's alpha to 255 so the
+    // drawing pipeline treats frames as fully opaque regardless of the
+    // renderer in use (Direct2D, software, GL). The backdrop colour
+    // matches drawPackCover's ARGB backdrop. ARGB storage (with explicit
+    // alpha=255) was chosen over RGB after observed translucency on the
+    // Direct2D path with the RGB format.
     constexpr juce::uint8 bgR = 0x1f;
     constexpr juce::uint8 bgG = 0x21;
     constexpr juce::uint8 bgB = 0x28;
 
     for (int f = 0; f < layers; ++f)
     {
-        juce::Image img(juce::Image::RGB, width, height, /*clear*/ false);
+        juce::Image img(juce::Image::ARGB, width, height, /*clear*/ false);
         {
             juce::Image::BitmapData bd(img, juce::Image::BitmapData::writeOnly);
             const stbi_uc* src = data + f * frameBytes;
@@ -85,23 +87,25 @@ bool PackGifCache::decodeInto(const juce::File& gifFile, Entry& outEntry)
                 {
                     const stbi_uc* p = src + (y * width + x) * 4;
                     const juce::uint8 a = p[3];
+                    juce::uint8 r, g, b;
                     if (a == 255)
                     {
-                        bd.setPixelColour(x, y, juce::Colour::fromRGB(p[0], p[1], p[2]));
+                        r = p[0]; g = p[1]; b = p[2];
                     }
                     else if (a == 0)
                     {
-                        bd.setPixelColour(x, y, juce::Colour::fromRGB(bgR, bgG, bgB));
+                        r = bgR; g = bgG; b = bgB;
                     }
                     else
                     {
-                        // Soft-edge GIF (rare) — straight alpha blend onto backdrop.
                         const int ia = 255 - a;
-                        const juce::uint8 r = (juce::uint8) ((p[0] * a + bgR * ia) / 255);
-                        const juce::uint8 g = (juce::uint8) ((p[1] * a + bgG * ia) / 255);
-                        const juce::uint8 b = (juce::uint8) ((p[2] * a + bgB * ia) / 255);
-                        bd.setPixelColour(x, y, juce::Colour::fromRGB(r, g, b));
+                        r = (juce::uint8) ((p[0] * a + bgR * ia) / 255);
+                        g = (juce::uint8) ((p[1] * a + bgG * ia) / 255);
+                        b = (juce::uint8) ((p[2] * a + bgB * ia) / 255);
                     }
+                    // Force alpha = 255 always — the pre-composite onto
+                    // bgR/bgG/bgB has handled any source transparency.
+                    bd.setPixelColour(x, y, juce::Colour::fromRGBA(r, g, b, 255));
                 }
             }
         }

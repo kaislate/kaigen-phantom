@@ -1454,6 +1454,11 @@ void PresetBrowser::drawPackCover(juce::Graphics& g,
         g.fillRect(dest);
     }
 
+    // Force opacity to 1.0 before drawing — defensive against any
+    // upstream g.setOpacity(x<1) that would dim the image. juce::Graphics
+    // state isn't reset between widget paints in the same parent.
+    juce::Graphics::ScopedSaveState ss(g);
+    g.setOpacity(1.0f);
     g.drawImage(img, dest.toFloat(),
                 juce::RectanglePlacement::fillDestination);
 }
