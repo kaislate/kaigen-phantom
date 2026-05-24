@@ -260,7 +260,8 @@ void PresetManager::scanPresetsFromDisk()
         }
 
         info.hasCoverArt = packDir.getChildFile("cover.png").existsAsFile()
-                        || packDir.getChildFile("cover.jpg").existsAsFile();
+                        || packDir.getChildFile("cover.jpg").existsAsFile()
+                        || packDir.getChildFile("cover.gif").existsAsFile();
         info.isReadOnly = (packName == kFactoryPackName);
         packs[packName] = info;
     };
@@ -370,7 +371,8 @@ void PresetManager::loadFactoryPacksFromBinaryData()
             pp.packJsonBytes.append(data, (size_t) size);
         }
         else if (fileName.equalsIgnoreCase("cover.png")
-              || fileName.equalsIgnoreCase("cover.jpg"))
+              || fileName.equalsIgnoreCase("cover.jpg")
+              || fileName.equalsIgnoreCase("cover.gif"))
         {
             pp.info.hasCoverArt = true;
         }
@@ -464,6 +466,8 @@ std::vector<PackInfo> PresetManager::getAllPacks() const
 juce::File PresetManager::getPackCoverFile(const juce::String& packName) const
 {
     auto packDir = getPresetsRootDirectory().getChildFile(packName);
+    auto gif = packDir.getChildFile("cover.gif");
+    if (gif.existsAsFile()) return gif;
     auto png = packDir.getChildFile("cover.png");
     if (png.existsAsFile()) return png;
     auto jpg = packDir.getChildFile("cover.jpg");
@@ -850,9 +854,23 @@ bool PresetManager::setPackCover(const juce::String& packName, const juce::File&
     auto packDir = getPresetsRootDirectory().getChildFile(packName);
     if (! packDir.isDirectory()) return false;
 
-    // Load -> resize to fit 512x512 -> write as PNG. Format is forced to
-    // PNG regardless of source extension so the rest of the code only
-    // needs to look for cover.png / cover.jpg.
+    // Always wipe any prior cover.* — only one stays.
+    packDir.getChildFile("cover.png").deleteFile();
+    packDir.getChildFile("cover.jpg").deleteFile();
+    packDir.getChildFile("cover.gif").deleteFile();
+
+    // GIFs are stored verbatim so animation frames + timing are preserved.
+    // JUCE's image pipeline only decodes the first frame; the browser uses
+    // a separate animated-GIF player on the file directly.
+    if (sourceImage.getFileExtension().equalsIgnoreCase(".gif"))
+    {
+        auto destGif = packDir.getChildFile("cover.gif");
+        if (! sourceImage.copyFileTo(destGif)) return false;
+        rescan();
+        return true;
+    }
+
+    // PNG / JPG path — load, resize to fit 512x512, write as PNG.
     auto img = juce::ImageFileFormat::loadFrom(sourceImage);
     if (! img.isValid()) return false;
 
@@ -866,11 +884,7 @@ bool PresetManager::setPackCover(const juce::String& packName, const juce::File&
                             juce::Graphics::highResamplingQuality);
     }
 
-    // Remove a stale cover.jpg if present so the new cover.png wins.
-    packDir.getChildFile("cover.jpg").deleteFile();
-
     auto destPng = packDir.getChildFile("cover.png");
-    destPng.deleteFile();
     juce::FileOutputStream out(destPng);
     if (! out.openedOk()) return false;
 

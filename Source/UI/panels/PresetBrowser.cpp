@@ -273,7 +273,7 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
         auto chooser = std::make_shared<juce::FileChooser>(
             "Choose cover art",
             juce::File::getSpecialLocation(juce::File::userPicturesDirectory),
-            "*.png;*.jpg;*.jpeg");
+            "*.png;*.jpg;*.jpeg;*.gif");
         chooser->launchAsync(juce::FileBrowserComponent::openMode
                              | juce::FileBrowserComponent::canSelectFiles,
             [this, packName, chooser](const juce::FileChooser& fc)
@@ -704,16 +704,118 @@ void PresetBrowser::paint(juce::Graphics& g)
         g.setColour(juce::Colour(kBorderSoft));
         g.drawRoundedRectangle(previewBox.toFloat().reduced(0.5f), 3.0f, 1.0f);
 
+        // Packs-mode selection branch — show pack metadata + cover when
+        // the user has single-clicked a pack tile. Wins over the preset
+        // selection branch since Packs mode hides the row table anyway.
+        const bool packSelected = isPacksMode()
+                                && selectedPackCardIdx >= 0
+                                && selectedPackCardIdx < (int) packCards.size();
+
         const bool hasSelection = selectedPreviewRow >= 0
                                 && selectedPreviewRow < (int) rows.size()
                                 && ! rows[(size_t) selectedPreviewRow].isHeader;
 
-        if (! hasSelection)
+        if (packSelected)
+        {
+            const auto& pc = packCards[(size_t) selectedPackCardIdx];
+            const auto packInfos = processor.getPresetManager().getAllPacks();
+            auto pit = std::find_if(packInfos.begin(), packInfos.end(),
+                [&](const kaigen::phantom::PackInfo& p) { return p.name == pc.name; });
+
+            auto inner = previewBox.reduced(14, 14);
+
+            // Cover image — large portrait at the top, square aspect, centred.
+            const int coverSize = juce::jmin(inner.getWidth(), 220);
+            auto coverArea = inner.removeFromTop(coverSize);
+            inner.removeFromTop(12);
+
+            const auto coverFile = processor.getPresetManager()
+                                            .getPackCoverFile(pc.name);
+            if (coverFile.existsAsFile())
+            {
+                auto img = juce::ImageFileFormat::loadFrom(coverFile);
+                if (img.isValid())
+                {
+                    g.setColour(juce::Colour(0x40000000));
+                    g.fillRect(coverArea);
+                    g.drawImage(img, coverArea.toFloat(),
+                                juce::RectanglePlacement::centred);
+                }
+            }
+            else
+            {
+                // Fallback initial-letter art (matches pack-tile style).
+                const auto seed = (juce::uint32) pc.name.hashCode();
+                const float hue = (float) (seed % 360) / 360.0f;
+                juce::ColourGradient grad(
+                    juce::Colour::fromHSV(hue, 0.55f, 0.80f, 1.0f),
+                    (float) coverArea.getX(), (float) coverArea.getY(),
+                    juce::Colour::fromHSV(std::fmod(hue + 0.12f, 1.0f),
+                                            0.45f, 0.55f, 1.0f),
+                    (float) coverArea.getRight(), (float) coverArea.getBottom(),
+                    false);
+                g.setGradientFill(grad);
+                g.fillRect(coverArea);
+                g.setColour(juce::Colour(0xd9FFFFFF));
+                g.setFont(juce::FontOptions(Theme::uiFontFamily(),
+                    (float) coverArea.getHeight() * 0.55f, juce::Font::plain));
+                g.drawText(pc.displayName.substring(0, 1).toUpperCase(),
+                           coverArea, juce::Justification::centred, false);
+            }
+
+            // Name (bold, large)
+            g.setColour(juce::Colour(kTextStrong));
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 18.0f, juce::Font::bold));
+            g.drawText(pc.displayName, inner.removeFromTop(24),
+                       juce::Justification::topLeft, true);
+            inner.removeFromTop(6);
+
+            // Preset count.
+            g.setColour(juce::Colour(kTextLabel));
+            g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::plain));
+            g.drawText(juce::String(pc.presetCount) + " preset"
+                        + (pc.presetCount == 1 ? "" : "s"),
+                       inner.removeFromTop(16),
+                       juce::Justification::topLeft, false);
+            inner.removeFromTop(8);
+
+            // Designer + description from PackInfo.
+            if (pit != packInfos.end())
+            {
+                auto drawKV = [&](const juce::String& label, const juce::String& value) {
+                    if (value.isEmpty()) return;
+                    auto row = inner.removeFromTop(18);
+                    g.setColour(juce::Colour(kTextLabel));
+                    g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::plain));
+                    const auto labelW = (int) g.getCurrentFont().getStringWidthFloat(label + " ") + 2;
+                    g.drawText(label, row.removeFromLeft(labelW),
+                               juce::Justification::topLeft, false);
+                    g.setColour(juce::Colour(kTextBody));
+                    g.drawText(value, row, juce::Justification::topLeft, true);
+                    inner.removeFromTop(3);
+                };
+                drawKV("Designer:", pit->designer);
+
+                if (pit->description.isNotEmpty())
+                {
+                    inner.removeFromTop(10);
+                    g.setColour(juce::Colour(kBorderSoft));
+                    g.drawLine((float) inner.getX(), (float) inner.getY(),
+                                (float) inner.getRight(), (float) inner.getY(), 1.0f);
+                    inner.removeFromTop(10);
+                    g.setColour(juce::Colour(kTextBody));
+                    g.setFont(juce::FontOptions(Theme::uiFontFamily(), 12.0f, juce::Font::plain));
+                    g.drawFittedText(pit->description, inner, juce::Justification::topLeft, 8);
+                }
+            }
+        }
+        else if (! hasSelection)
         {
             g.setColour(juce::Colour(kTextDim));
             g.setFont(juce::FontOptions(Theme::uiFontFamily(), 13.0f, juce::Font::plain));
-            g.drawText("Select a preset", previewBox.reduced(14),
-                        juce::Justification::centredTop, true);
+            g.drawText(isPacksMode() ? "Click a pack to inspect" : "Select a preset",
+                       previewBox.reduced(14),
+                       juce::Justification::centredTop, true);
         }
         else
         {
@@ -870,6 +972,14 @@ void PresetBrowser::paint(juce::Graphics& g)
             {
                 g.setColour(juce::Colour(0x14000000));
                 g.fillRect(cardOuter);
+            }
+
+            // Persistent selection ring — single-click selects a pack
+            // without drilling in (double-click drills in).
+            if ((int) i == selectedPackCardIdx)
+            {
+                g.setColour(juce::Colour(0xffFFFFFF));
+                g.drawRect(cardOuter, 2);
             }
         }
         return;   // skip the table rendering when in Explore.
@@ -1339,6 +1449,35 @@ void PresetBrowser::mouseMove(const juce::MouseEvent& e)
     }
 }
 
+void PresetBrowser::mouseDoubleClick(const juce::MouseEvent& e)
+{
+    // In Packs mode, double-click on a pack tile drills into the
+    // pack's preset list. (Single-click selects in mouseDown.)
+    if (! isPacksMode()) return;
+
+    for (size_t i = 0; i < packCards.size(); ++i)
+    {
+        if (! packCardBounds((int) i).translated(0, -listScrollY)
+                .contains(e.getPosition())) continue;
+
+        const auto& pc = packCards[i];
+        for (size_t ci = 0; ci < categories.size(); ++ci)
+        {
+            if (categories[ci].kind == CategoryKind::Pack
+                && categories[ci].packFilter == pc.name)
+            {
+                activeCategoryIdx = (int) ci;
+                selectedPackCardIdx = -1;
+                listScrollY = 0;
+                rebuildRows();
+                repaint();
+                return;
+            }
+        }
+        return;
+    }
+}
+
 void PresetBrowser::mouseExit(const juce::MouseEvent&)
 {
     if (hoverRow != -1 || hoverCategoryIdx != -1 || hoverPackCardIdx != -1)
@@ -1366,6 +1505,7 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
             {
                 activeCategoryIdx = (int) i;
                 listScrollY = 0;
+                selectedPackCardIdx = -1;
                 rebuildRows();
                 searchField.setTextToShowWhenEmpty(
                     juce::String(juce::CharPointer_UTF8(
@@ -1378,30 +1518,27 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
         }
     }
 
-    // Explore mode: clicking a pack card → switch sidebar to that pack's
-    // category and rebuild as a list view.
+    // Packs mode: single-click selects a pack tile (populates preview pane
+    // + activates AUTHORING buttons). Double-click drills into the pack
+    // (handled in mouseDoubleClick). Clicking empty space deselects.
     if (isPacksMode())
     {
+        int hit = -1;
         for (size_t i = 0; i < packCards.size(); ++i)
         {
             if (packCardBounds((int) i).translated(0, -listScrollY)
                     .contains(e.getPosition()))
             {
-                const auto& pc = packCards[i];
-                for (size_t ci = 0; ci < categories.size(); ++ci)
-                {
-                    if (categories[ci].kind == CategoryKind::Pack
-                        && categories[ci].packFilter == pc.name)
-                    {
-                        activeCategoryIdx = (int) ci;
-                        rebuildRows();
-                        repaint();
-                        break;
-                    }
-                }
-                return;
+                hit = (int) i;
+                break;
             }
         }
+        if (hit != selectedPackCardIdx)
+        {
+            selectedPackCardIdx = hit;
+            repaint();
+        }
+        return;
     }
 
     // Column-header click → toggle sort. Cycle per column:
@@ -1483,6 +1620,14 @@ juce::String PresetBrowser::activePackName() const
         return {};
     const auto& cat = categories[(size_t) activeCategoryIdx];
     if (cat.kind == CategoryKind::Pack) return cat.packFilter;
+
+    // In Packs mode, the single-click selection acts as the active pack
+    // for the AUTHORING buttons without forcing a drill-in.
+    if (cat.kind == CategoryKind::Packs
+        && selectedPackCardIdx >= 0
+        && selectedPackCardIdx < (int) packCards.size())
+        return packCards[(size_t) selectedPackCardIdx].name;
+
     return {};
 }
 

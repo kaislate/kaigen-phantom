@@ -35,6 +35,7 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
+    void mouseDoubleClick(const juce::MouseEvent& e) override;
     void mouseMove(const juce::MouseEvent& e) override;
     void mouseExit(const juce::MouseEvent& e) override;
     void mouseWheelMove(const juce::MouseEvent& e,
@@ -93,7 +94,8 @@ private:
         int          presetCount { 0 };
     };
     std::vector<PackCard> packCards;
-    int hoverPackCardIdx { -1 };
+    int hoverPackCardIdx    { -1 };
+    int selectedPackCardIdx { -1 };   // single-click in Packs mode
 
     void rebuildPackCards();
     juce::Rectangle<int> packCardBounds(int idx) const;
