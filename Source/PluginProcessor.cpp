@@ -218,7 +218,33 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     }
 
     const int sourceSel = (int) inputSourceParam->load();
-    if (sourceSel == 2)   // 0=Input, 1=Sidechain (existing path), 2=Sampler
+    if (sourceSel == 1)   // Sidechain
+    {
+        // Copy the sidechain bus over the main buffer so the engines see
+        // it as their primary input. The existing DualEngineHost sidechain
+        // argument still receives the bus separately for envelope ducking
+        // (see sidechainPtr extraction further down in processBlock).
+        //
+        // Mirror the channel-offset pattern used by that later extraction:
+        // JUCE packs all enabled input buses into `buffer`, with the
+        // sidechain channels starting at `getTotalNumInputChannels() - nSCBusChannels`.
+        // If no sidechain is connected, fall through and leave the buffer
+        // as main-input audio (graceful fallback).
+        const int nSCBusChannels = getChannelCountOfBus(true, 1);
+        if (nSCBusChannels > 0)
+        {
+            const int scStartCh = getTotalNumInputChannels() - nSCBusChannels;
+            if (scStartCh >= nCh && scStartCh + nSCBusChannels <= buffer.getNumChannels())
+            {
+                // Sidechain channels (>= nCh) and main channels (< nCh) don't overlap,
+                // so copying sidechain → main in-place on the same backing buffer is safe.
+                for (int ch = 0; ch < nCh; ++ch)
+                    buffer.copyFrom(ch, 0, buffer,
+                                    scStartCh + juce::jmin(ch, nSCBusChannels - 1), 0, n);
+            }
+        }
+    }
+    else if (sourceSel == 2)   // Sampler
     {
         // Overwrite the main buffer with the sampler's output so the rest
         // of processBlock (input peak, FFT capture, engine input) sees
@@ -228,7 +254,6 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
                             juce::jmin(ch, samplerOutputBuffer.getNumChannels() - 1), 0, n);
     }
     // sourceSel == 0 (Input): nothing to do — buffer already holds main input.
-    // sourceSel == 1 (Sidechain): existing DualEngineHost sidechain code handles it.
 
     // ── Input Gain → engine detection only ────────────────────────────
     // Buffer audio stays at unity. The gain is forwarded to both engines where
