@@ -242,6 +242,55 @@ void Spectrum::drawPane(juce::Graphics& g,
 {
     drawGrid(g, paneW, paneH);
 
+    // ── Legend (top-centre, swatches matching the actual curve colours) ──
+    // INPUT is the dry pre-engine signal (gray curve); OUTPUT is the
+    // post-engine signal (white curve, includes HPF/LPF-filtered phantom
+    // plus dry pass-through in Combine/Replace modes); PEAK is the
+    // peak-hold envelope of OUTPUT. Helps disambiguate why an HPF may
+    // not appear to attenuate the dry low band: in Combine mode the dry
+    // pass-through bypasses the filter entirely.
+    {
+        constexpr float kRow      = 12.0f;
+        constexpr float kSwatch   = 8.0f;
+        constexpr float kGap      = 4.0f;
+        constexpr float kItemGap  = 12.0f;
+        constexpr float kFontPx   = 9.5f;
+
+        juce::Font lf(juce::FontOptions(kFontPx, juce::Font::plain));
+        g.setFont(lf);
+
+        // Pre-measure item widths so we can centre the whole legend.
+        const float wIn   = lf.getStringWidthFloat("INPUT");
+        const float wOut  = lf.getStringWidthFloat("OUTPUT");
+        const float wPeak = lf.getStringWidthFloat("PEAK");
+        const float itemW = (kSwatch + kGap + wIn)
+                         + kItemGap + (kSwatch + kGap + wOut)
+                         + (peakBins != nullptr ? (kItemGap + kSwatch + kGap + wPeak) : 0.0f);
+
+        float x = (paneW - itemW) * 0.5f;
+        const float y = 2.0f;
+
+        auto drawItem = [&](juce::Colour swatch, const juce::String& label, bool line)
+        {
+            g.setColour(swatch);
+            if (line)
+                g.fillRect(x, y + kRow * 0.5f - 0.5f, kSwatch, 1.5f);
+            else
+                g.fillRect(x, y + (kRow - kSwatch) * 0.5f, kSwatch, kSwatch);
+            x += kSwatch + kGap;
+            g.setColour(juce::Colour(0x88ffffff));
+            g.drawText(label,
+                       juce::Rectangle<float>(x, y, lf.getStringWidthFloat(label) + 1.0f, kRow),
+                       juce::Justification::centredLeft, false);
+            x += lf.getStringWidthFloat(label) + kItemGap;
+        };
+
+        drawItem(juce::Colour(0xb0a0a0af), "INPUT",  false);   // matches gray stroke
+        drawItem(juce::Colour(0xe6ffffff), "OUTPUT", false);   // matches white stroke
+        if (peakBins != nullptr)
+            drawItem(juce::Colour(0x80ffffff), "PEAK", true);  // matches peak line
+    }
+
     const auto inPts  = buildCurvePoints(inBins,  paneW, paneH);
     const auto outPts = buildCurvePoints(outBins, paneW, paneH);
 
