@@ -175,6 +175,10 @@ PresetBrowser::PresetBrowser(PhantomProcessor& p, juce::AudioProcessorValueTreeS
     deleteButton.setVisible(false);
     addAndMakeVisible(deleteButton);
 
+    // Animated GIF cover player — added but hidden until a pack with a
+    // cover.gif is single-clicked in Packs mode.
+    addChildComponent(coverGifPlayer);
+
 #if DEVELOPER_MODE
     auto setupAuthoringButton = [this](juce::TextButton& b)
     {
@@ -376,6 +380,12 @@ void PresetBrowser::changeListenerCallback(juce::ChangeBroadcaster*)
     rebuildCategories();
     rebuildPackCards();
     rebuildRows();
+    // A rescan may have replaced/removed the selected pack's cover file
+    // (setPackCover, deletePack, etc.) — drop the cached GIF so the next
+    // sync reloads from disk.
+    coverGifPlayer.clear();
+    coverGifPackName.clear();
+    syncCoverGifPlayer();
     repaint();
 }
 
@@ -388,12 +398,16 @@ void PresetBrowser::visibilityChanged()
         hoverRow = -1;
         hoverCategoryIdx = -1;
         hoverPackCardIdx = -1;
+        selectedPackCardIdx = -1;
         selectedPreviewRow = -1;
         sidebarScrollY = 0;
         listScrollY = 0;
         sortColumn = SortColumn::None;
         sortAscending = true;
         deleteButton.setVisible(false);
+        coverGifPlayer.clear();
+        coverGifPlayer.setVisible(false);
+        coverGifPackName.clear();
         searchField.setText("", juce::dontSendNotification);
         return;
     }
@@ -731,7 +745,9 @@ void PresetBrowser::paint(juce::Graphics& g)
 
             const auto coverFile = processor.getPresetManager()
                                             .getPackCoverFile(pc.name);
-            if (coverFile.existsAsFile())
+            const bool isGifCover = coverFile.existsAsFile()
+                && coverFile.getFileExtension().equalsIgnoreCase(".gif");
+            if (coverFile.existsAsFile() && ! isGifCover)
             {
                 auto img = juce::ImageFileFormat::loadFrom(coverFile);
                 if (img.isValid())
@@ -741,6 +757,14 @@ void PresetBrowser::paint(juce::Graphics& g)
                     g.drawImage(img, coverArea.toFloat(),
                                 juce::RectanglePlacement::centred);
                 }
+            }
+            else if (isGifCover)
+            {
+                // GifPlayer is a child component painting this rect;
+                // just fill the background so transparent GIF frames
+                // don't show whatever's underneath.
+                g.setColour(juce::Colour(0x40000000));
+                g.fillRect(coverArea);
             }
             else
             {
@@ -1234,6 +1258,60 @@ juce::Rectangle<int> PresetBrowser::previewDeleteButtonBounds() const
     return juce::Rectangle<int>(box.getX(), box.getBottom() - 24, 80, 22);
 }
 
+juce::Rectangle<int> PresetBrowser::packPreviewCoverBounds() const
+{
+    // Mirrors the cover-area math inside the Packs-mode paint branch:
+    // inner = previewBox.reduced(14,14), then a square inner.removeFromTop
+    // bounded by min(width, 220). Keep both code paths in sync.
+    auto previewBox = previewBounds().reduced(10, 0).withTrimmedTop(28).withTrimmedBottom(10);
+    auto inner = previewBox.reduced(14, 14);
+    const int coverSize = juce::jmin(inner.getWidth(), 220);
+    return inner.removeFromTop(coverSize);
+}
+
+void PresetBrowser::syncCoverGifPlayer()
+{
+    const bool packSelected = isPacksMode()
+                            && selectedPackCardIdx >= 0
+                            && selectedPackCardIdx < (int) packCards.size();
+
+    if (! packSelected)
+    {
+        if (coverGifPackName.isNotEmpty())
+        {
+            coverGifPlayer.clear();
+            coverGifPlayer.setVisible(false);
+            coverGifPackName.clear();
+        }
+        return;
+    }
+
+    const auto& pc = packCards[(size_t) selectedPackCardIdx];
+    const auto coverFile = processor.getPresetManager().getPackCoverFile(pc.name);
+    const bool isGif = coverFile.existsAsFile()
+        && coverFile.getFileExtension().equalsIgnoreCase(".gif");
+
+    if (! isGif)
+    {
+        if (coverGifPackName.isNotEmpty())
+        {
+            coverGifPlayer.clear();
+            coverGifPlayer.setVisible(false);
+            coverGifPackName.clear();
+        }
+        return;
+    }
+
+    if (coverGifPackName != pc.name)
+    {
+        coverGifPlayer.load(coverFile);
+        coverGifPackName = pc.name;
+    }
+    coverGifPlayer.setBounds(packPreviewCoverBounds());
+    coverGifPlayer.setVisible(true);
+    coverGifPlayer.toFront(false);
+}
+
 int PresetBrowser::contentHeightForList() const
 {
     if (isPacksMode())
@@ -1347,6 +1425,8 @@ void PresetBrowser::resized()
     searchField.setBounds(searchBarBounds().reduced(12, 6));
     if (deleteButton.isVisible())
         deleteButton.setBounds(previewDeleteButtonBounds());
+    if (coverGifPlayer.isVisible())
+        coverGifPlayer.setBounds(packPreviewCoverBounds());
 
 #if DEVELOPER_MODE
     {
@@ -1470,6 +1550,7 @@ void PresetBrowser::mouseDoubleClick(const juce::MouseEvent& e)
                 selectedPackCardIdx = -1;
                 listScrollY = 0;
                 rebuildRows();
+                syncCoverGifPlayer();
                 repaint();
                 return;
             }
@@ -1507,6 +1588,7 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
                 listScrollY = 0;
                 selectedPackCardIdx = -1;
                 rebuildRows();
+                syncCoverGifPlayer();
                 searchField.setTextToShowWhenEmpty(
                     juce::String(juce::CharPointer_UTF8(
                         isPacksMode() ? "Search packs\xe2\x80\xa6"
@@ -1536,6 +1618,7 @@ void PresetBrowser::mouseDown(const juce::MouseEvent& e)
         if (hit != selectedPackCardIdx)
         {
             selectedPackCardIdx = hit;
+            syncCoverGifPlayer();
             repaint();
         }
         return;

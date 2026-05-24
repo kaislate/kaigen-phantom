@@ -4,6 +4,7 @@
 #include <vector>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "../widgets/GifPlayer.h"
 
 class PhantomProcessor;
 
@@ -83,7 +84,9 @@ private:
 
     juce::Rectangle<int> previewBounds() const;
     juce::Rectangle<int> previewDeleteButtonBounds() const;
+    juce::Rectangle<int> packPreviewCoverBounds() const;
     void deleteSelectedPreset();
+    void syncCoverGifPlayer();
 
     /** Visible pack cards in Explore mode. Computed in rebuildPackCards()
      *  from PresetManager::getAllPacks(); updated whenever the row list
@@ -136,6 +139,12 @@ private:
     juce::TextButton closeButton;
     juce::TextButton deleteButton { "Delete" };
     juce::TextEditor searchField;
+
+    // Animated cover-art player — only visible when the selected pack's
+    // cover is a .gif. Tracked alongside selection state so we can avoid
+    // re-decoding on every repaint.
+    GifPlayer coverGifPlayer;
+    juce::String coverGifPackName;   // empty when no gif loaded
 
 #if DEVELOPER_MODE
     juce::TextButton newPackButton       { "+ New Pack" };
