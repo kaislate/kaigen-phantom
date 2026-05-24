@@ -113,6 +113,9 @@ PhantomSampler::PhantomSampler()
 {
     for (int i = 0; i < kNumVoices; ++i)
         synth.addVoice(new PhantomSamplerVoice());
+
+    for (int i = 0; i < synth.getNumVoices(); ++i)
+        phantomVoices.push_back(static_cast<PhantomSamplerVoice*>(synth.getVoice(i)));
 }
 
 void PhantomSampler::prepareToPlay(double sampleRate, int /*blockSize*/)
@@ -152,32 +155,24 @@ bool PhantomSampler::hasSample() const noexcept
 
 void PhantomSampler::setRootNote(int n) noexcept
 {
-    for (int i = 0; i < synth.getNumVoices(); ++i)
-        if (auto* v = dynamic_cast<PhantomSamplerVoice*>(synth.getVoice(i)))
-            v->setRootNote(n);
+    for (auto* v : phantomVoices) v->setRootNote(n);
 }
 
 void PhantomSampler::setLoopEnabled(bool l) noexcept
 {
-    for (int i = 0; i < synth.getNumVoices(); ++i)
-        if (auto* v = dynamic_cast<PhantomSamplerVoice*>(synth.getVoice(i)))
-            v->setLoopEnabled(l);
+    for (auto* v : phantomVoices) v->setLoopEnabled(l);
 }
 
 void PhantomSampler::setGainDb(float gainDb) noexcept
 {
     const float linear = juce::Decibels::decibelsToGain(gainDb);
-    for (int i = 0; i < synth.getNumVoices(); ++i)
-        if (auto* v = dynamic_cast<PhantomSamplerVoice*>(synth.getVoice(i)))
-            v->setGainLinear(linear);
+    for (auto* v : phantomVoices) v->setGainLinear(linear);
 }
 
 void PhantomSampler::setEnvelope(float a, float d, float s, float r)
 {
     juce::ADSR::Parameters p{ a, d, juce::jlimit(0.0f, 1.0f, s), r };
-    for (int i = 0; i < synth.getNumVoices(); ++i)
-        if (auto* v = dynamic_cast<PhantomSamplerVoice*>(synth.getVoice(i)))
-            v->setEnvelopeParameters(p);
+    for (auto* v : phantomVoices) v->setEnvelopeParameters(p);
 }
 
 int PhantomSampler::getActiveVoiceCount() const noexcept
@@ -194,11 +189,10 @@ int PhantomSampler::getPlayheadPosition() const noexcept
     // to lowest — a cheap, deterministic heuristic for the SamplerStrip's
     // playhead overlay. Not strictly "most recently started"; JUCE's
     // Synthesiser voice allocator doesn't guarantee that ordering.
-    for (int i = synth.getNumVoices() - 1; i >= 0; --i)
+    for (auto it = phantomVoices.rbegin(); it != phantomVoices.rend(); ++it)
     {
-        if (auto* v = dynamic_cast<PhantomSamplerVoice*>(synth.getVoice(i)))
-            if (v->isVoiceActive())
-                return v->getPlayheadPosition();
+        if ((*it)->isVoiceActive())
+            return (*it)->getPlayheadPosition();
     }
     return -1;
 }

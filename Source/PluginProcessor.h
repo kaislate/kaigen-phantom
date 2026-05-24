@@ -259,6 +259,18 @@ private:
     std::atomic<float>*               reverbMixParam    { nullptr };
     std::atomic<float>*               reverbSourceParam { nullptr };  // 0 = Post, 1 = Phantom
 
+    // Sampler params cached once at construction for the audio thread —
+    // avoids 8 hashmap lookups per block. Same pattern as the reverb
+    // params above.
+    std::atomic<float>* inputSourceParam     { nullptr };
+    std::atomic<float>* samplerRootParam     { nullptr };
+    std::atomic<float>* samplerLoopParam     { nullptr };
+    std::atomic<float>* samplerGainParam     { nullptr };
+    std::atomic<float>* samplerAParam        { nullptr };
+    std::atomic<float>* samplerDParam        { nullptr };
+    std::atomic<float>* samplerSParam        { nullptr };
+    std::atomic<float>* samplerRParam        { nullptr };
+
     // ─── MIDI-playable sampler (Input Source = 2) ─────────────────────────
     // PhantomSampler owns the juce::Synthesiser + voices. Its output is
     // rendered into samplerOutputBuffer every processBlock so the

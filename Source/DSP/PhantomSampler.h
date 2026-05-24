@@ -2,6 +2,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <mutex>
+#include <vector>
 
 namespace kaigen::phantom
 {
@@ -109,6 +110,11 @@ private:
     // a SpinLock or atomic-pointer swap would be a follow-up if profiling
     // flags this on a contended system.
     std::mutex        soundsMutex;
+
+    // Cached PhantomSamplerVoice* — populated in the ctor since voices
+    // are added once and never replaced. Removes 32 dynamic_casts per
+    // audio block compared to walking synth.getVoice(i) every setter call.
+    std::vector<PhantomSamplerVoice*> phantomVoices;
 };
 
 } // namespace kaigen::phantom

@@ -50,6 +50,15 @@ PhantomProcessor::PhantomProcessor()
     // with a single relaxed load (no APVTS lookup on the audio thread).
     reverbMixParam    = apvts.getRawParameterValue(ParamID::REVERB_MIX);
     reverbSourceParam = apvts.getRawParameterValue(ParamID::REVERB_SOURCE);
+
+    inputSourceParam = apvts.getRawParameterValue(ParamID::INPUT_SOURCE);
+    samplerRootParam = apvts.getRawParameterValue(ParamID::SAMPLER_ROOT_NOTE);
+    samplerLoopParam = apvts.getRawParameterValue(ParamID::SAMPLER_LOOP);
+    samplerGainParam = apvts.getRawParameterValue(ParamID::SAMPLER_GAIN);
+    samplerAParam    = apvts.getRawParameterValue(ParamID::SAMPLER_A);
+    samplerDParam    = apvts.getRawParameterValue(ParamID::SAMPLER_D);
+    samplerSParam    = apvts.getRawParameterValue(ParamID::SAMPLER_S);
+    samplerRParam    = apvts.getRawParameterValue(ParamID::SAMPLER_R);
 }
 
 PhantomProcessor::~PhantomProcessor()
@@ -196,20 +205,17 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     samplerOutputBuffer.clear();
     {
         // Push current APVTS values into the voices once per block.
-        phantomSampler.setRootNote(
-            (int) apvts.getRawParameterValue(ParamID::SAMPLER_ROOT_NOTE)->load());
-        phantomSampler.setLoopEnabled(
-            apvts.getRawParameterValue(ParamID::SAMPLER_LOOP)->load() > 0.5f);
-        phantomSampler.setGainDb(apvts.getRawParameterValue(ParamID::SAMPLER_GAIN)->load());
-        phantomSampler.setEnvelope(
-            apvts.getRawParameterValue(ParamID::SAMPLER_A)->load(),
-            apvts.getRawParameterValue(ParamID::SAMPLER_D)->load(),
-            apvts.getRawParameterValue(ParamID::SAMPLER_S)->load(),
-            apvts.getRawParameterValue(ParamID::SAMPLER_R)->load());
+        phantomSampler.setRootNote((int) samplerRootParam->load());
+        phantomSampler.setLoopEnabled(samplerLoopParam->load() > 0.5f);
+        phantomSampler.setGainDb(samplerGainParam->load());
+        phantomSampler.setEnvelope(samplerAParam->load(),
+                                    samplerDParam->load(),
+                                    samplerSParam->load(),
+                                    samplerRParam->load());
         phantomSampler.renderNextBlock(samplerOutputBuffer, midiMessages);
     }
 
-    const int sourceSel = (int) apvts.getRawParameterValue(ParamID::INPUT_SOURCE)->load();
+    const int sourceSel = (int) inputSourceParam->load();
     if (sourceSel == 2)   // 0=Input, 1=Sidechain (existing path), 2=Sampler
     {
         // Overwrite the main buffer with the sampler's output so the rest
