@@ -16,7 +16,8 @@ class PhantomMiniKnob : public juce::Component,
 public:
     PhantomMiniKnob(juce::AudioProcessorValueTreeState& apvts,
                     juce::StringRef paramID,
-                    const juce::String& label = {});
+                    const juce::String& label = {},
+                    bool darkBackground = false);
     ~PhantomMiniKnob() override;
 
     void paint(juce::Graphics& g) override;
@@ -55,8 +56,13 @@ private:
     juce::String formatValue();
 
     /** Cached static layers (body + shadow + OLED bezel + arc track), shared
-     *  across all PhantomMiniKnob instances. Built lazily on first paint. */
-    static const juce::Image& getCachedStaticLayers();
+     *  across all PhantomMiniKnob instances with the same style. The dark
+     *  variant drops the white shadow halo + uses a dark body gradient so
+     *  the knob blends with a dark section background (e.g. SamplerStrip)
+     *  instead of standing out with phantom-white highlights. */
+    static const juce::Image& getCachedStaticLayers(bool darkBackground);
+
+    bool darkStyle { false };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomMiniKnob)
 };

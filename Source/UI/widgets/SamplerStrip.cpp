@@ -25,7 +25,7 @@ SamplerStrip::SamplerStrip(PhantomProcessor& p, juce::AudioProcessorValueTreeSta
       sourceToggle(a, ParamID::INPUT_SOURCE,
                     juce::StringArray{ "Input", "Sidechain", "Sampler" }, 1),
       loopToggle(a, ParamID::SAMPLER_LOOP, "Loop"),
-      gainKnob(a, ParamID::SAMPLER_GAIN, "Gain")
+      gainKnob(a, ParamID::SAMPLER_GAIN, "Gain", /*darkBackground=*/true)
 {
     addAndMakeVisible(sourceToggle);
 
@@ -56,6 +56,16 @@ SamplerStrip::SamplerStrip(PhantomProcessor& p, juce::AudioProcessorValueTreeSta
     setupSlider(decaySlider,   ParamID::SAMPLER_D, decayAttach);
     setupSlider(sustainSlider, ParamID::SAMPLER_S, sustainAttach);
     setupSlider(releaseSlider, ParamID::SAMPLER_R, releaseAttach);
+
+    // If the plugin opened with a sample already loaded (restored from
+    // plugin state by PluginProcessor::setStateInformation before the
+    // editor exists), the thumbnail wasn't built — build it now from
+    // the processor's AudioThumbnail which setSampleFromBytes seeded.
+    if (processor.getSampleFilename().isNotEmpty()
+        && processor.getPhantomSampler().hasSample())
+    {
+        rebuildWaveformThumbnail();
+    }
 
     // 30 Hz playhead refresh while voices are active.
     startTimerHz(30);
@@ -261,14 +271,16 @@ void SamplerStrip::loadSampleAsync(const juce::File& file)
     juce::Thread::launch([self, file, myGen]
     {
         // Cheap up-front size check via stat() - avoids reading hundreds of MB
-        // into memory just to reject afterwards.
-        if (file.getSize() > 5 * 1024 * 1024)
+        // into memory just to reject afterwards. 50MB is enough for ~5 min of
+        // 44.1k/16-bit stereo or several minutes of FLAC/MP3; preset state
+        // grows correspondingly when the sample is embedded.
+        if (file.getSize() > 50 * 1024 * 1024)
         {
             juce::MessageManager::callAsync([self, myGen] {
                 if (auto* pp = self.getComponent()) {
                     if (pp->loadGeneration.load(std::memory_order_relaxed) != myGen) return;
                     pp->loadState = LoadState::Error;
-                    pp->errorMessage = "Sample too large (max 5MB)";
+                    pp->errorMessage = "Sample too large (max 50MB)";
                     pp->repaint();
                 }
             });

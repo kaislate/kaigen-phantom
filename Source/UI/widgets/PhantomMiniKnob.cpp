@@ -16,8 +16,9 @@ namespace
 
 PhantomMiniKnob::PhantomMiniKnob(juce::AudioProcessorValueTreeState& apvts,
                                   juce::StringRef paramID,
-                                  const juce::String& lbl)
-    : apvtsRef(&apvts), label(lbl)
+                                  const juce::String& lbl,
+                                  bool darkBackground)
+    : apvtsRef(&apvts), label(lbl), darkStyle(darkBackground)
 {
     const auto idStr = juce::String(paramID);
     if (idStr.startsWith("a_") || idStr.startsWith("b_"))
@@ -127,8 +128,8 @@ void PhantomMiniKnob::paint(juce::Graphics& g)
 
     // ── Static layers (body + shadows + OLED bezel + arc track) ────────
     // Cached image, blitted at the body's top-left so it lines up with the
-    // bodyArea. The cache is one-time-built shared across all instances.
-    const auto& cached = getCachedStaticLayers();
+    // bodyArea. Two caches (light + dark) shared across all instances.
+    const auto& cached = getCachedStaticLayers(darkStyle);
     const int cacheX = (getWidth() - cached.getWidth()) / 2;
     g.drawImageAt(cached, cacheX, 0);
 
@@ -184,7 +185,9 @@ void PhantomMiniKnob::paint(juce::Graphics& g)
     // ── External label below the knob body ─────────────────────────────────
     if (label.isNotEmpty())
     {
-        g.setColour(Theme::textOnLightLabel);
+        // Light text on dark backgrounds (sampler section), dark text on
+        // light backgrounds (main phantom panel).
+        g.setColour(darkStyle ? juce::Colour(0xb0d0d2d4) : Theme::textOnLightLabel);
         g.setFont(juce::FontOptions("Space Grotesk", 8.0f, juce::Font::plain));
         // Label sits BELOW the body + shadow padding.
         constexpr int kShadowPadLabel = 17;
@@ -209,17 +212,19 @@ void PhantomMiniKnob::resized()
 
 namespace
 {
-    juce::Image gMiniStaticCache;
+    juce::Image gMiniStaticCache;       // light-bg variant (default)
+    juce::Image gMiniStaticCacheDark;   // dark-bg variant (sampler strip etc.)
 }
 
-const juce::Image& PhantomMiniKnob::getCachedStaticLayers()
+const juce::Image& PhantomMiniKnob::getCachedStaticLayers(bool darkBackground)
 {
-    if (gMiniStaticCache.isValid()) return gMiniStaticCache;
+    juce::Image& cache = darkBackground ? gMiniStaticCacheDark : gMiniStaticCache;
+    if (cache.isValid()) return cache;
 
     constexpr int kShadowPad = 17;
     constexpr int imageW = kBodySize + kShadowPad * 2;   // square; height matches.
-    gMiniStaticCache = juce::Image(juce::Image::ARGB, imageW, imageW + kShadowPad, true);
-    juce::Graphics g(gMiniStaticCache);
+    cache = juce::Image(juce::Image::ARGB, imageW, imageW + kShadowPad, true);
+    juce::Graphics g(cache);
 
     const auto centre = juce::Point<float>((float) imageW * 0.5f,
                                              (float) (kShadowPad + kBodySize / 2));
@@ -227,35 +232,72 @@ const juce::Image& PhantomMiniKnob::getCachedStaticLayers()
     const float oledR  = radius - kInset;
     const float arcR   = oledR - 3.0f;
 
-    // Body — DropShadows + transparent radial gradient.
+    // Body — DropShadows + radial gradient. The light variant uses bright
+    // white halos and a white-tinted body for the silver-on-grey phantom
+    // look; the dark variant drops the halos and uses a subtle dark
+    // gradient so the knob recedes into a dark surface.
     {
         juce::Path circle;
         circle.addEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre));
 
-        juce::DropShadow brB { juce::Colour(0x24000000), 17, juce::Point<int>(3, 5) };
+        // Black drop shadow for depth — softer on dark bg.
+        juce::DropShadow brB { juce::Colour(darkBackground ? 0x14000000 : 0x24000000),
+                                17, juce::Point<int>(3, 5) };
         brB.drawForPath(g, circle);
-        juce::DropShadow brA { juce::Colour(0x4D000000), 10, juce::Point<int>(2, 3) };
+        juce::DropShadow brA { juce::Colour(darkBackground ? 0x2D000000 : 0x4D000000),
+                                10, juce::Point<int>(2, 3) };
         brA.drawForPath(g, circle);
-        juce::DropShadow tlB { juce::Colour(0x4DFFFFFF), 17, juce::Point<int>(-3, -5) };
-        tlB.drawForPath(g, circle);
-        juce::DropShadow tlA { juce::Colour(0xa8FFFFFF), 10, juce::Point<int>(-2, -3) };
-        tlA.drawForPath(g, circle);
 
-        const juce::Point<float> gradOrigin {
-            centre.x - radius * 0.30f,
-            centre.y - radius * 0.40f
-        };
-        juce::ColourGradient body(juce::Colour(0x3DFFFFFF), gradOrigin,
-                                    juce::Colour(0x12000000),
-                                    { centre.x + radius, centre.y + radius },
-                                    true);
-        body.addColour(0.22, juce::Colour(0x1FFFFFFF));
-        body.addColour(0.60, juce::Colour(0x05000000));
-        g.setGradientFill(body);
-        g.fillEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre));
+        // White top-left halo: phantom-light look. Skipped entirely on
+        // dark bg (it's the source of the "phantom white" glow the user
+        // wanted gone from the sampler section).
+        if (! darkBackground)
+        {
+            juce::DropShadow tlB { juce::Colour(0x4DFFFFFF), 17, juce::Point<int>(-3, -5) };
+            tlB.drawForPath(g, circle);
+            juce::DropShadow tlA { juce::Colour(0xa8FFFFFF), 10, juce::Point<int>(-2, -3) };
+            tlA.drawForPath(g, circle);
+        }
+
+        // Body fill — light variant uses a bright-to-shadow radial; dark
+        // variant uses a near-flat dark grey with a subtle inset feel.
+        if (darkBackground)
+        {
+            const juce::Point<float> gradOrigin {
+                centre.x - radius * 0.20f,
+                centre.y - radius * 0.30f
+            };
+            juce::ColourGradient body(juce::Colour(0xff2a2e36), gradOrigin,
+                                        juce::Colour(0xff14171c),
+                                        { centre.x + radius, centre.y + radius },
+                                        true);
+            body.addColour(0.55, juce::Colour(0xff1d2128));
+            g.setGradientFill(body);
+            g.fillEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre));
+
+            // Hint of an inner rim so the body has a defined edge against
+            // the dark backdrop.
+            g.setColour(juce::Colour(0x33000000));
+            g.drawEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre).reduced(0.5f), 1.0f);
+        }
+        else
+        {
+            const juce::Point<float> gradOrigin {
+                centre.x - radius * 0.30f,
+                centre.y - radius * 0.40f
+            };
+            juce::ColourGradient body(juce::Colour(0x3DFFFFFF), gradOrigin,
+                                        juce::Colour(0x12000000),
+                                        { centre.x + radius, centre.y + radius },
+                                        true);
+            body.addColour(0.22, juce::Colour(0x1FFFFFFF));
+            body.addColour(0.60, juce::Colour(0x05000000));
+            g.setGradientFill(body);
+            g.fillEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(centre));
+        }
     }
 
-    // OLED bezel.
+    // OLED bezel — same on both variants (always reads as a black inset).
     {
         const auto rect = juce::Rectangle<float>(oledR * 2, oledR * 2).withCentre(centre);
         g.setColour(juce::Colours::black);
@@ -268,7 +310,7 @@ const juce::Image& PhantomMiniKnob::getCachedStaticLayers()
         g.drawEllipse(rect.expanded(1.5f), 0.5f);
     }
 
-    // Arc track.
+    // Arc track — same on both variants (lit white arc reads on either bg).
     {
         juce::Path track;
         track.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f,
@@ -278,7 +320,7 @@ const juce::Image& PhantomMiniKnob::getCachedStaticLayers()
                                                     juce::PathStrokeType::butt));
     }
 
-    return gMiniStaticCache;
+    return cache;
 }
 
 void PhantomMiniKnob::mouseDown(const juce::MouseEvent& e)

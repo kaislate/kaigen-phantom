@@ -1098,10 +1098,10 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
                 {
                     juce::MemoryBlock bytes(bytesStream.getData(), bytesStream.getDataSize());
 
-                    // Defensive: refuse oversized embedded samples. The UI-path cap is
-                    // 5 MB enforced in the SamplerStrip; this mirrors the cap so a
-                    // preset copied from a more permissive build cannot OOM the load.
-                    if (bytes.getSize() > 5 * 1024 * 1024) return;
+                    // Defensive: refuse oversized embedded samples. UI-path cap
+                    // is 50 MB enforced in SamplerStrip; mirror it here so a
+                    // crafted preset can't OOM the load.
+                    if (bytes.getSize() > 50 * 1024 * 1024) return;
 
                     // Decode synchronously here (we're already off the audio
                     // thread on the host's setStateInformation path). For a
