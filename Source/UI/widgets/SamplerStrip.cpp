@@ -25,6 +25,7 @@ SamplerStrip::SamplerStrip(PhantomProcessor& p, juce::AudioProcessorValueTreeSta
       sourceToggle(a, ParamID::INPUT_SOURCE,
                     juce::StringArray{ "Input", "Sidechain", "Sampler" }, 1),
       loopToggle(a, ParamID::SAMPLER_LOOP, "Loop"),
+      sliceToggle(a, ParamID::SAMPLER_SLICE_MODE, "Slice"),
       gainKnob(a, ParamID::SAMPLER_GAIN, "Gain", /*darkBackground=*/true)
 {
     addAndMakeVisible(sourceToggle);
@@ -41,6 +42,7 @@ SamplerStrip::SamplerStrip(PhantomProcessor& p, juce::AudioProcessorValueTreeSta
     addAndMakeVisible(rootNoteCombo);
 
     addAndMakeVisible(loopToggle);
+    addAndMakeVisible(sliceToggle);
     addAndMakeVisible(gainKnob);
 
     auto setupSlider = [&](juce::Slider& s, const juce::String& paramId,
@@ -127,6 +129,29 @@ void SamplerStrip::paint(juce::Graphics& g)
         g.setColour(juce::Colour(0xffe6b04a));   // amber — distinct from blue playhead
         g.drawLine(startX, wf.getY(), startX, wf.getBottom(), 1.0f);
         g.drawLine(endX,   wf.getY(), endX,   wf.getBottom(), 1.0f);
+
+        // Slice mode: thin cyan vertical lines at each slice boundary.
+        // Drawn under the amber start/end markers so those still pop.
+        if (apvts.getRawParameterValue(ParamID::SAMPLER_SLICE_MODE)->load() > 0.5f)
+        {
+            const auto& slices = processor.getPhantomSampler().getSliceTable();
+            const double durSec = processor.getSampleThumbnail().getTotalLength();
+            const double srcRate = processor.getPhantomSampler().getLoadedSourceSampleRate();
+            const double rate    = srcRate > 0.0 ? srcRate : 44100.0;
+            const int totalSamples = (int) (durSec * rate);
+            if (totalSamples > 0)
+            {
+                g.setColour(juce::Colour(0x9966ddff));   // cyan, 60% alpha
+                for (int s : slices)
+                {
+                    if (s <= 0) continue;   // skip slice-0 line at left edge
+                    const float frac = (float) s / (float) totalSamples;
+                    if (frac >= 1.0f) break;
+                    const float x = wf.getX() + frac * wf.getWidth();
+                    g.drawLine(x, wf.getY(), x, wf.getBottom(), 1.0f);
+                }
+            }
+        }
 
         // Triangle handles pointing INWARD (into the active region) so
         // the user sees the grab area as an arrow.
@@ -239,6 +264,7 @@ void SamplerStrip::resized()
 
     placeCentered(rootNoteCombo, kRootW, kRootH);
     placeCentered(loopToggle,    kLoopW, kLoopH);
+    placeCentered(sliceToggle,   kLoopW, kLoopH);
     placeCentered(gainKnob,      kGainW, kGainH);
 
     // ADSR sliders share a row, each with a letter label painted below.

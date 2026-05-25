@@ -93,6 +93,7 @@ namespace ParamID
     inline constexpr auto SAMPLER_R          = "sampler_release";    // seconds
     inline constexpr auto SAMPLER_START      = "sampler_start";      // 0..1 of sample length
     inline constexpr auto SAMPLER_END        = "sampler_end";        // 0..1 of sample length
+    inline constexpr auto SAMPLER_SLICE_MODE = "sampler_slice_mode"; // bool: pitched vs slice
 
     // ── Macros (PR3a) — global, automatable ────────────────────────────
     inline constexpr auto MACRO1 = "macro1";
@@ -198,6 +199,7 @@ inline std::vector<juce::String> getAllParameterIDs()
     ids.push_back(ParamID::SAMPLER_R);
     ids.push_back(ParamID::SAMPLER_START);
     ids.push_back(ParamID::SAMPLER_END);
+    ids.push_back(ParamID::SAMPLER_SLICE_MODE);
 
     ids.push_back(ParamID::MACRO1);
     ids.push_back(ParamID::MACRO2);
@@ -466,6 +468,9 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         juce::ParameterID{ ParamID::SAMPLER_END, 1 },
         "Sampler End",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.0001f), 1.0f));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ ParamID::SAMPLER_SLICE_MODE, 1 },
+        "Sampler Slice Mode", false));
 
     // Macros (PR3a) — global APVTS params, automatable. Read by Macro
     // modulators in ModulationEngine.

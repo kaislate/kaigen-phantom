@@ -314,6 +314,7 @@ private:
     std::atomic<float>* samplerRParam        { nullptr };
     std::atomic<float>* samplerStartParam    { nullptr };
     std::atomic<float>* samplerEndParam      { nullptr };
+    std::atomic<float>* samplerSliceModeParam{ nullptr };
 
     // ─── MIDI-playable sampler (Input Source = 2) ─────────────────────────
     // PhantomSampler owns the juce::Synthesiser + voices. Its output is

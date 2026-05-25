@@ -61,6 +61,7 @@ PhantomProcessor::PhantomProcessor()
     samplerRParam    = apvts.getRawParameterValue(ParamID::SAMPLER_R);
     samplerStartParam = apvts.getRawParameterValue(ParamID::SAMPLER_START);
     samplerEndParam   = apvts.getRawParameterValue(ParamID::SAMPLER_END);
+    samplerSliceModeParam = apvts.getRawParameterValue(ParamID::SAMPLER_SLICE_MODE);
 
     sampleFormatManager.registerBasicFormats();
 }
@@ -218,6 +219,7 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
                                     samplerRParam->load());
         phantomSampler.setStartEnd(samplerStartParam->load(),
                                     samplerEndParam->load());
+        phantomSampler.setSliceMode(samplerSliceModeParam->load() > 0.5f);
         phantomSampler.renderNextBlock(samplerOutputBuffer, midiMessages);
     }
 
@@ -840,6 +842,12 @@ bool PhantomProcessor::setSampleFromBytes(juce::MemoryBlock sourceBytes,
     }
     cachedSampleBytes    = std::move(sourceBytes);
     cachedSampleFilename = std::move(filename);
+
+    // Auto-detect transients for slice mode. Even when slice mode is
+    // off, having a fresh table ready means the toggle takes effect
+    // immediately without recompute. setStateInformation overrides
+    // this with the persisted table if one was saved.
+    phantomSampler.detectSlices();
     return true;
 }
 
@@ -991,6 +999,23 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
             juce::Base64::toBase64(cachedSampleBytes.getData(),
                                     cachedSampleBytes.getSize()),
             nullptr);
+
+        // Slice points as a comma-separated string. Restored verbatim
+        // in setStateInformation so the user's manually-adjusted slices
+        // (or the auto-detected set from a previous load) survive
+        // project save/reopen.
+        const auto& slices = phantomSampler.getSliceTable();
+        if (! slices.empty())
+        {
+            juce::String csv;
+            for (size_t i = 0; i < slices.size(); ++i)
+            {
+                if (i > 0) csv << ',';
+                csv << slices[i];
+            }
+            samplerNode.setProperty("slices", csv, nullptr);
+        }
+
         wrapper.appendChild(samplerNode, nullptr);
     }
 
@@ -1122,6 +1147,21 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
                         reader->read(&decoded, 0, decoded.getNumSamples(), 0, true, true);
                         setSampleFromBytes(std::move(bytes), filename,
                                             std::move(decoded), reader->sampleRate);
+
+                        // Restore persisted slice table (overrides the
+                        // auto-detect that setSampleFromBytes triggered).
+                        const auto slicesStr = samplerNode.getProperty("slices").toString();
+                        if (slicesStr.isNotEmpty())
+                        {
+                            std::vector<int> slices;
+                            const auto tokens = juce::StringArray::fromTokens(slicesStr, ",", "");
+                            for (const auto& t : tokens)
+                            {
+                                const int v = t.trim().getIntValue();
+                                if (v >= 0) slices.push_back(v);
+                            }
+                            phantomSampler.setSliceTable(std::move(slices));
+                        }
                     }
                 }
             }

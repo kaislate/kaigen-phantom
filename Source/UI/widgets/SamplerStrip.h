@@ -66,6 +66,7 @@ private:
     // Controls row.
     juce::ComboBox  rootNoteCombo;
     EtchedToggle    loopToggle;
+    EtchedToggle    sliceToggle;
     PhantomMiniKnob gainKnob;
     juce::Slider    attackSlider, decaySlider, sustainSlider, releaseSlider;
 

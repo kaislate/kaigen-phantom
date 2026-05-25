@@ -55,6 +55,10 @@ public:
         startFrac = juce::jlimit(0.0f, 1.0f, start01);
         endFrac   = juce::jlimit(startFrac + 0.0001f, 1.0f, end01);
     }
+    void setSliceMode(bool slice) noexcept { sliceMode = slice; }
+    /** Pointer-to-shared slice table (lives on PhantomSampler).
+     *  PhantomSampler keeps it alive; voices read by const reference. */
+    void setSliceTable(const std::vector<int>* table) noexcept { slicePoints = table; }
 
     // For the SamplerStrip playhead overlay. 0..numSamples-1 of the
     // active sample; -1 when voice idle. Read by the message thread,
@@ -70,6 +74,9 @@ private:
     float                 velocityGain   { 1.0f };   // re-set every startNote
     float                 startFrac      { 0.0f };   // [0,1] of source length
     float                 endFrac        { 1.0f };
+    bool                  sliceMode      { false };
+    const std::vector<int>* slicePoints  { nullptr };   // owned by PhantomSampler
+    int                   sliceEndSample { 0 };         // computed at startNote in slice mode
     juce::ADSR            adsr;
     std::atomic<int>      playheadAtomic   { -1 };
 };
@@ -105,6 +112,19 @@ public:
     void setEnvelope(float attackSec, float decaySec,
                      float sustain01, float releaseSec);
     void setStartEnd(float start01, float end01) noexcept;
+    void setSliceMode(bool slice) noexcept;
+
+    /** Detects onsets in the loaded sample and stores them as slice
+     *  points. Returns the new number of slices (always >= 1; a sample
+     *  with no detected transients yields a single full-length slice). */
+    int detectSlices();
+
+    /** Replace the slice table with an externally-provided list (used
+     *  when restoring from plugin state). Sorted + clamped + dedup'd. */
+    void setSliceTable(std::vector<int> slices);
+
+    /** Read-only access to the current slice table. */
+    const std::vector<int>& getSliceTable() const noexcept { return sliceTable; }
 
     int  getActiveVoiceCount() const noexcept;
     int  getPlayheadPosition() const noexcept;
@@ -129,6 +149,11 @@ private:
     // are added once and never replaced. Removes 32 dynamic_casts per
     // audio block compared to walking synth.getVoice(i) every setter call.
     std::vector<PhantomSamplerVoice*> phantomVoices;
+
+    // Slice points in source samples (sorted, dedup'd, always includes 0
+    // as the first entry; the last slice extends to srcLen). Owned here;
+    // each voice keeps a const pointer for startNote lookups.
+    std::vector<int> sliceTable;
 };
 
 } // namespace kaigen::phantom

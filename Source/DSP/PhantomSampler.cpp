@@ -24,10 +24,29 @@ void PhantomSamplerVoice::startNote(int midiNoteNumber, float velocity,
     const double noteRatio = std::pow(2.0, (midiNoteNumber - rootNote) / 12.0);
     const double srcRate   = sound->getSourceSampleRate();
     const double liveRate  = getSampleRate();
-    pitchRatio       = noteRatio * (srcRate / liveRate);
-    // Start from the start marker (or 0 if no start was set).
     const int srcLenForStart = sound->getAudioBuffer().getNumSamples();
-    sourcePosition   = (double) startFrac * (double) srcLenForStart;
+
+    if (sliceMode && slicePoints != nullptr && ! slicePoints->empty())
+    {
+        // MIDI note → slice index, mapped C2 (MIDI 36) = slice 0.
+        const int numSlices = (int) slicePoints->size();
+        const int sliceIdx  = juce::jlimit(0, numSlices - 1, midiNoteNumber - 36);
+        const int startSamp = (*slicePoints)[(size_t) sliceIdx];
+        sliceEndSample = (sliceIdx + 1 < numSlices)
+                            ? (*slicePoints)[(size_t) (sliceIdx + 1)]
+                            : srcLenForStart;
+        sourcePosition  = (double) startSamp;
+        // Slice playback always at native source rate — no pitch shift.
+        pitchRatio = srcRate / liveRate;
+    }
+    else
+    {
+        pitchRatio = noteRatio * (srcRate / liveRate);
+        // Start from the start marker (or 0 if no start was set).
+        sourcePosition  = (double) startFrac * (double) srcLenForStart;
+        sliceEndSample  = 0;   // unused outside slice mode
+    }
+
     velocityGain     = juce::jlimit(0.0f, 1.0f, velocity);
     adsr.setSampleRate(liveRate);
     adsr.noteOn();
@@ -89,27 +108,31 @@ void PhantomSamplerVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer
             outputBuffer.addSample(ch, startSample + n, v);
         }
 
-        // Effective playback window respects start/end markers. Clamp
-        // computed bounds against srcLen so a marker beyond the actual
-        // sample length doesn't read out of bounds.
-        const int startSamp = juce::jlimit(0, srcLen - 1, (int) (startFrac * srcLen));
-        const int endSamp   = juce::jlimit(startSamp + 1, srcLen, (int) (endFrac   * srcLen));
-        const int regionLen = endSamp - startSamp;
+        // Effective playback window. In pitched mode this respects the
+        // user-set start/end markers; in slice mode the bounds are the
+        // current slice [sliceStart, sliceEndSample] computed at startNote.
+        const int regionEnd = sliceMode
+            ? juce::jmin(srcLen, sliceEndSample)
+            : juce::jlimit(1, srcLen, (int) (endFrac * srcLen));
+        const int regionStart = sliceMode
+            ? juce::jlimit(0, regionEnd - 1, (int) sourcePosition)   // no loop-wrap target in slice
+            : juce::jlimit(0, regionEnd - 1, (int) (startFrac * srcLen));
+        const int regionLen = regionEnd - regionStart;
 
         sourcePosition += pitchRatio;
-        if (sourcePosition >= (double) endSamp)
+        if (sourcePosition >= (double) regionEnd)
         {
-            if (loopEnabled && regionLen > 0)
+            // Loop wrap is disabled in slice mode (each slice is a one-shot).
+            if (loopEnabled && ! sliceMode && regionLen > 0)
             {
-                // Wrap back to startSamp, preserving any overshoot.
-                const double overshoot = std::fmod(sourcePosition - (double) startSamp,
+                const double overshoot = std::fmod(sourcePosition - (double) regionStart,
                                                     (double) regionLen);
-                sourcePosition = (double) startSamp +
+                sourcePosition = (double) regionStart +
                                  (overshoot < 0.0 ? overshoot + regionLen : overshoot);
             }
             else
             {
-                sourcePosition = (double) (endSamp - 1);
+                sourcePosition = (double) (regionEnd - 1);
                 adsr.noteOff();   // start release; voice continues to silence
             }
         }
@@ -184,6 +207,101 @@ void PhantomSampler::setRootNote(int n) noexcept
 void PhantomSampler::setStartEnd(float start01, float end01) noexcept
 {
     for (auto* v : phantomVoices) v->setStartEnd(start01, end01);
+}
+
+void PhantomSampler::setSliceMode(bool slice) noexcept
+{
+    for (auto* v : phantomVoices) v->setSliceMode(slice);
+}
+
+void PhantomSampler::setSliceTable(std::vector<int> slices)
+{
+    // Sort + dedup + clamp to [0, srcLen). Always include 0 as the
+    // first slice so MIDI note 36 has a valid start point even on
+    // a sample with no detected transients.
+    std::sort(slices.begin(), slices.end());
+    slices.erase(std::unique(slices.begin(), slices.end()), slices.end());
+    if (slices.empty() || slices.front() != 0)
+        slices.insert(slices.begin(), 0);
+
+    sliceTable = std::move(slices);
+    for (auto* v : phantomVoices) v->setSliceTable(&sliceTable);
+}
+
+int PhantomSampler::detectSlices()
+{
+    // Energy-based onset detection over the loaded sound. Adequate for
+    // percussive material; tonal samples often yield just slice 0 (full
+    // sample) which is the right fallback.
+    std::vector<int> hits;
+    hits.push_back(0);   // slice 0 always at sample 0
+
+    if (synth.getNumSounds() > 0)
+    {
+        if (auto* sound = dynamic_cast<PhantomSamplerSound*>(synth.getSound(0).get()))
+        {
+            const auto& src = sound->getAudioBuffer();
+            const int srcLen = src.getNumSamples();
+            const double srcRate = sound->getSourceSampleRate();
+
+            if (srcLen > 1024 && srcRate > 0.0)
+            {
+                constexpr int   kHopSize     = 256;     // ~5.8 ms @ 44.1k
+                constexpr int   kFrameSize   = 1024;    // ~23 ms @ 44.1k
+                constexpr int   kMaxSlices   = 32;
+                const int       minGapSamp   = (int) (0.05 * srcRate);   // 50 ms
+                const int       numFrames    = (srcLen - kFrameSize) / kHopSize;
+
+                std::vector<float> rms((size_t) numFrames, 0.0f);
+                for (int f = 0; f < numFrames; ++f)
+                {
+                    const int start = f * kHopSize;
+                    double sum = 0.0;
+                    for (int i = 0; i < kFrameSize; ++i)
+                    {
+                        const float s = src.getSample(0, start + i);
+                        sum += (double) s * (double) s;
+                    }
+                    rms[(size_t) f] = (float) std::sqrt(sum / (double) kFrameSize);
+                }
+
+                // Positive RMS differences = energy flux.
+                std::vector<float> flux((size_t) numFrames, 0.0f);
+                for (int f = 1; f < numFrames; ++f)
+                {
+                    const float d = rms[(size_t) f] - rms[(size_t) (f - 1)];
+                    flux[(size_t) f] = juce::jmax(0.0f, d);
+                }
+
+                // Peak-pick above an adaptive threshold (3× local median),
+                // enforcing minimum slice spacing.
+                for (int f = 1; f < numFrames - 1; ++f)
+                {
+                    const int wStart = juce::jmax(0, f - 20);
+                    const int wEnd   = juce::jmin(numFrames, f + 20);
+                    std::vector<float> window(flux.begin() + wStart, flux.begin() + wEnd);
+                    std::sort(window.begin(), window.end());
+                    const float median    = window[window.size() / 2];
+                    const float threshold = juce::jmax(0.02f, median * 3.0f);
+
+                    if (flux[(size_t) f] > threshold
+                        && flux[(size_t) f] > flux[(size_t) (f - 1)]
+                        && flux[(size_t) f] > flux[(size_t) (f + 1)])
+                    {
+                        const int samp = f * kHopSize;
+                        if (samp - hits.back() >= minGapSamp)
+                        {
+                            hits.push_back(samp);
+                            if ((int) hits.size() >= kMaxSlices) break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    setSliceTable(std::move(hits));
+    return (int) sliceTable.size();
 }
 
 void PhantomSampler::setLoopEnabled(bool l) noexcept
