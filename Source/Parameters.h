@@ -91,6 +91,8 @@ namespace ParamID
     inline constexpr auto SAMPLER_D          = "sampler_decay";      // seconds
     inline constexpr auto SAMPLER_S          = "sampler_sustain";    // 0..1
     inline constexpr auto SAMPLER_R          = "sampler_release";    // seconds
+    inline constexpr auto SAMPLER_START      = "sampler_start";      // 0..1 of sample length
+    inline constexpr auto SAMPLER_END        = "sampler_end";        // 0..1 of sample length
 
     // ── Macros (PR3a) — global, automatable ────────────────────────────
     inline constexpr auto MACRO1 = "macro1";
@@ -194,6 +196,8 @@ inline std::vector<juce::String> getAllParameterIDs()
     ids.push_back(ParamID::SAMPLER_D);
     ids.push_back(ParamID::SAMPLER_S);
     ids.push_back(ParamID::SAMPLER_R);
+    ids.push_back(ParamID::SAMPLER_START);
+    ids.push_back(ParamID::SAMPLER_END);
 
     ids.push_back(ParamID::MACRO1);
     ids.push_back(ParamID::MACRO2);
@@ -454,6 +458,14 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         juce::ParameterID{ ParamID::SAMPLER_R, 1 },
         "Sampler Release",
         juce::NormalisableRange<float>(0.001f, 4.0f, 0.0001f, 0.4f), 0.200f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_START, 1 },
+        "Sampler Start",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.0001f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_END, 1 },
+        "Sampler End",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.0001f), 1.0f));
 
     // Macros (PR3a) — global APVTS params, automatable. Read by Macro
     // modulators in ModulationEngine.

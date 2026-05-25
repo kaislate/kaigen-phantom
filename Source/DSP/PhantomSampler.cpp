@@ -25,11 +25,13 @@ void PhantomSamplerVoice::startNote(int midiNoteNumber, float velocity,
     const double srcRate   = sound->getSourceSampleRate();
     const double liveRate  = getSampleRate();
     pitchRatio       = noteRatio * (srcRate / liveRate);
-    sourcePosition   = 0.0;
+    // Start from the start marker (or 0 if no start was set).
+    const int srcLenForStart = sound->getAudioBuffer().getNumSamples();
+    sourcePosition   = (double) startFrac * (double) srcLenForStart;
     velocityGain     = juce::jlimit(0.0f, 1.0f, velocity);
     adsr.setSampleRate(liveRate);
     adsr.noteOn();
-    playheadAtomic.store(0, std::memory_order_relaxed);
+    playheadAtomic.store((int) sourcePosition, std::memory_order_relaxed);
 }
 
 void PhantomSamplerVoice::stopNote(float /*velocity*/, bool allowTailOff)
@@ -87,17 +89,27 @@ void PhantomSamplerVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer
             outputBuffer.addSample(ch, startSample + n, v);
         }
 
+        // Effective playback window respects start/end markers. Clamp
+        // computed bounds against srcLen so a marker beyond the actual
+        // sample length doesn't read out of bounds.
+        const int startSamp = juce::jlimit(0, srcLen - 1, (int) (startFrac * srcLen));
+        const int endSamp   = juce::jlimit(startSamp + 1, srcLen, (int) (endFrac   * srcLen));
+        const int regionLen = endSamp - startSamp;
+
         sourcePosition += pitchRatio;
-        if (sourcePosition >= (double) srcLen)
+        if (sourcePosition >= (double) endSamp)
         {
-            if (loopEnabled)
+            if (loopEnabled && regionLen > 0)
             {
-                sourcePosition = std::fmod(sourcePosition, (double) srcLen);
-                if (sourcePosition < 0.0) sourcePosition += (double) srcLen;
+                // Wrap back to startSamp, preserving any overshoot.
+                const double overshoot = std::fmod(sourcePosition - (double) startSamp,
+                                                    (double) regionLen);
+                sourcePosition = (double) startSamp +
+                                 (overshoot < 0.0 ? overshoot + regionLen : overshoot);
             }
             else
             {
-                sourcePosition = (double) (srcLen - 1);
+                sourcePosition = (double) (endSamp - 1);
                 adsr.noteOff();   // start release; voice continues to silence
             }
         }
@@ -167,6 +179,11 @@ double PhantomSampler::getLoadedSourceSampleRate() const noexcept
 void PhantomSampler::setRootNote(int n) noexcept
 {
     for (auto* v : phantomVoices) v->setRootNote(n);
+}
+
+void PhantomSampler::setStartEnd(float start01, float end01) noexcept
+{
+    for (auto* v : phantomVoices) v->setStartEnd(start01, end01);
 }
 
 void PhantomSampler::setLoopEnabled(bool l) noexcept

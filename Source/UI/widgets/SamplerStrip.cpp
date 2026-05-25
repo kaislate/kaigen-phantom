@@ -97,10 +97,52 @@ void SamplerStrip::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0xff0a0c12));
     g.fillRect(waveformArea);
 
+    // Cache the float-form bounds for mouse hit-testing in mouseDown/Drag.
+    const_cast<SamplerStrip*>(this)->waveformBoundsCache = waveformArea.toFloat();
+
     if (waveformImage.isValid())
     {
         g.drawImage(waveformImage, waveformArea.toFloat(),
                     juce::RectanglePlacement::stretchToFit);
+
+        // ── Start/end markers + dim overlay outside the active region ──
+        const float startFrac = juce::jlimit(0.0f, 1.0f,
+            apvts.getRawParameterValue(ParamID::SAMPLER_START)->load());
+        const float endFrac   = juce::jlimit(0.0f, 1.0f,
+            apvts.getRawParameterValue(ParamID::SAMPLER_END)->load());
+        const auto wf = waveformArea.toFloat();
+        const float startX = wf.getX() + startFrac * wf.getWidth();
+        const float endX   = wf.getX() + endFrac   * wf.getWidth();
+
+        // Dim regions outside [start, end] so the active region pops.
+        g.setColour(juce::Colour(0xa0000000));
+        if (startX > wf.getX())
+            g.fillRect(juce::Rectangle<float>(wf.getX(), wf.getY(),
+                                                startX - wf.getX(), wf.getHeight()));
+        if (endX < wf.getRight())
+            g.fillRect(juce::Rectangle<float>(endX, wf.getY(),
+                                                wf.getRight() - endX, wf.getHeight()));
+
+        // Vertical lines at start/end so the boundaries read at a glance.
+        g.setColour(juce::Colour(0xffe6b04a));   // amber — distinct from blue playhead
+        g.drawLine(startX, wf.getY(), startX, wf.getBottom(), 1.0f);
+        g.drawLine(endX,   wf.getY(), endX,   wf.getBottom(), 1.0f);
+
+        // Triangle handles pointing INWARD (into the active region) so
+        // the user sees the grab area as an arrow.
+        constexpr float kTriH = 7.0f;
+        const float triY = wf.getY();
+        juce::Path startTri;
+        startTri.addTriangle(startX,         triY,
+                             startX + kTriH, triY + kTriH * 0.5f,
+                             startX,         triY + kTriH);
+        juce::Path endTri;
+        endTri.addTriangle(endX,         triY,
+                           endX - kTriH, triY + kTriH * 0.5f,
+                           endX,         triY + kTriH);
+        g.setColour(juce::Colour(0xffe6b04a));
+        g.fillPath(startTri);
+        g.fillPath(endTri);
 
         // Playhead overlay (atomic int from PhantomSampler). Maps the
         // source-sample index to a fraction of the thumbnail's total
@@ -214,12 +256,84 @@ void SamplerStrip::resized()
     placeSlider(releaseSlider);
 }
 
+float SamplerStrip::fractionAtX(float xpx) const noexcept
+{
+    if (waveformBoundsCache.getWidth() <= 0.0f) return 0.0f;
+    return juce::jlimit(0.0f, 1.0f,
+        (xpx - waveformBoundsCache.getX()) / waveformBoundsCache.getWidth());
+}
+
 void SamplerStrip::mouseDown(const juce::MouseEvent& e)
 {
-    // Click on the waveform area opens the file picker.
+    // Click on the waveform area: hit-test the start/end markers first;
+    // if a marker is grabbed, start a drag instead of opening the picker.
     auto waveformArea = juce::Rectangle<int>(0, kHeaderH, getWidth(), kWaveformH);
-    if (waveformArea.contains(e.getPosition()))
+    if (! waveformArea.contains(e.getPosition()))
+        return;
+
+    // Open file picker if no sample loaded yet — no markers to grab.
+    if (! processor.getPhantomSampler().hasSample())
+    {
         pickAndLoadFile();
+        return;
+    }
+
+    const float startFrac = apvts.getRawParameterValue(ParamID::SAMPLER_START)->load();
+    const float endFrac   = apvts.getRawParameterValue(ParamID::SAMPLER_END)->load();
+    const float startX = waveformBoundsCache.getX() + startFrac * waveformBoundsCache.getWidth();
+    const float endX   = waveformBoundsCache.getX() + endFrac   * waveformBoundsCache.getWidth();
+
+    // ±8 px hit zone around each marker.
+    constexpr float kHit = 8.0f;
+    if (std::abs((float) e.x - startX) < kHit)
+    {
+        activeDrag = DragTarget::Start;
+        return;
+    }
+    if (std::abs((float) e.x - endX) < kHit)
+    {
+        activeDrag = DragTarget::End;
+        return;
+    }
+
+    // Empty waveform area → file picker.
+    pickAndLoadFile();
+}
+
+void SamplerStrip::mouseDrag(const juce::MouseEvent& e)
+{
+    if (activeDrag == DragTarget::None) return;
+    const float frac = fractionAtX((float) e.x);
+    const auto* paramId = (activeDrag == DragTarget::Start)
+                              ? ParamID::SAMPLER_START : ParamID::SAMPLER_END;
+    if (auto* p = apvts.getParameter(paramId))
+        p->setValueNotifyingHost(frac);
+    repaint();
+}
+
+void SamplerStrip::mouseUp(const juce::MouseEvent&)
+{
+    activeDrag = DragTarget::None;
+}
+
+void SamplerStrip::mouseDoubleClick(const juce::MouseEvent& e)
+{
+    // Double-click on a marker resets it to its default (start=0, end=1).
+    auto waveformArea = juce::Rectangle<int>(0, kHeaderH, getWidth(), kWaveformH);
+    if (! waveformArea.contains(e.getPosition())) return;
+    if (! processor.getPhantomSampler().hasSample()) return;
+
+    const float startFrac = apvts.getRawParameterValue(ParamID::SAMPLER_START)->load();
+    const float endFrac   = apvts.getRawParameterValue(ParamID::SAMPLER_END)->load();
+    const float startX = waveformBoundsCache.getX() + startFrac * waveformBoundsCache.getWidth();
+    const float endX   = waveformBoundsCache.getX() + endFrac   * waveformBoundsCache.getWidth();
+    constexpr float kHit = 8.0f;
+
+    if (std::abs((float) e.x - startX) < kHit)
+        if (auto* p = apvts.getParameter(ParamID::SAMPLER_START)) p->setValueNotifyingHost(0.0f);
+    if (std::abs((float) e.x - endX) < kHit)
+        if (auto* p = apvts.getParameter(ParamID::SAMPLER_END))   p->setValueNotifyingHost(1.0f);
+    repaint();
 }
 
 bool SamplerStrip::isInterestedInFileDrag(const juce::StringArray& files)

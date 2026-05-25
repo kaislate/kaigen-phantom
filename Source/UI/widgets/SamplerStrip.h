@@ -31,6 +31,9 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
+    void mouseDrag(const juce::MouseEvent& e) override;
+    void mouseUp(const juce::MouseEvent& e) override;
+    void mouseDoubleClick(const juce::MouseEvent& e) override;
 
     // FileDragAndDropTarget
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
@@ -74,6 +77,14 @@ private:
 
     // Waveform thumbnail cached as an Image so paint is cheap.
     juce::Image waveformImage;
+
+    // Start/end markers drawn as triangle handles over the waveform.
+    // Updated by mouse drag → APVTS::setValueNotifyingHost. Hit-testing
+    // tracks which marker (if any) is currently being dragged.
+    enum class DragTarget { None, Start, End };
+    DragTarget activeDrag { DragTarget::None };
+    juce::Rectangle<float> waveformBoundsCache;   // last paint's waveform rect (for hit-tests)
+    float fractionAtX(float xpx) const noexcept;  // px → 0..1 inside waveformBoundsCache
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SamplerStrip)
 };

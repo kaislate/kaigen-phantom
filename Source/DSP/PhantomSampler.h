@@ -50,6 +50,11 @@ public:
     void setLoopEnabled(bool l) noexcept         { loopEnabled = l; }
     void setEnvelopeParameters(const juce::ADSR::Parameters& p) { adsr.setParameters(p); }
     void setGainLinear(float g) noexcept { baseGainLinear = g; }
+    void setStartEnd(float start01, float end01) noexcept
+    {
+        startFrac = juce::jlimit(0.0f, 1.0f, start01);
+        endFrac   = juce::jlimit(startFrac + 0.0001f, 1.0f, end01);
+    }
 
     // For the SamplerStrip playhead overlay. 0..numSamples-1 of the
     // active sample; -1 when voice idle. Read by the message thread,
@@ -63,6 +68,8 @@ private:
     bool                  loopEnabled      { false };
     float                 baseGainLinear { 1.0f };   // settable from outside via setGainLinear
     float                 velocityGain   { 1.0f };   // re-set every startNote
+    float                 startFrac      { 0.0f };   // [0,1] of source length
+    float                 endFrac        { 1.0f };
     juce::ADSR            adsr;
     std::atomic<int>      playheadAtomic   { -1 };
 };
@@ -97,6 +104,7 @@ public:
     void setGainDb(float gainDb) noexcept;
     void setEnvelope(float attackSec, float decaySec,
                      float sustain01, float releaseSec);
+    void setStartEnd(float start01, float end01) noexcept;
 
     int  getActiveVoiceCount() const noexcept;
     int  getPlayheadPosition() const noexcept;

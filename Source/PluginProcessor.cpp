@@ -59,6 +59,8 @@ PhantomProcessor::PhantomProcessor()
     samplerDParam    = apvts.getRawParameterValue(ParamID::SAMPLER_D);
     samplerSParam    = apvts.getRawParameterValue(ParamID::SAMPLER_S);
     samplerRParam    = apvts.getRawParameterValue(ParamID::SAMPLER_R);
+    samplerStartParam = apvts.getRawParameterValue(ParamID::SAMPLER_START);
+    samplerEndParam   = apvts.getRawParameterValue(ParamID::SAMPLER_END);
 
     sampleFormatManager.registerBasicFormats();
 }
@@ -214,6 +216,8 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
                                     samplerDParam->load(),
                                     samplerSParam->load(),
                                     samplerRParam->load());
+        phantomSampler.setStartEnd(samplerStartParam->load(),
+                                    samplerEndParam->load());
         phantomSampler.renderNextBlock(samplerOutputBuffer, midiMessages);
     }
 
