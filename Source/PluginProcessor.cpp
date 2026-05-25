@@ -407,23 +407,40 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     {
         const auto& aOut = dualEngineHost.getEngineAOutput();
         const auto& bOut = dualEngineHost.getEngineBOutput();
+        const auto& aSynth = dualEngineHost.getEngineA().getPhantomOnlyOutput();
+        const auto& bSynth = dualEngineHost.getEngineB().getPhantomOnlyOutput();
 
         if (aOut.getNumChannels() > 0 && bOut.getNumChannels() > 0
             && aOut.getNumSamples() == n && bOut.getNumSamples() == n)
         {
             const float* aL = aOut.getReadPointer(0);
             const float* bL = bOut.getReadPointer(0);
+            // Synth-only side buffers may have a different channel count
+            // (PhantomEngine sizes them to nCh of the current block) but
+            // always have at least one channel during normal processing.
+            const float* aSynthL = (aSynth.getNumChannels() > 0 && aSynth.getNumSamples() == n)
+                                       ? aSynth.getReadPointer(0) : nullptr;
+            const float* bSynthL = (bSynth.getNumChannels() > 0 && bSynth.getNumSamples() == n)
+                                       ? bSynth.getReadPointer(0) : nullptr;
             int posA = fftWritePosEngineA.load(std::memory_order_relaxed);
             int posB = fftWritePosEngineB.load(std::memory_order_relaxed);
+            int posAs = fftWritePosEngineASynth.load(std::memory_order_relaxed);
+            int posBs = fftWritePosEngineBSynth.load(std::memory_order_relaxed);
             for (int i = 0; i < n; ++i)
             {
                 fftBufferEngineA[(size_t) posA] = aL[i];
                 fftBufferEngineB[(size_t) posB] = bL[i];
-                posA = (posA + 1) & kEngineRingMask;
-                posB = (posB + 1) & kEngineRingMask;
+                fftBufferEngineASynth[(size_t) posAs] = aSynthL ? aSynthL[i] : 0.0f;
+                fftBufferEngineBSynth[(size_t) posBs] = bSynthL ? bSynthL[i] : 0.0f;
+                posA  = (posA  + 1) & kEngineRingMask;
+                posB  = (posB  + 1) & kEngineRingMask;
+                posAs = (posAs + 1) & kEngineRingMask;
+                posBs = (posBs + 1) & kEngineRingMask;
             }
             fftWritePosEngineA.store(posA, std::memory_order_relaxed);
             fftWritePosEngineB.store(posB, std::memory_order_relaxed);
+            fftWritePosEngineASynth.store(posAs, std::memory_order_relaxed);
+            fftWritePosEngineBSynth.store(posBs, std::memory_order_relaxed);
 
             samplesSinceEngineFftA += n;
             samplesSinceEngineFftB += n;
@@ -480,11 +497,15 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             {
                 samplesSinceEngineFftA = 0;
                 runEngineFft(fftBufferEngineA, posA, fftScratchEngineA, engineASpectrum);
+                runEngineFft(fftBufferEngineASynth, posAs,
+                              fftScratchEngineASynth, engineASynthSpectrum);
             }
             if (samplesSinceEngineFftB >= kFftSize)
             {
                 samplesSinceEngineFftB = 0;
                 runEngineFft(fftBufferEngineB, posB, fftScratchEngineB, engineBSpectrum);
+                runEngineFft(fftBufferEngineBSynth, posBs,
+                              fftScratchEngineBSynth, engineBSynthSpectrum);
             }
         }
     }

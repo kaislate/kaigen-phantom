@@ -52,6 +52,15 @@ void Spectrum::timerCallback()
     smoothBinsAtomic(processor.engineASpectrum, smoothedEngA);
     smoothBinsAtomic(processor.engineBSpectrum, smoothedEngB);
 
+    // Per-engine synth-only bins (post-filter, pre-ghost-mix). In
+    // Combined mode the synth curve uses the max of A+B so a HPF/LPF
+    // sweep on either engine's filter is visible on the single pane.
+    smoothBinsAtomic(processor.engineASynthSpectrum, smoothedSynthA);
+    smoothBinsAtomic(processor.engineBSynthSpectrum, smoothedSynthB);
+    for (int i = 0; i < kBinCount; ++i)
+        smoothedSynth[(size_t) i] =
+            juce::jmax(smoothedSynthA[(size_t) i], smoothedSynthB[(size_t) i]);
+
     repaint();
 }
 
@@ -238,6 +247,7 @@ void Spectrum::drawPane(juce::Graphics& g,
                         const std::array<float, kBinCount>& inBins,
                         const std::array<float, kBinCount>& outBins,
                         const std::array<float, kBinCount>* peakBins,
+                        const std::array<float, kBinCount>* synthBins,
                         float xoverHz) const
 {
     drawGrid(g, paneW, paneH);
@@ -260,12 +270,14 @@ void Spectrum::drawPane(juce::Graphics& g,
         g.setFont(lf);
 
         // Pre-measure item widths so we can centre the whole legend.
-        const float wIn   = lf.getStringWidthFloat("INPUT");
-        const float wOut  = lf.getStringWidthFloat("OUTPUT");
-        const float wPeak = lf.getStringWidthFloat("PEAK");
+        const float wIn    = lf.getStringWidthFloat("INPUT");
+        const float wOut   = lf.getStringWidthFloat("OUTPUT");
+        const float wSynth = lf.getStringWidthFloat("SYNTH");
+        const float wPeak  = lf.getStringWidthFloat("PEAK");
         const float itemW = (kSwatch + kGap + wIn)
                          + kItemGap + (kSwatch + kGap + wOut)
-                         + (peakBins != nullptr ? (kItemGap + kSwatch + kGap + wPeak) : 0.0f);
+                         + (synthBins != nullptr ? (kItemGap + kSwatch + kGap + wSynth) : 0.0f)
+                         + (peakBins  != nullptr ? (kItemGap + kSwatch + kGap + wPeak)  : 0.0f);
 
         float x = (paneW - itemW) * 0.5f;
         const float y = 2.0f;
@@ -287,6 +299,8 @@ void Spectrum::drawPane(juce::Graphics& g,
 
         drawItem(juce::Colour(0xb0a0a0af), "INPUT",  false);   // matches gray stroke
         drawItem(juce::Colour(0xe6ffffff), "OUTPUT", false);   // matches white stroke
+        if (synthBins != nullptr)
+            drawItem(juce::Colour(0xb2508ed7), "SYNTH", false); // matches oscilloscope blue
         if (peakBins != nullptr)
             drawItem(juce::Colour(0x80ffffff), "PEAK", true);  // matches peak line
     }
@@ -360,6 +374,35 @@ void Spectrum::drawPane(juce::Graphics& g,
         }
     }
 
+    // ── Layer 2.5: SYNTH (phantom-only, post-filter) — blue stroke ────────
+    // Matches the oscilloscope's "SYNTH" trace colour (0x508ED7). Drawn
+    // ON TOP of OUTPUT so the user sees the synth contribution within
+    // the total output mix; useful when an HPF appears to leave OUTPUT
+    // untouched in the low band (the dry pass-through bypasses the
+    // filter), the SYNTH curve still shows real attenuation.
+    if (synthBins != nullptr)
+    {
+        const auto synthPts = buildCurvePoints(*synthBins, paneW, paneH);
+        if (synthPts.size() >= 2)
+        {
+            const auto strokePath = makeStrokePath(synthPts);
+            const float sw = juce::jmax(1.0f, paneH * 0.005f);
+
+            // Soft blue glow (matches the oscilloscope synth-trace style).
+            g.setColour(juce::Colour(0x33508ed7));    // ~20% blue glow
+            g.strokePath(strokePath,
+                         juce::PathStrokeType(sw + 3.0f,
+                                              juce::PathStrokeType::curved,
+                                              juce::PathStrokeType::rounded));
+            // Sharp primary stroke.
+            g.setColour(juce::Colour(0xcc508ed7));    // 80% blue
+            g.strokePath(strokePath,
+                         juce::PathStrokeType(sw,
+                                              juce::PathStrokeType::curved,
+                                              juce::PathStrokeType::rounded));
+        }
+    }
+
     // ── Layer 3: output peak-hold line ────────────────────────────────────
     if (peakBins != nullptr)
     {
@@ -405,8 +448,11 @@ void Spectrum::drawPane(juce::Graphics& g,
         g.setColour(juce::Colour(0x99508ed7)); // rgba(80,142,215,0.60) → 0x99
         const juce::String labelText = juce::String(juce::roundToInt(xoverHz)) + "Hz";
         const float labelW = labelFontPx * 4.5f;   // ~7 Courier glyph widths
+        // Y offset 16 px so the label sits BELOW the top-centre legend
+        // strip (legend uses y=2..14). Previously at y=2 the crossover
+        // text was visually clipped by the legend swatches.
         g.drawText(labelText,
-                   juce::Rectangle<float>(xPos + 3.0f, 2.0f, labelW, labelFontPx),
+                   juce::Rectangle<float>(xPos + 3.0f, 16.0f, labelW, labelFontPx),
                    juce::Justification::centredLeft, false);
     }
 }
@@ -436,7 +482,7 @@ void Spectrum::paint(juce::Graphics& g)
                 apvts.getParameter(ParamID::A_PHANTOM_THRESHOLD)))
             xoverHz = p->get();
 
-        drawPane(g, w, h, smoothedIn, smoothedOut, &peakOut, xoverHz);
+        drawPane(g, w, h, smoothedIn, smoothedOut, &peakOut, &smoothedSynth, xoverHz);
     }
     else
     {
@@ -454,7 +500,7 @@ void Spectrum::paint(juce::Graphics& g)
                     apvts.getParameter(ParamID::A_PHANTOM_THRESHOLD)))
                 xoverHz = p->get();
 
-            drawPane(g, halfW, h, smoothedIn, smoothedEngA, nullptr, xoverHz);
+            drawPane(g, halfW, h, smoothedIn, smoothedEngA, nullptr, &smoothedSynthA, xoverHz);
         }
 
         // Engine B — right pane
@@ -469,7 +515,7 @@ void Spectrum::paint(juce::Graphics& g)
 
             // Translate so drawPane draws relative to (0,0) inside the right pane.
             g.addTransform(juce::AffineTransform::translation(halfW, 0.0f));
-            drawPane(g, w - halfW, h, smoothedIn, smoothedEngB, nullptr, xoverHz);
+            drawPane(g, w - halfW, h, smoothedIn, smoothedEngB, nullptr, &smoothedSynthB, xoverHz);
         }
 
         // Center divider

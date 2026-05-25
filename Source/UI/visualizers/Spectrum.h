@@ -82,23 +82,32 @@ private:
     static void drawGrid(juce::Graphics& g, float w, float h);
 
     /** Draw a single spectrum pane (Combined or one half of Split).
-     *  xOffset is the canvas-space x translation already applied by caller. */
+     *  xOffset is the canvas-space x translation already applied by caller.
+     *  synthBins is the engine's phantom-only (post-filter, pre-mix) curve,
+     *  drawn as a blue stroke between OUTPUT and PEAK so the user can see
+     *  filter attenuation on the synth signal directly even when the dry
+     *  pass-through in Combine/Replace modes leaves OUTPUT looking
+     *  unaffected. nullptr to skip. */
     void drawPane(juce::Graphics& g,
                   float paneW, float paneH,
                   const std::array<float, kBinCount>& inBins,
                   const std::array<float, kBinCount>& outBins,
                   const std::array<float, kBinCount>* peakBins,  // nullptr → no peak line
+                  const std::array<float, kBinCount>* synthBins, // nullptr → no synth line
                   float xoverHz) const;
 
     // ── State ────────────────────────────────────────────────────────────
     PhantomProcessor& processor;
     juce::AudioProcessorValueTreeState& apvts;
 
-    std::array<float, kBinCount> smoothedIn   {};
-    std::array<float, kBinCount> smoothedOut  {};
-    std::array<float, kBinCount> peakOut      {};
-    std::array<float, kBinCount> smoothedEngA {};
-    std::array<float, kBinCount> smoothedEngB {};
+    std::array<float, kBinCount> smoothedIn       {};
+    std::array<float, kBinCount> smoothedOut      {};
+    std::array<float, kBinCount> peakOut          {};
+    std::array<float, kBinCount> smoothedEngA     {};
+    std::array<float, kBinCount> smoothedEngB     {};
+    std::array<float, kBinCount> smoothedSynth    {};   // combined-mode synth-only
+    std::array<float, kBinCount> smoothedSynthA   {};   // split-mode engine A synth
+    std::array<float, kBinCount> smoothedSynthB   {};   // split-mode engine B synth
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Spectrum)
 };

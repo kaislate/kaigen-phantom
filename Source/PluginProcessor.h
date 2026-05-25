@@ -82,6 +82,13 @@ public:
     std::array<std::atomic<float>, kSpectrumBins> engineASpectrum {};
     std::array<std::atomic<float>, kSpectrumBins> engineBSpectrum {};
 
+    // Per-engine synth-only spectra (phantom post-filter, pre-ghost-mix).
+    // Populated alongside engineASpectrum/engineBSpectrum on the audio
+    // thread; consumed by the Spectrum visualizer to draw a blue "SYNTH"
+    // overlay showing the synth contribution attenuated by HPF/LPF.
+    std::array<std::atomic<float>, kSpectrumBins> engineASynthSpectrum {};
+    std::array<std::atomic<float>, kSpectrumBins> engineBSynthSpectrum {};
+
     // Oscilloscope ring buffers. Audio thread does relaxed atomic stores;
     // editor binding does relaxed atomic loads. Plain float[] would tear
     // only theoretically on x86/ARM, but std::atomic<float> with relaxed
@@ -234,6 +241,25 @@ private:
     // cadence (one FFT per kFftSize samples ≈ 5.86 Hz at 48k).
     int samplesSinceEngineFftA = 0;
     int samplesSinceEngineFftB = 0;
+
+    // Per-engine SYNTH-only FFT capture (mirrors the per-engine output FFT
+    // above, but reads from PhantomEngine::getPhantomOnlyOutput() — the
+    // phantom contribution BEFORE the ghost mix folds in the dry low/high
+    // bands). Lets the spectrum visualizer overlay a blue "SYNTH" curve
+    // showing just the synthesis output (post-filter), so a HPF/LPF
+    // setting visibly attenuates this curve even when the dry pass-
+    // through in Combine/Replace modes leaves the white OUTPUT curve
+    // looking untouched in the affected band.
+    std::array<float, kFftSize * 2> fftBufferEngineASynth {};
+    std::array<float, kFftSize * 2> fftBufferEngineBSynth {};
+    std::array<float, kFftSize * 2> fftScratchEngineASynth {};
+    std::array<float, kFftSize * 2> fftScratchEngineBSynth {};
+    std::atomic<int> fftWritePosEngineASynth { 0 };
+    std::atomic<int> fftWritePosEngineBSynth { 0 };
+    // Runs in lockstep with the per-engine OUTPUT FFT — reuses the
+    // existing samplesSinceEngineFft* counters; no separate cadence.
+    // The output atomic arrays (engineASynthSpectrum/engineBSynthSpectrum)
+    // live in the public section near engineASpectrum/engineBSpectrum.
 
     // Editor focus: which tab the UI is on + whether LINK is active.
     // Editor preference, not preset state — stored alongside APVTS in the
