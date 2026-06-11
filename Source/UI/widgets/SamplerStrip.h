@@ -61,31 +61,44 @@ private:
 
     // Header row.
     WordSelector  sourceToggle;     // 3-way choice: Input/Sidechain/Sampler
+    WordSelector  warpToggle;       // 2-way choice: Off/Complex (warp mode)
     juce::TextButton folderButton;  // glyph: folder icon
 
     // Controls row.
     juce::ComboBox  rootNoteCombo;
+    juce::ComboBox  quantizeCombo;
     EtchedToggle    loopToggle;
     EtchedToggle    sliceToggle;
+    EtchedToggle    autoSliceToggle;
+    EtchedToggle    reverseToggle;
+    EtchedToggle    fixVelToggle;
     PhantomMiniKnob gainKnob;
-    juce::Slider    attackSlider, decaySlider, sustainSlider, releaseSlider;
+    juce::Slider    attackSlider, decaySlider, sustainSlider, releaseSlider, xfadeSlider, velocitySlider;
 
     // APVTS attachments.
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment>   rootAttach;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>     attackAttach, decayAttach, sustainAttach, releaseAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment>   rootAttach, quantizeAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>     attackAttach, decayAttach, sustainAttach, releaseAttach, xfadeAttach, velocityAttach;
     // (sourceToggle, loopToggle, gainKnob already have their own
     // attachments via their WordSelector/EtchedToggle/PhantomMiniKnob ctors.)
 
     // Waveform thumbnail cached as an Image so paint is cheap.
     juce::Image waveformImage;
 
-    // Start/end markers drawn as triangle handles over the waveform.
-    // Updated by mouse drag → APVTS::setValueNotifyingHost. Hit-testing
-    // tracks which marker (if any) is currently being dragged.
-    enum class DragTarget { None, Start, End };
+    // Start/end markers + slice handles drawn over the waveform.
+    // Updated by mouse drag → APVTS or PhantomSampler.setSliceTable.
+    enum class DragTarget { None, Start, End, Slice };
     DragTarget activeDrag { DragTarget::None };
+    int        draggedSliceIdx { -1 };   // valid when activeDrag == Slice
     juce::Rectangle<float> waveformBoundsCache;   // last paint's waveform rect (for hit-tests)
     float fractionAtX(float xpx) const noexcept;  // px → 0..1 inside waveformBoundsCache
+
+    // Sample-position helpers (depend on the loaded sample's length).
+    int  totalSourceSamples() const noexcept;
+    int  sampleAtX(float xpx) const noexcept;     // px → source-sample index
+
+    // Hit-tests the slice handles (returns -1 if no hit). Slice 0 is
+    // never grabbable (always at sample 0).
+    int hitTestSliceHandle(juce::Point<int> p) const noexcept;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SamplerStrip)
 };

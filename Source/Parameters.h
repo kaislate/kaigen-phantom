@@ -94,6 +94,13 @@ namespace ParamID
     inline constexpr auto SAMPLER_START      = "sampler_start";      // 0..1 of sample length
     inline constexpr auto SAMPLER_END        = "sampler_end";        // 0..1 of sample length
     inline constexpr auto SAMPLER_SLICE_MODE = "sampler_slice_mode"; // bool: pitched vs slice
+    inline constexpr auto SAMPLER_REVERSE    = "sampler_reverse";    // bool
+    inline constexpr auto SAMPLER_LOOP_XFADE = "sampler_loop_xfade_ms"; // 0..100 ms
+    inline constexpr auto SAMPLER_WARP_MODE  = "sampler_warp_mode";     // choice: Off, Complex
+    inline constexpr auto SAMPLER_QUANTIZE   = "sampler_quantize";      // choice: Off, 1/4, 1/8, 1/16, 1/32
+    inline constexpr auto SAMPLER_VEL_FIXED  = "sampler_vel_fixed";     // bool: override incoming MIDI vel
+    inline constexpr auto SAMPLER_VEL_VALUE  = "sampler_vel_value";     // int 1..127
+    inline constexpr auto SAMPLER_AUTO_SLICE = "sampler_auto_slice";    // bool: auto-detect on sample load
 
     // ── Macros (PR3a) — global, automatable ────────────────────────────
     inline constexpr auto MACRO1 = "macro1";
@@ -200,6 +207,13 @@ inline std::vector<juce::String> getAllParameterIDs()
     ids.push_back(ParamID::SAMPLER_START);
     ids.push_back(ParamID::SAMPLER_END);
     ids.push_back(ParamID::SAMPLER_SLICE_MODE);
+    ids.push_back(ParamID::SAMPLER_REVERSE);
+    ids.push_back(ParamID::SAMPLER_LOOP_XFADE);
+    ids.push_back(ParamID::SAMPLER_WARP_MODE);
+    ids.push_back(ParamID::SAMPLER_QUANTIZE);
+    ids.push_back(ParamID::SAMPLER_VEL_FIXED);
+    ids.push_back(ParamID::SAMPLER_VEL_VALUE);
+    ids.push_back(ParamID::SAMPLER_AUTO_SLICE);
 
     ids.push_back(ParamID::MACRO1);
     ids.push_back(ParamID::MACRO2);
@@ -471,6 +485,38 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ ParamID::SAMPLER_SLICE_MODE, 1 },
         "Sampler Slice Mode", false));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ ParamID::SAMPLER_REVERSE, 1 },
+        "Sampler Reverse", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_LOOP_XFADE, 1 },
+        "Sampler Loop Crossfade",
+        juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f), 5.0f,
+        juce::AudioParameterFloatAttributes().withLabel("ms")));
+    // Warp mode — Off = classic varispeed (faster note = higher pitch + shorter
+    // duration); Complex = SignalSmith Stretch holds the source rate constant
+    // and pitches the audio independently. Slice mode ignores warp regardless.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{ ParamID::SAMPLER_WARP_MODE, 1 },
+        "Sampler Warp Mode",
+        juce::StringArray{ "Off", "Complex" }, 0));
+    // Quantize — snaps incoming MIDI note-ons to the host's tempo grid.
+    // Note-offs pass through unmodified so held notes ring out naturally.
+    // Requires host playback (tempo + ppq); falls back to passthrough when
+    // the host isn't playing.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{ ParamID::SAMPLER_QUANTIZE, 1 },
+        "Sampler Quantize",
+        juce::StringArray{ "Off", "1/4", "1/8", "1/16", "1/32" }, 0));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ ParamID::SAMPLER_VEL_FIXED, 1 },
+        "Sampler Fix Velocity", false));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        juce::ParameterID{ ParamID::SAMPLER_VEL_VALUE, 1 },
+        "Sampler Velocity", 1, 127, 100));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ ParamID::SAMPLER_AUTO_SLICE, 1 },
+        "Sampler Auto-Slice", true));
 
     // Macros (PR3a) — global APVTS params, automatable. Read by Macro
     // modulators in ModulationEngine.

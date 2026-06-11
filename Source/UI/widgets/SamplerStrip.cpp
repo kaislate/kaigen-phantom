@@ -8,9 +8,10 @@ namespace kaigen::phantom
 
 namespace
 {
-    constexpr int kHeaderH   = 24;
-    constexpr int kWaveformH = 60;
-    constexpr int kControlsH = 90;   // tall enough for full PhantomMiniKnob + labeled ADSR sliders
+    constexpr int kHeaderH       = 24;
+    constexpr int kMarkerStripH  = 16;   // hosts slice MIDI-note labels + triangle handles in slice mode
+    constexpr int kWaveformH     = 60;
+    constexpr int kControlsH     = 90;   // tall enough for full PhantomMiniKnob + labeled ADSR sliders
 
     juce::String midiNoteName(int n)
     {
@@ -24,11 +25,17 @@ SamplerStrip::SamplerStrip(PhantomProcessor& p, juce::AudioProcessorValueTreeSta
     : processor(p), apvts(a),
       sourceToggle(a, ParamID::INPUT_SOURCE,
                     juce::StringArray{ "Input", "Sidechain", "Sampler" }, 1),
+      warpToggle(a, ParamID::SAMPLER_WARP_MODE,
+                  juce::StringArray{ "Off", "Complex" }, 1),
       loopToggle(a, ParamID::SAMPLER_LOOP, "Loop"),
       sliceToggle(a, ParamID::SAMPLER_SLICE_MODE, "Slice"),
+      autoSliceToggle(a, ParamID::SAMPLER_AUTO_SLICE, "Auto"),
+      reverseToggle(a, ParamID::SAMPLER_REVERSE, "Rev"),
+      fixVelToggle(a, ParamID::SAMPLER_VEL_FIXED, "FixVel"),
       gainKnob(a, ParamID::SAMPLER_GAIN, "Gain", /*darkBackground=*/true)
 {
     addAndMakeVisible(sourceToggle);
+    addAndMakeVisible(warpToggle);
 
     folderButton.setButtonText("...");
     folderButton.getProperties().set("phantom-style", "header-glyph");
@@ -41,8 +48,18 @@ SamplerStrip::SamplerStrip(PhantomProcessor& p, juce::AudioProcessorValueTreeSta
         apvts, ParamID::SAMPLER_ROOT_NOTE, rootNoteCombo);
     addAndMakeVisible(rootNoteCombo);
 
+    // Quantize combo — text mirrors the APVTS choice labels.
+    for (auto& label : juce::StringArray{ "Off", "1/4", "1/8", "1/16", "1/32" })
+        quantizeCombo.addItem(label, quantizeCombo.getNumItems() + 1);
+    quantizeAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        apvts, ParamID::SAMPLER_QUANTIZE, quantizeCombo);
+    addAndMakeVisible(quantizeCombo);
+
     addAndMakeVisible(loopToggle);
     addAndMakeVisible(sliceToggle);
+    addAndMakeVisible(autoSliceToggle);
+    addAndMakeVisible(reverseToggle);
+    addAndMakeVisible(fixVelToggle);
     addAndMakeVisible(gainKnob);
 
     auto setupSlider = [&](juce::Slider& s, const juce::String& paramId,
@@ -58,6 +75,8 @@ SamplerStrip::SamplerStrip(PhantomProcessor& p, juce::AudioProcessorValueTreeSta
     setupSlider(decaySlider,   ParamID::SAMPLER_D, decayAttach);
     setupSlider(sustainSlider, ParamID::SAMPLER_S, sustainAttach);
     setupSlider(releaseSlider, ParamID::SAMPLER_R, releaseAttach);
+    setupSlider(xfadeSlider,    ParamID::SAMPLER_LOOP_XFADE, xfadeAttach);
+    setupSlider(velocitySlider, ParamID::SAMPLER_VEL_VALUE,  velocityAttach);
 
     // If the plugin opened with a sample already loaded (restored from
     // plugin state by PluginProcessor::setStateInformation before the
@@ -80,12 +99,13 @@ void SamplerStrip::paint(juce::Graphics& g)
     g.fillAll(juce::Colour(0xff121419));
 
     auto area = getLocalBounds();
-    auto headerArea = area.removeFromTop(kHeaderH);
+    auto headerArea  = area.removeFromTop(kHeaderH);
+    auto markerStrip = area.removeFromTop(kMarkerStripH).reduced(6, 0);
     auto waveformArea = area.removeFromTop(kWaveformH).reduced(6, 4);
     // controlsArea is the remainder; positioned in resized().
 
-    // Header - filename label drawn between the source selector and folder button.
-    auto filenameRect = headerArea.reduced(8, 0).withTrimmedLeft(220);   // skip the sourceToggle width
+    // Header - filename label drawn between the warp selector and folder button.
+    auto filenameRect = headerArea.reduced(8, 0).withTrimmedLeft(220 + 100);   // skip source + warp
     filenameRect.removeFromRight(40);   // skip the folderButton width
     g.setColour(juce::Colour(processor.getSampleFilename().isEmpty()
         ? 0x66ffffff : 0xffd0d2d4));
@@ -116,58 +136,104 @@ void SamplerStrip::paint(juce::Graphics& g)
         const float startX = wf.getX() + startFrac * wf.getWidth();
         const float endX   = wf.getX() + endFrac   * wf.getWidth();
 
-        // Dim regions outside [start, end] so the active region pops.
-        g.setColour(juce::Colour(0xa0000000));
-        if (startX > wf.getX())
-            g.fillRect(juce::Rectangle<float>(wf.getX(), wf.getY(),
-                                                startX - wf.getX(), wf.getHeight()));
-        if (endX < wf.getRight())
-            g.fillRect(juce::Rectangle<float>(endX, wf.getY(),
-                                                wf.getRight() - endX, wf.getHeight()));
+        const bool sliceMode = apvts.getRawParameterValue(ParamID::SAMPLER_SLICE_MODE)->load() > 0.5f;
+        const juce::Colour amber(0xffe6b04a);
 
-        // Vertical lines at start/end so the boundaries read at a glance.
-        g.setColour(juce::Colour(0xffe6b04a));   // amber — distinct from blue playhead
-        g.drawLine(startX, wf.getY(), startX, wf.getBottom(), 1.0f);
-        g.drawLine(endX,   wf.getY(), endX,   wf.getBottom(), 1.0f);
-
-        // Slice mode: thin cyan vertical lines at each slice boundary.
-        // Drawn under the amber start/end markers so those still pop.
-        if (apvts.getRawParameterValue(ParamID::SAMPLER_SLICE_MODE)->load() > 0.5f)
+        // Start/end markers + dim overlay only apply in pitched mode. In
+        // slice mode each slice has its own region [slices[i], slices[i+1])
+        // so start/end are meaningless and would just confuse the user.
+        if (! sliceMode)
         {
+            // Dim regions outside [start, end] so the active region pops.
+            g.setColour(juce::Colour(0xa0000000));
+            if (startX > wf.getX())
+                g.fillRect(juce::Rectangle<float>(wf.getX(), wf.getY(),
+                                                    startX - wf.getX(), wf.getHeight()));
+            if (endX < wf.getRight())
+                g.fillRect(juce::Rectangle<float>(endX, wf.getY(),
+                                                    wf.getRight() - endX, wf.getHeight()));
+
+            // Vertical lines at start/end so the boundaries read at a glance.
+            g.setColour(amber);   // distinct from blue playhead
+            g.drawLine(startX, wf.getY(), startX, wf.getBottom(), 1.0f);
+            g.drawLine(endX,   wf.getY(), endX,   wf.getBottom(), 1.0f);
+
+            // Triangle handles pointing INWARD (into the active region) so
+            // the user sees the grab area as an arrow.
+            constexpr float kTriH = 7.0f;
+            const float triY = wf.getY();
+            juce::Path startTri;
+            startTri.addTriangle(startX,         triY,
+                                 startX + kTriH, triY + kTriH * 0.5f,
+                                 startX,         triY + kTriH);
+            juce::Path endTri;
+            endTri.addTriangle(endX,         triY,
+                               endX - kTriH, triY + kTriH * 0.5f,
+                               endX,         triY + kTriH);
+            g.setColour(amber);
+            g.fillPath(startTri);
+            g.fillPath(endTri);
+        }
+        else
+        {
+            // Slice mode: blue (SYNTH) vertical line per slice running
+            // through the waveform, with a draggable handle (note label +
+            // triangle) sitting above the waveform in the marker strip.
+            // Color matches the spectrum/oscilloscope SYNTH stroke so the
+            // sampler reads as a synth source at a glance. Slice 0 is
+            // fixed at sample 0 and shown faded with no handle.
             const auto& slices = processor.getPhantomSampler().getSliceTable();
-            const double durSec = processor.getSampleThumbnail().getTotalLength();
-            const double srcRate = processor.getPhantomSampler().getLoadedSourceSampleRate();
-            const double rate    = srcRate > 0.0 ? srcRate : 44100.0;
-            const int totalSamples = (int) (durSec * rate);
+            const int totalSamples = totalSourceSamples();
             if (totalSamples > 0)
             {
-                g.setColour(juce::Colour(0x9966ddff));   // cyan, 60% alpha
-                for (int s : slices)
+                constexpr float kTriH = 5.0f;
+                constexpr float kTriW = 9.0f;
+                const auto strip = markerStrip.toFloat();   // marker strip rect for labels/triangles
+                const juce::Colour synthBlue(0xff508ED7);   // matches SYNTH stroke in spectrum/scope
+
+                g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+
+                for (int idx = 0; idx < (int) slices.size(); ++idx)
                 {
-                    if (s <= 0) continue;   // skip slice-0 line at left edge
-                    const float frac = (float) s / (float) totalSamples;
-                    if (frac >= 1.0f) break;
+                    const float frac = (float) slices[idx] / (float) totalSamples;
+                    if (frac > 1.0f) break;
                     const float x = wf.getX() + frac * wf.getWidth();
-                    g.drawLine(x, wf.getY(), x, wf.getBottom(), 1.0f);
+
+                    // Slice line through the waveform. Faded for the fixed
+                    // slice 0, solid for the rest so movable ones pop.
+                    g.setColour(synthBlue.withAlpha(idx == 0 ? 0.45f : 1.0f));
+                    g.drawLine(x, wf.getY(), x, wf.getBottom(), idx == 0 ? 1.0f : 1.5f);
+
+                    // Marker-strip area: label above, triangle pointing down
+                    // toward the waveform line, both forming the drag handle.
+                    const auto label = midiNoteName(36 + idx);
+                    const float labelW = 28.0f;
+                    juce::Rectangle<int> labelBox = (idx == 0)
+                        ? juce::Rectangle<int>((int) (strip.getX()),       (int) strip.getY(),
+                                               (int) labelW,               (int) (strip.getHeight() - kTriH))
+                        : juce::Rectangle<int>((int) (x - labelW * 0.5f),  (int) strip.getY(),
+                                               (int) labelW,               (int) (strip.getHeight() - kTriH));
+                    g.setColour(synthBlue);
+                    g.drawText(label, labelBox,
+                               idx == 0 ? juce::Justification::centredLeft
+                                        : juce::Justification::centred,
+                               false);
+
+                    // Downward-pointing triangle sits just above the
+                    // waveform line — only for movable slices.
+                    if (idx > 0)
+                    {
+                        const float triY = strip.getBottom() - kTriH;
+                        juce::Path tri;
+                        tri.addTriangle(x - kTriW * 0.5f, triY,
+                                        x + kTriW * 0.5f, triY,
+                                        x,                triY + kTriH);
+                        g.setColour(synthBlue);
+                        g.fillPath(tri);
+                    }
                 }
             }
         }
-
-        // Triangle handles pointing INWARD (into the active region) so
-        // the user sees the grab area as an arrow.
-        constexpr float kTriH = 7.0f;
-        const float triY = wf.getY();
-        juce::Path startTri;
-        startTri.addTriangle(startX,         triY,
-                             startX + kTriH, triY + kTriH * 0.5f,
-                             startX,         triY + kTriH);
-        juce::Path endTri;
-        endTri.addTriangle(endX,         triY,
-                           endX - kTriH, triY + kTriH * 0.5f,
-                           endX,         triY + kTriH);
-        g.setColour(juce::Colour(0xffe6b04a));
-        g.fillPath(startTri);
-        g.fillPath(endTri);
 
         // Playhead overlay (atomic int from PhantomSampler). Maps the
         // source-sample index to a fraction of the thumbnail's total
@@ -189,7 +255,7 @@ void SamplerStrip::paint(juce::Graphics& g)
             const float frac = juce::jlimit(0.0f, 1.0f,
                 (float) playhead / juce::jmax(1.0f, (float) totalSamples));
             const int xpx = waveformArea.getX() + (int) (frac * waveformArea.getWidth());
-            g.setColour(juce::Colour(0xff77ddff));
+            g.setColour(juce::Colour(0xe6ffffff));   // OUTPUT white — matches spectrum/scope legend
             g.drawLine((float) xpx, (float) waveformArea.getY(),
                         (float) xpx, (float) waveformArea.getBottom(), 1.0f);
         }
@@ -212,10 +278,12 @@ void SamplerStrip::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0x99ffffff));
     g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
     struct { juce::Slider* s; const char* label; } adsr[] = {
-        { &attackSlider,  "A" },
-        { &decaySlider,   "D" },
-        { &sustainSlider, "S" },
-        { &releaseSlider, "R" }
+        { &attackSlider,   "A"  },
+        { &decaySlider,    "D"  },
+        { &sustainSlider,  "S"  },
+        { &releaseSlider,  "R"  },
+        { &xfadeSlider,    "XF" },
+        { &velocitySlider, "V"  }
     };
     for (const auto& entry : adsr)
     {
@@ -230,13 +298,15 @@ void SamplerStrip::resized()
 {
     auto area = getLocalBounds();
     auto headerArea = area.removeFromTop(kHeaderH);
+    area.removeFromTop(kMarkerStripH);   // slice handle strip — painted directly
     auto waveformArea = area.removeFromTop(kWaveformH);
-    juce::ignoreUnused(waveformArea);   // painted directly, no children
+    juce::ignoreUnused(waveformArea);    // painted directly, no children
     auto controlsArea = area.removeFromTop(kControlsH).reduced(8, 4);
 
-    // Header - source selector left, folder button right, filename
-    // painted between (in paint()).
+    // Header - source selector left, warp selector next to it, folder
+    // button right, filename painted between (in paint()).
     sourceToggle.setBounds(headerArea.removeFromLeft(220).reduced(6, 2));
+    warpToggle.setBounds(headerArea.removeFromLeft(100).reduced(6, 2));
     folderButton.setBounds(headerArea.removeFromRight(36).reduced(4));
 
     // Controls row — 90 px tall. Widget heights vary; vertical-centre
@@ -262,13 +332,19 @@ void SamplerStrip::resized()
         controlsArea.removeFromLeft(kColGap);
     };
 
-    placeCentered(rootNoteCombo, kRootW, kRootH);
-    placeCentered(loopToggle,    kLoopW, kLoopH);
-    placeCentered(sliceToggle,   kLoopW, kLoopH);
-    placeCentered(gainKnob,      kGainW, kGainH);
+    placeCentered(rootNoteCombo,  kRootW, kRootH);
+    placeCentered(quantizeCombo,  kRootW, kRootH);
+    placeCentered(loopToggle,     kLoopW, kLoopH);
+    placeCentered(sliceToggle,    kLoopW, kLoopH);
+    placeCentered(autoSliceToggle,kLoopW, kLoopH);
+    placeCentered(reverseToggle,  kLoopW, kLoopH);
+    placeCentered(fixVelToggle,   kLoopW + 10, kLoopH);   // slightly wider for "FixVel" text
+    placeCentered(gainKnob,       kGainW, kGainH);
 
     // ADSR sliders share a row, each with a letter label painted below.
     // Slider takes rowH - kEnvSpace; the label area is drawn in paint().
+    // XF (loop crossfade) sits last so it visually groups with the time-
+    // domain envelope params even though it's a sample-loop control.
     const int sliderH = juce::jmax(40, rowH - kEnvSpace);
     auto placeSlider = [&](juce::Slider& s)
     {
@@ -280,6 +356,8 @@ void SamplerStrip::resized()
     placeSlider(decaySlider);
     placeSlider(sustainSlider);
     placeSlider(releaseSlider);
+    placeSlider(xfadeSlider);
+    placeSlider(velocitySlider);
 }
 
 float SamplerStrip::fractionAtX(float xpx) const noexcept
@@ -289,18 +367,102 @@ float SamplerStrip::fractionAtX(float xpx) const noexcept
         (xpx - waveformBoundsCache.getX()) / waveformBoundsCache.getWidth());
 }
 
+int SamplerStrip::totalSourceSamples() const noexcept
+{
+    const double durSec  = processor.getSampleThumbnail().getTotalLength();
+    const double srcRate = processor.getPhantomSampler().getLoadedSourceSampleRate();
+    const double rate    = srcRate > 0.0 ? srcRate : 44100.0;
+    return (int) (durSec * rate);
+}
+
+int SamplerStrip::sampleAtX(float xpx) const noexcept
+{
+    const int total = totalSourceSamples();
+    if (total <= 0) return 0;
+    return juce::jlimit(0, total - 1, (int) (fractionAtX(xpx) * (float) total));
+}
+
+int SamplerStrip::hitTestSliceHandle(juce::Point<int> p) const noexcept
+{
+    // The handle is the label + triangle stacked in the marker strip just
+    // above the waveform — together they form a generous drag target so
+    // the user can grab a slice by its note name as easily as by its arrow.
+    if (apvts.getRawParameterValue(ParamID::SAMPLER_SLICE_MODE)->load() <= 0.5f)
+        return -1;
+
+    const auto& slices = processor.getPhantomSampler().getSliceTable();
+    const int total = totalSourceSamples();
+    if (total <= 0) return -1;
+
+    // Marker strip spans [waveformTop - kMarkerStripH, waveformTop].
+    const int waveformTop = (int) waveformBoundsCache.getY();
+    const int stripTop    = waveformTop - kMarkerStripH;
+    if (p.y < stripTop || p.y > waveformTop) return -1;
+
+    constexpr int kHandleHalfW = 14;   // matches the label box half-width
+
+    // Slice 0 is fixed at sample 0 — not grabbable.
+    for (int idx = 1; idx < (int) slices.size(); ++idx)
+    {
+        const float frac = (float) slices[idx] / (float) total;
+        if (frac > 1.0f) break;
+        const float x = waveformBoundsCache.getX() + frac * waveformBoundsCache.getWidth();
+        if (std::abs((float) p.x - x) <= kHandleHalfW) return idx;
+    }
+    return -1;
+}
+
 void SamplerStrip::mouseDown(const juce::MouseEvent& e)
 {
-    // Click on the waveform area: hit-test the start/end markers first;
-    // if a marker is grabbed, start a drag instead of opening the picker.
-    auto waveformArea = juce::Rectangle<int>(0, kHeaderH, getWidth(), kWaveformH);
+    // Click on the waveform area: hit-test the marker/slice handles first;
+    // if anything is grabbed, start a drag instead of opening the picker.
+    // Combined hit zone: marker strip (slice handles) + waveform (markers/picker).
+    auto waveformArea = juce::Rectangle<int>(0, kHeaderH, getWidth(), kMarkerStripH + kWaveformH);
     if (! waveformArea.contains(e.getPosition()))
         return;
 
-    // Open file picker if no sample loaded yet — no markers to grab.
+    // Open file picker if no sample loaded yet — no handles to grab.
     if (! processor.getPhantomSampler().hasSample())
     {
         pickAndLoadFile();
+        return;
+    }
+
+    const bool sliceMode = apvts.getRawParameterValue(ParamID::SAMPLER_SLICE_MODE)->load() > 0.5f;
+
+    if (sliceMode)
+    {
+        // Right-click (or ctrl-click on macOS) — manual slice authoring.
+        //   on handle → delete that slice
+        //   on empty  → insert a new slice at the click position
+        if (e.mods.isPopupMenu())
+        {
+            const int hit = hitTestSliceHandle(e.getPosition());
+            auto slices = processor.getPhantomSampler().getSliceTable();
+            if (hit > 0 && hit < (int) slices.size())
+            {
+                slices.erase(slices.begin() + hit);
+            }
+            else
+            {
+                const int sampleIdx = sampleAtX((float) e.x);
+                if (sampleIdx > 0) slices.push_back(sampleIdx);
+            }
+            processor.getPhantomSampler().setSliceTable(std::move(slices));
+            repaint();
+            return;
+        }
+
+        // Left-click: hit-test the handle, start dragging if grabbed.
+        const int hit = hitTestSliceHandle(e.getPosition());
+        if (hit > 0)
+        {
+            activeDrag       = DragTarget::Slice;
+            draggedSliceIdx  = hit;
+            return;
+        }
+        // Empty left-click in slice mode is a no-op (don't open picker —
+        // the user is likely just trying to inspect the waveform).
         return;
     }
 
@@ -329,6 +491,29 @@ void SamplerStrip::mouseDown(const juce::MouseEvent& e)
 void SamplerStrip::mouseDrag(const juce::MouseEvent& e)
 {
     if (activeDrag == DragTarget::None) return;
+
+    if (activeDrag == DragTarget::Slice)
+    {
+        auto slices = processor.getPhantomSampler().getSliceTable();
+        if (draggedSliceIdx <= 0 || draggedSliceIdx >= (int) slices.size())
+        {
+            activeDrag      = DragTarget::None;
+            draggedSliceIdx = -1;
+            return;
+        }
+        const int total = totalSourceSamples();
+        // Clamp between neighbours so the table stays ordered and the
+        // dragged slice doesn't merge with its siblings mid-drag.
+        const int leftBound  = slices[draggedSliceIdx - 1] + 1;
+        const int rightBound = (draggedSliceIdx + 1 < (int) slices.size())
+                                   ? slices[draggedSliceIdx + 1] - 1
+                                   : juce::jmax(1, total - 1);
+        slices[draggedSliceIdx] = juce::jlimit(leftBound, rightBound, sampleAtX((float) e.x));
+        processor.getPhantomSampler().setSliceTable(std::move(slices));
+        repaint();
+        return;
+    }
+
     const float frac = fractionAtX((float) e.x);
     const auto* paramId = (activeDrag == DragTarget::Start)
                               ? ParamID::SAMPLER_START : ParamID::SAMPLER_END;
@@ -339,16 +524,38 @@ void SamplerStrip::mouseDrag(const juce::MouseEvent& e)
 
 void SamplerStrip::mouseUp(const juce::MouseEvent&)
 {
-    activeDrag = DragTarget::None;
+    activeDrag      = DragTarget::None;
+    draggedSliceIdx = -1;
 }
 
 void SamplerStrip::mouseDoubleClick(const juce::MouseEvent& e)
 {
-    // Double-click on a marker resets it to its default (start=0, end=1).
-    auto waveformArea = juce::Rectangle<int>(0, kHeaderH, getWidth(), kWaveformH);
+    // Combined hit zone: marker strip (slice handles) + waveform (markers/picker).
+    auto waveformArea = juce::Rectangle<int>(0, kHeaderH, getWidth(), kMarkerStripH + kWaveformH);
     if (! waveformArea.contains(e.getPosition())) return;
     if (! processor.getPhantomSampler().hasSample()) return;
 
+    const bool sliceMode = apvts.getRawParameterValue(ParamID::SAMPLER_SLICE_MODE)->load() > 0.5f;
+
+    if (sliceMode)
+    {
+        // Double-click on a slice handle deletes that slice (slice 0 is
+        // never deletable — it's the implicit start at sample 0).
+        const int hit = hitTestSliceHandle(e.getPosition());
+        if (hit > 0)
+        {
+            auto slices = processor.getPhantomSampler().getSliceTable();
+            if (hit < (int) slices.size())
+            {
+                slices.erase(slices.begin() + hit);
+                processor.getPhantomSampler().setSliceTable(std::move(slices));
+                repaint();
+            }
+        }
+        return;
+    }
+
+    // Pitched mode: double-click on a start/end marker resets it.
     const float startFrac = apvts.getRawParameterValue(ParamID::SAMPLER_START)->load();
     const float endFrac   = apvts.getRawParameterValue(ParamID::SAMPLER_END)->load();
     const float startX = waveformBoundsCache.getX() + startFrac * waveformBoundsCache.getWidth();
@@ -501,7 +708,7 @@ void SamplerStrip::rebuildWaveformThumbnail()
     juce::Graphics g(waveformImage);
     g.setColour(juce::Colour(0xff1a2028));
     g.fillAll();
-    g.setColour(juce::Colour(0xff77ddff));
+    g.setColour(juce::Colour(0xffa0a0af));   // INPUT gray — matches spectrum/scope legend
     juce::Rectangle<int> rect(0, 0, kImgW, kImgH);
     thumb.drawChannels(g, rect, 0.0, thumb.getTotalLength(), 1.0f);
 }

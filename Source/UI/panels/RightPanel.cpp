@@ -449,7 +449,7 @@ void RightPanel::resized()
     // Sampler strip — sits between the spectrum (above) and the pitch
     // slot (below). Fixed height + small gaps either side; the spectrum
     // gives up the equivalent vertical space from its bottom-anchored area.
-    constexpr int kSamplerStripH   = 174;   // header 24 + waveform 60 + controls 90
+    constexpr int kSamplerStripH   = 190;   // header 24 + marker strip 16 + waveform 60 + controls 90
     constexpr int kSamplerGapAbove = 8;
     constexpr int kSamplerGapBelow = 8;
 
