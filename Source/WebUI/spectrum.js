@@ -379,6 +379,10 @@ function drawOnePane(ctx, xOffset, paneW, h, side /* 'A' | 'B' */) {
 }
 
 // ─── Meter drawing ──────────────────────────────────────────────────────────
+// Linear amplitude → dB → normalized 0..1 across the [-60, 0] dBFS window.
+// -6 dB lands at ~90% of the meter's height (matches Ableton-style readouts);
+// the previous linear mapping put -6 dB at ~50% which made the plugin look
+// 30+ dB quieter than the host's track meter.
 function drawMeter(canvas, level, peak, label) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -386,29 +390,44 @@ function drawMeter(canvas, level, peak, label) {
     const w = canvas.width;
     const h = canvas.height;
 
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, w, h);
-
-    const fillH = level * h * 0.9;
-    if (fillH > 0.5) {
-        const grad = ctx.createLinearGradient(0, h, 0, h - fillH);
-        grad.addColorStop(0, 'rgba(255,255,255,0.55)');
-        grad.addColorStop(1, 'rgba(255,255,255,0.12)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(1, h - fillH, w - 2, fillH);
+    function toDbNormalized(lin) {
+        if (lin <= 0) return 0;
+        const dB = 20 * Math.log10(lin);
+        return Math.max(0, Math.min(1, (dB + 60) / 60));
     }
 
-    if (peak > 0) {
-        const py = h - peak * h * 0.9;
-        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    const fillPct = toDbNormalized(level);
+    const peakPct = toDbNormalized(peak);
+
+    // Minimal "DJ-style" white-glowing bar: clear the canvas and let the
+    // surrounding panel background show through. No solid fill, no label.
+    ctx.clearRect(0, 0, w, h);
+
+    if (fillPct > 0) {
+        const fillH = fillPct * h;
+        const grad = ctx.createLinearGradient(0, h, 0, h - fillH);
+        grad.addColorStop(0, 'rgba(245, 250, 255, 0.85)');
+        grad.addColorStop(1, 'rgba(220, 235, 250, 0.95)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(1, h - fillH, w - 2, fillH);
+        // Soft cool-white glow.
+        ctx.shadowColor = 'rgba(180, 210, 240, 0.7)';
+        ctx.shadowBlur = 4;
+        ctx.fillRect(1, h - fillH, w - 2, fillH);
+        ctx.shadowBlur = 0;
+    }
+
+    if (peakPct > 0) {
+        const py = h - peakPct * h;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
         ctx.fillRect(1, py, w - 2, 1);
     }
 
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.font = Math.max(8, Math.round(h * 0.04)) + 'px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(label, w / 2, h - 2);
+    // Clipping indicator: red top edge if peak >= -0.1 dBFS (linear ~0.989).
+    if (peak >= 0.989) {
+        ctx.fillStyle = 'rgba(255, 80, 80, 0.9)';
+        ctx.fillRect(0, 0, w, 2);
+    }
 }
 
 // ─── Data ingest ─────────────────────────────────────────────────────────────

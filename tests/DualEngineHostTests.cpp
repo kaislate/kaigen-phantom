@@ -73,3 +73,24 @@ TEST_CASE("DualEngineHost: silence in -> silence out at morph=1", "[host]")
 {
     runSilenceTest(1.0f);
 }
+
+// Invariant: every per-engine APVTS param ("a_*" / "b_*") must be registered
+// in DualEngineHost's parameter cache. If you add a new per-engine param to
+// `createParameterLayout()` and use it in `syncEngineFromPrefix`, you MUST also
+// add it to `buildParamCache()`. This test fails loudly at build time if you
+// forget — without it, Release builds would silently skip the param (or, worse,
+// null-deref on the audio thread).
+TEST_CASE("DualEngineHost: param cache covers every per-engine APVTS param", "[host]")
+{
+    StubProcessor proc;
+    juce::AudioProcessorValueTreeState apvts(proc, nullptr, "PHANTOM_STATE",
+                                             createParameterLayout());
+    kaigen::phantom::DualEngineHost host(apvts);
+
+    juce::StringArray missing;
+    const bool ok = host.validateParamCachesCoverAPVTS(missing);
+
+    INFO("Missing per-engine params (add to buildParamCache): "
+         << missing.joinIntoString(", ").toStdString());
+    REQUIRE(ok);
+}

@@ -57,6 +57,7 @@ namespace ParamID
     KAIGEN_PER_ENGINE(SYNTH_GATE_THRESHOLD, "synth_gate_threshold")
     KAIGEN_PER_ENGINE(SYNTH_H1, "synth_h1")
     KAIGEN_PER_ENGINE(SYNTH_SUB, "synth_sub")
+    KAIGEN_PER_ENGINE(SYNTH_TRIM, "synth_trim")
 
     // ── Crossing detection / pitch ────────────────────────────────────
     KAIGEN_PER_ENGINE(SYNTH_MIN_SAMPLES, "synth_min_samples")
@@ -81,11 +82,39 @@ namespace ParamID
     inline constexpr auto MORPH_B_LEVEL_DB         = "morph_b_level_db";
     inline constexpr auto MORPH_BYPASS_IDLE_ENGINE = "morph_bypass_idle_engine";
 
+    // ── Sampler (PR-sampler) ─────────────────────────────────────────────
+    inline constexpr auto INPUT_SOURCE       = "input_source";       // choice 0/1/2
+    inline constexpr auto SAMPLER_ROOT_NOTE  = "sampler_root_note";  // int 0..127
+    inline constexpr auto SAMPLER_LOOP       = "sampler_loop";       // bool
+    inline constexpr auto SAMPLER_GAIN       = "sampler_gain";       // dB
+    inline constexpr auto SAMPLER_A          = "sampler_attack";     // seconds
+    inline constexpr auto SAMPLER_D          = "sampler_decay";      // seconds
+    inline constexpr auto SAMPLER_S          = "sampler_sustain";    // 0..1
+    inline constexpr auto SAMPLER_R          = "sampler_release";    // seconds
+    inline constexpr auto SAMPLER_START      = "sampler_start";      // 0..1 of sample length
+    inline constexpr auto SAMPLER_END        = "sampler_end";        // 0..1 of sample length
+    inline constexpr auto SAMPLER_SLICE_MODE = "sampler_slice_mode"; // bool: pitched vs slice
+    inline constexpr auto SAMPLER_REVERSE    = "sampler_reverse";    // bool
+    inline constexpr auto SAMPLER_LOOP_XFADE = "sampler_loop_xfade_ms"; // 0..100 ms
+    inline constexpr auto SAMPLER_WARP_MODE  = "sampler_warp_mode";     // choice: Off, Complex
+    inline constexpr auto SAMPLER_QUANTIZE   = "sampler_quantize";      // choice: Off, 1/4, 1/8, 1/16, 1/32
+    inline constexpr auto SAMPLER_VEL_FIXED  = "sampler_vel_fixed";     // bool: override incoming MIDI vel
+    inline constexpr auto SAMPLER_VEL_VALUE  = "sampler_vel_value";     // int 1..127
+    inline constexpr auto SAMPLER_AUTO_SLICE = "sampler_auto_slice";    // bool: auto-detect on sample load
+
     // ── Macros (PR3a) — global, automatable ────────────────────────────
     inline constexpr auto MACRO1 = "macro1";
     inline constexpr auto MACRO2 = "macro2";
     inline constexpr auto MACRO3 = "macro3";
     inline constexpr auto MACRO4 = "macro4";
+
+    // ── Reverb (single-knob global send) ──────────────────────────────
+    // Single global param: dry/wet mix into the post-engine signal. The
+    // reverb's character is baked (Concert Hall / 1970s VVV preset, 4 s
+    // decay), so the user only sees an "amount" knob. Same instance feeds
+    // both engines (parallel send on the morphed output).
+    inline constexpr auto REVERB_MIX    = "reverb_mix";
+    inline constexpr auto REVERB_SOURCE = "reverb_source";
 
     #undef KAIGEN_PER_ENGINE
 }
@@ -151,6 +180,7 @@ inline std::vector<juce::String> getAllParameterIDs()
     addAB(ParamID::A_SYNTH_GATE_THRESHOLD, ParamID::B_SYNTH_GATE_THRESHOLD);
     addAB(ParamID::A_SYNTH_H1, ParamID::B_SYNTH_H1);
     addAB(ParamID::A_SYNTH_SUB, ParamID::B_SYNTH_SUB);
+    addAB(ParamID::A_SYNTH_TRIM, ParamID::B_SYNTH_TRIM);
     addAB(ParamID::A_SYNTH_MIN_SAMPLES, ParamID::B_SYNTH_MIN_SAMPLES);
     addAB(ParamID::A_SYNTH_MAX_SAMPLES, ParamID::B_SYNTH_MAX_SAMPLES);
     addAB(ParamID::A_TRACKING_SPEED, ParamID::B_TRACKING_SPEED);
@@ -166,10 +196,32 @@ inline std::vector<juce::String> getAllParameterIDs()
     ids.push_back(ParamID::MORPH_B_LEVEL_DB);
     ids.push_back(ParamID::MORPH_BYPASS_IDLE_ENGINE);
 
+    ids.push_back(ParamID::INPUT_SOURCE);
+    ids.push_back(ParamID::SAMPLER_ROOT_NOTE);
+    ids.push_back(ParamID::SAMPLER_LOOP);
+    ids.push_back(ParamID::SAMPLER_GAIN);
+    ids.push_back(ParamID::SAMPLER_A);
+    ids.push_back(ParamID::SAMPLER_D);
+    ids.push_back(ParamID::SAMPLER_S);
+    ids.push_back(ParamID::SAMPLER_R);
+    ids.push_back(ParamID::SAMPLER_START);
+    ids.push_back(ParamID::SAMPLER_END);
+    ids.push_back(ParamID::SAMPLER_SLICE_MODE);
+    ids.push_back(ParamID::SAMPLER_REVERSE);
+    ids.push_back(ParamID::SAMPLER_LOOP_XFADE);
+    ids.push_back(ParamID::SAMPLER_WARP_MODE);
+    ids.push_back(ParamID::SAMPLER_QUANTIZE);
+    ids.push_back(ParamID::SAMPLER_VEL_FIXED);
+    ids.push_back(ParamID::SAMPLER_VEL_VALUE);
+    ids.push_back(ParamID::SAMPLER_AUTO_SLICE);
+
     ids.push_back(ParamID::MACRO1);
     ids.push_back(ParamID::MACRO2);
     ids.push_back(ParamID::MACRO3);
     ids.push_back(ParamID::MACRO4);
+
+    ids.push_back(ParamID::REVERB_MIX);
+    ids.push_back(ParamID::REVERB_SOURCE);
 
     return ids;
 }
@@ -227,7 +279,8 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
 
         params.push_back(std::make_unique<APC>(
             pid("recipe_preset"), disp("Recipe Preset"),
-            juce::StringArray{ "Warm", "Aggressive", "Hollow", "Dense", "Stable", "Weird", "Custom" }, 4));
+            juce::StringArray{ "Warm", "Aggressive", "Hollow", "Dense", "Stable", "Weird",
+                               "Custom 1", "Custom 2", "Custom 3" }, 4));
         params.push_back(std::make_unique<APF>(
             pid("harmonic_saturation"), disp("Harmonic Saturation"),
             juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f,
@@ -293,6 +346,14 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
         params.push_back(std::make_unique<APF>(
             pid("synth_sub"), disp("Sub Amp"),
             juce::NormalisableRange<float>(0.0f, 200.0f), 0.0f,
+            juce::AudioParameterFloatAttributes().withLabel("%")));
+
+        // Synth trim — post-envelope multiplier on the synth output. Lets the
+        // user push the synth above the input's natural amplitude (the
+        // envelope follower otherwise anchors synth loudness to the input).
+        params.push_back(std::make_unique<APF>(
+            pid("synth_trim"), disp("Synth Trim"),
+            juce::NormalisableRange<float>(0.0f, 400.0f), 100.0f,
             juce::AudioParameterFloatAttributes().withLabel("%")));
 
         // ── Crossing detection ────────────────────────────────────────
@@ -381,6 +442,82 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     params.push_back(std::make_unique<AudioParameterBool>(
         ParamID::MORPH_BYPASS_IDLE_ENGINE, "Morph Bypass Idle Engine", true));
 
+    // ── Sampler parameters ───────────────────────────────────────────────
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{ ParamID::INPUT_SOURCE, 1 },
+        "Engine Input Source",
+        juce::StringArray{ "Input", "Sidechain", "Sampler" },
+        0));   // default = Input
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        juce::ParameterID{ ParamID::SAMPLER_ROOT_NOTE, 1 },
+        "Sampler Root Note", 0, 127, 60));   // default C3
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ ParamID::SAMPLER_LOOP, 1 },
+        "Sampler Loop", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_GAIN, 1 },
+        "Sampler Gain",
+        juce::NormalisableRange<float>(-12.0f, 12.0f, 0.01f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_A, 1 },
+        "Sampler Attack",
+        juce::NormalisableRange<float>(0.001f, 4.0f, 0.0001f, 0.4f), 0.005f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_D, 1 },
+        "Sampler Decay",
+        juce::NormalisableRange<float>(0.0f, 4.0f, 0.0001f, 0.4f), 0.200f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_S, 1 },
+        "Sampler Sustain",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.80f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_R, 1 },
+        "Sampler Release",
+        juce::NormalisableRange<float>(0.001f, 4.0f, 0.0001f, 0.4f), 0.200f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_START, 1 },
+        "Sampler Start",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.0001f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_END, 1 },
+        "Sampler End",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.0001f), 1.0f));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ ParamID::SAMPLER_SLICE_MODE, 1 },
+        "Sampler Slice Mode", false));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ ParamID::SAMPLER_REVERSE, 1 },
+        "Sampler Reverse", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ ParamID::SAMPLER_LOOP_XFADE, 1 },
+        "Sampler Loop Crossfade",
+        juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f), 5.0f,
+        juce::AudioParameterFloatAttributes().withLabel("ms")));
+    // Warp mode — Off = classic varispeed (faster note = higher pitch + shorter
+    // duration); Complex = SignalSmith Stretch holds the source rate constant
+    // and pitches the audio independently. Slice mode ignores warp regardless.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{ ParamID::SAMPLER_WARP_MODE, 1 },
+        "Sampler Warp Mode",
+        juce::StringArray{ "Off", "Complex" }, 0));
+    // Quantize — snaps incoming MIDI note-ons to the host's tempo grid.
+    // Note-offs pass through unmodified so held notes ring out naturally.
+    // Requires host playback (tempo + ppq); falls back to passthrough when
+    // the host isn't playing.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{ ParamID::SAMPLER_QUANTIZE, 1 },
+        "Sampler Quantize",
+        juce::StringArray{ "Off", "1/4", "1/8", "1/16", "1/32" }, 0));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ ParamID::SAMPLER_VEL_FIXED, 1 },
+        "Sampler Fix Velocity", false));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        juce::ParameterID{ ParamID::SAMPLER_VEL_VALUE, 1 },
+        "Sampler Velocity", 1, 127, 100));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ ParamID::SAMPLER_AUTO_SLICE, 1 },
+        "Sampler Auto-Slice", true));
+
     // Macros (PR3a) — global APVTS params, automatable. Read by Macro
     // modulators in ModulationEngine.
     params.push_back(std::make_unique<APF>(
@@ -395,6 +532,24 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     params.push_back(std::make_unique<APF>(
         ParamID::MACRO4, "Macro 4",
         NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+
+    // Reverb send — global single-knob. Default 0 (off) so the reverb is
+    // opt-in and pre-existing presets / sessions remain bit-identical to
+    // pre-reverb behaviour until the user dials it up.
+    params.push_back(std::make_unique<APF>(
+        ParamID::REVERB_MIX, "Reverb",
+        NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+
+    // Reverb routing: false (default) = reverb processes the full
+    // post-engine signal (input + synth). true = reverb processes only
+    // the synth contribution (phantomOut * ghostAmount), regardless of
+    // ghost mode.
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        ParamID::REVERB_SOURCE, "Reverb Source", false,
+        juce::AudioParameterBoolAttributes()
+            .withStringFromValueFunction([](bool b, int) {
+                return b ? juce::String("Phantom") : juce::String("Post");
+            })));
 
     return { params.begin(), params.end() };
 }

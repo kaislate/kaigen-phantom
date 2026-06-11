@@ -3,6 +3,7 @@
 #include "Modulator.h"
 #include "Routing.h"
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -18,10 +19,19 @@ namespace kaigen::phantom
  *  Per-engine scope is enforced structurally: addRouting() rejects any
  *  routing whose paramId doesn't start with the engine's prefix
  *  (constructor parameter, e.g., "a_" or "b_").
+ *
+ *  Thread-safety: routings are stored in an atomic shared_ptr to an
+ *  immutable vector. Message-thread mutators (add/remove/setDepth/clear)
+ *  build a new vector and atomic-store the new snapshot. Audio-thread
+ *  reads (getModulatedValue) atomic-load the snapshot and iterate;
+ *  lock-free.
  */
 class ModulationEngine
 {
 public:
+    using RoutingsList = std::vector<Routing>;
+    using RoutingsSnapshot = std::shared_ptr<const RoutingsList>;
+
     /** Construct.
      *  @param apvtsRef  the APVTS instance (for reading the modulated param's range)
      *  @param prefix    "a_" or "b_" — the engine's APVTS prefix; routings to params
@@ -38,12 +48,31 @@ public:
     void removeRouting(const juce::String& sourceId, const juce::String& paramId);
     void clearRoutings();
 
-    const std::vector<Routing>& getRoutings() const noexcept { return routings; }
+    /** Update the depth of an existing routing. Returns false if no routing
+     *  matches sourceId+paramId. */
+    bool setRoutingDepth(const juce::String& sourceId, const juce::String& paramId, float newDepth);
+
+    /** Returns a snapshot of the current routing list. Caller can iterate
+     *  safely; the underlying vector is immutable. Subsequent mutations
+     *  produce a new snapshot, not in-place changes. */
+    RoutingsSnapshot getRoutingsSnapshot() const noexcept;
+
+    /** Convenience: by-value copy of the current snapshot's vector. Use
+     *  sparingly — copies the vector. Prefer getRoutingsSnapshot for hot
+     *  paths. */
+    std::vector<Routing> getRoutings() const;
 
     /** Lookup the modulated value for a given param. Returns base + Σ
      *  (depth × modulator_value × range) clamped to [min, max]. If no
      *  routings match, returns base unchanged. */
     float getModulatedValue(const juce::String& paramId, float base) const;
+
+    /** Hot-path overload: caller has already resolved the param pointer
+     *  (avoids the apvts.getParameter() hash lookup per call). Used by
+     *  DualEngineHost's cached-pointer sync path. */
+    float getModulatedValue(const juce::String& paramId,
+                            juce::RangedAudioParameter* param,
+                            float base) const noexcept;
 
     /** Persistence: writes <Engine prefix="a_">[modulators...][routings...]</Engine>. */
     juce::ValueTree toValueTree() const;
@@ -57,7 +86,7 @@ private:
     juce::AudioProcessorValueTreeState& apvts;
     juce::String prefix;
     std::vector<std::unique_ptr<Modulator>> modulators;
-    std::vector<Routing> routings;
+    std::atomic<RoutingsSnapshot> routingsAtomic { std::make_shared<const RoutingsList>() };
 };
 
 } // namespace kaigen::phantom

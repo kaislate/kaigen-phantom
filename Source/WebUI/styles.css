@@ -20,10 +20,15 @@ input, textarea, [contenteditable="true"] {
 *:focus { outline: none; }
 
 body{
-  background:#AEAFB1;margin:0;overflow:hidden;
-  width:1300px;height:820px;
+  background:#0a0c10;margin:0;overflow:hidden;
+  width:1300px;
+  display:flex;
+  flex-direction:column;
   font-family:'Space Grotesk',sans-serif;
   color:rgba(0,0,0,0.70);
+  /* Anchor for the absolutely-positioned matrix overlay (matrix.css). The
+     matrix layers over the wrap's 820px slot rather than replacing it. */
+  position:relative;
 }
 
 .hidden,
@@ -372,10 +377,13 @@ phantom-knob.mode-inactive{
   display:block;text-align:center;width:100%;margin-bottom:6px;
 }
 
-/* Ghost panel — toggle sits above the Crossover knob */
+/* Ghost panel — toggle sits above the Crossover/Strength knob pair */
 .ghost-row{align-items:flex-end;}
 .ghost-crossover-col{
   display:flex;flex-direction:column;align-items:center;gap:6px;
+}
+.ghost-crossover-knobs{
+  display:flex;gap:8px;align-items:center;
 }
 .ghost-mode-toggle{margin-left:0;}
 
@@ -475,11 +483,21 @@ phantom-knob.mode-inactive{
   border-color:rgba(74,144,226,0.55);
 }
 
-/* I/O meters — now siblings of spectrum-wrap so they match its height */
+/* I/O meters — minimal "DJ-style" white-glowing bars that live inside the
+   Levels panel flanking the In/Out knobs. No solid background, no inset
+   shadow well; the meter is just the canvas pixels themselves on whatever
+   panel surface sits below. */
 .io-meter{
-  width:16px;flex-shrink:0;background:#000;border-radius:4px;border:none;
-  box-shadow:inset 2px 2px 6px rgba(0,0,0,1),
-    -1.5px -1.5px 4px rgba(255,255,255,0.28),2px 2px 5px rgba(0,0,0,0.20);
+  width:14px;height:90px;background:transparent;border:none;border-radius:2px;
+  flex-shrink:0;
+}
+
+/* Levels panel — meter | In knob | Out knob | meter, centered. */
+.levels-row{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.levels-meter{
+  width:12px;height:70px;
 }
 
 /* ═══ FILTER PANEL — LPF ⟷ HPF link button ═══ */
@@ -718,3 +736,257 @@ phantom-knob.mode-inactive{
     font-size: 11px; color: rgba(255,255,255,0.75);
     min-width: 40px; text-align: right;
 }
+
+/* ═══ BOTTOM MODULATION PANEL (PR3b) ═══
+   Lives as a direct child of <body> (sibling of .wrap, not inside it) so the
+   editor's main 820px wrap can keep its overflow:hidden without truncating
+   the original knobs/spectrum/oscilloscope content. The body is a flex
+   column; this panel sits below the wrap. flex-shrink:0 prevents the panel
+   from being squashed when the matrix sub-panel below it is open. */
+.modulation-panel {
+  position: relative;
+  width: 1300px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  background: rgba(14, 17, 22, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.modulation-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px 0;
+}
+.modulation-mode-toggle {
+  display: inline-flex;
+  gap: 2px;
+  background: rgba(20, 24, 30, 0.5);
+  padding: 2px;
+  border-radius: 4px;
+}
+.mode-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font: 600 9px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 1.5px;
+  padding: 5px 12px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.mode-btn:hover { color: rgba(255, 255, 255, 0.65); }
+.mode-btn.is-active {
+  background: rgba(74, 144, 226, 0.20);
+  color: #4A90E2;
+  box-shadow: 0 0 6px rgba(74, 144, 226, 0.30);
+}
+.modulation-counter {
+  font: 600 9px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* Matrix overlays the wrap (see matrix.css: position:absolute over body's
+   first 820px slot). The wrap stays in flow underneath; no display:none
+   rule needed, which lets the matrix fade in/out cleanly on toggle. */
+
+.modulation-row {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  gap: 6px;
+  padding: 8px 12px;
+  /* Slot-row collapse animation: the row + labels shrink to 0px when the
+     SLOTS toggle is off (panel.is-slots-collapsed). max-height is set
+     generously above the natural ~120px content height so the open state
+     is unconstrained. */
+  overflow: hidden;
+  max-height: 200px;
+  opacity: 1;
+  transition: max-height 220ms ease-out, opacity 220ms ease-out, padding 220ms ease-out;
+}
+.modulation-panel.is-slots-collapsed .modulation-row,
+.modulation-panel.is-slots-collapsed .modulation-row-labels {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* Matrix view "slides down" beneath the slot row rather than replacing it.
+   The slot row stays anchored at the top of the panel and the matrix
+   appears in the editor's newly-allocated bottom region (see the height
+   bump in modulation-panel.js's applyMode → setEditorHeight call). */
+
+.mod-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 6px;
+  background: transparent;        /* no rounded-rectangle button surround */
+  border: 1px solid transparent;
+  border-radius: 0;
+  cursor: pointer;
+  user-select: none;
+  transition: background 120ms;
+}
+.mod-slot[disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.mod-slot:not([disabled]):hover {
+  background: rgba(255, 255, 255, 0.03);   /* very subtle hover */
+}
+.mod-slot.is-active {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+/* Active highlight moves to the dot itself — glow + slight scale rather
+   than an outlined surrounding rectangle. Per-type glow color is set via
+   the --slot-active-glow custom property below so each modulator type
+   keeps its identity color. */
+.mod-slot.is-active .mod-slot-dot {
+  box-shadow: 0 0 14px var(--slot-active-glow, rgba(93, 211, 224, 0.7));
+  transform: scale(1.05);
+}
+.mod-slot.is-active.mod-slot-macro  { --slot-active-glow: rgba(93, 211, 224, 0.7); }
+.mod-slot.is-active.mod-slot-lfo    { --slot-active-glow: rgba(74, 144, 226, 0.7); }
+.mod-slot.is-active.mod-slot-random { --slot-active-glow: rgba(107, 93, 201, 0.7); }
+.mod-slot.is-active.mod-slot-morph  { --slot-active-glow: rgba(239, 239, 242, 0.7); }
+
+.mod-slot-dot {
+  position: relative;
+  overflow: hidden;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #444 30%, #1f242c 70%);
+  border: 2px solid #555;
+  box-shadow: 0 0 0 transparent;
+  transition: box-shadow 120ms, transform 120ms;
+}
+.mod-slot-macro .mod-slot-dot {
+  background: radial-gradient(circle, #5DD3E0 30%, #1f242c 70%);
+  border: 2px solid #5DD3E0;
+  box-shadow: 0 0 6px rgba(93, 211, 224, 0.5);
+}
+.mod-slot-lfo .mod-slot-dot {
+  background: radial-gradient(circle, #4A90E2 30%, #1f242c 70%);
+  border: 2px solid #4A90E2;
+}
+.mod-slot-random .mod-slot-dot {
+  background: radial-gradient(circle, #6B5DC9 30%, #1f242c 70%);
+  border: 2px solid #6B5DC9;
+}
+.mod-slot-morph .mod-slot-dot {
+  background: radial-gradient(circle at 35% 35%, #fafaff 10%, #b8b8c4 50%, #4a4d54 80%);
+  border: 2px solid #EFEFF2;
+  box-shadow: 0 0 8px rgba(239, 239, 242, 0.5);
+}
+
+/* Conic-gradient ring driven by --v (0–100). Used by macro + morph slots. */
+.mod-slot-ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: conic-gradient(currentColor calc(var(--v, 0) * 1%), rgba(255,255,255,0.08) 0);
+}
+.mod-slot-ring::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: #0a0c10;
+}
+
+.mod-slot-macro .mod-slot-ring { color: #5DD3E0; }
+.mod-slot-morph .mod-slot-ring { color: #EFEFF2; }
+
+/* LFO mini-waveform placeholder (greyed until PR4 wires live data). */
+.mod-slot-lfo-svg {
+  width: 24px;
+  height: 14px;
+  position: absolute;
+  inset: 50% 50%;
+  transform: translate(-50%, -50%);
+  color: #4A90E2;
+}
+
+/* Random scatter placeholder (greyed until PR5 wires live data). */
+.mod-slot-scatter {
+  position: absolute;
+  inset: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 1px;
+}
+.mod-slot-scatter i {
+  background: #6B5DC9;
+  opacity: 0.3;
+  border-radius: 50%;
+}
+.mod-slot-scatter i:nth-child(1) { opacity: 0.8; }
+.mod-slot-scatter i:nth-child(5) { opacity: 0.6; }
+.mod-slot-scatter i:nth-child(7) { opacity: 0.9; }
+
+.mod-slot-name,
+.mod-slot-name-btn {
+  font: 700 9px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 1px;
+  color: #6a7a8a;
+}
+/* The name button replaces the static label inside macro slots. It is the
+   click target for switching to MATRIX view; the surrounding <div> can't
+   own the click because the inner phantom-knob needs full pointer ownership
+   for value drag. */
+.mod-slot-name-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.mod-slot-name-btn:hover { color: #8db9c4; }
+.mod-slot-macro .mod-slot-name,
+.mod-slot-macro .mod-slot-name-btn { color: #5DD3E0; }
+.mod-slot-lfo .mod-slot-name { color: #4A90E2; }
+.mod-slot-random .mod-slot-name { color: #9990E0; }
+.mod-slot-morph .mod-slot-name { color: #EFEFF2; }
+
+/* Macro-slot vertical layout: the small phantom-knob (56px) replaces the
+   36px .mod-slot-dot, so we tighten gap + padding to keep the row visually
+   balanced with the 36px dot of LFO/Random/Morph slots. */
+.mod-slot-macro {
+  gap: 4px;
+  padding: 4px 6px;
+}
+
+/* Engine scope labels — sit below the slot row, span the 5 slots on each
+   side. Grid columns mirror the .modulation-row's 11 cells (5 + 1 morph + 5). */
+.modulation-row-labels {
+  display: grid;
+  grid-template-columns: 5fr 1fr 5fr;
+  padding: 0 12px 6px;
+  align-items: center;
+  /* Match the .modulation-row collapse animation so the engine labels fade
+     out together when SLOTS is toggled off. */
+  overflow: hidden;
+  max-height: 200px;
+  opacity: 1;
+  transition: max-height 220ms ease-out, opacity 220ms ease-out, padding 220ms ease-out;
+}
+.mod-engine-label {
+  font: 600 9px/1 'Space Grotesk', sans-serif;
+  letter-spacing: 3px;
+  color: rgba(255, 255, 255, 0.30);
+  text-align: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  padding-top: 4px;
+}
+.mod-engine-label-spacer {
+  /* empty middle column above the morph slot */
+}
+

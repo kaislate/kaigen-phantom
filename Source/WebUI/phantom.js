@@ -45,6 +45,20 @@ if (autoGainBtn && inputGainAutoState) {
   updateAutoGainUI();
 }
 
+// ── Reverb source toggle ─────────────────────────────────────────────────
+const reverbSourceState = window.Juce.getToggleStateLogical?.("reverb_source");
+const reverbSourceBtn   = document.getElementById("reverb-source-btn");
+if (reverbSourceState && reverbSourceBtn) {
+    reverbSourceBtn.addEventListener("click", () => {
+        reverbSourceState.setValue(!reverbSourceState.getValue());
+    });
+    reverbSourceState.valueChangedEvent.addListener(() => {
+        reverbSourceBtn.classList.toggle("active", reverbSourceState.getValue());
+    });
+    // Initial visual state.
+    reverbSourceBtn.classList.toggle("active", reverbSourceState.getValue());
+}
+
 // ── MIDI triggering toggles ───────────────────────────────────────────────────
 const midiTriggerState     = window.Juce.getToggleStateLogical?.("midi_trigger_enabled");
 const midiGateReleaseState = window.Juce.getToggleStateLogical?.("midi_gate_release");
@@ -141,8 +155,20 @@ document.querySelectorAll("phantom-knob[data-param], phantom-mini-knob[data-para
   const paramName = el.dataset.param;
   const state = getSliderStateLogical(paramName);
 
+  // Track local drag state so we can ignore the relay's echo for our own
+  // writes. With two plugin instances open, the message thread saturates
+  // and the round-trip echo can arrive several pointermoves late carrying
+  // stale values — without this guard, the echo overwrites el.value mid-drag
+  // and the knob rubber-bands.
+  let userIsDragging = false;
+  let lastSentValue = NaN;
+
   function updateKnob() {
-    el.value = state.getNormalisedValue();
+    if (!userIsDragging) {
+      el.value = state.getNormalisedValue();
+    }
+    // displayValue still updates either way — the readout reflects the
+    // host's authoritative value even mid-drag.
     el.displayValue = formatDisplayValue(state);
   }
 
@@ -150,10 +176,24 @@ document.querySelectorAll("phantom-knob[data-param], phantom-mini-knob[data-para
   state.valueChangedEvent.addListener(updateKnob);
   state.propertiesChangedEvent.addListener(updateKnob);
 
-  // Listen for user interaction on the knob
-  el.addEventListener("knob-change", (e) => {
+  // Drag begins: open the gesture and gate echo writes to el.value.
+  el.addEventListener("knob-pointerdown", () => {
+    userIsDragging = true;
+    lastSentValue = NaN;
     state.sliderDragStarted();
+  });
+
+  // Per-pointermove writes — coalesced so identical consecutive values
+  // don't generate redundant IPC across the bridge.
+  el.addEventListener("knob-change", (e) => {
+    if (e.detail.value === lastSentValue) return;
+    lastSentValue = e.detail.value;
     state.setNormalisedValue(e.detail.value);
+  });
+
+  // Drag ends: close the gesture and reopen the echo gate.
+  el.addEventListener("knob-pointerup", () => {
+    userIsDragging = false;
     state.sliderDragEnded();
   });
 
@@ -309,9 +349,12 @@ const getPeaks = getNativeFunction("getPeakLevels");
 const getPitch = getNativeFunction("getPitchInfo");
 
 // Backpressured polling: wait for all three bridge calls to resolve before
-// scheduling the next frame. Additionally throttled to ~30 fps — meters and
-// spectrum smoothing look identical at 30 vs 60, and halving bridge traffic
-// significantly reduces WebView2 IPC allocation pressure during playback.
+// scheduling the next frame. Additionally throttled to ~15 fps — meters and
+// spectrum smoothing look identical at 15 vs 60 thanks to client-side
+// smoothing in spectrum.js, and quartering bridge traffic substantially
+// reduces WebView2 IPC + per-engine FFT pressure during playback. Two-instance
+// message-thread saturation testing showed the prior 30 Hz rate drove ~60
+// FFT(8192) computations/sec/instance on the message thread.
 async function pollData() {
   try {
     const [bins, peaks, p] = await Promise.all([
@@ -338,8 +381,11 @@ async function pollData() {
   } catch (err) {
     console.error("pollData failed:", err);
   }
-  // Throttle to ~30 fps: skip every other rAF tick before the next poll.
-  requestAnimationFrame(() => requestAnimationFrame(pollData));
+  // Throttle to ~15 fps: skip 3 rAF ticks before the next poll.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(pollData))));
 }
 
 pollData();
@@ -638,4 +684,29 @@ if (binauralModeSelectAdv) {
   }
 })();
 
+})();
+
+// ── Dev toggle: shift+click the PHANTOM logo to switch to native UI ────
+// Path B development aid. Sends a setUseNativeEditor binding call; the
+// change takes effect on next plugin window reopen. Removed when Path B
+// cuts over (Phase 6).
+(function setupNativeUIToggle() {
+    const logo = document.getElementById('phantom-logo');
+    if (!logo) return;
+    if (typeof window.Juce === 'undefined' || typeof window.Juce.getNativeFunction !== 'function') return;
+
+    let setUseNativeEditor = null;
+    try { setUseNativeEditor = window.Juce.getNativeFunction('setUseNativeEditor'); }
+    catch (e) { console.warn('[phantom] setUseNativeEditor binding unavailable', e); return; }
+    if (!setUseNativeEditor) return;
+
+    logo.addEventListener('click', (ev) => {
+        if (!ev.shiftKey) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        try {
+            setUseNativeEditor(true);
+            alert('Native UI enabled. Close and reopen the plugin window to see it.');
+        } catch (e) { console.warn('[phantom] setUseNativeEditor failed', e); }
+    });
 })();

@@ -55,6 +55,7 @@ public:
     void setMaxPeriodSamples(float samples);   // max waveset length [100–8000 samples]
     void setH1Amplitude(float amp);        // RESYN only: H1 level [0–2]
     void setSubAmplitude(float amp);       // RESYN only: sub-harmonic level [0–2]
+    void setSynthTrim(float gain);         // post-envelope synth output gain [0–4]
     void setUsePunch(bool on);             // enable per-wavelet peak amplitude modulation
     void setPunchAmount(float amount);     // [0–1]: 0 = pure envelope, 1 = pure wavelet peak
     void setBoostThreshold(float thr);     // RESYN only: upward expansion threshold [0–1]
@@ -75,13 +76,22 @@ public:
      *  operates on the bass band, not the full input signal shown in the scope. */
     float getSynthInputPeak() const noexcept;
 
+    /** Phantom-only output for the most recent process() call. Holds
+     *  phantomOut * ghostAmount * outputGainLin per sample per channel.
+     *  Same lifetime as DualEngineHost::getEngineAOutput: stable until
+     *  the next process() call. */
+    const juce::AudioBuffer<float>& getPhantomOnlyOutput() const noexcept { return phantomOnlyBuf; }
+
     // ─── Audio processing ────────────────────────────────────────────────
     void process(juce::AudioBuffer<float>& buffer, const juce::AudioBuffer<float>* sidechain = nullptr);
 
     // ─── Oscilloscope capture (written by audio thread) ──────────────────
+    // Atomic floats with relaxed ordering: audio thread stores, editor binding
+    // loads. relaxed is sufficient — visualisation tolerates eventual
+    // consistency and no other observable state depends on these samples.
     static constexpr int kOscBufSize = 2048;
-    std::array<float, kOscBufSize> oscSynthBuf {};   // phantom harmonics (ch 0, envelope-scaled)
-    std::atomic<int>               oscSynthWrPos { 0 };
+    std::array<std::atomic<float>, kOscBufSize> oscSynthBuf {};   // phantom harmonics (ch 0, envelope-scaled)
+    std::atomic<int>                            oscSynthWrPos { 0 };
 
 private:
     BassExtractor     bassExtractor;
@@ -96,6 +106,13 @@ private:
 
     juce::AudioBuffer<float> lowBuf;
     juce::AudioBuffer<float> highBuf;
+
+    // Captures phantomOut * ghostAmount * outputGainLin per sample per
+    // channel in the main process loop. Used by the reverb-source
+    // selector to feed only the synth contribution into the reverb,
+    // independently of ghost mode. Sized in prepare(), populated in
+    // process(), exposed via getPhantomOnlyOutput().
+    juce::AudioBuffer<float> phantomOnlyBuf;
 
     // Post-synthesis saturation (smoothed per-sample)
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothSatL;
@@ -121,6 +138,7 @@ private:
     float ghostAmount     = 1.0f;
     int   ghostMode       = 0;  // 0=Replace, 1=Combine, 2=Phantom Only
     float phantomStrength = 0.8f;
+    float synthTrim       = 1.0f;   // post-envelope multiplier on phantomOut (0..4)
     float outputGainLin   = 1.0f;
     float stereoWidth     = 1.0f;
     int envSource = 0;  // 0 = main input bass band, 1 = sidechain

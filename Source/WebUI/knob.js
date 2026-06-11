@@ -206,6 +206,12 @@ class PhantomKnob extends HTMLElement {
 
   _onPointerDown(e) {
     if (e.button !== 0) return;
+    // Notify host bindings that a drag gesture is beginning so they can
+    // raise sliderDragStarted() once per gesture and gate echo writes.
+    this.dispatchEvent(new CustomEvent('knob-pointerdown', {
+      bubbles: true,
+      detail: { name: this.dataset.param }
+    }));
     this._dragging = true;
     this._updateDragState();
     this._lastY = e.clientY;
@@ -238,15 +244,30 @@ class PhantomKnob extends HTMLElement {
     document.removeEventListener('pointermove', this._onPointerMove);
     document.removeEventListener('pointerup', this._onPointerUp);
     try { this.releasePointerCapture(e.pointerId); } catch (_) {}
+    // Notify host bindings that the drag gesture has ended so they can
+    // raise sliderDragEnded() and re-open the echo gate.
+    this.dispatchEvent(new CustomEvent('knob-pointerup', {
+      bubbles: true,
+      detail: { name: this.dataset.param }
+    }));
   }
 
   _onDblClick() {
     const def = parseFloat(this.getAttribute('default-value')) || 0;
     this._value = Math.max(0, Math.min(1, def));
     this._render();
+    // Emit synthetic begin/change/end so phantom.js's drag-state machinery
+    // treats the dblclick-reset as a one-shot gesture (matching the way a
+    // real drag opens and closes its echo gate around the write).
+    const name = this.dataset.param;
+    this.dispatchEvent(new CustomEvent('knob-pointerdown', {
+      bubbles: true, detail: { name }
+    }));
     this.dispatchEvent(new CustomEvent('knob-change', {
-      bubbles: true,
-      detail: { name: this.dataset.param, value: this._value }
+      bubbles: true, detail: { name, value: this._value }
+    }));
+    this.dispatchEvent(new CustomEvent('knob-pointerup', {
+      bubbles: true, detail: { name }
     }));
   }
 

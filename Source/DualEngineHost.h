@@ -4,6 +4,7 @@
 #include "Engines/PhantomEngine.h"
 #include "MorphCrossfader.h"
 #include "Modulation/ModulationEngine.h"
+#include <atomic>
 #include <functional>
 
 namespace kaigen::phantom
@@ -48,6 +49,11 @@ public:
     const juce::AudioBuffer<float>& getEngineAOutput() const noexcept { return aScratch; }
     const juce::AudioBuffer<float>& getEngineBOutput() const noexcept { return bScratch; }
 
+    /** Crossfaded phantom-only outputs of both engines. Used by the
+     *  reverb-source selector to feed only the synth contribution
+     *  into the reverb. Same lifetime as getEngineAOutput. */
+    const juce::AudioBuffer<float>& getPhantomOnlyOutput() const noexcept { return phantomOnlyMix; }
+
     /** Inject the modulation engines that intercept per-param value lookup
      *  in syncEngineFromPrefix. Owned by PhantomProcessor; pointers are
      *  non-owning. Pass nullptr for either side to disable modulation
@@ -56,8 +62,39 @@ public:
     void setModulationEngines(kaigen::phantom::ModulationEngine* modA,
                               kaigen::phantom::ModulationEngine* modB) noexcept;
 
+    /** Diagnostic: returns true iff every "a_*" / "b_*" param in the APVTS
+     *  layout has a populated entry in the corresponding cache. Used by a
+     *  unit test to catch the case where someone adds a per-engine APVTS
+     *  param but forgets to register it in `buildParamCache`. Any IDs
+     *  found missing are appended to `missing`. Compares by full string
+     *  (NOT pointer equality), so it also validates the cache against
+     *  drift in the layout-vs-cache invariant. */
+    bool validateParamCachesCoverAPVTS(juce::StringArray& missing) const;
+
 private:
-    void syncEngineFromPrefix(PhantomEngine& target, const char* prefix);
+    /** Per-engine pre-resolved parameter cache. Each entry holds the full
+     *  param ID (e.g. "a_phantom_threshold") AND a direct atomic pointer.
+     *  Built once at construction so the audio-thread sync loop does ZERO
+     *  string allocation and ZERO APVTS hash lookups per block. The leaf-key
+     *  is the const char* literal pointer (string literals dedupe at link
+     *  time, so pointer equality is reliable for ParamID::LEAF_* lookups). */
+    struct CachedLeaf
+    {
+        const char*                 leafKey  { nullptr };
+        juce::String                fullId;
+        std::atomic<float>*         baseAtom { nullptr };
+        juce::RangedAudioParameter* param    { nullptr };
+    };
+
+    void syncEngineFromPrefix(PhantomEngine& target,
+                              const std::vector<CachedLeaf>& cache,
+                              kaigen::phantom::ModulationEngine* modEng);
+
+    void buildParamCache(std::vector<CachedLeaf>& cache, const char* prefix);
+    const CachedLeaf& findCached(const std::vector<CachedLeaf>& cache, const char* leaf) const noexcept;
+
+    std::vector<CachedLeaf> cacheA;
+    std::vector<CachedLeaf> cacheB;
 
     juce::AudioProcessorValueTreeState& apvts;
     PhantomEngine    engineA, engineB;
@@ -70,8 +107,14 @@ private:
     juce::AudioBuffer<float> aScratch;
     juce::AudioBuffer<float> bScratch;
 
-    kaigen::phantom::ModulationEngine* modA { nullptr };
-    kaigen::phantom::ModulationEngine* modB { nullptr };
+    // Crossfaded mix of engineA.getPhantomOnlyOutput() and
+    // engineB.getPhantomOnlyOutput() using the same weights as the main
+    // crossfader. Exposed to PluginProcessor for the reverb-source
+    // selector. Stable until the next process() call.
+    juce::AudioBuffer<float> phantomOnlyMix;
+
+    std::atomic<kaigen::phantom::ModulationEngine*> modA { nullptr };
+    std::atomic<kaigen::phantom::ModulationEngine*> modB { nullptr };
 };
 
 } // namespace kaigen::phantom

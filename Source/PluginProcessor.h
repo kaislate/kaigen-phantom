@@ -6,8 +6,13 @@
 #include "DualEngineHost.h"
 #include "EngineFocus.h"
 #include "SpectrumViewMode.h"
+#include "MatrixViewState.h"
+#include "EditorViewState.h"
 #include "Modulation/ModulationEngine.h"
 #include "Modulation/Macro.h"
+#include "DSP/SingleKnobReverb.h"
+#include "DSP/PhantomSampler.h"
+#include "DSP/SamplerMidiPreprocessor.h"
 
 class PhantomProcessor : public juce::AudioProcessor,
                          private juce::AudioProcessorValueTreeState::Listener
@@ -66,27 +71,36 @@ public:
     std::atomic<float> peakOutR { 0.0f };
 
     static constexpr int kSpectrumBins = 80;
-    std::array<float, kSpectrumBins> spectrumData {};       // input (pre-engine)
-    std::array<float, kSpectrumBins> spectrumOutputData {}; // output (post-engine)
+    std::array<std::atomic<float>, kSpectrumBins> spectrumData {};       // input (pre-engine)
+    std::array<std::atomic<float>, kSpectrumBins> spectrumOutputData {}; // output (post-engine)
     std::atomic<bool> spectrumReady { false };
 
-    /** Selector for computeEngineSpectrum: which engine ring buffer to read. */
-    enum class SpectrumEngineId { A, B };
+    // Per-engine spectra, computed on the audio thread (mirrors the input/output
+    // pipeline). The native binding reads these as atomic snapshots — no FFT,
+    // no allocation on the message thread. memory_order_relaxed is sufficient:
+    // spectrum visualization tolerates eventual consistency, and the publish
+    // timestamp doesn't gate any other observable state.
+    std::array<std::atomic<float>, kSpectrumBins> engineASpectrum {};
+    std::array<std::atomic<float>, kSpectrumBins> engineBSpectrum {};
 
-    /** UI-thread helper. Reads the most recent kFftSize samples from the
-     *  per-engine FFT ring buffer (populated in processBlock — see Task 3),
-     *  applies the same Hann window + FFT + log-binning pipeline as the
-     *  input/output spectra, and writes binned magnitudes (range 0..1) to
-     *  `dst`. Called from the WebView native binding on the message thread. */
-    void computeEngineSpectrum(SpectrumEngineId which,
-                               std::array<float, kSpectrumBins>& dst) const;
+    // Per-engine synth-only spectra (phantom post-filter, pre-ghost-mix).
+    // Populated alongside engineASpectrum/engineBSpectrum on the audio
+    // thread; consumed by the Spectrum visualizer to draw a blue "SYNTH"
+    // overlay showing the synth contribution attenuated by HPF/LPF.
+    std::array<std::atomic<float>, kSpectrumBins> engineASynthSpectrum {};
+    std::array<std::atomic<float>, kSpectrumBins> engineBSynthSpectrum {};
 
-    // Oscilloscope ring buffers (written by audio thread, read by editor)
+    // Oscilloscope ring buffers. Audio thread does relaxed atomic stores;
+    // editor binding does relaxed atomic loads. Plain float[] would tear
+    // only theoretically on x86/ARM, but std::atomic<float> with relaxed
+    // ordering makes the data race well-defined at zero cost in codegen
+    // (still a single mov on these platforms) — same pattern the spectrum
+    // arrays already use above.
     static constexpr int kOscBufSize = PhantomEngine::kOscBufSize;
-    std::array<float, kOscBufSize> oscInputBuf  {};
-    std::array<float, kOscBufSize> oscOutputBuf {};
-    std::atomic<int>               oscInputWrPos  { 0 };
-    std::atomic<int>               oscOutputWrPos { 0 };
+    std::array<std::atomic<float>, kOscBufSize> oscInputBuf  {};
+    std::array<std::atomic<float>, kOscBufSize> oscOutputBuf {};
+    std::atomic<int>                            oscInputWrPos  { 0 };
+    std::atomic<int>                            oscOutputWrPos { 0 };
 
     // Dual-engine host: owns A + B engine instances and the morph crossfader.
     // PR1 always shows engine A in the editor; PR2 introduces tab switching.
@@ -96,6 +110,26 @@ public:
      *  PR1 = always A. PR2 will dispatch on the active tab. */
     PhantomEngine& getActiveEngine() noexcept { return dualEngineHost.getActiveEngine(); }
     kaigen::phantom::DualEngineHost& getDualEngineHost() noexcept { return dualEngineHost; }
+
+    // ── Sampler accessor (used by SamplerStrip UI in subsequent tasks) ──
+    kaigen::phantom::PhantomSampler&       getPhantomSampler()       noexcept { return phantomSampler; }
+    const kaigen::phantom::PhantomSampler& getPhantomSampler() const noexcept { return phantomSampler; }
+
+    // Called by SamplerStrip after a successful background decode. Stores
+    // the original source bytes (for preset embed) and pushes the decoded
+    // AudioBuffer into the live PhantomSampler. Returns true on success.
+    bool setSampleFromBytes(juce::MemoryBlock sourceBytes,
+                            juce::String filename,
+                            juce::AudioBuffer<float> decoded,
+                            double sourceSampleRate);
+
+    void clearSample();
+    const juce::String& getSampleFilename() const noexcept { return cachedSampleFilename; }
+    // Returns a non-const reference because juce::AudioThumbnail::drawChannels
+    // (and a few other render-side APIs) are non-const — JUCE mutates internal
+    // cache state during drawing. The UI strip needs to call drawChannels, so
+    // a const accessor would force a const_cast at every call site.
+    juce::AudioThumbnail& getSampleThumbnail() noexcept { return sampleThumb; }
 
     // ─── Modulation engines (PR3a) ────────────────────────────────────────
     // Per-engine modulation containers. Engine A scopes Macro 1+2 to a_*
@@ -114,14 +148,47 @@ public:
     EngineFocus getEngineFocus() const noexcept { return engineFocus; }
     void setEngineFocus(EngineFocus newFocus) noexcept;
 
+    /** Broadcaster fired (on the message thread) whenever the engine focus
+     *  changes — editor widgets that need to retarget their per-engine
+     *  APVTS attachments (PhantomKnob.setEnginePrefix etc.) subscribe here. */
+    juce::ChangeBroadcaster& getEngineFocusBroadcaster() noexcept
+        { return engineFocusBroadcaster; }
+
     // Spectrum view mode — editor-state, persisted in plugin state.
     using SpectrumViewMode = kaigen::phantom::SpectrumViewMode;
 
     SpectrumViewMode getSpectrumViewMode() const noexcept { return spectrumViewMode; }
     void setSpectrumViewMode(SpectrumViewMode m) noexcept { spectrumViewMode = m; }
 
+    // Matrix view state — editor-state, persisted in plugin state.
+    using MatrixViewState = kaigen::phantom::MatrixViewState;
+
+    MatrixViewState getMatrixView() const                      { return matrixView; }
+    void            setMatrixView(const MatrixViewState& s)    { matrixView = s; }
+
+    // Editor view state — which editor (native vs WebView) the user prefers.
+    // Editor-state, persisted in plugin state.
+    using EditorViewState = kaigen::phantom::EditorViewState;
+
+    EditorViewState getEditorView() const                      { return editorView; }
+    void            setEditorView(const EditorViewState& s)
+    {
+        editorView = s;
+        editorViewBroadcaster.sendChangeMessage();
+    }
+
+    /** Broadcaster fired (on the message thread) whenever EditorViewState
+     *  changes — UI components that mirror settings (e.g. PresetBrowser's
+     *  GIF animation toggle) listen to this. */
+    juce::ChangeBroadcaster& getEditorViewBroadcaster() noexcept
+        { return editorViewBroadcaster; }
+
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
+    void applyRecipePreset(int engineIdx, int presetIdx);
+    void readCurrentH(int engineIdx, std::array<float, 7>& outH) const;
+    void writeHParams (int engineIdx, const std::array<float, 7>& inH);
+    void writeHParamsRaw01(int engineIdx, const std::array<float, 7>& inH01);
     static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout();
 
     double sampleRate = 44100.0;
@@ -142,8 +209,8 @@ private:
     static constexpr int kFftOrder = 13;
     static constexpr int kFftSize  = 1 << kFftOrder;
     // Ring-buffer mask for the per-engine FFT capture rings. Single source of
-    // truth; used at both the producer (processBlock) and consumer
-    // (computeEngineSpectrum) call sites.
+    // truth; used at both ring-write (producer) and FFT-read (consumer)
+    // sites — both running on the audio thread in processBlock.
     static constexpr int kEngineRingMask = (kFftSize * 2) - 1;
     juce::dsp::FFT spectrumFFT { kFftOrder };
     std::array<float, kFftSize * 2> fftBuffer {};       // input (pre-engine)
@@ -154,27 +221,64 @@ private:
     // Per-engine output FFT capture (split-mode spectrum view).
     // Same size as the existing input fftBuffer; populated from
     // dualEngineHost.getEngineAOutput()/getEngineBOutput() in processBlock
-    // after dualEngineHost.process(...) returns. Read by the WebView
-    // native binding (see Task 4) on the message thread, hence atomic
-    // write positions for the producer-side ring buffer.
+    // after dualEngineHost.process(...) returns, then transformed in-place
+    // on the audio thread on the same kFftSize cadence as input/output.
+    // Atomic write positions are kept for symmetry with the existing
+    // pattern; only the audio thread mutates them.
     std::array<float, kFftSize * 2> fftBufferEngineA {};
     std::array<float, kFftSize * 2> fftBufferEngineB {};
     std::atomic<int> fftWritePosEngineA { 0 };
     std::atomic<int> fftWritePosEngineB { 0 };
 
-    // Scratch buffer used by computeEngineSpectrum() (UI/message thread).
-    // Mutable because the method is logically const (it does not change
-    // observable state — it only reads the ring buffer and writes to the
-    // caller-provided destination), but the FFT in-place transform needs
-    // writable storage.
-    mutable std::array<float, kFftSize * 2> spectrumEngineScratch {};
+    // Per-engine FFT scratch buffers (audio thread). Populated by copying the
+    // most recent kFftSize samples from the per-engine ring buffer, then
+    // Hann-windowed and FFT'd in place. Pre-allocated here so the audio
+    // thread never heap-allocates.
+    std::array<float, kFftSize * 2> fftScratchEngineA {};
+    std::array<float, kFftSize * 2> fftScratchEngineB {};
+
+    // Sub-rate cadence: count samples since last per-engine FFT and run when
+    // we've accumulated kFftSize new samples. Matches the input/output
+    // cadence (one FFT per kFftSize samples ≈ 5.86 Hz at 48k).
+    int samplesSinceEngineFftA = 0;
+    int samplesSinceEngineFftB = 0;
+
+    // Per-engine SYNTH-only FFT capture (mirrors the per-engine output FFT
+    // above, but reads from PhantomEngine::getPhantomOnlyOutput() — the
+    // phantom contribution BEFORE the ghost mix folds in the dry low/high
+    // bands). Lets the spectrum visualizer overlay a blue "SYNTH" curve
+    // showing just the synthesis output (post-filter), so a HPF/LPF
+    // setting visibly attenuates this curve even when the dry pass-
+    // through in Combine/Replace modes leaves the white OUTPUT curve
+    // looking untouched in the affected band.
+    std::array<float, kFftSize * 2> fftBufferEngineASynth {};
+    std::array<float, kFftSize * 2> fftBufferEngineBSynth {};
+    std::array<float, kFftSize * 2> fftScratchEngineASynth {};
+    std::array<float, kFftSize * 2> fftScratchEngineBSynth {};
+    std::atomic<int> fftWritePosEngineASynth { 0 };
+    std::atomic<int> fftWritePosEngineBSynth { 0 };
+    // Runs in lockstep with the per-engine OUTPUT FFT — reuses the
+    // existing samplesSinceEngineFft* counters; no separate cadence.
+    // The output atomic arrays (engineASynthSpectrum/engineBSynthSpectrum)
+    // live in the public section near engineASpectrum/engineBSpectrum.
 
     // Editor focus: which tab the UI is on + whether LINK is active.
     // Editor preference, not preset state — stored alongside APVTS in the
     // <PluginState> wrapper but outside of any preset.
     EngineFocus engineFocus;
+    juce::ChangeBroadcaster engineFocusBroadcaster;
+    juce::ChangeBroadcaster editorViewBroadcaster;
 
     SpectrumViewMode spectrumViewMode { SpectrumViewMode::Split };
+
+    // Matrix view UI state (mode + per-engine expanded categories).
+    // Layout/UI concern only — routing data lives in <ModulationConfig>.
+    kaigen::phantom::MatrixViewState matrixView;
+
+    // Editor view state (native vs WebView preference).
+    // Editor preference, not preset state — persisted alongside other view
+    // states in the <PluginState> wrapper.
+    kaigen::phantom::EditorViewState editorView;
 
     // ─── Modulation engines (PR3a) ────────────────────────────────────────
     // Declared after `apvts` (public, above) so the references they hold
@@ -184,6 +288,131 @@ private:
     // these for value-lookup intercept).
     kaigen::phantom::ModulationEngine modEngineA { apvts, "a_" };
     kaigen::phantom::ModulationEngine modEngineB { apvts, "b_" };
+
+    // ─── Single-knob reverb (global parallel send) ────────────────────────
+    // Sits after the dual-engine host's crossfaded output. The user knob
+    // (`reverb_mix`) is just the wet amount; every internal coefficient is
+    // baked to match the user's reference Valhalla Vintage Verb preset.
+    // Scratch buffer holds a copy of the post-engine signal so the reverb
+    // can write its wet output without trampling the dry path. Pre-allocated
+    // in prepareToPlay() to keep processBlock allocation-free.
+    kaigen::phantom::SingleKnobReverb reverb;
+    juce::AudioBuffer<float>          reverbScratch;
+    float                             reverbMixSmoothed { 0.0f };
+    std::atomic<float>*               reverbMixParam    { nullptr };
+    std::atomic<float>*               reverbSourceParam { nullptr };  // 0 = Post, 1 = Phantom
+
+    // Sampler params cached once at construction for the audio thread —
+    // avoids 8 hashmap lookups per block. Same pattern as the reverb
+    // params above.
+    std::atomic<float>* inputSourceParam     { nullptr };
+    std::atomic<float>* samplerRootParam     { nullptr };
+    std::atomic<float>* samplerLoopParam     { nullptr };
+    std::atomic<float>* samplerGainParam     { nullptr };
+    std::atomic<float>* samplerAParam        { nullptr };
+    std::atomic<float>* samplerDParam        { nullptr };
+    std::atomic<float>* samplerSParam        { nullptr };
+    std::atomic<float>* samplerRParam        { nullptr };
+    std::atomic<float>* samplerStartParam    { nullptr };
+    std::atomic<float>* samplerEndParam      { nullptr };
+    std::atomic<float>* samplerSliceModeParam{ nullptr };
+    std::atomic<float>* samplerReverseParam  { nullptr };
+    std::atomic<float>* samplerLoopXfadeParam{ nullptr };
+    std::atomic<float>* samplerWarpModeParam { nullptr };
+    std::atomic<float>* samplerQuantizeParam { nullptr };
+    std::atomic<float>* samplerVelFixedParam { nullptr };
+    std::atomic<float>* samplerVelValueParam { nullptr };
+
+    // Rewrites host MIDI (quantize + fixed velocity) into the sampler's
+    // per-block buffer; owns the deferred-note bookkeeping that keeps
+    // note-offs behind their quantized note-ons.
+    kaigen::phantom::SamplerMidiPreprocessor samplerMidiPre;
+
+    // ─── MIDI-playable sampler (Input Source = 2) ─────────────────────────
+    // PhantomSampler owns the juce::Synthesiser + voices. Its output is
+    // rendered into samplerOutputBuffer every processBlock so the
+    // playhead/voice-count UI remains live even when INPUT_SOURCE is
+    // Input/Sidechain. When INPUT_SOURCE == 2 (Sampler) the main `buffer`
+    // is overwritten with the sampler output before the input-peak/FFT
+    // capture so the rest of processBlock sees sampler audio with no
+    // further branching.
+    kaigen::phantom::PhantomSampler phantomSampler;
+    juce::AudioBuffer<float>        samplerOutputBuffer;
+
+    // Original source bytes of the loaded sample, kept so getStateInformation
+    // can serialize them into the <Sampler> child. Written from the message
+    // thread when the SamplerStrip finishes loading; read by getStateInformation
+    // (also message thread). The base64 encoding is computed once here at
+    // load time — hosts autosave aggressively, and re-encoding ~tens of MB
+    // of sample data on every getStateInformation call stalls the message
+    // thread for no reason.
+    juce::MemoryBlock cachedSampleBytes;
+    juce::String      cachedSampleBase64;
+    juce::String      cachedSampleFilename;
+    juce::AudioFormatManager sampleFormatManager;
+
+    // AudioThumbnail of the loaded sample. Built from cachedSampleBytes
+    // after setSampleFromBytes; consumed by SamplerStrip for its waveform
+    // row. Owns its own background-thread cache via the cache below.
+    // Declaration order matters: sampleThumb's ctor takes references to
+    // sampleFormatManager and sampleThumbCache, both of which must be
+    // constructed first.
+    juce::AudioThumbnailCache sampleThumbCache { 1 };
+    juce::AudioThumbnail      sampleThumb { 512, sampleFormatManager, sampleThumbCache };
+
+    // ─── Recipe Custom slots ─────────────────────────────────────────────
+    // Per-engine, per-Custom-slot stored H values (H2..H8 normalised [0..1]).
+    // When the user manually edits an H value while a built-in preset is
+    // selected, the processor auto-switches to the first EMPTY slot. The
+    // RecipeSlotPills widget reads these and renders the save/delete UI.
+    struct RecipeSlot
+    {
+        bool                 filled { false };
+        std::array<float, 7> savedH {};   // H2..H8
+    };
+
+    // [engineIdx 0=A, 1=B][slotIdx 0=Cust1, 1=Cust2, 2=Cust3]
+    std::array<std::array<RecipeSlot, 3>, 2> recipeSlots {};
+
+    // Last selected built-in preset per engine — used by clearRecipeSlot()
+    // as the fall-back when the user deletes the currently-active slot and
+    // no other Custom slot is filled. Indexed [engineIdx]. Initialised to
+    // 0 ("Warm").
+    std::array<int, 2> lastBuiltInPreset { 0, 0 };
+
+    // Guard that suppresses the auto-switch H-listener while we're loading
+    // a preset's H values into the params (so the load itself doesn't read
+    // as a user edit and re-trigger auto-switch). UI thread only.
+    bool loadingPreset { false };
+
+    // Per-engine "previous H" buffer used by the revert path when an H edit
+    // is rejected (all Custom slots full + on a built-in). Updated before
+    // every accepted edit and every preset-load. Indexed [engineIdx][hIdx].
+    std::array<std::array<float, 7>, 2> previousH {};
+
+    // Fired on the message thread when an H edit was rejected. RecipeWheel
+    // listens and triggers its lock-flash overlay.
+    juce::ChangeBroadcaster wheelLockBroadcaster;
+
+public:
+    // ── Recipe slot public surface (UI-thread only) ──────────────────────
+    const RecipeSlot& getRecipeSlot(int engineIdx, int slotIdx) const noexcept;
+
+    /** Save current live H values into the given slot. Marks filled. */
+    void saveRecipeSlot(int engineIdx, int slotIdx);
+
+    /** Mark slot empty. If this slot is the active preset, falls back to
+     *  the first other filled Custom slot, else lastBuiltInPreset, else 0. */
+    void clearRecipeSlot(int engineIdx, int slotIdx);
+
+    /** Returns 0..2 for the first empty Custom slot, or -1 if all filled. */
+    int findFirstEmptyCustomSlot(int engineIdx) const noexcept;
+
+    int getLastBuiltInPreset(int engineIdx) const noexcept { return lastBuiltInPreset[(size_t) engineIdx]; }
+
+    juce::ChangeBroadcaster& getWheelLockBroadcaster() noexcept { return wheelLockBroadcaster; }
+
+private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomProcessor)
 };

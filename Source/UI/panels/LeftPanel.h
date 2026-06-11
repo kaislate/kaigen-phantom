@@ -1,0 +1,64 @@
+// Source/UI/panels/LeftPanel.h
+#pragma once
+#include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_audio_processors/juce_audio_processors.h>
+#include "../widgets/PhantomKnob.h"
+#include "../widgets/ToggleGroup.h"
+#include "../widgets/WordSelector.h"
+#include "../widgets/RecipeSlotPills.h"
+#include "../widgets/LinkButton.h"
+#include "../widgets/RecipeWheel.h"
+
+class PhantomProcessor;
+
+namespace kaigen::phantom
+{
+
+class LeftPanel : public juce::Component, private juce::Slider::Listener
+{
+public:
+    LeftPanel(juce::AudioProcessorValueTreeState& apvts, ::PhantomProcessor& processor);
+    ~LeftPanel() override;
+
+    void paint(juce::Graphics& g) override;
+    void resized() override;
+
+    /** Retarget every per-engine widget under this panel to the given engine
+     *  prefix ("a_" or "b_"). When `mirrorPrefix` is non-empty (LINK mode),
+     *  widget edits also mirror to the other engine's matching param. */
+    void setEnginePrefix(const juce::String& activePrefix,
+                          const juce::String& mirrorPrefix = {});
+
+private:
+    void sliderValueChanged(juce::Slider* s) override;
+
+    bool filterLinkUpdating { false };  // recursion guard
+
+    juce::AudioProcessorValueTreeState& apvts;
+
+    // Sub-section inset card bounds — computed in resized(), used in paint().
+    juce::Rectangle<int> recipeCardBounds;
+    juce::Rectangle<int> ghostCardBounds;
+    juce::Rectangle<int> filterCardBounds;
+
+    // Recipe wheel + preset selector
+    RecipeWheel  recipeWheel;
+    WordSelector recipePresetSelector;
+    RecipeSlotPills recipeSlotPills;
+
+    // Ghost section
+    PhantomKnob  ghostAmountKnob;
+    PhantomKnob  crossoverKnob;
+    PhantomKnob  strengthKnob;
+    WordSelector ghostModeToggle;
+
+    // Filter section
+    PhantomKnob lpfKnob;
+    PhantomKnob hpfKnob;
+    LinkButton   filterLinkBtn;
+    WordSelector filterSlopeToggle;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LeftPanel)
+};
+
+} // namespace kaigen::phantom

@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "BinaryData.h"
+#include "PresetMigration.h"
 
 #if JUCE_WINDOWS
 #include <windows.h>
@@ -16,6 +17,7 @@ static const char* getMimeForExtension(const juce::String& extension)
         { "json", "application/json" },
         { "png",  "image/png" },  { "jpg",  "image/jpeg" },
         { "svg",  "image/svg+xml" }, { "woff2","font/woff2" },
+        { "ttf",  "font/ttf" },   { "otf",  "font/otf" },
     };
     if (const auto it = mimeMap.find(extension.toLowerCase()); it != mimeMap.end())
         return it->second;
@@ -112,9 +114,16 @@ void PhantomEditor::parentHierarchyChanged()
     // windows appear only after the user interacts with the UI (e.g., after
     // first mouse-down on a canvas). We rescan on a long-running timer so
     // those windows also get the focus subclass installed.
+    //
+    // Tick rate is 4000 ms (was 1000 ms). The startup quick-passes below
+    // (50/200/500 ms) cover the initial WebView2 HWND creation, so this
+    // timer's only ongoing job is catching late helper windows that appear
+    // after user interaction — which doesn't need second-level granularity.
+    // EnumChildWindows on the message thread at 1 Hz/instance was a measured
+    // contributor to two-instance message-thread saturation.
     focusRescanTimer.owner = this;
     if (!focusRescanTimer.isTimerRunning())
-        focusRescanTimer.startTimer(1000);
+        focusRescanTimer.startTimer(4000);
 
     // Also do a few quick passes during startup to catch windows before
     // the first real scan tick.
@@ -203,6 +212,11 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         &self.synthBoostThresholdRelayA,  &self.synthBoostThresholdRelayB,
         &self.synthBoostAmountRelayA,     &self.synthBoostAmountRelayB,
         &self.morphAmountRelay,
+        &self.macro1Relay,
+        &self.macro2Relay,
+        &self.macro3Relay,
+        &self.macro4Relay,
+        &self.reverbMixRelay,
     };
     for (auto* r : sliderRelays)
         options = options.withOptionsFrom(*r);
@@ -222,6 +236,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
     // Globals stay registered once.
     options = options.withOptionsFrom(self.bypassRelay);
     options = options.withOptionsFrom(self.inputGainAutoRelay);
+    options = options.withOptionsFrom(self.reverbSourceRelay);
     // Per-engine toggles get both A and B registered.
     options = options.withOptionsFrom(self.punchEnabledRelayA);
     options = options.withOptionsFrom(self.punchEnabledRelayB);
@@ -235,47 +250,51 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         .withNativeFunction("getSpectrumData",
             [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
-                juce::Array<juce::var> inputBins, outputBins;
+                // Reuse member Arrays across calls. clearQuick() drops elements
+                // without releasing the backing buffer, and ensureStorageAllocated
+                // sizes it on first use so subsequent fills don't realloc.
+                self.specInArr .clearQuick();
+                self.specOutArr.clearQuick();
+                self.specInArr .ensureStorageAllocated(PhantomProcessor::kSpectrumBins);
+                self.specOutArr.ensureStorageAllocated(PhantomProcessor::kSpectrumBins);
+
                 for (int i = 0; i < PhantomProcessor::kSpectrumBins; ++i)
                 {
-                    inputBins .add(self.processor.spectrumData      [(size_t) i]);
-                    outputBins.add(self.processor.spectrumOutputData[(size_t) i]);
+                    self.specInArr .add(self.processor.spectrumData      [(size_t) i]
+                                            .load(std::memory_order_relaxed));
+                    self.specOutArr.add(self.processor.spectrumOutputData[(size_t) i]
+                                            .load(std::memory_order_relaxed));
                 }
 
                 auto* obj = new juce::DynamicObject();
-                obj->setProperty("input",   inputBins);
-                obj->setProperty("output",  outputBins);
+                obj->setProperty("input",   self.specInArr);
+                obj->setProperty("output",  self.specOutArr);
 
-                // Per-engine spectra are only consumed by the JS Split-mode
-                // renderer. Skip the two FFTs (one per engine, kFftSize=8192)
-                // when the user is in Combined mode — saves significant CPU at
-                // the ~30Hz UI poll cadence. The viewMode key still travels
-                // unconditionally so JS knows which renderer to dispatch to.
+                // Per-engine spectra are produced on the audio thread (atomic
+                // snapshot) so the binding cost is just kSpectrumBins atomic
+                // loads per engine. Skip the two arrays in Combined mode: JS
+                // doesn't render them, and skipping shaves the marshalling
+                // copy at the WebView boundary.
                 const bool needPerEngine =
                     self.processor.getSpectrumViewMode() == PhantomProcessor::SpectrumViewMode::Split;
 
                 if (needPerEngine)
                 {
-                    // Per-engine spectra — computed UI-side from the ring buffers
-                    // populated in processBlock (Task 3). Same Hann window + FFT +
-                    // log-binning pipeline as input/output, on the engine's mono
-                    // channel-0 output.
-                    std::array<float, PhantomProcessor::kSpectrumBins> engineABins {};
-                    std::array<float, PhantomProcessor::kSpectrumBins> engineBBins {};
-                    self.processor.computeEngineSpectrum(
-                        PhantomProcessor::SpectrumEngineId::A, engineABins);
-                    self.processor.computeEngineSpectrum(
-                        PhantomProcessor::SpectrumEngineId::B, engineBBins);
+                    self.specEngineAArr.clearQuick();
+                    self.specEngineBArr.clearQuick();
+                    self.specEngineAArr.ensureStorageAllocated(PhantomProcessor::kSpectrumBins);
+                    self.specEngineBArr.ensureStorageAllocated(PhantomProcessor::kSpectrumBins);
 
-                    juce::Array<juce::var> engineAArr, engineBArr;
                     for (int i = 0; i < PhantomProcessor::kSpectrumBins; ++i)
                     {
-                        engineAArr.add(engineABins[(size_t) i]);
-                        engineBArr.add(engineBBins[(size_t) i]);
+                        self.specEngineAArr.add(
+                            (double) self.processor.engineASpectrum[(size_t) i].load(std::memory_order_relaxed));
+                        self.specEngineBArr.add(
+                            (double) self.processor.engineBSpectrum[(size_t) i].load(std::memory_order_relaxed));
                     }
 
-                    obj->setProperty("engineA", engineAArr);
-                    obj->setProperty("engineB", engineBArr);
+                    obj->setProperty("engineA", self.specEngineAArr);
+                    obj->setProperty("engineB", self.specEngineBArr);
                 }
 
                 obj->setProperty("viewMode",
@@ -320,17 +339,35 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
             [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
                 auto& engine = self.processor.getActiveEngine();
-                juce::Array<juce::var> inArr, synthArr, outArr;
+
+                // Reuse member Arrays across calls. clearQuick() drops elements
+                // without releasing the backing buffer, and ensureStorageAllocated
+                // sizes it on first use so subsequent fills don't realloc.
+                // setProperty() copies the Array into the var's RefCountedArray,
+                // so the next call's clearQuick() does not clobber data already
+                // marshalled to JS — see juce_Variant.cpp:418/524.
+                self.oscInArr   .clearQuick();
+                self.oscSynthArr.clearQuick();
+                self.oscOutArr  .clearQuick();
+                self.oscInArr   .ensureStorageAllocated(PhantomEngine::kOscBufSize);
+                self.oscSynthArr.ensureStorageAllocated(PhantomEngine::kOscBufSize);
+                self.oscOutArr  .ensureStorageAllocated(PhantomEngine::kOscBufSize);
+
+                // Relaxed atomic loads — the audio thread is concurrently
+                // doing relaxed stores into these slots. Tearing on the
+                // float scalar would have been UB with plain float[]; with
+                // std::atomic<float> the race is well-defined and codegen
+                // is identical (single mov on x86/ARM).
                 for (int i = 0; i < PhantomEngine::kOscBufSize; ++i)
                 {
-                    inArr  .add((double) self.processor.oscInputBuf [(size_t) i]);
-                    synthArr.add((double) engine.oscSynthBuf[(size_t) i]);
-                    outArr .add((double) self.processor.oscOutputBuf[(size_t) i]);
+                    self.oscInArr   .add((double) self.processor.oscInputBuf [(size_t) i].load(std::memory_order_relaxed));
+                    self.oscSynthArr.add((double) engine.oscSynthBuf         [(size_t) i].load(std::memory_order_relaxed));
+                    self.oscOutArr  .add((double) self.processor.oscOutputBuf[(size_t) i].load(std::memory_order_relaxed));
                 }
                 auto* obj = new juce::DynamicObject();
-                obj->setProperty("input",       inArr);
-                obj->setProperty("synth",       synthArr);
-                obj->setProperty("output",      outArr);
+                obj->setProperty("input",       self.oscInArr);
+                obj->setProperty("synth",       self.oscSynthArr);
+                obj->setProperty("output",      self.oscOutArr);
                 obj->setProperty("inputWrPos",  (int) self.processor.oscInputWrPos .load(std::memory_order_relaxed));
                 obj->setProperty("synthWrPos",  (int) engine.oscSynthWrPos.load(std::memory_order_relaxed));
                 obj->setProperty("outputWrPos", (int) self.processor.oscOutputWrPos.load(std::memory_order_relaxed));
@@ -341,7 +378,7 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
         .withNativeFunction("setEditorHeight",
             [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
             {
-                const int height = args.size() > 0 ? (int) args[0] : 820;
+                const int height = args.size() > 0 ? (int) args[0] : 970;
                 const int clamped = juce::jlimit(400, 2000, height);
                 juce::MessageManager::callAsync([weakSelf = juce::Component::SafePointer<PhantomEditor>(&self), clamped]
                 {
@@ -607,6 +644,251 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
                     : PhantomProcessor::SpectrumViewMode::Split);
                 complete({});
             })
+        // ── Matrix view UI state (mode + per-engine expanded categories) ──
+        .withNativeFunction("matrixGetState",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                const auto s = self.processor.getMatrixView();
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty("mode", s.mode == kaigen::phantom::MatrixMode::Matrix ? "Matrix" : "Slots");
+                obj->setProperty("expandedA", s.expandedA);
+                obj->setProperty("expandedB", s.expandedB);
+                complete(juce::var(obj));
+            })
+        .withNativeFunction("matrixSetState",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1 || ! args[0].isObject()) { complete({}); return; }
+                auto* obj = args[0].getDynamicObject();
+                if (obj == nullptr) { complete({}); return; }
+
+                kaigen::phantom::MatrixViewState s;
+                s.mode = (obj->getProperty("mode").toString() == "Matrix")
+                         ? kaigen::phantom::MatrixMode::Matrix : kaigen::phantom::MatrixMode::Slots;
+                if (obj->hasProperty("expandedA")) s.expandedA = obj->getProperty("expandedA").toString();
+                if (obj->hasProperty("expandedB")) s.expandedB = obj->getProperty("expandedB").toString();
+                self.processor.setMatrixView(s);
+                complete(juce::var(true));
+            })
+        .withNativeFunction("setUseNativeEditor",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1) { complete({}); return; }
+                const bool useNative = (bool) args[0];
+                auto state = self.processor.getEditorView();
+                state.useNativeEditor = useNative;
+                self.processor.setEditorView(state);
+                // Mark plugin state dirty so the host saves the new flag.
+                self.processor.updateHostDisplay();
+                complete(juce::var(true));
+            })
+        // ── Modulation: routing CRUD + macro metadata (PR3b Task 3) ──────
+        .withNativeFunction("modulationGetState",
+            [&self](const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                juce::DynamicObject::Ptr root = new juce::DynamicObject();
+
+                auto buildEngine = [&](kaigen::phantom::ModulationEngine& eng, const juce::String& prefix) -> juce::var
+                {
+                    juce::DynamicObject::Ptr engObj = new juce::DynamicObject();
+
+                    // Modulators (macros for PR3b — hardcoded by id since this PR knows the inventory)
+                    juce::Array<juce::var> mods;
+                    const auto macroIds = (prefix == "a_")
+                                        ? std::vector<const char*>{ "macro1", "macro2" }
+                                        : std::vector<const char*>{ "macro3", "macro4" };
+                    for (const auto& mid : macroIds)
+                    {
+                        auto* m = eng.findModulator(mid);
+                        if (m == nullptr) continue;
+                        juce::DynamicObject::Ptr mObj = new juce::DynamicObject();
+                        mObj->setProperty("id", juce::String(mid));
+                        if (auto* macro = dynamic_cast<kaigen::phantom::Macro*>(m))
+                            mObj->setProperty("name", macro->getName());
+                        else
+                            mObj->setProperty("name", juce::String(mid));
+                        mods.add(juce::var(mObj.get()));
+                    }
+                    engObj->setProperty("modulators", mods);
+
+                    // Routings
+                    juce::Array<juce::var> routes;
+                    auto snapshot = eng.getRoutingsSnapshot();
+                    for (const auto& r : *snapshot)
+                    {
+                        juce::DynamicObject::Ptr rObj = new juce::DynamicObject();
+                        rObj->setProperty("source", r.sourceId);
+                        rObj->setProperty("param",  r.paramId);
+                        rObj->setProperty("depth",  r.depth);
+                        rObj->setProperty("invert", r.polarityInverted);
+                        routes.add(juce::var(rObj.get()));
+                    }
+                    engObj->setProperty("routings", routes);
+
+                    // Eligible params (for the "+ Add destination" picker)
+                    juce::Array<juce::var> eligible;
+                    for (const auto& leaf : kaigen::phantom::PresetMigration::getPerEngineLeaves())
+                    {
+                        const juce::String pid = prefix + leaf;
+                        if (auto* p = self.processor.apvts.getParameter(pid))
+                        {
+                            juce::DynamicObject::Ptr pObj = new juce::DynamicObject();
+                            pObj->setProperty("id",   pid);
+                            pObj->setProperty("name", p->getName(64));
+                            eligible.add(juce::var(pObj.get()));
+                        }
+                    }
+                    engObj->setProperty("eligible", eligible);
+
+                    return juce::var(engObj.get());
+                };
+
+                root->setProperty("engineA", buildEngine(self.processor.getModulationEngineA(), "a_"));
+                root->setProperty("engineB", buildEngine(self.processor.getModulationEngineB(), "b_"));
+
+                complete(juce::var(root.get()));
+            })
+        .withNativeFunction("modulationGetLiveState", [&self]
+            (const juce::Array<juce::var>&, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+        {
+            juce::DynamicObject::Ptr root = new juce::DynamicObject();
+
+            auto buildEngine = [&](kaigen::phantom::ModulationEngine& eng) -> juce::var
+            {
+                juce::Array<juce::var> rows;
+                auto snapshot = eng.getRoutingsSnapshot();
+                for (const auto& r : *snapshot)
+                {
+                    juce::DynamicObject::Ptr rObj = new juce::DynamicObject();
+                    rObj->setProperty("source", r.sourceId);
+                    rObj->setProperty("param",  r.paramId);
+
+                    // Base value from APVTS
+                    float base = 0.0f;
+                    if (auto* p = self.processor.apvts.getRawParameterValue(r.paramId))
+                        base = p->load();
+                    rObj->setProperty("base", base);
+
+                    // Modulated value from the engine
+                    rObj->setProperty("modulated", eng.getModulatedValue(r.paramId, base));
+
+                    // Modulator's live value
+                    auto* m = eng.findModulator(r.sourceId);
+                    rObj->setProperty("modValue", m ? m->getCurrentValue() : 0.0f);
+
+                    rows.add(juce::var(rObj.get()));
+                }
+                return juce::var(rows);
+            };
+
+            root->setProperty("engineA", buildEngine(self.processor.getModulationEngineA()));
+            root->setProperty("engineB", buildEngine(self.processor.getModulationEngineB()));
+
+            // Per-macro live values (used by the slot-view conic rings in
+            // live-modulation.js / modulation-panel.js). Keyed by macro id;
+            // each entry has { value } so future per-macro fields can be
+            // added without breaking subscribers. Macros 1-2 live on engine
+            // A, 3-4 on engine B.
+            juce::DynamicObject::Ptr macrosObj = new juce::DynamicObject();
+            auto addMacro = [&](kaigen::phantom::ModulationEngine& eng, const juce::String& id)
+            {
+                if (auto* m = eng.findModulator(id))
+                {
+                    juce::DynamicObject::Ptr mObj = new juce::DynamicObject();
+                    mObj->setProperty("value", m->getCurrentValue());
+                    macrosObj->setProperty(id, juce::var(mObj.get()));
+                }
+            };
+            addMacro(self.processor.getModulationEngineA(), "macro1");
+            addMacro(self.processor.getModulationEngineA(), "macro2");
+            addMacro(self.processor.getModulationEngineB(), "macro3");
+            addMacro(self.processor.getModulationEngineB(), "macro4");
+            root->setProperty("macros", juce::var(macrosObj.get()));
+
+            // Morph amount (RT-safe atomic load from APVTS).
+            float morphAmt = 0.0f;
+            if (auto* p = self.processor.apvts.getRawParameterValue("morph_amount"))
+                morphAmt = p->load();
+            root->setProperty("morph_amount", morphAmt);
+
+            complete(juce::var(root.get()));
+        })
+        .withNativeFunction("modulationAddRouting",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1 || ! args[0].isObject()) { complete(juce::var(false)); return; }
+                auto* obj = args[0].getDynamicObject();
+                if (obj == nullptr) { complete(juce::var(false)); return; }
+
+                kaigen::phantom::Routing r;
+                r.sourceId = obj->getProperty("source").toString();
+                r.paramId  = obj->getProperty("param").toString();
+                {
+                    const auto depthVar = obj->getProperty("depth");
+                    r.depth = depthVar.isVoid() ? 0.5f : (float) depthVar;
+                }
+
+                const bool isA = r.paramId.startsWith("a_");
+                auto& eng = isA ? self.processor.getModulationEngineA()
+                               : self.processor.getModulationEngineB();
+                const bool ok = eng.addRouting(r);
+                if (ok)
+                    self.webView.emitEventIfBrowserIsVisible("modulationStateChanged", juce::var{});
+                complete(juce::var(ok));
+            })
+        .withNativeFunction("modulationRemoveRouting",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1 || ! args[0].isObject()) { complete({}); return; }
+                auto* obj = args[0].getDynamicObject();
+                if (obj == nullptr) { complete({}); return; }
+                const auto src = obj->getProperty("source").toString();
+                const auto pid = obj->getProperty("param").toString();
+                const bool isA = pid.startsWith("a_");
+                auto& eng = isA ? self.processor.getModulationEngineA()
+                               : self.processor.getModulationEngineB();
+                eng.removeRouting(src, pid);
+                self.webView.emitEventIfBrowserIsVisible("modulationStateChanged", juce::var{});
+                complete({});
+            })
+        .withNativeFunction("modulationSetRoutingDepth",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1 || ! args[0].isObject()) { complete(juce::var(false)); return; }
+                auto* obj = args[0].getDynamicObject();
+                if (obj == nullptr) { complete(juce::var(false)); return; }
+                const auto src = obj->getProperty("source").toString();
+                const auto pid = obj->getProperty("param").toString();
+                const auto depthVar = obj->getProperty("depth");
+                const float depth = depthVar.isVoid() ? 0.5f : (float) depthVar;
+                const bool isA = pid.startsWith("a_");
+                auto& eng = isA ? self.processor.getModulationEngineA()
+                               : self.processor.getModulationEngineB();
+                const bool ok = eng.setRoutingDepth(src, pid, depth);
+                if (ok)
+                    self.webView.emitEventIfBrowserIsVisible("modulationStateChanged", juce::var{});
+                complete(juce::var(ok));
+            })
+        .withNativeFunction("modulationSetMacroName",
+            [&self](const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion complete)
+            {
+                if (args.size() < 1 || ! args[0].isObject()) { complete({}); return; }
+                auto* obj = args[0].getDynamicObject();
+                if (obj == nullptr) { complete({}); return; }
+                const auto sourceId = obj->getProperty("source").toString();
+                const auto name     = obj->getProperty("name").toString();
+
+                const bool isA = (sourceId == "macro1" || sourceId == "macro2");
+                auto& eng = isA ? self.processor.getModulationEngineA()
+                               : self.processor.getModulationEngineB();
+                auto* m = eng.findModulator(sourceId);
+                if (auto* macro = dynamic_cast<kaigen::phantom::Macro*>(m))
+                {
+                    macro->setName(name);
+                    self.webView.emitEventIfBrowserIsVisible("modulationStateChanged", juce::var{});
+                }
+                complete({});
+            })
         .withResourceProvider([&self](const auto& url) { return self.getResource(url); });
 
     return options;
@@ -626,7 +908,11 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
     setMouseClickGrabsKeyboardFocus(false);
     webView.setWantsKeyboardFocus(false);
     webView.setMouseClickGrabsKeyboardFocus(false);
-    setSize(1300, 820);
+    // Initial editor height = wrap (820) + always-visible modulation panel
+    // (150) = 970. Matches BASE_HEIGHT in modulation-panel.js. The JS still
+    // calls setEditorHeight(970) on load as a belt-and-braces fallback;
+    // setting it here prevents a brief flicker before that JS fires.
+    setSize(1300, 970);
     addAndMakeVisible(webView);
 
     juce::MessageManager::callAsync([this]()
@@ -708,6 +994,13 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         { ParamID::B_SYNTH_BOOST_AMOUNT,      synthBoostAmountRelayB },
 
         { ParamID::MORPH_AMOUNT,              morphAmountRelay },
+
+        { ParamID::MACRO1,                    macro1Relay },
+        { ParamID::MACRO2,                    macro2Relay },
+        { ParamID::MACRO3,                    macro3Relay },
+        { ParamID::MACRO4,                    macro4Relay },
+
+        { ParamID::REVERB_MIX,                reverbMixRelay },
     };
     for (auto& b : sliderBindings)
         sliderAttachments.push_back(std::make_unique<juce::WebSliderParameterAttachment>(
@@ -737,6 +1030,8 @@ PhantomEditor::PhantomEditor(PhantomProcessor& p)
         *processor.apvts.getParameter(ParamID::BYPASS), bypassRelay, nullptr);
     inputGainAutoAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
         *processor.apvts.getParameter(ParamID::INPUT_GAIN_AUTO), inputGainAutoRelay, nullptr);
+    reverbSourceAttachment = std::make_unique<juce::WebToggleButtonParameterAttachment>(
+        *processor.apvts.getParameter(ParamID::REVERB_SOURCE), reverbSourceRelay, nullptr);
 
     // Per-engine toggles — paired A/B attachments, each bound to its respective param.
     punchEnabledAttachmentA = std::make_unique<juce::WebToggleButtonParameterAttachment>(

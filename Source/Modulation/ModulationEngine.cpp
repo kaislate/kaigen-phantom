@@ -25,28 +25,80 @@ bool ModulationEngine::addRouting(const Routing& r)
 {
     if (! r.paramId.startsWith(prefix)) return false;
     if (findModulator(r.sourceId) == nullptr) return false;
-    routings.push_back(r);
+
+    auto current = routingsAtomic.load();
+    auto next = std::make_shared<RoutingsList>(*current);
+    next->push_back(r);
+    routingsAtomic.store(std::shared_ptr<const RoutingsList>(next));
     return true;
 }
 
 void ModulationEngine::removeRouting(const juce::String& sourceId, const juce::String& paramId)
 {
-    routings.erase(std::remove_if(routings.begin(), routings.end(),
+    auto current = routingsAtomic.load();
+    auto next = std::make_shared<RoutingsList>(*current);
+    next->erase(std::remove_if(next->begin(), next->end(),
         [&](const Routing& r) { return r.sourceId == sourceId && r.paramId == paramId; }),
-        routings.end());
+        next->end());
+    routingsAtomic.store(std::shared_ptr<const RoutingsList>(next));
 }
 
-void ModulationEngine::clearRoutings() { routings.clear(); }
+void ModulationEngine::clearRoutings()
+{
+    routingsAtomic.store(std::make_shared<const RoutingsList>());
+}
+
+bool ModulationEngine::setRoutingDepth(const juce::String& sourceId, const juce::String& paramId, float newDepth)
+{
+    auto current = routingsAtomic.load();
+    auto next = std::make_shared<RoutingsList>(*current);
+    bool found = false;
+    for (auto& r : *next)
+    {
+        if (r.sourceId == sourceId && r.paramId == paramId)
+        {
+            r.depth = newDepth;
+            found = true;
+            break;
+        }
+    }
+    if (! found) return false;
+    routingsAtomic.store(std::shared_ptr<const RoutingsList>(next));
+    return true;
+}
+
+ModulationEngine::RoutingsSnapshot ModulationEngine::getRoutingsSnapshot() const noexcept
+{
+    return routingsAtomic.load();
+}
+
+std::vector<Routing> ModulationEngine::getRoutings() const
+{
+    return *routingsAtomic.load();
+}
 
 float ModulationEngine::getModulatedValue(const juce::String& paramId, float base) const
 {
-    auto* paramPtr = apvts.getParameter(paramId);
-    if (paramPtr == nullptr) return base;
-    const auto range = paramPtr->getNormalisableRange();
-    const float span = range.end - range.start;
+    return getModulatedValue(paramId, apvts.getParameter(paramId), base);
+}
+
+float ModulationEngine::getModulatedValue(const juce::String& paramId,
+                                            juce::RangedAudioParameter* param,
+                                            float base) const noexcept
+{
+    if (param == nullptr) return base;
+
+    // Cheap early-out when no routings exist (the COMMON case). Avoids
+    // dereferencing range + iterating an empty list — the snapshot load is
+    // a single atomic shared_ptr load, ~10ns.
+    auto snapshot = routingsAtomic.load();
+    if (! snapshot || snapshot->empty()) return base;
+
+    const auto& range = param->getNormalisableRange();
+    const float span  = range.end - range.start;
 
     float modulated = base;
-    for (const auto& r : routings)
+    for (const auto& r : *snapshot)
     {
         if (r.paramId != paramId) continue;
         auto* m = findModulator(r.sourceId);
@@ -67,7 +119,8 @@ juce::ValueTree ModulationEngine::toValueTree() const
     for (auto& m : modulators) m->writeToTree(mods);
     node.appendChild(mods, nullptr);
     juce::ValueTree routes("Routings");
-    for (auto& r : routings) routes.appendChild(r.toValueTree(), nullptr);
+    auto snapshot = routingsAtomic.load();
+    for (const auto& r : *snapshot) routes.appendChild(r.toValueTree(), nullptr);
     node.appendChild(routes, nullptr);
     return node;
 }
@@ -80,14 +133,19 @@ void ModulationEngine::fromValueTree(const juce::ValueTree& engineNode)
     auto modsNode = engineNode.getChildWithName("Modulators");
     for (auto& m : modulators) m->readFromTree(modsNode);
 
-    routings.clear();
+    auto next = std::make_shared<RoutingsList>();
     auto routesNode = engineNode.getChildWithName("Routings");
     for (int i = 0; i < routesNode.getNumChildren(); ++i)
     {
         auto child = routesNode.getChild(i);
-        if (child.hasType("Route"))
-            addRouting(Routing::fromValueTree(child));   // may reject if invalid
+        if (! child.hasType("Route")) continue;
+        Routing r = Routing::fromValueTree(child);
+        // Validate (same as addRouting): correct prefix + known modulator.
+        if (! r.paramId.startsWith(prefix)) continue;
+        if (findModulator(r.sourceId) == nullptr) continue;
+        next->push_back(r);
     }
+    routingsAtomic.store(std::shared_ptr<const RoutingsList>(next));
 }
 
 } // namespace kaigen::phantom

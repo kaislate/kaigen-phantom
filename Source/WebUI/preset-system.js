@@ -62,9 +62,13 @@ function initNativeBridge() {
 //     focusin/focusout update the native flag so the Win32 subclass
 //     (which runs as a safety net) knows whether to forward keys.
 
+// Despite the "text" name, this matches any form-interactive target whose
+// default mousedown behaviour we must NOT preventDefault on. <select> is
+// included because the Win32 focus subclass otherwise blocks the dropdown
+// from opening (preventDefault on mousedown stops the popup from showing).
 function isTextTarget(target) {
     return !!target && typeof target.matches === 'function' &&
-        target.matches('input, textarea, [contenteditable="true"]');
+        target.matches('input, textarea, select, [contenteditable="true"]');
 }
 
 function wireFocusTracking() {

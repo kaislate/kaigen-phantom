@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "UI/NativePluginEditor.h"
 #include "PresetMigration.h"
 #include "EngineFocus.h"
 #include "Modulation/Routing.h"
@@ -16,6 +17,18 @@ PhantomProcessor::PhantomProcessor()
     // preset from either tab populates that engine's harmonic amps.
     apvts.addParameterListener(ParamID::A_RECIPE_PRESET, this);
     apvts.addParameterListener(ParamID::B_RECIPE_PRESET, this);
+
+    // H param listeners drive the auto-switch / revert / mark-dirty path.
+    const char* aH[] = { ParamID::A_RECIPE_H2, ParamID::A_RECIPE_H3,
+                          ParamID::A_RECIPE_H4, ParamID::A_RECIPE_H5,
+                          ParamID::A_RECIPE_H6, ParamID::A_RECIPE_H7,
+                          ParamID::A_RECIPE_H8 };
+    const char* bH[] = { ParamID::B_RECIPE_H2, ParamID::B_RECIPE_H3,
+                          ParamID::B_RECIPE_H4, ParamID::B_RECIPE_H5,
+                          ParamID::B_RECIPE_H6, ParamID::B_RECIPE_H7,
+                          ParamID::B_RECIPE_H8 };
+    for (auto* id : aH) apvts.addParameterListener(id, this);
+    for (auto* id : bH) apvts.addParameterListener(id, this);
     presetManager.initialize();
 
     // ── Modulation engines (PR3a) ─────────────────────────────────────
@@ -28,27 +41,52 @@ PhantomProcessor::PhantomProcessor()
     modEngineB.addModulator(std::make_unique<Macro>("macro3", apvts, ParamID::MACRO3));
     modEngineB.addModulator(std::make_unique<Macro>("macro4", apvts, ParamID::MACRO4));
 
-    // PR3a proof-of-life routing — replaced by user-created routings via the
-    // macro editor UI in PR3b. Verifies the framework end-to-end:
-    // automating macro1 in the host should audibly affect engine A's ghost.
-    {
-        kaigen::phantom::Routing r;
-        r.sourceId = "macro1";
-        r.paramId  = ParamID::A_GHOST;
-        r.depth    = 0.5f;
-        modEngineA.addRouting(r);
-    }
-
     // Wire the modulation engines into the per-block param sync. This must
     // happen after the engines are populated above so the host caches
     // pointers to fully-configured engines.
     dualEngineHost.setModulationEngines(&modEngineA, &modEngineB);
+
+    // Cache the reverb-mix atomic pointer once so processBlock can read it
+    // with a single relaxed load (no APVTS lookup on the audio thread).
+    reverbMixParam    = apvts.getRawParameterValue(ParamID::REVERB_MIX);
+    reverbSourceParam = apvts.getRawParameterValue(ParamID::REVERB_SOURCE);
+
+    inputSourceParam = apvts.getRawParameterValue(ParamID::INPUT_SOURCE);
+    samplerRootParam = apvts.getRawParameterValue(ParamID::SAMPLER_ROOT_NOTE);
+    samplerLoopParam = apvts.getRawParameterValue(ParamID::SAMPLER_LOOP);
+    samplerGainParam = apvts.getRawParameterValue(ParamID::SAMPLER_GAIN);
+    samplerAParam    = apvts.getRawParameterValue(ParamID::SAMPLER_A);
+    samplerDParam    = apvts.getRawParameterValue(ParamID::SAMPLER_D);
+    samplerSParam    = apvts.getRawParameterValue(ParamID::SAMPLER_S);
+    samplerRParam    = apvts.getRawParameterValue(ParamID::SAMPLER_R);
+    samplerStartParam = apvts.getRawParameterValue(ParamID::SAMPLER_START);
+    samplerEndParam   = apvts.getRawParameterValue(ParamID::SAMPLER_END);
+    samplerSliceModeParam = apvts.getRawParameterValue(ParamID::SAMPLER_SLICE_MODE);
+    samplerReverseParam   = apvts.getRawParameterValue(ParamID::SAMPLER_REVERSE);
+    samplerLoopXfadeParam = apvts.getRawParameterValue(ParamID::SAMPLER_LOOP_XFADE);
+    samplerWarpModeParam  = apvts.getRawParameterValue(ParamID::SAMPLER_WARP_MODE);
+    samplerQuantizeParam  = apvts.getRawParameterValue(ParamID::SAMPLER_QUANTIZE);
+    samplerVelFixedParam  = apvts.getRawParameterValue(ParamID::SAMPLER_VEL_FIXED);
+    samplerVelValueParam  = apvts.getRawParameterValue(ParamID::SAMPLER_VEL_VALUE);
+
+    sampleFormatManager.registerBasicFormats();
 }
 
 PhantomProcessor::~PhantomProcessor()
 {
     apvts.removeParameterListener(ParamID::A_RECIPE_PRESET, this);
     apvts.removeParameterListener(ParamID::B_RECIPE_PRESET, this);
+
+    const char* aH[] = { ParamID::A_RECIPE_H2, ParamID::A_RECIPE_H3,
+                          ParamID::A_RECIPE_H4, ParamID::A_RECIPE_H5,
+                          ParamID::A_RECIPE_H6, ParamID::A_RECIPE_H7,
+                          ParamID::A_RECIPE_H8 };
+    const char* bH[] = { ParamID::B_RECIPE_H2, ParamID::B_RECIPE_H3,
+                          ParamID::B_RECIPE_H4, ParamID::B_RECIPE_H5,
+                          ParamID::B_RECIPE_H6, ParamID::B_RECIPE_H7,
+                          ParamID::B_RECIPE_H8 };
+    for (auto* id : aH) apvts.removeParameterListener(id, this);
+    for (auto* id : bH) apvts.removeParameterListener(id, this);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout PhantomProcessor::makeLayout()
@@ -85,7 +123,8 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
 
     fftWritePos = 0;
     fftBuffer.fill(0.0f);
-    spectrumData.fill(0.0f);
+    for (auto& a : spectrumData)       a.store(0.0f, std::memory_order_relaxed);
+    for (auto& a : spectrumOutputData) a.store(0.0f, std::memory_order_relaxed);
     spectrumReady.store(false);
 
     // Per-engine spectrum capture (split-mode view).
@@ -93,6 +132,28 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
     fftBufferEngineB.fill(0.0f);
     fftWritePosEngineA.store(0, std::memory_order_relaxed);
     fftWritePosEngineB.store(0, std::memory_order_relaxed);
+    fftScratchEngineA.fill(0.0f);
+    fftScratchEngineB.fill(0.0f);
+    samplesSinceEngineFftA = 0;
+    samplesSinceEngineFftB = 0;
+    for (auto& a : engineASpectrum) a.store(0.0f, std::memory_order_relaxed);
+    for (auto& a : engineBSpectrum) a.store(0.0f, std::memory_order_relaxed);
+
+    // Reverb send: prepare delay lines + filter state, then pre-allocate a
+    // stereo scratch buffer matching the worst-case block size so the audio
+    // thread can grab a copy of the engine output without allocating.
+    reverb.prepare(sr, samplesPerBlock);
+    reverb.reset();
+    reverbScratch.setSize(2, samplesPerBlock, false, true, false);
+    reverbMixSmoothed = reverbMixParam ? reverbMixParam->load() : 0.0f;
+
+    // ── Sampler (MIDI-playable source, INPUT_SOURCE = 2) ──────────────
+    // Preallocate stereo sampler output to the host's worst-case block
+    // size so processBlock can render the synth without heap allocation
+    // even when no sample is loaded (Synthesiser early-outs on idle).
+    phantomSampler.prepareToPlay(sr, samplesPerBlock);
+    samplerMidiPre.prepare();
+    samplerOutputBuffer.setSize(2, samplesPerBlock, false, true, true);
 }
 
 void PhantomProcessor::releaseResources() {}
@@ -147,6 +208,102 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         if      (m.isNoteOn())  dualEngineHost.handleMidiNoteOn();
         else if (m.isNoteOff()) dualEngineHost.handleMidiNoteOff();
     }
+
+    // ── Sampler + Engine-input source switch ────────────────────────
+    // Render the sampler into its own buffer regardless of the source
+    // selection so the playhead/voice-count UI updates even when the
+    // engines are reading Input or Sidechain (cheap when no voices
+    // are active — Synthesiser::renderNextBlock early-outs).
+    samplerOutputBuffer.setSize(buffer.getNumChannels(), n, false, false, true);
+    samplerOutputBuffer.clear();
+    {
+        // Push current APVTS values into the voices once per block.
+        phantomSampler.setRootNote((int) samplerRootParam->load());
+        phantomSampler.setLoopEnabled(samplerLoopParam->load() > 0.5f);
+        phantomSampler.setGainDb(samplerGainParam->load());
+        phantomSampler.setEnvelope(samplerAParam->load(),
+                                    samplerDParam->load(),
+                                    samplerSParam->load(),
+                                    samplerRParam->load());
+        phantomSampler.setStartEnd(samplerStartParam->load(),
+                                    samplerEndParam->load());
+        phantomSampler.setSliceMode(samplerSliceModeParam->load() > 0.5f);
+        phantomSampler.setReverse(samplerReverseParam->load() > 0.5f);
+        phantomSampler.setLoopCrossfadeMs(samplerLoopXfadeParam->load());
+        phantomSampler.setWarpMode((int) samplerWarpModeParam->load());
+
+        // ── Build the sampler's per-block midi buffer ──────────────────
+        // We deliberately don't mutate the host's midiMessages — the
+        // engines also consume it (MIDI-trigger features). The preprocessor
+        // produces a sampler-only buffer with quantize + velocity-override
+        // applied, and owns the deferred-note bookkeeping that keeps
+        // note-offs behind their quantized note-ons.
+        kaigen::phantom::SamplerMidiPreprocessor::Settings midiSettings;
+        midiSettings.velFixed = samplerVelFixedParam->load() > 0.5f;
+        midiSettings.velValue = (int) samplerVelValueParam->load();
+
+        // Grid sizes in ppq (1 beat = 1 ppq).
+        constexpr double kGridPpq[] = { 0.0, 1.0, 0.5, 0.25, 0.125 };
+        const int quantIdx = (int) samplerQuantizeParam->load();
+        midiSettings.gridPpq = (quantIdx >= 0 && quantIdx < 5) ? kGridPpq[quantIdx] : 0.0;
+
+        // Read the host playhead for quantize; without one, quantize stays
+        // inactive (havePpq = false).
+        double bpm = 120.0;
+        if (auto* head = getPlayHead())
+        {
+            if (auto pos = head->getPosition())
+            {
+                if (auto t = pos->getBpm())           bpm = *t;
+                if (auto p = pos->getPpqPosition()) { midiSettings.blockStartPpq = *p;
+                                                      midiSettings.havePpq = true; }
+            }
+        }
+        const double sr = getSampleRate();
+        midiSettings.ppqPerSample = (sr > 0.0) ? (bpm / 60.0) / sr : 0.0;
+        midiSettings.sampleRate   = sr;
+
+        phantomSampler.renderNextBlock(samplerOutputBuffer,
+                                       samplerMidiPre.process(midiMessages, n, midiSettings));
+    }
+
+    const int sourceSel = (int) inputSourceParam->load();
+    if (sourceSel == 1)   // Sidechain
+    {
+        // Copy the sidechain bus over the main buffer so the engines see
+        // it as their primary input. The existing DualEngineHost sidechain
+        // argument still receives the bus separately for envelope ducking
+        // (see sidechainPtr extraction further down in processBlock).
+        //
+        // Mirror the channel-offset pattern used by that later extraction:
+        // JUCE packs all enabled input buses into `buffer`, with the
+        // sidechain channels starting at `getTotalNumInputChannels() - nSCBusChannels`.
+        // If no sidechain is connected, fall through and leave the buffer
+        // as main-input audio (graceful fallback).
+        const int nSCBusChannels = getChannelCountOfBus(true, 1);
+        if (nSCBusChannels > 0)
+        {
+            const int scStartCh = getTotalNumInputChannels() - nSCBusChannels;
+            if (scStartCh >= nCh && scStartCh + nSCBusChannels <= buffer.getNumChannels())
+            {
+                // Sidechain channels (>= nCh) and main channels (< nCh) don't overlap,
+                // so copying sidechain → main in-place on the same backing buffer is safe.
+                for (int ch = 0; ch < nCh; ++ch)
+                    buffer.copyFrom(ch, 0, buffer,
+                                    scStartCh + juce::jmin(ch, nSCBusChannels - 1), 0, n);
+            }
+        }
+    }
+    else if (sourceSel == 2)   // Sampler
+    {
+        // Overwrite the main buffer with the sampler's output so the rest
+        // of processBlock (input peak, FFT capture, engine input) sees
+        // sampler audio without any further branching.
+        for (int ch = 0; ch < nCh; ++ch)
+            buffer.copyFrom(ch, 0, samplerOutputBuffer,
+                            juce::jmin(ch, samplerOutputBuffer.getNumChannels() - 1), 0, n);
+    }
+    // sourceSel == 0 (Input): nothing to do — buffer already holds main input.
 
     // ── Input Gain → engine detection only ────────────────────────────
     // Buffer audio stays at unity. The gain is forwarded to both engines where
@@ -205,7 +362,7 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             pL = juce::jmax(pL, std::abs(inL[i]));
             pR = juce::jmax(pR, std::abs(inR[i]));
 
-            oscInputBuf[(size_t) oscInWp] = inL[i];
+            oscInputBuf[(size_t) oscInWp].store(inL[i], std::memory_order_relaxed);
             oscInWp = (oscInWp + 1) & (kOscBufSize - 1);
 
             fftBuffer[(size_t) fftWritePos++] = inL[i];
@@ -247,7 +404,9 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
 
                     const float normMag = mag * normalizer;
                     const float dB      = juce::Decibels::gainToDecibels(normMag, -96.0f);
-                    spectrumData[(size_t) b] = juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f);
+                    spectrumData[(size_t) b].store(
+                        juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f),
+                        std::memory_order_relaxed);
                 }
 
                 spectrumReady.store(true, std::memory_order_release);
@@ -288,31 +447,183 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     // input, and crossfades into `buffer` (in place).
     dualEngineHost.process(buffer, sidechainPtr);
 
-    // ── Per-engine FFT capture (split-mode spectrum view) ────────────
+    // ── Per-engine FFT capture + transform (split-mode spectrum view) ──
     // aScratch / bScratch hold each engine's post-process / pre-crossfader
     // output. They're valid until the next dualEngineHost.process() call,
     // i.e. until the next processBlock — so capture them now into the two
-    // ring buffers consumed by the native binding on the UI thread.
+    // ring buffers, then run the FFT on the audio thread on the same
+    // sub-rate cadence as the input/output FFTs (one transform per
+    // kFftSize samples accumulated). The bin magnitudes are published into
+    // atomic snapshot arrays the WebView native binding reads as plain
+    // atomic loads — no FFT, no allocation on the message thread.
     {
         const auto& aOut = dualEngineHost.getEngineAOutput();
         const auto& bOut = dualEngineHost.getEngineBOutput();
+        const auto& aSynth = dualEngineHost.getEngineA().getPhantomOnlyOutput();
+        const auto& bSynth = dualEngineHost.getEngineB().getPhantomOnlyOutput();
 
         if (aOut.getNumChannels() > 0 && bOut.getNumChannels() > 0
             && aOut.getNumSamples() == n && bOut.getNumSamples() == n)
         {
             const float* aL = aOut.getReadPointer(0);
             const float* bL = bOut.getReadPointer(0);
+            // Synth-only side buffers may have a different channel count
+            // (PhantomEngine sizes them to nCh of the current block) but
+            // always have at least one channel during normal processing.
+            const float* aSynthL = (aSynth.getNumChannels() > 0 && aSynth.getNumSamples() == n)
+                                       ? aSynth.getReadPointer(0) : nullptr;
+            const float* bSynthL = (bSynth.getNumChannels() > 0 && bSynth.getNumSamples() == n)
+                                       ? bSynth.getReadPointer(0) : nullptr;
             int posA = fftWritePosEngineA.load(std::memory_order_relaxed);
             int posB = fftWritePosEngineB.load(std::memory_order_relaxed);
+            int posAs = fftWritePosEngineASynth.load(std::memory_order_relaxed);
+            int posBs = fftWritePosEngineBSynth.load(std::memory_order_relaxed);
             for (int i = 0; i < n; ++i)
             {
                 fftBufferEngineA[(size_t) posA] = aL[i];
                 fftBufferEngineB[(size_t) posB] = bL[i];
-                posA = (posA + 1) & kEngineRingMask;
-                posB = (posB + 1) & kEngineRingMask;
+                fftBufferEngineASynth[(size_t) posAs] = aSynthL ? aSynthL[i] : 0.0f;
+                fftBufferEngineBSynth[(size_t) posBs] = bSynthL ? bSynthL[i] : 0.0f;
+                posA  = (posA  + 1) & kEngineRingMask;
+                posB  = (posB  + 1) & kEngineRingMask;
+                posAs = (posAs + 1) & kEngineRingMask;
+                posBs = (posBs + 1) & kEngineRingMask;
             }
             fftWritePosEngineA.store(posA, std::memory_order_relaxed);
             fftWritePosEngineB.store(posB, std::memory_order_relaxed);
+            fftWritePosEngineASynth.store(posAs, std::memory_order_relaxed);
+            fftWritePosEngineBSynth.store(posBs, std::memory_order_relaxed);
+
+            samplesSinceEngineFftA += n;
+            samplesSinceEngineFftB += n;
+
+            // Shared log-bin parameters — reused for both engines below.
+            const float srHz       = (float) sampleRate;
+            const float fftSizeF   = (float) kFftSize;
+            const int   maxBin     = kFftSize / 2 - 1;
+            const float logMin     = std::log10(30.0f);
+            const float logMax     = std::log10(16000.0f);
+            const float normalizer = 2.0f / (float) (kFftSize / 2);
+
+            // Helper: run Hann-windowed FFT + log-binning on `ring` starting
+            // from the most-recent kFftSize samples ending at `wrPos`,
+            // writing magnitudes into `dst`. Scratch is the per-engine
+            // pre-allocated FFT buffer (size kFftSize * 2).
+            auto runEngineFft = [&](const std::array<float, kFftSize * 2>& ring,
+                                    int wrPos,
+                                    std::array<float, kFftSize * 2>& scratch,
+                                    std::array<std::atomic<float>, kSpectrumBins>& dst)
+            {
+                int readPos = (wrPos - kFftSize) & kEngineRingMask;
+                for (int k = 0; k < kFftSize; ++k)
+                {
+                    const float w = 0.5f * (1.0f - std::cos(
+                        juce::MathConstants<float>::twoPi * k / (float)(kFftSize - 1)));
+                    scratch[(size_t) k] = ring[(size_t) readPos] * w;
+                    readPos = (readPos + 1) & kEngineRingMask;
+                }
+                for (int k = kFftSize; k < kFftSize * 2; ++k)
+                    scratch[(size_t) k] = 0.0f;
+
+                spectrumFFT.performFrequencyOnlyForwardTransform(scratch.data());
+
+                for (int b = 0; b < kSpectrumBins; ++b)
+                {
+                    const float fLow  = std::pow(10.0f, logMin + (logMax - logMin) *  b      / kSpectrumBins);
+                    const float fHigh = std::pow(10.0f, logMin + (logMax - logMin) * (b + 1) / kSpectrumBins);
+                    const int binLow  = juce::jmax(1,      (int) std::floor(fLow  * fftSizeF / srHz));
+                    const int binHigh = juce::jmin(maxBin, (int) std::ceil (fHigh * fftSizeF / srHz));
+
+                    float mag = 0.0f;
+                    for (int k = binLow; k <= binHigh; ++k)
+                        mag = juce::jmax(mag, scratch[(size_t) k]);
+
+                    const float normMag = mag * normalizer;
+                    const float dB      = juce::Decibels::gainToDecibels(normMag, -96.0f);
+                    dst[(size_t) b].store(juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f),
+                                          std::memory_order_relaxed);
+                }
+            };
+
+            if (samplesSinceEngineFftA >= kFftSize)
+            {
+                samplesSinceEngineFftA = 0;
+                runEngineFft(fftBufferEngineA, posA, fftScratchEngineA, engineASpectrum);
+                runEngineFft(fftBufferEngineASynth, posAs,
+                              fftScratchEngineASynth, engineASynthSpectrum);
+            }
+            if (samplesSinceEngineFftB >= kFftSize)
+            {
+                samplesSinceEngineFftB = 0;
+                runEngineFft(fftBufferEngineB, posB, fftScratchEngineB, engineBSpectrum);
+                runEngineFft(fftBufferEngineBSynth, posBs,
+                              fftScratchEngineBSynth, engineBSynthSpectrum);
+            }
+        }
+    }
+
+    // ── Reverb send (post-engine parallel mix) ───────────────────────
+    // Read the target mix once per block and slew toward it across the
+    // block to avoid zipper noise on automation changes. When the target
+    // is exactly zero AND the smoothed value has also settled to zero we
+    // skip the reverb work entirely — the tank still needs occasional
+    // reset() to fully silence but at 0 mix the wet contribution is
+    // already inaudible.
+    {
+        const float target = reverbMixParam ? reverbMixParam->load() : 0.0f;
+        const bool  isAudibleNow = (reverbMixSmoothed > 1.0e-4f) || (target > 1.0e-4f);
+
+        if (isAudibleNow && nCh > 0 && n > 0
+            && reverbScratch.getNumSamples() >= n)
+        {
+            // Select the wet input. By default (reverb_source = 0) the
+            // reverb processes the full post-engine signal (input + synth).
+            // When reverb_source = 1 it processes ONLY the synth
+            // contribution — the dry input still passes to the output
+            // through `buffer` unchanged, but the reverb tail is
+            // generated from just the synth.
+            const bool reverbOnPhantomOnly =
+                reverbSourceParam && reverbSourceParam->load() > 0.5f;
+            const juce::AudioBuffer<float>& reverbSource =
+                reverbOnPhantomOnly
+                    ? dualEngineHost.getPhantomOnlyOutput()
+                    : buffer;
+
+            // Copy the chosen source into the reverb scratch — the main
+            // buffer stays as the dry signal we'll mix back into.
+            for (int c = 0; c < nCh && c < reverbScratch.getNumChannels(); ++c)
+                reverbScratch.copyFrom(c, 0, reverbSource,
+                                       juce::jmin(c, reverbSource.getNumChannels() - 1),
+                                       0, n);
+
+            // Render wet in-place into the scratch (caller does dry-mix).
+            reverb.process(reverbScratch);
+
+            // Mix back: out = dry + smoothed_mix * wet. Slew the mix value
+            // linearly across the block so a sudden knob jump doesn't click.
+            float mix = reverbMixSmoothed;
+            const float deltaPerSample = (target - mix) / (float) n;
+
+            for (int c = 0; c < nCh; ++c)
+            {
+                float* dry = buffer.getWritePointer(c);
+                const float* wet = reverbScratch.getReadPointer(
+                    juce::jmin(c, reverbScratch.getNumChannels() - 1));
+                float m = mix;
+                for (int i = 0; i < n; ++i)
+                {
+                    dry[i] += m * wet[i];
+                    m += deltaPerSample;
+                }
+            }
+            // End-of-block snap to the target so floating drift over many
+            // blocks doesn't accumulate against the param value.
+            reverbMixSmoothed = target;
+        }
+        else
+        {
+            // Not audible — just track the target without doing reverb work.
+            reverbMixSmoothed = target;
         }
     }
 
@@ -332,7 +643,7 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             pL = juce::jmax(pL, std::abs(outL[i]));
             pR = juce::jmax(pR, std::abs(outR[i]));
 
-            oscOutputBuf[(size_t) oscOutWp] = outL[i];
+            oscOutputBuf[(size_t) oscOutWp].store(outL[i], std::memory_order_relaxed);
             oscOutWp = (oscOutWp + 1) & (kOscBufSize - 1);
 
             fftOutputBuffer[(size_t) fftOutputWritePos++] = outL[i];
@@ -373,7 +684,9 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
 
                     const float normMag = mag * norm2;
                     const float dB      = juce::Decibels::gainToDecibels(normMag, -96.0f);
-                    spectrumOutputData[(size_t) b] = juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f);
+                    spectrumOutputData[(size_t) b].store(
+                        juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f),
+                        std::memory_order_relaxed);
                 }
             }
         }
@@ -384,101 +697,293 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     }
 }
 
-void PhantomProcessor::computeEngineSpectrum(SpectrumEngineId which,
-                                             std::array<float, kSpectrumBins>& dst) const
+namespace
 {
-    // Source ring buffer + atomic write position for the requested engine.
-    const auto& ring   = (which == SpectrumEngineId::A) ? fftBufferEngineA   : fftBufferEngineB;
-    const int   wrPos  = ((which == SpectrumEngineId::A) ? fftWritePosEngineA
-                                                         : fftWritePosEngineB).load(std::memory_order_acquire);
-
-    // Copy the most recent kFftSize samples from the ring into the scratch
-    // FFT buffer (size = kFftSize * 2; second half zero-padded for the FFT).
-    int readPos = (wrPos - kFftSize) & kEngineRingMask;
-    for (int k = 0; k < kFftSize; ++k)
+    const char* hParamId(int engineIdx, int hIdx)
     {
-        spectrumEngineScratch[(size_t) k] = ring[(size_t) readPos];
-        readPos = (readPos + 1) & kEngineRingMask;
+        // hIdx is 0..6 (H2..H8). engineIdx 0=A, 1=B.
+        static const char* aIds[7] = {
+            ParamID::A_RECIPE_H2, ParamID::A_RECIPE_H3, ParamID::A_RECIPE_H4,
+            ParamID::A_RECIPE_H5, ParamID::A_RECIPE_H6, ParamID::A_RECIPE_H7,
+            ParamID::A_RECIPE_H8
+        };
+        static const char* bIds[7] = {
+            ParamID::B_RECIPE_H2, ParamID::B_RECIPE_H3, ParamID::B_RECIPE_H4,
+            ParamID::B_RECIPE_H5, ParamID::B_RECIPE_H6, ParamID::B_RECIPE_H7,
+            ParamID::B_RECIPE_H8
+        };
+        return (engineIdx == 1 ? bIds : aIds)[juce::jlimit(0, 6, hIdx)];
     }
 
-    // Hann window — same coefficients as the input/output FFT in processBlock.
-    for (int k = 0; k < kFftSize; ++k)
+    int hIndexFromParamId(const juce::String& paramId, int& engineIdxOut)
     {
-        const float w = 0.5f * (1.0f - std::cos(
-            juce::MathConstants<float>::twoPi * k / (float)(kFftSize - 1)));
-        spectrumEngineScratch[(size_t) k] *= w;
-    }
-    for (int k = kFftSize; k < kFftSize * 2; ++k)
-        spectrumEngineScratch[(size_t) k] = 0.0f;
-
-    spectrumFFT.performFrequencyOnlyForwardTransform(spectrumEngineScratch.data());
-
-    // Log-frequency binning — identical to spectrumData / spectrumOutputData.
-    const float sr         = (float) sampleRate;
-    const float fftSizeF   = (float) kFftSize;
-    const int   maxBin     = kFftSize / 2 - 1;
-    const float logMin     = std::log10(30.0f);
-    const float logMax     = std::log10(16000.0f);
-    const float normalizer = 2.0f / (float) (kFftSize / 2);
-
-    for (int b = 0; b < kSpectrumBins; ++b)
-    {
-        const float fLow  = std::pow(10.0f, logMin + (logMax - logMin) *  b      / kSpectrumBins);
-        const float fHigh = std::pow(10.0f, logMin + (logMax - logMin) * (b + 1) / kSpectrumBins);
-
-        const int binLow  = juce::jmax(1,      (int) std::floor(fLow  * fftSizeF / sr));
-        const int binHigh = juce::jmin(maxBin, (int) std::ceil (fHigh * fftSizeF / sr));
-
-        float mag = 0.0f;
-        for (int k = binLow; k <= binHigh; ++k)
-            mag = juce::jmax(mag, spectrumEngineScratch[(size_t) k]);
-
-        const float normMag = mag * normalizer;
-        const float dB      = juce::Decibels::gainToDecibels(normMag, -96.0f);
-        dst[(size_t) b]     = juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f);
+        for (int e = 0; e < 2; ++e)
+            for (int h = 0; h < 7; ++h)
+                if (paramId == hParamId(e, h))
+                {
+                    engineIdxOut = e;
+                    return h;
+                }
+        return -1;
     }
 }
 
 void PhantomProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
-    // Recipe Preset is a per-engine choice: when either engine's selector changes,
-    // populate that engine's H2..H8 amplitudes from the chosen recipe table.
-    // "Custom" (index 6) leaves the harmonics untouched.
-    const bool isA = (parameterID == ParamID::A_RECIPE_PRESET);
-    const bool isB = (parameterID == ParamID::B_RECIPE_PRESET);
-    if (!isA && !isB) return;
+    // Branch 1: recipe_preset change → load that preset's H values.
+    if (parameterID == ParamID::A_RECIPE_PRESET)
+    {
+        applyRecipePreset(0, juce::roundToInt(newValue));
+        return;
+    }
+    if (parameterID == ParamID::B_RECIPE_PRESET)
+    {
+        applyRecipePreset(1, juce::roundToInt(newValue));
+        return;
+    }
 
-    const int idx = juce::roundToInt(newValue);
-    const float* tables[] = {
-        kWarmAmps, kAggressiveAmps, kHollowAmps, kDenseAmps,
-        kStableAmps, kWeirdAmps,
-        nullptr   // Custom (index 6)
-    };
+    // Branch 2: H param change → auto-switch / revert / mark-dirty.
+    int engineIdx = -1;
+    const int hIdx = hIndexFromParamId(parameterID, engineIdx);
+    if (hIdx < 0) return;
 
-    if (idx < 0 || idx >= 6 || tables[idx] == nullptr) return;
+    // Ignore writes we issued ourselves while loading a preset.
+    if (loadingPreset) return;
 
-    const char* hIds[7] = {
-        isA ? ParamID::A_RECIPE_H2 : ParamID::B_RECIPE_H2,
-        isA ? ParamID::A_RECIPE_H3 : ParamID::B_RECIPE_H3,
-        isA ? ParamID::A_RECIPE_H4 : ParamID::B_RECIPE_H4,
-        isA ? ParamID::A_RECIPE_H5 : ParamID::B_RECIPE_H5,
-        isA ? ParamID::A_RECIPE_H6 : ParamID::B_RECIPE_H6,
-        isA ? ParamID::A_RECIPE_H7 : ParamID::B_RECIPE_H7,
-        isA ? ParamID::A_RECIPE_H8 : ParamID::B_RECIPE_H8,
-    };
-    for (int i = 0; i < 7; ++i)
-        if (auto* p = apvts.getParameter(hIds[i]))
-            p->setValueNotifyingHost(p->convertTo0to1(tables[idx][i] * 100.0f));
+    const char* presetParamId = (engineIdx == 1)
+        ? ParamID::B_RECIPE_PRESET : ParamID::A_RECIPE_PRESET;
+    const int currentPreset = juce::roundToInt(
+        apvts.getRawParameterValue(presetParamId)->load());
+
+    if (currentPreset >= 6 && currentPreset <= 8)
+    {
+        // On a Custom slot — accept the edit, refresh previousH so a
+        // subsequent preset-load can revert to this state.
+        readCurrentH(engineIdx, previousH[(size_t) engineIdx]);
+        return;
+    }
+
+    // On a built-in. Find the first empty Custom slot.
+    const int emptySlot = findFirstEmptyCustomSlot(engineIdx);
+    if (emptySlot < 0)
+    {
+        // All customs full → revert this edit, fire wheel-lock flash.
+        loadingPreset = true;
+        writeHParamsRaw01(engineIdx, previousH[(size_t) engineIdx]);
+        loadingPreset = false;
+
+        juce::MessageManager::callAsync(
+            [bc = &wheelLockBroadcaster]() { bc->sendChangeMessage(); });
+        return;
+    }
+
+    // Remember which built-in we came from.
+    lastBuiltInPreset[(size_t) engineIdx] = currentPreset;
+
+    // Switch the preset to the empty slot. applyRecipePreset will fire as
+    // a result of the choice change; since the slot is not `filled`, it
+    // won't overwrite the just-edited H values.
+    if (auto* presetParam = apvts.getParameter(presetParamId))
+        presetParam->setValueNotifyingHost(presetParam->convertTo0to1((float) (6 + emptySlot)));
+}
+
+void PhantomProcessor::readCurrentH(int engineIdx, std::array<float, 7>& outH) const
+{
+    for (int h = 0; h < 7; ++h)
+    {
+        const auto* raw = apvts.getRawParameterValue(hParamId(engineIdx, h));
+        // Params are stored as [0..100] (percent). Normalise to [0..1].
+        outH[(size_t) h] = (raw != nullptr) ? raw->load() * 0.01f : 0.0f;
+    }
+}
+
+void PhantomProcessor::writeHParams(int engineIdx, const std::array<float, 7>& inH)
+{
+    // inH is [0..1]; the params want [0..100]; setValueNotifyingHost wants normalised [0..1].
+    for (int h = 0; h < 7; ++h)
+    {
+        if (auto* p = apvts.getParameter(hParamId(engineIdx, h)))
+        {
+            const float pct = juce::jlimit(0.0f, 100.0f, inH[(size_t) h] * 100.0f);
+            p->setValueNotifyingHost(p->convertTo0to1(pct));
+        }
+    }
+}
+
+void PhantomProcessor::writeHParamsRaw01(int engineIdx, const std::array<float, 7>& inH01)
+{
+    // Same as writeHParams but inputs already 0..1 (used by the revert
+    // path which has the previous percent-normalised values cached as
+    // 0..1 of the param range).
+    writeHParams(engineIdx, inH01);
+}
+
+void PhantomProcessor::applyRecipePreset(int engineIdx, int presetIdx)
+{
+    // Snapshot current H into previousH BEFORE the load — so a subsequent
+    // user edit can revert to the just-loaded values, not to whatever was
+    // there before this load.
+    readCurrentH(engineIdx, previousH[(size_t) engineIdx]);
+
+    if (presetIdx >= 0 && presetIdx <= 5)
+    {
+        const float* tables[6] = {
+            kWarmAmps, kAggressiveAmps, kHollowAmps,
+            kDenseAmps, kStableAmps, kWeirdAmps
+        };
+        const float* src = tables[presetIdx];
+        std::array<float, 7> values {};
+        for (int h = 0; h < 7; ++h) values[(size_t) h] = src[h];
+
+        loadingPreset = true;
+        writeHParams(engineIdx, values);
+        loadingPreset = false;
+
+        // After loading a built-in, remember it for delete fallback.
+        lastBuiltInPreset[(size_t) engineIdx] = presetIdx;
+
+        // Refresh previousH to the just-loaded values.
+        previousH[(size_t) engineIdx] = values;
+    }
+    else if (presetIdx >= 6 && presetIdx <= 8)
+    {
+        const int slotIdx = presetIdx - 6;
+        const auto& slot = recipeSlots[(size_t) engineIdx][(size_t) slotIdx];
+        if (slot.filled)
+        {
+            loadingPreset = true;
+            writeHParams(engineIdx, slot.savedH);
+            loadingPreset = false;
+            previousH[(size_t) engineIdx] = slot.savedH;
+        }
+        // If !filled, leave H values as-is — the user is editing into an
+        // empty slot. previousH stays at the snapshot above so a later
+        // revert restores the pre-switch values.
+    }
 }
 
 juce::AudioProcessorEditor* PhantomProcessor::createEditor()
 {
-    return new PhantomEditor(*this);
+    // Native UI is now the only UI. The WebView editor (PhantomEditor) and
+    // its shift+click toggle handlers (TopBar mouseDown, phantom.js
+    // setupNativeUIToggle) still exist but the createEditor flag is ignored
+    // — restore the conditional branch on `editorView.useNativeEditor` if
+    // you ever need the WebView fallback during Path B troubleshooting.
+    return new kaigen::phantom::NativePluginEditor(*this, apvts);
+}
+
+bool PhantomProcessor::setSampleFromBytes(juce::MemoryBlock sourceBytes,
+                                           juce::String filename,
+                                           juce::AudioBuffer<float> decoded,
+                                           double sourceSampleRate)
+{
+    // Reset + feed the thumbnail BEFORE the sampler load so we keep
+    // `decoded` around for the thumb addBlock call below; the sampler's
+    // loadSample takes the buffer by move (consuming it).
+    sampleThumb.reset(decoded.getNumChannels(), sourceSampleRate, decoded.getNumSamples());
+    sampleThumb.addBlock(0, decoded, 0, decoded.getNumSamples());
+
+    if (! phantomSampler.loadSample(std::move(decoded), sourceSampleRate))
+    {
+        sampleThumb.reset(0, 0.0, 0);
+        return false;
+    }
+    cachedSampleBytes    = std::move(sourceBytes);
+    cachedSampleBase64   = juce::Base64::toBase64(cachedSampleBytes.getData(),
+                                                  cachedSampleBytes.getSize());
+    cachedSampleFilename = std::move(filename);
+
+    // Auto-detect transients for slice mode unless the user has turned
+    // Auto-Slice off (manual slice authoring). In manual mode we seed the
+    // table with just slice 0 so the user starts from a clean slate.
+    // setStateInformation overrides this with the persisted table if one
+    // was saved.
+    const bool autoSlice = apvts.getRawParameterValue(ParamID::SAMPLER_AUTO_SLICE)->load() > 0.5f;
+    if (autoSlice)
+        phantomSampler.detectSlices();
+    else
+        phantomSampler.setSliceTable({ 0 });
+    return true;
+}
+
+void PhantomProcessor::clearSample()
+{
+    phantomSampler.clearSample();
+    cachedSampleBytes.reset();
+    cachedSampleBase64.clear();
+    cachedSampleFilename.clear();
+    sampleThumb.reset(0, 0.0, 0);
 }
 
 void PhantomProcessor::setEngineFocus(EngineFocus newFocus) noexcept
 {
+    const bool changed = (engineFocus.activeTab != newFocus.activeTab)
+                       || (engineFocus.linkOn != newFocus.linkOn);
     engineFocus = newFocus;
+    if (changed)
+        juce::MessageManager::callAsync(
+            [bc = &engineFocusBroadcaster]() { bc->sendChangeMessage(); });
+}
+
+const PhantomProcessor::RecipeSlot&
+PhantomProcessor::getRecipeSlot(int engineIdx, int slotIdx) const noexcept
+{
+    const int e = juce::jlimit(0, 1, engineIdx);
+    const int s = juce::jlimit(0, 2, slotIdx);
+    return recipeSlots[(size_t) e][(size_t) s];
+}
+
+int PhantomProcessor::findFirstEmptyCustomSlot(int engineIdx) const noexcept
+{
+    const int e = juce::jlimit(0, 1, engineIdx);
+    for (int s = 0; s < 3; ++s)
+        if (! recipeSlots[(size_t) e][(size_t) s].filled)
+            return s;
+    return -1;
+}
+
+void PhantomProcessor::saveRecipeSlot(int engineIdx, int slotIdx)
+{
+    const int e = juce::jlimit(0, 1, engineIdx);
+    const int s = juce::jlimit(0, 2, slotIdx);
+
+    auto& slot = recipeSlots[(size_t) e][(size_t) s];
+    readCurrentH(e, slot.savedH);
+    slot.filled = true;
+}
+
+void PhantomProcessor::clearRecipeSlot(int engineIdx, int slotIdx)
+{
+    const int e = juce::jlimit(0, 1, engineIdx);
+    const int s = juce::jlimit(0, 2, slotIdx);
+
+    auto& slot = recipeSlots[(size_t) e][(size_t) s];
+    slot.filled = false;
+    slot.savedH = {};
+
+    // If this slot was the active preset, fall back: first other filled
+    // Custom → lastBuiltInPreset → 0 (Warm).
+    const char* presetParamId = (e == 1)
+        ? ParamID::B_RECIPE_PRESET : ParamID::A_RECIPE_PRESET;
+    const int currentPreset = juce::roundToInt(
+        apvts.getRawParameterValue(presetParamId)->load());
+
+    if (currentPreset == 6 + s)
+    {
+        int fallback = -1;
+        for (int other = 0; other < 3; ++other)
+            if (other != s && recipeSlots[(size_t) e][(size_t) other].filled)
+            {
+                fallback = 6 + other;
+                break;
+            }
+        if (fallback < 0)
+            fallback = juce::jlimit(0, 5, lastBuiltInPreset[(size_t) e]);
+
+        if (auto* presetParam = apvts.getParameter(presetParamId))
+            presetParam->setValueNotifyingHost(
+                presetParam->convertTo0to1((float) fallback));
+    }
 }
 
 void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
@@ -501,6 +1006,8 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
 
     kaigen::phantom::writeEngineFocusToTree(wrapper, engineFocus);
     kaigen::phantom::writeSpectrumViewModeToTree(wrapper, spectrumViewMode);
+    kaigen::phantom::writeMatrixViewToTree(wrapper, matrixView);
+    kaigen::phantom::writeEditorViewToTree(wrapper, editorView);
 
     // <ModulationConfig> — per-engine modulator + routing tables. Preset-side
     // persistence (within an APVTS-state child or sibling) lands in PR3b; for
@@ -509,6 +1016,63 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
     modConfig.appendChild(modEngineA.toValueTree(), nullptr);
     modConfig.appendChild(modEngineB.toValueTree(), nullptr);
     wrapper.appendChild(modConfig, nullptr);
+
+    // <RecipeSlots> — per-engine Custom slot data + last-built-in preset.
+    // 6 <Slot engine=E slot=S filled=B h2..h8=F> children, plus two
+    // <LastBuiltIn engine=E value=I> entries. Missing on load → all slots
+    // empty + lastBuiltIn = 0.
+    juce::ValueTree slotsRoot("RecipeSlots");
+    for (int e = 0; e < 2; ++e)
+    {
+        for (int s = 0; s < 3; ++s)
+        {
+            const auto& slot = recipeSlots[(size_t) e][(size_t) s];
+            juce::ValueTree slotNode("Slot");
+            slotNode.setProperty("engine", e, nullptr);
+            slotNode.setProperty("slot",   s, nullptr);
+            slotNode.setProperty("filled", slot.filled, nullptr);
+            for (int h = 0; h < 7; ++h)
+                slotNode.setProperty(juce::String("h") + juce::String(h + 2),
+                                     slot.savedH[(size_t) h], nullptr);
+            slotsRoot.appendChild(slotNode, nullptr);
+        }
+
+        juce::ValueTree last("LastBuiltIn");
+        last.setProperty("engine", e, nullptr);
+        last.setProperty("value",  lastBuiltInPreset[(size_t) e], nullptr);
+        slotsRoot.appendChild(last, nullptr);
+    }
+    wrapper.appendChild(slotsRoot, nullptr);
+
+    // <Sampler> — embedded sample bytes (base64) + filename. Missing when
+    // no sample is loaded; the read path treats an empty/missing child as
+    // "no sample" and leaves PhantomSampler silent.
+    if (cachedSampleBytes.getSize() > 0)
+    {
+        juce::ValueTree samplerNode("Sampler");
+        samplerNode.setProperty("filename", cachedSampleFilename, nullptr);
+        // Pre-encoded at load time; juce::String is refcounted so this
+        // setProperty shares the buffer rather than copying it.
+        samplerNode.setProperty("bytes", cachedSampleBase64, nullptr);
+
+        // Slice points as a comma-separated string. Restored verbatim
+        // in setStateInformation so the user's manually-adjusted slices
+        // (or the auto-detected set from a previous load) survive
+        // project save/reopen.
+        const auto& slices = phantomSampler.getSliceTable();
+        if (! slices.empty())
+        {
+            juce::String csv;
+            for (size_t i = 0; i < slices.size(); ++i)
+            {
+                if (i > 0) csv << ',';
+                csv << slices[i];
+            }
+            samplerNode.setProperty("slices", csv, nullptr);
+        }
+
+        wrapper.appendChild(samplerNode, nullptr);
+    }
 
     if (auto xml = wrapper.createXml())
         copyXmlToBinary(*xml, destData);
@@ -552,6 +1116,12 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
         if (wrapper.getChildWithName("SpectrumView").isValid())
             spectrumViewMode = kaigen::phantom::readSpectrumViewModeFromTree(wrapper);
 
+        if (wrapper.getChildWithName("MatrixView").isValid())
+            matrixView = kaigen::phantom::readMatrixViewFromTree(wrapper);
+
+        if (wrapper.getChildWithName("EditorView").isValid())
+            editorView = kaigen::phantom::readEditorViewFromTree(wrapper);
+
         // <ModulationConfig> — restore per-engine modulators + routings. The
         // ValueTree contains one <Engine> child per engine, each tagged with
         // a "prefix" property ("a_" or "b_"); dispatch on that to the right
@@ -565,6 +1135,90 @@ void PhantomProcessor::setStateInformation(const void* data, int sizeInBytes)
                 const auto p = engineNode.getProperty("prefix").toString();
                 if      (p == "a_") modEngineA.fromValueTree(engineNode);
                 else if (p == "b_") modEngineB.fromValueTree(engineNode);
+            }
+        }
+
+        // <RecipeSlots> — per-engine Custom slot data. Missing on legacy
+        // projects → all slots remain empty (default-constructed).
+        if (auto slotsRoot = wrapper.getChildWithName("RecipeSlots"); slotsRoot.isValid())
+        {
+            for (int i = 0; i < slotsRoot.getNumChildren(); ++i)
+            {
+                const auto node = slotsRoot.getChild(i);
+
+                if (node.hasType("Slot"))
+                {
+                    const int e = (int) node.getProperty("engine", -1);
+                    const int s = (int) node.getProperty("slot",   -1);
+                    if (e < 0 || e > 1 || s < 0 || s > 2) continue;
+
+                    auto& slot = recipeSlots[(size_t) e][(size_t) s];
+                    slot.filled = (bool) node.getProperty("filled", false);
+                    for (int h = 0; h < 7; ++h)
+                        slot.savedH[(size_t) h] = (float) node.getProperty(
+                            juce::String("h") + juce::String(h + 2), 0.0f);
+                }
+                else if (node.hasType("LastBuiltIn"))
+                {
+                    const int e = (int) node.getProperty("engine", -1);
+                    const int v = (int) node.getProperty("value",  0);
+                    if (e >= 0 && e <= 1)
+                        lastBuiltInPreset[(size_t) e] = juce::jlimit(0, 5, v);
+                }
+            }
+        }
+
+        // <Sampler> — decode bytes off the message thread and hand the
+        // resulting AudioBuffer back via setSampleFromBytes. Until decode
+        // completes, the sampler stays silent; the plugin remains fully usable.
+        if (auto samplerNode = wrapper.getChildWithName("Sampler"); samplerNode.isValid())
+        {
+            const auto filename  = samplerNode.getProperty("filename").toString();
+            const auto base64    = samplerNode.getProperty("bytes").toString();
+            if (base64.isNotEmpty())
+            {
+                juce::MemoryOutputStream bytesStream;
+                if (juce::Base64::convertFromBase64(bytesStream, base64))
+                {
+                    juce::MemoryBlock bytes(bytesStream.getData(), bytesStream.getDataSize());
+
+                    // Defensive: refuse oversized embedded samples. UI-path cap
+                    // is 50 MB enforced in SamplerStrip; mirror it here so a
+                    // crafted preset can't OOM the load.
+                    if (bytes.getSize() > 50 * 1024 * 1024) return;
+
+                    // Decode synchronously here (we're already off the audio
+                    // thread on the host's setStateInformation path). For a
+                    // load triggered from the SamplerStrip UI, the strip's
+                    // own callback uses juce::Thread::launch.
+                    std::unique_ptr<juce::AudioFormatReader> reader(
+                        sampleFormatManager.createReaderFor(
+                            std::make_unique<juce::MemoryInputStream>(bytes, false)));
+                    if (reader != nullptr)
+                    {
+                        juce::AudioBuffer<float> decoded(
+                            (int) reader->numChannels,
+                            (int) reader->lengthInSamples);
+                        reader->read(&decoded, 0, decoded.getNumSamples(), 0, true, true);
+                        setSampleFromBytes(std::move(bytes), filename,
+                                            std::move(decoded), reader->sampleRate);
+
+                        // Restore persisted slice table (overrides the
+                        // auto-detect that setSampleFromBytes triggered).
+                        const auto slicesStr = samplerNode.getProperty("slices").toString();
+                        if (slicesStr.isNotEmpty())
+                        {
+                            std::vector<int> slices;
+                            const auto tokens = juce::StringArray::fromTokens(slicesStr, ",", "");
+                            for (const auto& t : tokens)
+                            {
+                                const int v = t.trim().getIntValue();
+                                if (v >= 0) slices.push_back(v);
+                            }
+                            phantomSampler.setSliceTable(std::move(slices));
+                        }
+                    }
+                }
             }
         }
     }

@@ -28,6 +28,18 @@ public:
     void setLevels(float aDb, float bDb) noexcept;
     void setMorph(float normalised) noexcept;       // [0,1]
 
+    /** Latch the per-block gain ramp: subsequent mix() calls interpolate
+     *  from the previous block's gains to the current targets. Call once
+     *  per audio block, after the setters, before any mix() calls. */
+    void startBlock() noexcept;
+
+    /** True when a side contributes nothing to this block — its gain ramp
+     *  both starts and ends below the silence threshold. Callers use this
+     *  (after startBlock()) to skip processing the idle engine without
+     *  hard-cutting a morph ramp-out mid-transition. */
+    bool aIsSilentThisBlock() const noexcept;
+    bool bIsSilentThisBlock() const noexcept;
+
     /** Compute (gainA, gainB) at the current morph for the active curve. */
     void getCurrentGains(float& gainA, float& gainB) const noexcept;
 
@@ -38,16 +50,27 @@ public:
              const juce::AudioBuffer<float>& inB, bool bypassB,
              juce::AudioBuffer<float>& out) const;
 
-    /** Threshold for "exactly 0" / "exactly 1" — lets caller decide bypass.
-     *  Conservatively tight so we don't bypass when morph is at, e.g., 0.001
-     *  (which would still produce audible B). */
-    static constexpr float kBypassEpsilon = 1.0e-6f;
+    /** Silence threshold (linear gain, ~-46 dB) for the per-block silence
+     *  queries — below the noise floor of all reasonable output paths.
+     *  Operating on the actual ramp gains makes the idle-bypass decision
+     *  curve- and level-trim-aware. A loose threshold matters: idle bypass
+     *  cuts ~50% CPU in the common case where morph parks at one engine. */
+    static constexpr float kSilentGain = 0.005f;
 
 private:
     Curve curve { Curve::Linear };
     float morph { 0.0f };
     float gainALin { 1.0f };  // from level_db
     float gainBLin { 1.0f };
+
+    // Per-block gain ramp latched by startBlock(). When latched, mix()
+    // interpolates rampFrom → rampTo across the block (dezippers morph /
+    // level automation). When never latched (legacy callers), mix() applies
+    // the flat target gains.
+    float rampFromA { 1.0f }, rampFromB { 0.0f };
+    float rampToA   { 1.0f }, rampToB   { 0.0f };
+    bool  rampLatched { false };
+    bool  firstBlock  { true };
 };
 
 } // namespace kaigen::phantom

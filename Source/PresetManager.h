@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include <juce_events/juce_events.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <vector>
 #include <map>
@@ -48,7 +49,8 @@ struct PresetInfo
 {
     PresetMetadata metadata;
     PreviewData    preview;
-    juce::File     file;
+    juce::File     file;            // Empty when sourced from embedded BinaryData
+    juce::MemoryBlock embeddedData; // Non-empty only for embedded factory packs
 };
 
 // A preset pack = any directory under Presets/. Factory and User are the
@@ -62,6 +64,7 @@ struct PackInfo
     juce::String description;
     juce::String designer;
     bool         hasCoverArt = false;  // Whether cover.png exists in the pack folder
+    bool         isReadOnly  = false;   // Embedded factory packs are read-only
     int          presetCount = 0;
 };
 
@@ -73,11 +76,12 @@ struct PackInfo
 // node holds name/type/designer. Favorites live in a separate
 // `favorites.index` JSON file at the presets root so favorites work even
 // when the preset lives in a read-only pack directory.
-class PresetManager
+class PresetManager : public juce::Timer,
+                       public juce::ChangeBroadcaster
 {
 public:
     PresetManager();
-    ~PresetManager() = default;
+    ~PresetManager() override;
 
     // Create directories, scan the disk, load favorites index.
     void initialize();
@@ -113,6 +117,84 @@ public:
     bool deletePreset(const juce::String& presetName,
                       const juce::String& packName);
 
+#if DEVELOPER_MODE
+    // ── Pack authoring (designer build only) ──────────────────────────
+    //
+    // All authoring ops refuse PackInfo::isReadOnly packs (embedded
+    // factory packs + the on-disk Factory pack). Names are sanitised to
+    // safe folder names. Each successful op triggers a rescan + change
+    // broadcast so the browser refreshes. Call from the message thread
+    // only — these mutate the in-memory packs map that timerCallback
+    // also reads.
+
+    bool createPack(const juce::String& packName,
+                    const juce::String& description,
+                    const juce::String& designer);
+
+    // Renames the pack folder AND overwrites pack.json's displayName to
+    // match the trimmed newName. If a caller wants to preserve a custom
+    // displayName across a folder rename, follow up with setPackMetadata.
+    bool renamePack(const juce::String& oldName, const juce::String& newName);
+
+    bool setPackMetadata(const juce::String& packName,
+                         const juce::String& description,
+                         const juce::String& designer);
+
+    bool deletePack(const juce::String& packName);
+
+    // Copies the source image (PNG/JPG/GIF) into the pack as-is. PNG
+    // alpha, JPG colour fidelity, and GIF animation are preserved.
+    // Replaces any existing cover.* in the pack folder.
+    bool setPackCover(const juce::String& packName, const juce::File& sourceImage);
+
+    // Like setPackCover but applies a square crop. For static sources
+    // (PNG/JPG) the crop is BAKED into the saved PNG. For GIF sources
+    // the original file is copied as-is and a cover.crop.json sidecar
+    // is written with {scale, offsetX, offsetY} so the render path can
+    // apply the crop as a clip+transform mask (preserves animation).
+    //
+    // scale/offsetX/offsetY use the editor's source-image-pixel
+    // coordinate system: scale multiplies source dimensions; offsets
+    // position the scaled image relative to the frame's top-left.
+    bool setPackCoverWithCrop(const juce::String& packName,
+                              const juce::File& sourceImage,
+                              float scale, float offsetX, float offsetY);
+
+    // Saves the current APVTS state as <packDir>/<presetName>.fxp.
+    // Returns the saved (possibly disambiguated) preset name, empty on failure.
+    juce::String savePresetIntoPack(juce::AudioProcessorValueTreeState& apvts,
+                                    const juce::String& packName,
+                                    const juce::String& presetName,
+                                    const juce::String& type,
+                                    const juce::String& designer,
+                                    const juce::String& description);
+
+    // Zips the pack folder into destZipFile. Returns true on success.
+    bool exportPack(const juce::String& packName, const juce::File& destZipFile);
+
+    // Unzips a .kaipack into the User-presets root. Returns the imported
+    // pack name on success, or empty string when:
+    //   - the archive is missing / malformed
+    //   - the pack already exists and overwriteExisting is false
+    //   - the pack would shadow a read-only pack (embedded factory) — even
+    //     with overwriteExisting=true, isReadOnly is not bypassed
+    //   - the pack name is the reserved "Factory" or "User"
+    juce::String importPack(const juce::File& sourceZipFile, bool overwriteExisting);
+#endif
+
+    // Crop transform stored alongside an animated GIF cover. Empty
+    // (valid==false) for non-GIF covers or covers saved without crop.
+    // READ side is available in both DEV and ship builds since paint-
+    // time code (drawPackCover) needs it to render the crop mask.
+    struct CoverCrop
+    {
+        bool  valid   { false };
+        float scale   { 1.0f };
+        float offsetX { 0.0f };
+        float offsetY { 0.0f };
+    };
+    CoverCrop getPackCoverCrop(const juce::String& packName) const;
+
     // Favorites (persisted in favorites.index).
     void setFavorite(const juce::String& presetName,
                      const juce::String& packName,
@@ -120,8 +202,15 @@ public:
     bool isFavorite(const juce::String& presetName,
                     const juce::String& packName) const;
 
-    // Rescan disk (call after external file changes).
+    // Rescan disk (call after external file changes). Sends a change
+    // notification if the preset list actually changed.
     void rescan();
+
+    /** Timer callback (every 2 s) — checks the modification times of each
+     *  pack directory and triggers a rescan + change notification when any
+     *  diff is detected. Catches presets saved/deleted by another instance
+     *  of the plugin without needing a project reload. */
+    void timerCallback() override;
 
     // Packs (including Factory and User, plus any third-party pack dirs).
     std::vector<PackInfo> getAllPacks() const;
@@ -141,6 +230,7 @@ public:
 private:
     void ensureDirectoryStructure();
     void scanPresetsFromDisk();
+    void loadFactoryPacksFromBinaryData();
 
     void loadFavoritesIndex();
     void saveFavoritesIndex();
@@ -159,6 +249,11 @@ private:
     std::map<juce::String, std::vector<PresetInfo>> allPresets;
     std::map<juce::String, PackInfo> packs;  // keyed by folder name
     std::set<juce::String> favorites;        // keys: "packName/presetName"
+
+    /** Snapshot of last-modified times per pack directory, used by the
+     *  filesystem-watcher Timer to detect external changes. */
+    std::map<juce::String, juce::Time> packModTimes;
+    void refreshPackModTimes();
 };
 
 } // namespace kaigen::phantom

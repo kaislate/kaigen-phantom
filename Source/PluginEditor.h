@@ -115,6 +115,22 @@ private:
     // Morph slider — global. Drives the audio crossfader between engines A and B.
     juce::WebSliderRelay morphAmountRelay            { "morph_amount" };
 
+    // Macro modulators — global APVTS params (PR3a). Each macro is owned by
+    // a ModulationEngine (A: macro1/2, B: macro3/4) but the param itself is
+    // global so host automation works regardless of the active engine tab.
+    juce::WebSliderRelay macro1Relay                 { "macro1" };
+    juce::WebSliderRelay macro2Relay                 { "macro2" };
+    juce::WebSliderRelay macro3Relay                 { "macro3" };
+    juce::WebSliderRelay macro4Relay                 { "macro4" };
+
+    // Reverb send — global. Single-knob algorithmic reverb on the post-engine
+    // signal; same character for both engines.
+    juce::WebSliderRelay reverbMixRelay              { "reverb_mix" };
+
+    // Reverb source — global bool. false = Post-Engine (default),
+    // true = Phantom Only (reverb hears synth contribution only).
+    juce::WebToggleButtonRelay reverbSourceRelay     { "reverb_source" };
+
     // ── Combo-box relays ──────────────────────────────────────────────
     juce::WebComboBoxRelay modeRelayA                { "a_mode" };
     juce::WebComboBoxRelay modeRelayB                { "b_mode" };
@@ -149,12 +165,27 @@ private:
     std::vector<std::unique_ptr<juce::WebComboBoxParameterAttachment>> comboAttachments;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          bypassAttachment;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          inputGainAutoAttachment;
+    std::unique_ptr<juce::WebToggleButtonParameterAttachment>          reverbSourceAttachment;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          punchEnabledAttachmentA;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          punchEnabledAttachmentB;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          midiTriggerAttachmentA;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          midiTriggerAttachmentB;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          midiGateReleaseAttachmentA;
     std::unique_ptr<juce::WebToggleButtonParameterAttachment>          midiGateReleaseAttachmentB;
+
+    // ── Oscilloscope marshalling buffers ──────────────────────────────
+    // Reused across getOscilloscopeData() bridge calls to avoid 3×2048 fresh
+    // juce::var allocations at the poll rate (which was a measured contributor
+    // to two-instance message-thread saturation). setProperty() on a
+    // DynamicObject performs a copy of the Array's juce::var elements, so the
+    // next call's clearQuick() does not affect data already marshalled to JS.
+    juce::Array<juce::var> oscInArr, oscSynthArr, oscOutArr;
+
+    // ── Spectrum marshalling buffers ──────────────────────────────────
+    // Reused across getSpectrumData() bridge calls (same trick as above).
+    // input/output bins exist in every call; engineA/engineB only fill in
+    // Split mode but the storage is preallocated to avoid first-call alloc.
+    juce::Array<juce::var> specInArr, specOutArr, specEngineAArr, specEngineBArr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PhantomEditor)
 };

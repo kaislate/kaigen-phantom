@@ -250,10 +250,13 @@ document.addEventListener('osc-data', (e) => {
 
 // ── Polling + animation loop ─────────────────────────────────────────────────
 // The oscilloscope's payload is large: 3 channels × 2048 float samples ≈ 98 KB
-// of JSON per call. Three guards keep heap allocation bounded:
+// of JSON per call. Four guards keep heap allocation bounded:
 //   1. Skip entirely when the canvas isn't in the visible layout tree (e.g.
 //      advanced panel collapsed) — no point marshaling data no one can see.
-//   2. Poll at 10 fps instead of 20 fps (every 6th rAF at 60 fps).
+//   2. Poll at 5 fps (every 12th rAF at 60 fps). Two-instance message-thread
+//      saturation testing showed 10 Hz pushed ~61K juce::var allocs/s/instance,
+//      contending with WebSliderRelay drag traffic. 5 Hz is still readable for
+//      a monitoring scope and halves the bridge marshalling cost.
 //   3. Only one request in flight at a time; additional ticks are dropped.
 //   4. Draw at ~30 fps to match the other canvases and cut GPU work.
 const getOscData = window.Juce.getNativeFunction('getOscilloscopeData');
@@ -270,7 +273,7 @@ function tick() {
     if (!isVisible()) return;
     frameCount++;
 
-    if (getOscData && frameCount % 6 === 0 && !oscRequestInFlight) {
+    if (getOscData && frameCount % 12 === 0 && !oscRequestInFlight) {
         oscRequestInFlight = true;
         getOscData()
             .then((d) => {

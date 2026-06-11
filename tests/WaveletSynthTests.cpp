@@ -409,3 +409,49 @@ TEST_CASE("WaveletSynth: boost with threshold=0 (off) produces no extra gain")
     // With threshold=0 the boost should never fire, so output is identical
     REQUIRE(rmsOff == Catch::Approx(rmsNone).margin(0.01f));
 }
+
+// ── Sample-rate invariance ──────────────────────────────────────────────
+
+#include "Engines/ZeroCrossingSynth.h"
+
+namespace
+{
+    // Raise the synth's internal peak tracker with a short burst, then feed
+    // silence and measure how long (in seconds) the pitch readout stays
+    // alive. getEstimatedHz() returns 0 once the peak tracker decays below
+    // the -40 dBFS amplitude floor, so this measures the release time of
+    // the fast-attack / slow-release envelope.
+    template <typename Synth>
+    double peakReleaseSeconds(double sr)
+    {
+        Synth s;
+        s.prepare(sr);
+
+        for (int i = 0; i < 100; ++i)
+            s.process(0.5f);
+
+        const int cap = (int) (3.0 * sr);
+        int n = 0;
+        while (s.getEstimatedHz() > 0.0f && n < cap)
+        {
+            s.process(0.0f);
+            ++n;
+        }
+        REQUIRE(n < cap);   // tracker must decay at all
+        return (double) n / sr;
+    }
+}
+
+TEST_CASE("WaveletSynth: peak-tracker release time is sample-rate invariant", "[wavelet][samplerate]")
+{
+    const double t44 = peakReleaseSeconds<WaveletSynth>(44100.0);
+    const double t96 = peakReleaseSeconds<WaveletSynth>(96000.0);
+    REQUIRE(t96 == Catch::Approx(t44).epsilon(0.05));
+}
+
+TEST_CASE("ZeroCrossingSynth: peak-tracker release time is sample-rate invariant", "[zerocrossing][samplerate]")
+{
+    const double t44 = peakReleaseSeconds<ZeroCrossingSynth>(44100.0);
+    const double t96 = peakReleaseSeconds<ZeroCrossingSynth>(96000.0);
+    REQUIRE(t96 == Catch::Approx(t44).epsilon(0.05));
+}
