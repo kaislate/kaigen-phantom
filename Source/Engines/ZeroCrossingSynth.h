@@ -107,6 +107,11 @@ private:
     // estimate less than loud ones. Freezes updates entirely below −40 dBFS.
     float inputPeak = 0.0f;
 
+    // Sample-rate-derived per-sample decay (set in prepare). Voiced as
+    // 0.9998/sample at 44.1 kHz; derived from the prepared rate so release
+    // timing stays constant in seconds at every host sample rate.
+    float peakDecayCoef = 0.9998f;
+
     // Per-crossing peak: max |x| within the current crossing interval.
     // Latched to lastWaveletPeak on each valid crossing for Punch feature.
     float currentWaveletPeak = 0.0f;

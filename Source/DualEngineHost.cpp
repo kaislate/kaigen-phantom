@@ -250,12 +250,13 @@ void DualEngineHost::process(juce::AudioBuffer<float>& buffer,
     crossfader.setCurve(static_cast<MorphCrossfader::Curve>(curveIdx));
     crossfader.setLevels(aDb, bDb);
     crossfader.setMorph(morphAmt);
+    crossfader.startBlock();   // latch this block's gain ramp (both mixes share it)
 
-    // Idle bypass — block-boundary check.
-    // morph >= 1-eps  → A is silent  (engine A bypassed)
-    // morph <= eps    → B is silent  (engine B bypassed)
-    const bool bypassA = bypassIdle && morphAmt >= 1.0f - MorphCrossfader::kBypassEpsilon;
-    const bool bypassB = bypassIdle && morphAmt <= 0.0f + MorphCrossfader::kBypassEpsilon;
+    // Idle bypass — a side is only skippable once its gain ramp has fully
+    // settled at silence; during a morph transition block the outgoing
+    // engine still contributes its ramp-out tail.
+    const bool bypassA = bypassIdle && crossfader.aIsSilentThisBlock();
+    const bool bypassB = bypassIdle && crossfader.bIsSilentThisBlock();
 
     // Sync params from APVTS into each engine. Cache + modEng are passed
     // explicitly so the hot path does no string compare to pick which side.

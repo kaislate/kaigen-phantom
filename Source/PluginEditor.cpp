@@ -260,8 +260,10 @@ juce::WebBrowserComponent::Options PhantomEditor::buildWebViewOptions(PhantomEdi
 
                 for (int i = 0; i < PhantomProcessor::kSpectrumBins; ++i)
                 {
-                    self.specInArr .add(self.processor.spectrumData      [(size_t) i]);
-                    self.specOutArr.add(self.processor.spectrumOutputData[(size_t) i]);
+                    self.specInArr .add(self.processor.spectrumData      [(size_t) i]
+                                            .load(std::memory_order_relaxed));
+                    self.specOutArr.add(self.processor.spectrumOutputData[(size_t) i]
+                                            .load(std::memory_order_relaxed));
                 }
 
                 auto* obj = new juce::DynamicObject();

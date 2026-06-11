@@ -12,6 +12,7 @@
 #include "Modulation/Macro.h"
 #include "DSP/SingleKnobReverb.h"
 #include "DSP/PhantomSampler.h"
+#include "DSP/SamplerMidiPreprocessor.h"
 
 class PhantomProcessor : public juce::AudioProcessor,
                          private juce::AudioProcessorValueTreeState::Listener
@@ -70,8 +71,8 @@ public:
     std::atomic<float> peakOutR { 0.0f };
 
     static constexpr int kSpectrumBins = 80;
-    std::array<float, kSpectrumBins> spectrumData {};       // input (pre-engine)
-    std::array<float, kSpectrumBins> spectrumOutputData {}; // output (post-engine)
+    std::array<std::atomic<float>, kSpectrumBins> spectrumData {};       // input (pre-engine)
+    std::array<std::atomic<float>, kSpectrumBins> spectrumOutputData {}; // output (post-engine)
     std::atomic<bool> spectrumReady { false };
 
     // Per-engine spectra, computed on the audio thread (mirrors the input/output
@@ -315,6 +316,17 @@ private:
     std::atomic<float>* samplerStartParam    { nullptr };
     std::atomic<float>* samplerEndParam      { nullptr };
     std::atomic<float>* samplerSliceModeParam{ nullptr };
+    std::atomic<float>* samplerReverseParam  { nullptr };
+    std::atomic<float>* samplerLoopXfadeParam{ nullptr };
+    std::atomic<float>* samplerWarpModeParam { nullptr };
+    std::atomic<float>* samplerQuantizeParam { nullptr };
+    std::atomic<float>* samplerVelFixedParam { nullptr };
+    std::atomic<float>* samplerVelValueParam { nullptr };
+
+    // Rewrites host MIDI (quantize + fixed velocity) into the sampler's
+    // per-block buffer; owns the deferred-note bookkeeping that keeps
+    // note-offs behind their quantized note-ons.
+    kaigen::phantom::SamplerMidiPreprocessor samplerMidiPre;
 
     // ─── MIDI-playable sampler (Input Source = 2) ─────────────────────────
     // PhantomSampler owns the juce::Synthesiser + voices. Its output is
@@ -330,8 +342,12 @@ private:
     // Original source bytes of the loaded sample, kept so getStateInformation
     // can serialize them into the <Sampler> child. Written from the message
     // thread when the SamplerStrip finishes loading; read by getStateInformation
-    // (also message thread).
+    // (also message thread). The base64 encoding is computed once here at
+    // load time — hosts autosave aggressively, and re-encoding ~tens of MB
+    // of sample data on every getStateInformation call stalls the message
+    // thread for no reason.
     juce::MemoryBlock cachedSampleBytes;
+    juce::String      cachedSampleBase64;
     juce::String      cachedSampleFilename;
     juce::AudioFormatManager sampleFormatManager;
 

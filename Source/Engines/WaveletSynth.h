@@ -108,6 +108,13 @@ private:
     // (e.g. noise during a long envelope release tail).
     float inputPeak = 0.0f;
 
+    // Sample-rate-derived smoothing coefficients (set in prepare). The
+    // reference values are per-sample constants voiced at 44.1 kHz; deriving
+    // them from the prepared rate keeps release/boost timing identical in
+    // seconds at every host sample rate.
+    float peakDecayCoef   = 0.9998f;  // 0.9998/sample @ 44.1k ≈ 520 ms to -40 dBFS
+    float boostSmoothAlpha = 0.05f;   // one-pole alpha, ~0.45 ms @ 44.1k
+
     bool freeRun = false;
 
     static float warpPhase(float phase, float duty) noexcept;

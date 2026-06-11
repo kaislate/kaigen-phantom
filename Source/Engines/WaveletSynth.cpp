@@ -9,6 +9,11 @@ static constexpr float kPi    = juce::MathConstants<float>::pi;
 void WaveletSynth::prepare(double sr) noexcept
 {
     sampleRate = sr;
+
+    // Per-sample decay/smoothing constants are voiced at 44.1 kHz; re-derive
+    // for the prepared rate so timing stays constant in seconds.
+    peakDecayCoef    = std::pow(0.9998f, (float) (44100.0 / sr));
+    boostSmoothAlpha = 1.0f - std::pow(1.0f - 0.05f, (float) (44100.0 / sr));
     // minPeriodSamples / maxPeriodSamples are configured via setMinPeriodSamples /
     // setMaxPeriodSamples (called from syncParamsToEngine after prepareToPlay).
     // Member defaults handle the brief window before the first sync.
@@ -194,12 +199,12 @@ float WaveletSynth::process(float x) noexcept
     // noise-level zero crossings during a long envelope release cannot walk the
     // estimate to a higher frequency.
     const float absX = std::abs(x);
-    inputPeak = (absX > inputPeak) ? absX : inputPeak * 0.9998f;
+    inputPeak = (absX > inputPeak) ? absX : inputPeak * peakDecayCoef;
     // Per-wavelet peak: track max |x| within current cycle; latch on valid crossing.
     if (absX > currentWaveletPeak) currentWaveletPeak = absX;
     // Decay lastWaveletPeak alongside inputPeak so Punch doesn't hold a stale
     // amplitude during silence and cause self-oscillation.
-    lastWaveletPeak *= 0.9998f;
+    lastWaveletPeak *= peakDecayCoef;
     // RMS accumulation for gate (energy per waveset interval).
     currentWaveletSumSq += x * x;
     currentWaveletSampleCount++;
@@ -224,8 +229,8 @@ float WaveletSynth::process(float x) noexcept
         samplesSinceLastCrossing -= correction;
         accumulatedSamples       -= correction;
 
-        // inputPeak decays at ~0.9998/sample, so it crosses kAmplitudeFloor
-        // roughly 520 ms after the last loud sample (at 44.1 kHz).
+        // inputPeak decays at peakDecayCoef/sample (sample-rate-compensated),
+        // crossing kAmplitudeFloor roughly 520 ms after the last loud sample.
         static constexpr float kAmplitudeFloor = 0.01f;  // ≈ −40 dBFS
 
         // Only count this crossing if the individual interval is in range.
@@ -383,7 +388,7 @@ float WaveletSynth::process(float x) noexcept
     // Gate ramps 0↔1 over 5 ms (set in prepare) — no hard clicks on open/close.
     // Boost gain one-pole smooths between wavesets (~1 ms) instead of stepping.
     const float gateGain = gateGainSmooth.getNextValue();
-    smoothedBoostGain += 0.05f * (targetBoostGain - smoothedBoostGain);
+    smoothedBoostGain += boostSmoothAlpha * (targetBoostGain - smoothedBoostGain);
     y *= gateGain * smoothedBoostGain;
 
     // ── Wavelet window: silence once phase exceeds the active zone ───────

@@ -97,6 +97,7 @@ target_sources(KaigenPhantom PRIVATE
     Source/Modulation/ModulationEngine.cpp
     Source/DSP/SingleKnobReverb.cpp
     Source/DSP/PhantomSampler.cpp
+    Source/DSP/SamplerMidiPreprocessor.cpp
 )
 
 juce_add_binary_data(PhantomWebUI SOURCES
@@ -179,6 +180,12 @@ else()
 endif()
 
 target_include_directories(KaigenPhantom PRIVATE Source)
+
+# Signalsmith Stretch — MIT-licensed pitch/time stretcher used by the
+# sampler's Complex warp mode. Header-only, depends on signalsmith-linear
+# which their CMakeLists fetches via FetchContent on first configure.
+add_subdirectory(third_party/signalsmith-stretch)
+target_link_libraries(KaigenPhantom PRIVATE signalsmith-stretch)
 
 # Fetch WebView2 SDK for Windows
 set(WEBVIEW2_DIR "${CMAKE_BINARY_DIR}/webview2")

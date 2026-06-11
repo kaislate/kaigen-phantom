@@ -55,12 +55,8 @@ private:
     static constexpr float kSmoothDown = 0.08f;  // slow release (matches JS SMOOTH_DN)
     static constexpr float kPeakDecay  = 0.003f; // peak-hold decay per tick (matches JS)
 
-    /** Apply asymmetric smoothing from raw[] into smoothed[].
-     *  raw[] is read with memory_order_relaxed (atomic float array). */
-    void smoothBins(const float* raw,
-                    std::array<float, kBinCount>& smoothed) noexcept;
-
-    /** Same for an atomic-float source array (per-engine spectra). */
+    /** Apply asymmetric smoothing from an atomic-float source array
+     *  (read with memory_order_relaxed) into smoothed[]. */
     void smoothBinsAtomic(
         const std::array<std::atomic<float>, kBinCount>& raw,
         std::array<float, kBinCount>& smoothed) noexcept;

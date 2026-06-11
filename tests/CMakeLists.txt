@@ -49,6 +49,8 @@ add_executable(KaigenPhantomTests
     PackArchiveTests.cpp
     ../Source/DSP/PhantomSampler.cpp
     PhantomSamplerTests.cpp
+    ../Source/DSP/SamplerMidiPreprocessor.cpp
+    SamplerMidiPreprocessorTests.cpp
 )
 
 # Embedded fixture pack used by FactoryPackLoadingTests. This is a TEST-ONLY
@@ -102,6 +104,7 @@ target_link_libraries(KaigenPhantomTests
         Catch2::Catch2WithMain
         juce::juce_audio_utils
         juce::juce_dsp
+        signalsmith-stretch
 )
 
 target_include_directories(KaigenPhantomTests PRIVATE

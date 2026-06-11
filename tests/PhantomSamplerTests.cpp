@@ -244,3 +244,103 @@ TEST_CASE("PhantomSampler: load via loadSample then read back via hasSample", "[
     s.clearSample();
     REQUIRE_FALSE(s.hasSample());
 }
+
+// ── Slice table characterization (pins behavior across threading refactor) ──
+
+TEST_CASE("PhantomSampler: setSliceTable sorts, dedups, and forces slice 0", "[sampler][slices]")
+{
+    PhantomSampler s;
+    s.prepareToPlay(44100.0, 512);
+    REQUIRE(s.loadSample(makeSine440(), 44100.0));
+
+    s.setSliceTable({ 500, 100, 500, 300 });
+
+    const auto& t = s.getSliceTable();
+    REQUIRE(t == std::vector<int>{ 0, 100, 300, 500 });
+}
+
+TEST_CASE("PhantomSampler: slice mode maps C2+n to slice n region", "[sampler][slices]")
+{
+    PhantomSampler s;
+    s.prepareToPlay(44100.0, 512);
+    s.setEnvelope(0.001f, 0.001f, 1.0f, 0.001f);
+    s.setSliceMode(true);
+
+    // 1000-sample buffer: first half +0.4, second half -0.4 so the two
+    // slices have distinguishable polarity.
+    juce::AudioBuffer<float> buf(1, 1000);
+    for (int i = 0; i < 1000; ++i) buf.setSample(0, i, (i < 500) ? 0.4f : -0.4f);
+    REQUIRE(s.loadSample(std::move(buf), 44100.0));
+    s.setSliceTable({ 0, 500 });
+
+    // Note 37 = C2+1 → slice 1 → starts at sample 500 (negative half).
+    juce::MidiBuffer midi;
+    midi.addEvent(juce::MidiMessage::noteOn(1, 37, (juce::uint8) 127), 0);
+    juce::AudioBuffer<float> out(1, 256);
+    out.clear();
+    s.renderNextBlock(out, midi);
+
+    const int playhead = s.getPlayheadPosition();
+    CHECK(playhead >= 500);
+    CHECK(playhead < 1000);
+    CHECK(out.getSample(0, 100) < 0.0f);   // slice-1 content is negative
+}
+
+TEST_CASE("PhantomSampler: slice table update during playback applies to next note", "[sampler][slices]")
+{
+    PhantomSampler s;
+    s.prepareToPlay(44100.0, 512);
+    s.setEnvelope(0.001f, 0.001f, 1.0f, 0.001f);
+    s.setSliceMode(true);
+
+    juce::AudioBuffer<float> buf(1, 1000);
+    for (int i = 0; i < 1000; ++i) buf.setSample(0, i, 0.4f);
+    REQUIRE(s.loadSample(std::move(buf), 44100.0));
+    s.setSliceTable({ 0, 200 });
+
+    // Start a note, then replace the table mid-playback (the UI drag path).
+    juce::MidiBuffer on;
+    on.addEvent(juce::MidiMessage::noteOn(1, 37, (juce::uint8) 127), 0);
+    juce::AudioBuffer<float> out(1, 64);
+    out.clear();
+    s.renderNextBlock(out, on);
+
+    s.setSliceTable({ 0, 700 });
+    REQUIRE(s.getSliceTable() == std::vector<int>{ 0, 700 });
+
+    // Retrigger: the new note must use the updated table (slice 1 @ 700).
+    juce::MidiBuffer off;
+    off.addEvent(juce::MidiMessage::noteOff(1, 37), 0);
+    out.clear();
+    s.renderNextBlock(out, off);
+
+    juce::MidiBuffer on2;
+    on2.addEvent(juce::MidiMessage::noteOn(1, 37, (juce::uint8) 127), 0);
+    out.clear();
+    s.renderNextBlock(out, on2);
+
+    CHECK(s.getPlayheadPosition() >= 700);
+}
+
+TEST_CASE("PhantomSampler: complex warp mode produces audio", "[sampler][warp]")
+{
+    PhantomSampler s;
+    s.prepareToPlay(44100.0, 512);
+    s.setRootNote(60);
+    s.setLoopEnabled(true);
+    s.setEnvelope(0.001f, 0.001f, 1.0f, 0.001f);
+    s.setWarpMode(1);
+    REQUIRE(s.loadSample(makeSine440(), 44100.0));
+
+    juce::MidiBuffer on;
+    on.addEvent(juce::MidiMessage::noteOn(1, 67, (juce::uint8) 127), 0);
+
+    // The stretcher has inherent latency; render enough blocks for output
+    // to come up, then check the tail is live audio.
+    juce::AudioBuffer<float> out(2, 8192);
+    out.clear();
+    s.renderNextBlock(out, on);
+
+    REQUIRE_NOTHROW(s.getPlayheadPosition());
+    REQUIRE(out.getMagnitude(0, 4096, 4096) > 0.05f);
+}

@@ -62,6 +62,12 @@ PhantomProcessor::PhantomProcessor()
     samplerStartParam = apvts.getRawParameterValue(ParamID::SAMPLER_START);
     samplerEndParam   = apvts.getRawParameterValue(ParamID::SAMPLER_END);
     samplerSliceModeParam = apvts.getRawParameterValue(ParamID::SAMPLER_SLICE_MODE);
+    samplerReverseParam   = apvts.getRawParameterValue(ParamID::SAMPLER_REVERSE);
+    samplerLoopXfadeParam = apvts.getRawParameterValue(ParamID::SAMPLER_LOOP_XFADE);
+    samplerWarpModeParam  = apvts.getRawParameterValue(ParamID::SAMPLER_WARP_MODE);
+    samplerQuantizeParam  = apvts.getRawParameterValue(ParamID::SAMPLER_QUANTIZE);
+    samplerVelFixedParam  = apvts.getRawParameterValue(ParamID::SAMPLER_VEL_FIXED);
+    samplerVelValueParam  = apvts.getRawParameterValue(ParamID::SAMPLER_VEL_VALUE);
 
     sampleFormatManager.registerBasicFormats();
 }
@@ -117,7 +123,8 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
 
     fftWritePos = 0;
     fftBuffer.fill(0.0f);
-    spectrumData.fill(0.0f);
+    for (auto& a : spectrumData)       a.store(0.0f, std::memory_order_relaxed);
+    for (auto& a : spectrumOutputData) a.store(0.0f, std::memory_order_relaxed);
     spectrumReady.store(false);
 
     // Per-engine spectrum capture (split-mode view).
@@ -145,6 +152,7 @@ void PhantomProcessor::prepareToPlay(double sr, int samplesPerBlock)
     // size so processBlock can render the synth without heap allocation
     // even when no sample is loaded (Synthesiser early-outs on idle).
     phantomSampler.prepareToPlay(sr, samplesPerBlock);
+    samplerMidiPre.prepare();
     samplerOutputBuffer.setSize(2, samplesPerBlock, false, true, true);
 }
 
@@ -220,7 +228,43 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         phantomSampler.setStartEnd(samplerStartParam->load(),
                                     samplerEndParam->load());
         phantomSampler.setSliceMode(samplerSliceModeParam->load() > 0.5f);
-        phantomSampler.renderNextBlock(samplerOutputBuffer, midiMessages);
+        phantomSampler.setReverse(samplerReverseParam->load() > 0.5f);
+        phantomSampler.setLoopCrossfadeMs(samplerLoopXfadeParam->load());
+        phantomSampler.setWarpMode((int) samplerWarpModeParam->load());
+
+        // ── Build the sampler's per-block midi buffer ──────────────────
+        // We deliberately don't mutate the host's midiMessages — the
+        // engines also consume it (MIDI-trigger features). The preprocessor
+        // produces a sampler-only buffer with quantize + velocity-override
+        // applied, and owns the deferred-note bookkeeping that keeps
+        // note-offs behind their quantized note-ons.
+        kaigen::phantom::SamplerMidiPreprocessor::Settings midiSettings;
+        midiSettings.velFixed = samplerVelFixedParam->load() > 0.5f;
+        midiSettings.velValue = (int) samplerVelValueParam->load();
+
+        // Grid sizes in ppq (1 beat = 1 ppq).
+        constexpr double kGridPpq[] = { 0.0, 1.0, 0.5, 0.25, 0.125 };
+        const int quantIdx = (int) samplerQuantizeParam->load();
+        midiSettings.gridPpq = (quantIdx >= 0 && quantIdx < 5) ? kGridPpq[quantIdx] : 0.0;
+
+        // Read the host playhead for quantize; without one, quantize stays
+        // inactive (havePpq = false).
+        double bpm = 120.0;
+        if (auto* head = getPlayHead())
+        {
+            if (auto pos = head->getPosition())
+            {
+                if (auto t = pos->getBpm())           bpm = *t;
+                if (auto p = pos->getPpqPosition()) { midiSettings.blockStartPpq = *p;
+                                                      midiSettings.havePpq = true; }
+            }
+        }
+        const double sr = getSampleRate();
+        midiSettings.ppqPerSample = (sr > 0.0) ? (bpm / 60.0) / sr : 0.0;
+        midiSettings.sampleRate   = sr;
+
+        phantomSampler.renderNextBlock(samplerOutputBuffer,
+                                       samplerMidiPre.process(midiMessages, n, midiSettings));
     }
 
     const int sourceSel = (int) inputSourceParam->load();
@@ -360,7 +404,9 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
 
                     const float normMag = mag * normalizer;
                     const float dB      = juce::Decibels::gainToDecibels(normMag, -96.0f);
-                    spectrumData[(size_t) b] = juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f);
+                    spectrumData[(size_t) b].store(
+                        juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f),
+                        std::memory_order_relaxed);
                 }
 
                 spectrumReady.store(true, std::memory_order_release);
@@ -638,7 +684,9 @@ void PhantomProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
 
                     const float normMag = mag * norm2;
                     const float dB      = juce::Decibels::gainToDecibels(normMag, -96.0f);
-                    spectrumOutputData[(size_t) b] = juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f);
+                    spectrumOutputData[(size_t) b].store(
+                        juce::jlimit(0.0f, 1.0f, (dB + 60.0f) / 60.0f),
+                        std::memory_order_relaxed);
                 }
             }
         }
@@ -841,13 +889,20 @@ bool PhantomProcessor::setSampleFromBytes(juce::MemoryBlock sourceBytes,
         return false;
     }
     cachedSampleBytes    = std::move(sourceBytes);
+    cachedSampleBase64   = juce::Base64::toBase64(cachedSampleBytes.getData(),
+                                                  cachedSampleBytes.getSize());
     cachedSampleFilename = std::move(filename);
 
-    // Auto-detect transients for slice mode. Even when slice mode is
-    // off, having a fresh table ready means the toggle takes effect
-    // immediately without recompute. setStateInformation overrides
-    // this with the persisted table if one was saved.
-    phantomSampler.detectSlices();
+    // Auto-detect transients for slice mode unless the user has turned
+    // Auto-Slice off (manual slice authoring). In manual mode we seed the
+    // table with just slice 0 so the user starts from a clean slate.
+    // setStateInformation overrides this with the persisted table if one
+    // was saved.
+    const bool autoSlice = apvts.getRawParameterValue(ParamID::SAMPLER_AUTO_SLICE)->load() > 0.5f;
+    if (autoSlice)
+        phantomSampler.detectSlices();
+    else
+        phantomSampler.setSliceTable({ 0 });
     return true;
 }
 
@@ -855,6 +910,7 @@ void PhantomProcessor::clearSample()
 {
     phantomSampler.clearSample();
     cachedSampleBytes.reset();
+    cachedSampleBase64.clear();
     cachedSampleFilename.clear();
     sampleThumb.reset(0, 0.0, 0);
 }
@@ -995,10 +1051,9 @@ void PhantomProcessor::getStateInformation(juce::MemoryBlock& destData)
     {
         juce::ValueTree samplerNode("Sampler");
         samplerNode.setProperty("filename", cachedSampleFilename, nullptr);
-        samplerNode.setProperty("bytes",
-            juce::Base64::toBase64(cachedSampleBytes.getData(),
-                                    cachedSampleBytes.getSize()),
-            nullptr);
+        // Pre-encoded at load time; juce::String is refcounted so this
+        // setProperty shares the buffer rather than copying it.
+        samplerNode.setProperty("bytes", cachedSampleBase64, nullptr);
 
         // Slice points as a comma-separated string. Restored verbatim
         // in setStateInformation so the user's manually-adjusted slices

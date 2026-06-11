@@ -9,6 +9,10 @@ static constexpr float kPi    = juce::MathConstants<float>::pi;
 void ZeroCrossingSynth::prepare(double sr) noexcept
 {
     sampleRate = sr;
+
+    // Per-sample decay voiced at 44.1 kHz; re-derive for the prepared rate
+    // so timing stays constant in seconds.
+    peakDecayCoef = std::pow(0.9998f, (float) (44100.0 / sr));
     // minPeriodSamples / maxPeriodSamples configured via setMinPeriodSamples /
     // setMaxPeriodSamples after prepareToPlay. Member defaults handle first sync.
 
@@ -140,14 +144,14 @@ float ZeroCrossingSynth::process(float x) noexcept
     //   estimatedPeriod ≈ 882 → phase advances at 2π/882 per sample.
     //   H2 = sin(2 × φ) completes one cycle every 441 samples → lands on 100Hz
     //   (the original fundamental). Sub-harmonic synthesis in action.
-    // Fast-attack / slow-release amplitude tracker (~78 ms half-life at 44.1 kHz).
+    // Fast-attack / slow-release amplitude tracker (~78 ms half-life).
     const float absX = std::abs(x);
-    inputPeak = (absX > inputPeak) ? absX : inputPeak * 0.9998f;
+    inputPeak = (absX > inputPeak) ? absX : inputPeak * peakDecayCoef;
     // Per-wavelet peak: track max |x| within current crossing interval.
     if (absX > currentWaveletPeak) currentWaveletPeak = absX;
     // Decay lastWaveletPeak alongside inputPeak so Punch doesn't hold a stale
     // amplitude during silence and cause self-oscillation.
-    lastWaveletPeak *= 0.9998f;
+    lastWaveletPeak *= peakDecayCoef;
 
     samplesSinceLastCrossing += 1.0f;
     accumulatedSamples       += 1.0f;

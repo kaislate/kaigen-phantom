@@ -34,10 +34,9 @@ void Spectrum::timerCallback()
     // Skip work entirely when the editor isn't on screen.
     if (! isShowing()) return;
 
-    // Pull raw bins (pre-smoothed on the audio thread as plain float arrays;
-    // single-float reads are effectively atomic on x86/ARM at this visualization rate).
-    smoothBins(processor.spectrumData.data(),       smoothedIn);
-    smoothBins(processor.spectrumOutputData.data(), smoothedOut);
+    // Pull raw bins (published by the audio thread as relaxed atomics).
+    smoothBinsAtomic(processor.spectrumData,       smoothedIn);
+    smoothBinsAtomic(processor.spectrumOutputData, smoothedOut);
 
     // Peak hold: updated alongside smoothedOut (mirrors JS data-ingest logic).
     for (int i = 0; i < kBinCount; ++i)
@@ -65,17 +64,6 @@ void Spectrum::timerCallback()
 }
 
 // ─── Smoothing helpers ───────────────────────────────────────────────────────
-
-void Spectrum::smoothBins(const float* raw,
-                           std::array<float, kBinCount>& smoothed) noexcept
-{
-    for (int i = 0; i < kBinCount; ++i)
-    {
-        const float v = raw[(size_t) i];
-        const float coef = (v > smoothed[(size_t) i]) ? kSmoothUp : kSmoothDown;
-        smoothed[(size_t) i] += (v - smoothed[(size_t) i]) * coef;
-    }
-}
 
 void Spectrum::smoothBinsAtomic(
     const std::array<std::atomic<float>, kBinCount>& raw,
